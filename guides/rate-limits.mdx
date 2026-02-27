@@ -1,0 +1,49 @@
+---
+title: "Rate Limits"
+description: "Understand your plan's daily call limit and how to handle 429 responses."
+---
+
+## Daily call limits
+
+Every API key has a daily call limit based on its plan tier. The limit resets at midnight UTC.
+
+| Plan | Calls / day |
+|---|---|
+| Free | 100 |
+| Starter | 1,000 |
+| Pro | 5,000 |
+| Business | 20,000 |
+| Enterprise | Unlimited |
+
+## Checking your usage
+
+```bash
+GET /v1/usage
+```
+
+```json
+{
+  "calls_used": 247,
+  "daily_limit": 1000,
+  "period_start": "2026-02-01T00:00:00Z"
+}
+```
+
+`daily_limit` is `-1` for Enterprise (unlimited).
+
+## Handling 429 responses
+
+When you exceed your daily limit, the API returns `429`:
+
+```json
+{
+  "error": "daily rate limit exceeded",
+  "code": "rate_limited"
+}
+```
+
+The limit resets at midnight UTC. Check your usage with `GET /v1/usage` to monitor consumption and upgrade your plan if needed.
+
+<Note>
+  If Redis (the rate limiter backend) is unavailable, the API **fails open** — requests are allowed through rather than blocked. This prevents Redis downtime from taking down your integration.
+</Note>
