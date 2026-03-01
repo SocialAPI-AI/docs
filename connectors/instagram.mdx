@@ -1,0 +1,151 @@
+---
+title: Instagram
+description: Connect and interact with Instagram accounts via the Meta Graph API.
+---
+
+<Badge>Available</Badge>
+
+Instagram is the first fully supported connector. It uses the Meta Graph API for comments and DMs.
+
+## Details
+
+| Field | Value |
+|---|---|
+| Platform slug | `instagram` |
+| Auth type | OAuth 2.0 (Meta) |
+| API | Meta Graph API |
+
+## Feature support
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Comments | ✅ | |
+| Reply to comment | ✅ | |
+| Private reply | ✅ | Sends a DM to the commenter |
+| Comment replies (thread) | ✅ | |
+| Moderate comment (hide/unhide/delete) | ✅ | |
+| Toggle post comments | ✅ | |
+| DMs | ✅ | |
+| Send DM | ✅ | |
+| Get DM thread by user | ✅ | |
+| Reviews | — | Instagram has no review feature |
+| Mentions | — | |
+
+## Connecting
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "instagram",
+    "metadata": {
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "auth_url": "https://www.instagram.com/oauth/authorize?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+}
+```
+
+Redirect your user to `auth_url`. After they authorize, Instagram redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "instagram",
+    "code": "AQDtbPB9X...",
+    "metadata": {
+      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+## Sample: List comments
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/comments?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1NzkzMTg3MjE4",
+      "platform": "instagram",
+      "type": "comment",
+      "author": {
+        "id": "17841405793187218",
+        "name": "Jane Smith",
+        "avatar_url": "https://example.com/avatar.jpg"
+      },
+      "content": {
+        "text": "Love this product!",
+        "media": []
+      },
+      "metadata": {
+        "post_id": "17841405793100001"
+      },
+      "created_at": "2026-02-15T14:30:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_id": "17841405793187218"
+    }
+  ],
+  "count": 1
+}
+```
+
+## Sample: List DMs
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/dms?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "socapi_dm_aW5zdGFncmFtOnQxNzg0MTA1NzkzMTg3MjE4",
+      "platform": "instagram",
+      "type": "dm",
+      "author": {
+        "id": "17841405793187218",
+        "name": "Jane Smith",
+        "avatar_url": "https://example.com/avatar.jpg"
+      },
+      "content": {
+        "text": "Hi, I have a question about my order",
+        "media": []
+      },
+      "metadata": {
+        "thread_id": "t_17841405793187218"
+      },
+      "created_at": "2026-02-15T15:00:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_id": "t_17841405793187218"
+    }
+  ],
+  "count": 1
+}
+```
+
+## Notes
+
+- **Private replies** — Replying to a comment with `"private": true` sends a DM to the commenter. This is Instagram's native "Send Private Reply" feature, not a SocialAPI workaround.
+- **Token expiry** — Instagram access tokens can expire. If you receive `401` with `code: "invalid_token"`, reconnect the account using the OAuth flow.
+- **Required permissions** — Your Meta App must have `instagram_manage_comments` and `instagram_manage_messages` permissions approved.

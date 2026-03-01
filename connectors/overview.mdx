@@ -1,0 +1,45 @@
+---
+title: Connectors Overview
+description: Platform capabilities and feature matrix.
+---
+
+SocialAPI.AI uses a connector pattern — each platform implements the same interface. If a platform doesn't support a feature, the API returns `501` with `code: "not_supported"`. Your code doesn't need to branch per platform; just handle the 501.
+
+## Feature matrix
+
+| Platform | Auth | Comments | DMs | Reviews | Mentions | Private reply |
+|---|---|---|---|---|---|---|
+| Instagram | OAuth 2.0 | ✅ | ✅ | — | — | ✅ |
+| Facebook | OAuth 2.0 | Soon | Soon | — | — | — |
+| Google Reviews | OAuth 2.0 | — | — | Soon | — | — |
+| TikTok | OAuth 2.0 | Soon | — | — | — | — |
+| YouTube | OAuth 2.0 | Soon | — | — | — | — |
+| X / Twitter | OAuth 2.0 | Soon | Soon | — | Soon | — |
+| LinkedIn | OAuth 2.0 | Soon | — | — | Soon | — |
+| Trustpilot | API Key | — | — | Soon | — | — |
+
+**Legend:** ✅ Available · Soon = In development · — = Not supported by platform
+
+## What "not supported" means
+
+When a platform doesn't support a feature (e.g. Instagram has no reviews), calling that endpoint returns:
+
+```json
+{
+  "error": "operation not supported for this platform",
+  "code": "not_supported"
+}
+```
+
+This is expected behavior, not a bug. Design your app to handle `501` gracefully.
+
+## Auth types
+
+| Type | How it works |
+|---|---|
+| `oauth2` | `POST /accounts/connect` returns an `auth_url` to redirect your user to. After authorization, call `POST /oauth/exchange` with the code. |
+| `apikey` | Pass the platform API key in `metadata` in `POST /accounts/connect`. Returns account ID immediately. |
+
+## Private replies
+
+On Instagram, posting a reply with `"private": true` sends a DM to the commenter instead of a public reply. This is the platform's native "Send Private Reply" feature. The `private` field is silently ignored on platforms that don't support it.
