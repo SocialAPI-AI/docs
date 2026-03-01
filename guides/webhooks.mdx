@@ -1,0 +1,220 @@
+---
+title: Webhooks
+description: Receive real-time notifications when new interactions arrive on your connected accounts.
+---
+
+Instead of polling the API, register a webhook endpoint and SocialAPI will POST a signed payload to your server whenever a new comment, DM, review, or mention arrives.
+
+## Register an endpoint
+
+```bash
+curl -X POST https://api.social-api.ai/v1/webhooks \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://app.example.com/webhooks/socapi",
+    "events": ["comment.received", "dm.received"]
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "wh_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "url": "https://app.example.com/webhooks/socapi",
+  "events": ["comment.received", "dm.received"],
+  "secret": "a3f8c2e1b9d4f7a6c5e0b3d2f1a8e7c4b9d6f3a2e5c8b1d4f7a0e3c6b9d2f5a8",
+  "message": "Store the secret securely. It will not be shown again."
+}
+```
+
+The `secret` is returned **once**. Store it immediately in your environment — it cannot be retrieved again. You use it to verify incoming signatures.
+
+<Warning>
+  Endpoint URLs must use HTTPS. HTTP URLs are rejected with `400`.
+</Warning>
+
+## Event types
+
+| Event | When it fires |
+|---|---|
+| `comment.received` | A new comment arrives on any connected account |
+| `dm.received` | A new direct message arrives |
+| `review.received` | A new review arrives (Google Reviews, Trustpilot, etc.) |
+| `mention.received` | Your account is mentioned on a supported platform |
+
+You can subscribe to any combination. Pass `["comment.received", "dm.received", "review.received", "mention.received"]` to receive all events.
+
+## Payload format
+
+Every webhook POST has a JSON body with an `event` field and a `data` field containing the full interaction object:
+
+```json
+{
+  "event": "comment.received",
+  "data": {
+    "id": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
+    "type": "comment",
+    "platform": "instagram",
+    "platform_id": "17841405793187218",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "author": {
+      "id": "10215054824",
+      "name": "Jane Smith",
+      "avatar_url": "https://example.com/avatar.jpg"
+    },
+    "content": {
+      "text": "Love this product!",
+      "media": []
+    },
+    "created_at": "2026-03-01T14:30:00Z",
+    "metadata": {}
+  }
+}
+```
+
+The `data` object is the same `Interaction` shape returned by `GET /accounts/{id}/comments` (and the equivalent DM, review, and mention endpoints). The `id` field is a stable SocialAPI interaction ID — see [Interaction IDs](/guides/interaction-ids).
+
+## Request headers
+
+Every webhook request includes:
+
+| Header | Value |
+|---|---|
+| `Content-Type` | `application/json` |
+| `X-SocialAPI-Signature` | `sha256=<hmac-sha256-hex>` |
+| `X-SocialAPI-Event` | The event type, e.g. `comment.received` |
+
+## Verifying signatures
+
+Always verify the `X-SocialAPI-Signature` header before processing a webhook. This confirms the payload came from SocialAPI and was not tampered with.
+
+The signature is HMAC-SHA256 of the raw request body, using your endpoint secret as the key, prefixed with `sha256=`.
+
+<Tabs>
+  <Tab title="Node.js">
+```javascript
+import crypto from "crypto";
+
+function verifySignature(secret, rawBody, signatureHeader) {
+  const expected = "sha256=" + crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+  return crypto.timingSafeEqual(
+    Buffer.from(expected),
+    Buffer.from(signatureHeader)
+  );
+}
+
+// Express example
+app.post("/webhooks/socapi", express.raw({ type: "application/json" }), (req, res) => {
+  const sig = req.headers["x-socapi-signature"];
+  if (!verifySignature(process.env.SOCAPI_WEBHOOK_SECRET, req.body, sig)) {
+    return res.status(401).send("Invalid signature");
+  }
+  const event = JSON.parse(req.body);
+  // handle event.event and event.data
+  res.sendStatus(200);
+});
+```
+  </Tab>
+  <Tab title="Python">
+```python
+import hmac
+import hashlib
+
+def verify_signature(secret: str, raw_body: bytes, signature_header: str) -> bool:
+    expected = "sha256=" + hmac.new(
+        secret.encode(), raw_body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature_header)
+
+# Flask example
+@app.route("/webhooks/socapi", methods=["POST"])
+def webhook():
+    sig = request.headers.get("X-SocialAPI-Signature", "")
+    if not verify_signature(os.environ["SOCAPI_WEBHOOK_SECRET"], request.data, sig):
+        abort(401)
+    event = request.json
+    # handle event["event"] and event["data"]
+    return "", 200
+```
+  </Tab>
+  <Tab title="Go">
+```go
+func verifySignature(secret string, body []byte, sigHeader string) bool {
+    mac := hmac.New(sha256.New, []byte(secret))
+    mac.Write(body)
+    expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+    return hmac.Equal([]byte(expected), []byte(sigHeader))
+}
+```
+  </Tab>
+</Tabs>
+
+<Note>
+  Use a constant-time comparison (`timingSafeEqual` / `compare_digest` / `hmac.Equal`) to prevent timing attacks. A simple string equality check is not safe.
+</Note>
+
+## Responding to webhooks
+
+Your endpoint must return an HTTP `2xx` status within **10 seconds**. Any non-2xx response or a timeout is treated as a delivery failure.
+
+Return `200` immediately and process the event asynchronously if your handler does heavier work.
+
+## Retry behavior
+
+Failed deliveries are automatically retried up to **5 attempts** with exponential backoff:
+
+| Attempt | Delay |
+|---|---|
+| 1 | Immediate |
+| 2 | ~30 seconds |
+| 3 | ~5 minutes |
+| 4 | ~30 minutes |
+| 5 | ~3 hours |
+
+After 5 failed attempts, the delivery is marked `failed` and no further retries occur.
+
+## Managing endpoints
+
+**List your endpoints:**
+
+```bash
+curl https://api.social-api.ai/v1/webhooks \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "wh_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "url": "https://app.example.com/webhooks/socapi",
+      "events": ["comment.received", "dm.received"],
+      "is_active": true,
+      "created_at": "2026-03-01T10:00:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Delete an endpoint:**
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/webhooks/wh_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Deleting an endpoint stops all future deliveries immediately. In-flight jobs already queued may still attempt delivery once.
+
+## Security best practices
+
+- **Always verify signatures** — never trust a webhook payload without checking `X-SocialAPI-Signature`
+- **Store your secret in an environment variable** — never hardcode it or commit it to source control
+- **Use HTTPS** — HTTP endpoints are rejected at registration time
+- **Respond quickly** — return `200` before doing heavy processing to avoid timeouts and spurious retries
+- **Make handlers idempotent** — retries mean the same event may arrive more than once; use the interaction `id` to deduplicate
