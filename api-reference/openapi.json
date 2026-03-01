@@ -1,1159 +1,2081 @@
 {
-  "openapi": "3.0.3",
-  "info": {
-    "title": "SocialAPI.AI",
-    "description": "Unified social media inbox API. Read and respond to comments, DMs, reviews, and mentions across Instagram, Facebook, Google Reviews, TikTok, YouTube, X/Twitter, Trustpilot, and LinkedIn through a single REST API.",
-    "version": "1.0.0",
-    "contact": {
-      "name": "SocialAPI.AI Support",
-      "email": "support@social-api.ai"
-    }
-  },
-  "servers": [
-    {
-      "url": "https://api.social-api.ai/v1",
-      "description": "Production"
-    }
-  ],
-  "security": [
-    { "BearerAuth": [] }
-  ],
-  "components": {
-    "securitySchemes": {
-      "BearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "description": "Pass your API key as a Bearer token. Keys have the format `sk_live_...` and are created in the dashboard."
-      }
-    },
-    "schemas": {
-      "ErrorResponse": {
-        "type": "object",
-        "required": ["error", "code"],
-        "properties": {
-          "error": {
-            "type": "string",
-            "description": "Human-readable error message.",
-            "example": "account not found"
-          },
-          "code": {
-            "type": "string",
-            "description": "Machine-readable error code.",
-            "example": "account_not_found"
-          }
-        }
-      },
-      "Author": {
-        "type": "object",
-        "required": ["id", "name", "avatar_url"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Platform-native user ID.",
-            "example": "17841405793187218"
-          },
-          "name": {
-            "type": "string",
-            "description": "Display name of the author.",
-            "example": "Jane Smith"
-          },
-          "avatar_url": {
-            "type": "string",
-            "description": "URL of the author's profile photo.",
-            "example": "https://example.com/avatar.jpg"
-          }
-        }
-      },
-      "Media": {
-        "type": "object",
-        "required": ["url", "type"],
-        "properties": {
-          "url": {
-            "type": "string",
-            "description": "Direct URL to the media asset.",
-            "example": "https://cdn.example.com/photo.jpg"
-          },
-          "type": {
-            "type": "string",
-            "description": "Media type (image, video, etc.).",
-            "example": "image"
-          }
-        }
-      },
-      "Content": {
-        "type": "object",
-        "required": ["text"],
-        "properties": {
-          "text": {
-            "type": "string",
-            "description": "Text content of the interaction.",
-            "example": "Love this product! Really glad I found it."
-          },
-          "media": {
-            "type": "array",
-            "description": "Attached media, if any.",
-            "items": { "$ref": "#/components/schemas/Media" }
-          }
-        }
-      },
-      "Interaction": {
-        "type": "object",
-        "required": ["id", "platform", "type", "author", "content", "metadata", "created_at", "account_id", "platform_id"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Stable SocialAPI ID. Prefix encodes type: `socapi_cmt_` (comment), `socapi_rev_` (review), `socapi_dm_` (DM), `socapi_mnt_` (mention).",
-            "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1"
-          },
-          "platform": {
-            "type": "string",
-            "description": "Social platform name.",
-            "example": "instagram"
-          },
-          "type": {
-            "type": "string",
-            "enum": ["comment", "review", "dm", "mention"],
-            "description": "Interaction type.",
-            "example": "comment"
-          },
-          "author": { "$ref": "#/components/schemas/Author" },
-          "content": { "$ref": "#/components/schemas/Content" },
-          "metadata": {
-            "type": "object",
-            "description": "Platform-specific extra fields (post ID, star rating, etc.).",
-            "additionalProperties": true
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When the interaction was created on the platform.",
-            "example": "2026-02-15T14:30:00Z"
-          },
-          "account_id": {
-            "type": "string",
-            "description": "ID of the connected account this interaction belongs to.",
-            "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
-          },
-          "platform_id": {
-            "type": "string",
-            "description": "The platform's own native ID for this interaction.",
-            "example": "17841405793187218"
-          }
-        }
-      },
-      "Account": {
-        "type": "object",
-        "required": ["id", "platform", "name", "username"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "SocialAPI account ID. Use this as the `:id` path parameter.",
-            "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
-          },
-          "platform": {
-            "type": "string",
-            "description": "Social platform name.",
-            "example": "instagram"
-          },
-          "name": {
-            "type": "string",
-            "description": "Display name of the connected account.",
-            "example": "Acme Corp"
-          },
-          "username": {
-            "type": "string",
-            "description": "Handle or username on the platform.",
-            "example": "acmecorp"
-          }
-        }
-      },
-      "AccountsListResponse": {
-        "type": "object",
-        "required": ["data", "count"],
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/Account" }
-          },
-          "count": {
-            "type": "integer",
-            "description": "Total number of active connected accounts.",
-            "example": 2
-          }
-        }
-      },
-      "InteractionsListResponse": {
-        "type": "object",
-        "required": ["data", "count"],
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/Interaction" }
-          },
-          "count": {
-            "type": "integer",
-            "description": "Number of interactions returned.",
-            "example": 42
-          }
-        }
-      },
-      "Reply": {
-        "type": "object",
-        "required": ["id", "created_at"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "SocialAPI ID for the newly created reply.",
-            "example": "socapi_cmt_cmVwbHk6MTIzNDU2Nzg5"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When the reply was created.",
-            "example": "2026-02-15T14:35:00Z"
-          }
-        }
-      },
-      "ReplyRequest": {
-        "type": "object",
-        "required": ["text"],
-        "properties": {
-          "text": {
-            "type": "string",
-            "description": "Reply text content.",
-            "example": "Thanks for your feedback! We're glad you enjoyed it."
-          },
-          "private": {
-            "type": "boolean",
-            "description": "Send the reply as a private/direct message when the platform supports it. Ignored for review replies.",
-            "default": false,
-            "example": false
-          }
-        }
-      },
-      "SendDMRequest": {
-        "type": "object",
-        "required": ["text"],
-        "properties": {
-          "text": {
-            "type": "string",
-            "description": "Message text content.",
-            "example": "Hi! How can we help you today?"
-          }
-        }
-      },
-      "ModerateCommentRequest": {
-        "type": "object",
-        "required": ["action"],
-        "properties": {
-          "action": {
-            "type": "string",
-            "enum": ["hide", "unhide", "delete"],
-            "description": "Moderation action to apply.",
-            "example": "hide"
-          }
-        }
-      },
-      "TogglePostCommentsRequest": {
-        "type": "object",
-        "required": ["enabled"],
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "description": "Set to `true` to enable comments on the post, `false` to disable.",
-            "example": false
-          }
-        }
-      },
-      "UsageResponse": {
-        "type": "object",
-        "required": ["calls_used", "daily_limit", "period_start"],
-        "properties": {
-          "calls_used": {
-            "type": "integer",
-            "description": "Number of API calls made in the current daily window.",
-            "example": 247
-          },
-          "daily_limit": {
-            "type": "integer",
-            "description": "Maximum calls allowed per day on your plan. -1 means unlimited.",
-            "example": 1000
-          },
-          "period_start": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Start of the current billing period.",
-            "example": "2026-02-01T00:00:00Z"
-          }
-        }
-      },
-      "UsageLimitsResponse": {
-        "type": "object",
-        "description": "Platform-specific quota keys mapping to remaining counts. Keys are platform-defined (e.g. Instagram returns `posts_remaining`). Platforms without usage limits return an empty object.",
-        "additionalProperties": {
-          "type": "integer"
+    "openapi": "3.0.0",
+    "info": {
+        "description": "Unified social media inbox API. Read and respond to comments, DMs, reviews, and mentions across Instagram, Facebook, Google Reviews, TikTok, YouTube, X/Twitter, Trustpilot, and LinkedIn through a single REST API.",
+        "title": "SocialAPI.AI",
+        "contact": {
+            "name": "SocialAPI.AI Support",
+            "email": "support@social-api.ai"
         },
-        "example": { "posts_remaining": 198 }
-      },
-      "DMThreadResponse": {
-        "type": "object",
-        "required": ["thread_id"],
-        "properties": {
-          "thread_id": {
-            "type": "string",
-            "description": "Platform thread ID for this DM conversation.",
-            "example": "t_17841405793187218"
-          }
-        }
-      },
-      "OKResponse": {
-        "type": "object",
-        "required": ["ok"],
-        "properties": {
-          "ok": {
-            "type": "boolean",
-            "example": true
-          }
-        }
-      },
-      "KeyListItem": {
-        "type": "object",
-        "required": ["id", "name", "preview", "rate_limit", "is_active", "created_at"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Key UUID. Use this as the `:id` parameter when revoking.",
-            "example": "e4f2a1b3-0c5d-4e6f-a789-1b2c3d4e5f6a"
-          },
-          "name": {
-            "type": "string",
-            "description": "Friendly name for the key.",
-            "example": "Production App"
-          },
-          "preview": {
-            "type": "string",
-            "description": "Truncated preview of the key (suffix only). The full key is only shown at creation.",
-            "example": "sk_live_a1b2..."
-          },
-          "rate_limit": {
-            "type": "integer",
-            "description": "Daily call limit for this key (based on plan tier).",
-            "example": 1000
-          },
-          "is_active": {
-            "type": "boolean",
-            "description": "Whether the key is currently active.",
-            "example": true
-          },
-          "last_used_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "When this key was last used. Null if never used.",
-            "example": "2026-02-28T12:00:00Z"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When this key was created.",
-            "example": "2026-02-28T12:00:00Z"
-          }
-        }
-      },
-      "KeysListResponse": {
-        "type": "object",
-        "required": ["data", "count"],
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/KeyListItem" }
-          },
-          "count": {
-            "type": "integer",
-            "example": 3
-          }
-        }
-      },
-      "CreateKeyRequest": {
-        "type": "object",
-        "required": ["name"],
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Friendly label for this key.",
-            "example": "My App"
-          }
-        }
-      },
-      "CreateKeyResponse": {
-        "type": "object",
-        "required": ["id", "name", "raw_key", "message"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Key UUID.",
-            "example": "e4f2a1b3-0c5d-4e6f-a789-1b2c3d4e5f6a"
-          },
-          "name": {
-            "type": "string",
-            "example": "My App"
-          },
-          "raw_key": {
-            "type": "string",
-            "description": "The full API key. Shown only once — store it securely.",
-            "example": "sk_live_a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1"
-          },
-          "message": {
-            "type": "string",
-            "example": "Store this key securely. It will not be shown again."
-          }
-        }
-      },
-      "ConnectAccountRequest": {
-        "type": "object",
-        "required": ["platform"],
-        "properties": {
-          "platform": {
-            "type": "string",
-            "description": "Platform slug. One of: `instagram`, `facebook`, `google`, `tiktok`, `youtube`, `twitter`, `linkedin`, `trustpilot`.",
-            "example": "instagram"
-          },
-          "metadata": {
-            "type": "object",
-            "description": "Platform-specific metadata. For OAuth2 platforms, pass `redirect_uri` (the URL to redirect back to after authorization).",
-            "additionalProperties": true,
-            "example": { "redirect_uri": "https://app.example.com/oauth/callback" }
-          }
-        }
-      },
-      "ConnectOAuthResponse": {
-        "type": "object",
-        "required": ["auth_url", "state"],
-        "properties": {
-          "auth_url": {
-            "type": "string",
-            "description": "Redirect your user to this URL to complete the OAuth authorization flow.",
-            "example": "https://www.instagram.com/oauth/authorize?client_id=...&state=..."
-          },
-          "state": {
-            "type": "string",
-            "description": "CSRF state token. Pass this in the `metadata.state` field when calling `/oauth/exchange`.",
-            "example": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
-          }
-        }
-      },
-      "ConnectDirectResponse": {
-        "type": "object",
-        "required": ["account_id", "platform", "username"],
-        "properties": {
-          "account_id": {
-            "type": "string",
-            "description": "The SocialAPI account ID. Use this as `:id` in all subsequent requests.",
-            "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
-          },
-          "platform": {
-            "type": "string",
-            "example": "instagram"
-          },
-          "username": {
-            "type": "string",
-            "description": "The connected account's username on the platform.",
-            "example": "acmecorp"
-          }
-        }
-      },
-      "OAuthExchangeRequest": {
-        "type": "object",
-        "required": ["platform", "code", "metadata"],
-        "properties": {
-          "platform": {
-            "type": "string",
-            "description": "Platform slug matching the one used in `/accounts/connect`.",
-            "example": "instagram"
-          },
-          "code": {
-            "type": "string",
-            "description": "The authorization code received in the OAuth callback.",
-            "example": "AQDtbPB9X..."
-          },
-          "metadata": {
-            "type": "object",
-            "description": "Must include `state` (from connect response) and `redirect_uri` (must match the one used in connect).",
-            "required": ["state", "redirect_uri"],
-            "properties": {
-              "state": {
-                "type": "string",
-                "description": "The state value from the `POST /accounts/connect` response.",
-                "example": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
-              },
-              "redirect_uri": {
-                "type": "string",
-                "description": "Must exactly match the redirect_uri used in the connect request.",
-                "example": "https://app.example.com/oauth/callback"
-              }
+        "license": {
+            "name": "MIT"
+        },
+        "version": "1.0"
+    },
+    "paths": {
+        "/accounts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all active social media accounts connected to the authenticated API key's workspace.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "List connected accounts",
+                "responses": {
+                    "200": {
+                        "description": "List of connected accounts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AccountsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Daily rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/connect": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Initiates account connection. For OAuth2 platforms returns an auth_url to redirect the user to.\nFor apikey/credentials platforms stores the credentials immediately and returns account_id.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Connect a social account",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.connectRequest"
+                            }
+                        }
+                    },
+                    "description": "Platform and metadata",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Account connected (direct auth)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.connectAccountResponse"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "OAuth2 flow initiated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.connectOAuthResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing platform or unsupported platform",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/comments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetches comments for a connected account across all posts. Results are sorted newest-first. Use `cursor` for pagination and `since` to poll for new comments incrementally.",
+                "tags": [
+                    "Comments"
+                ],
+                "summary": "List comments",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-02-01T00:00:00Z",
+                        "description": "Return only items created after this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 50,
+                        "description": "Maximum number of results to return (1–100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor returned by the previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of comments",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InteractionsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Daily rate limit exceeded or platform rate limit hit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support this operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/dms": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetches direct message threads for a connected account, sorted by most recently active. Each thread is returned as an `Interaction` with `type: \"dm\"`. **Requires Starter plan or higher.**",
+                "tags": [
+                    "Direct Messages"
+                ],
+                "summary": "List DM threads",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-02-01T00:00:00Z",
+                        "description": "Return only threads active after this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 50,
+                        "description": "Maximum number of results to return (1–100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor returned by the previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of DM threads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InteractionsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "DMs not available on your plan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support DMs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/dms/thread": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the thread ID for an existing DM conversation with the given platform user. Returns 404 if no prior conversation exists with that user. Use the returned `thread_id` to send messages via `POST /accounts/:id/dms/:tid/send`. **Requires Starter plan or higher.**",
+                "tags": [
+                    "Direct Messages"
+                ],
+                "summary": "Look up a DM thread by user ID",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17841405793187218",
+                        "description": "Platform-specific user ID to look up",
+                        "name": "user_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Thread ID for the existing conversation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.DMThreadResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing user_id query parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "DMs not available on your plan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or no prior conversation with this user",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support DM thread lookup",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/dms/{tid}/send": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends a message to an existing DM thread. Use `GET /accounts/:id/dms/thread?user_id=...` to look up the thread ID before calling this endpoint. **Requires Starter plan or higher.**",
+                "tags": [
+                    "Direct Messages"
+                ],
+                "summary": "Send a direct message",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "t_17841405793187218",
+                        "description": "DM thread ID",
+                        "name": "tid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.SendDMRequest"
+                            }
+                        }
+                    },
+                    "description": "Message payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "The sent message",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ReplyResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "DMs not available on your plan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account or thread not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support sending DMs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/interactions/{iid}/moderate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Hides, unhides, or permanently deletes a comment. The `:iid` must be a comment ID (prefixed `socapi_cmt_`). Deleted comments cannot be recovered.",
+                "tags": [
+                    "Comments"
+                ],
+                "summary": "Moderate a comment",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
+                        "description": "Interaction ID (socapi_cmt_...)",
+                        "name": "iid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.ModerateCommentRequest"
+                            }
+                        }
+                    },
+                    "description": "Moderation action",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Action applied successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.OKResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body or non-comment ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support comment moderation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/interactions/{iid}/replies": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetches the reply thread for a specific comment. The `:iid` must be a comment ID (prefixed `socapi_cmt_`).",
+                "tags": [
+                    "Comments"
+                ],
+                "summary": "List replies to a comment",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
+                        "description": "Interaction ID (socapi_cmt_...)",
+                        "name": "iid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-02-01T00:00:00Z",
+                        "description": "Return only items created after this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 50,
+                        "description": "Maximum number of results to return (1–100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor returned by the previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of replies",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InteractionsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid interaction ID or query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support reply threads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/interactions/{iid}/reply": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Posts a reply to a comment (`socapi_cmt_`) or review (`socapi_rev_`). The interaction type is automatically detected from the ID prefix. Set `private: true` to send the reply as a private/direct message on platforms that support it (e.g. Instagram).",
+                "tags": [
+                    "Comments"
+                ],
+                "summary": "Reply to a comment or review",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
+                        "description": "Interaction ID (socapi_cmt_... or socapi_rev_...)",
+                        "name": "iid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.ReplyRequest"
+                            }
+                        }
+                    },
+                    "description": "Reply payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "The created reply",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ReplyResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body or unsupported interaction type",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support replies",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/limits": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns platform-specific quota data for a connected account as a key/value map where values are remaining counts. Keys are platform-defined — for example Instagram returns `posts_remaining`. An empty object is returned for platforms without usage limits.",
+                "tags": [
+                    "Usage"
+                ],
+                "summary": "Get platform usage limits",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Platform quota map (keys are platform-specific)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.UsageLimitsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not expose usage limits",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/mentions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetches posts and stories where your brand account was mentioned or tagged. Results are sorted newest-first. Returns 501 for platforms that do not support mention tracking.",
+                "tags": [
+                    "Mentions"
+                ],
+                "summary": "List brand mentions",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-02-01T00:00:00Z",
+                        "description": "Return only items created after this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 50,
+                        "description": "Maximum number of results to return (1–100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor returned by the previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of mentions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InteractionsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support mention tracking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/posts/{pid}/comments/toggle": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Toggles the comments setting for a specific post. Set `enabled: false` to prevent new comments; `enabled: true` to re-open them. Returns 501 on platforms that do not expose this setting.",
+                "tags": [
+                    "Comments"
+                ],
+                "summary": "Enable or disable comments on a post",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17841405793187218",
+                        "description": "Platform post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.TogglePostCommentsRequest"
+                            }
+                        }
+                    },
+                    "description": "Toggle payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Setting updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.OKResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support toggling comments",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/reviews": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetches reviews for a connected account (e.g. Google Business, Trustpilot). Results are sorted newest-first. Returns 501 for platforms that do not support reviews (e.g. Instagram).",
+                "tags": [
+                    "Reviews"
+                ],
+                "summary": "List reviews",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-02-01T00:00:00Z",
+                        "description": "Return only items created after this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 50,
+                        "description": "Maximum number of results to return (1–100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor returned by the previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of reviews",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InteractionsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support reviews",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/keys": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all API keys for the authenticated user.",
+                "tags": [
+                    "API Keys"
+                ],
+                "summary": "List API keys",
+                "responses": {
+                    "200": {
+                        "description": "List of API keys",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.KeysListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Daily rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
             },
-            "additionalProperties": true
-          }
-        }
-      }
-    },
-    "parameters": {
-      "accountId": {
-        "name": "id",
-        "in": "path",
-        "required": true,
-        "description": "Connected account ID (from `GET /accounts`).",
-        "schema": { "type": "string", "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }
-      },
-      "interactionId": {
-        "name": "iid",
-        "in": "path",
-        "required": true,
-        "description": "SocialAPI interaction ID (prefix encodes the type).",
-        "schema": { "type": "string", "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1" }
-      },
-      "since": {
-        "name": "since",
-        "in": "query",
-        "description": "Return interactions created after this timestamp (RFC3339).",
-        "schema": { "type": "string", "format": "date-time", "example": "2026-02-01T00:00:00Z" }
-      },
-      "limit": {
-        "name": "limit",
-        "in": "query",
-        "description": "Maximum number of results to return (1–100, default 50).",
-        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
-      },
-      "cursor": {
-        "name": "cursor",
-        "in": "query",
-        "description": "Pagination cursor returned in the previous response.",
-        "schema": { "type": "string" }
-      }
-    },
-    "responses": {
-      "Unauthorized": {
-        "description": "Invalid or missing API key.",
-        "content": {
-          "application/json": {
-            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
-            "example": { "error": "invalid or missing API key", "code": "unauthorized" }
-          }
-        }
-      },
-      "RateLimited": {
-        "description": "Daily API call limit exceeded for your plan.",
-        "content": {
-          "application/json": {
-            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
-            "example": { "error": "daily API call limit exceeded for your plan", "code": "rate_limit_exceeded" }
-          }
-        }
-      },
-      "NotFound": {
-        "description": "Resource not found.",
-        "content": {
-          "application/json": {
-            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
-            "example": { "error": "account not found", "code": "account_not_found" }
-          }
-        }
-      },
-      "NotSupported": {
-        "description": "This operation is not supported on the connected platform.",
-        "content": {
-          "application/json": {
-            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
-            "example": { "error": "operation not supported for this platform", "code": "not_supported" }
-          }
-        }
-      }
-    }
-  },
-  "tags": [
-    { "name": "Accounts", "description": "Manage connected social accounts and OAuth flows." },
-    { "name": "Comments", "description": "Read and reply to comments." },
-    { "name": "DMs", "description": "Read and send direct messages." },
-    { "name": "Reviews", "description": "Read and reply to reviews." },
-    { "name": "Mentions", "description": "Read mentions." },
-    { "name": "Moderation", "description": "Moderate comments and control post settings." },
-    { "name": "Usage", "description": "Check API usage and plan limits." },
-    { "name": "Keys", "description": "Manage API keys." },
-    { "name": "Users", "description": "Manage your user account." },
-    { "name": "Search", "description": "Cross-platform search (coming soon)." }
-  ],
-  "paths": {
-    "/accounts": {
-      "get": {
-        "tags": ["Accounts"],
-        "summary": "List connected accounts",
-        "description": "Returns all active social media accounts connected to the authenticated API key's workspace.",
-        "operationId": "listAccounts",
-        "responses": {
-          "200": {
-            "description": "List of connected accounts.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/AccountsListResponse" },
-                "example": {
-                  "data": [
-                    { "id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "platform": "instagram", "name": "Acme Corp", "username": "acmecorp" }
-                  ],
-                  "count": 1
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Generates a new API key for the authenticated user.",
+                "tags": [
+                    "API Keys"
+                ],
+                "summary": "Create API key",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.CreateKeyRequest"
+                            }
+                        }
+                    },
+                    "description": "Key name",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Key created (raw key shown once)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.CreateKeyResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or missing name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Daily rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
                 }
-              }
             }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "429": { "$ref": "#/components/responses/RateLimited" }
-        }
-      }
-    },
-    "/accounts/connect": {
-      "post": {
-        "tags": ["Accounts"],
-        "summary": "Connect a social account",
-        "description": "Initiates account connection.\n\n- **OAuth2 platforms** (Instagram, Facebook, etc.): Returns HTTP 202 with an `auth_url`. Redirect your user to that URL. After authorization, the platform redirects to your `redirect_uri` with a `code` and `state`. Call `POST /oauth/exchange` to complete the flow.\n- **Direct auth platforms** (API key / credentials): Returns HTTP 201 with the new `account_id` immediately.",
-        "operationId": "connectAccount",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/ConnectAccountRequest" }
-            }
-          }
         },
-        "responses": {
-          "201": {
-            "description": "Account connected (direct auth platforms).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ConnectDirectResponse" }
-              }
-            }
-          },
-          "202": {
-            "description": "OAuth2 flow initiated. Redirect your user to `auth_url`.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ConnectOAuthResponse" }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing or unsupported platform.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
-                "examples": {
-                  "missing_platform": { "value": { "error": "platform is required", "code": "missing_metadata" } },
-                  "unsupported": { "value": { "error": "platform not supported", "code": "unsupported_platform" } }
+        "/keys/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deactivates an API key. This is irreversible.",
+                "tags": [
+                    "API Keys"
+                ],
+                "summary": "Revoke API key",
+                "parameters": [
+                    {
+                        "description": "API key ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Key revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.OKResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "API key not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Daily rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
                 }
-              }
             }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "409": {
-            "description": "Account already connected.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
-                "example": { "error": "account already connected", "code": "account_already_linked" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/oauth/exchange": {
-      "post": {
-        "tags": ["Accounts"],
-        "summary": "Complete OAuth2 account connection",
-        "description": "Exchanges an OAuth2 authorization code for tokens and stores the connected account.\n\nThe `state` value from the `/accounts/connect` response is one-time-use and validated server-side (CSRF protection). It expires after 10 minutes.",
-        "operationId": "oauthExchange",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/OAuthExchangeRequest" }
-            }
-          }
         },
-        "responses": {
-          "201": {
-            "description": "Account connected successfully.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ConnectDirectResponse" }
-              }
+        "/oauth/exchange": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Exchanges an authorization code (received from the platform callback) for tokens.\nValidates the state token against Redis to prevent CSRF. State is one-time-use.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Complete OAuth2 account connection",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.exchangeRequest"
+                            }
+                        }
+                    },
+                    "description": "Platform, code, and metadata (redirect_uri + state)",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Account connected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.connectAccountResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing/expired state or unsupported platform",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "State belongs to a different API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
             }
-          },
-          "400": {
-            "description": "Missing/expired state or invalid request.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
-                "example": { "error": "invalid or expired state", "code": "missing_metadata" }
-              }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": {
-            "description": "State token belongs to a different API key.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
-                "example": { "error": "state does not belong to this API key", "code": "unauthorized" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/accounts/{id}/comments": {
-      "get": {
-        "tags": ["Comments"],
-        "summary": "List comments",
-        "description": "Returns comments for the connected account, in reverse-chronological order.",
-        "operationId": "getComments",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          { "$ref": "#/components/parameters/since" },
-          { "$ref": "#/components/parameters/limit" },
-          { "$ref": "#/components/parameters/cursor" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated list of comments.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/InteractionsListResponse" }
-              }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" },
-          "501": { "$ref": "#/components/responses/NotSupported" }
-        }
-      }
-    },
-    "/accounts/{id}/interactions/{iid}/replies": {
-      "get": {
-        "tags": ["Comments"],
-        "summary": "List comment replies",
-        "description": "Returns the reply thread for a comment. Only valid for `socapi_cmt_` IDs.",
-        "operationId": "getCommentReplies",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          { "$ref": "#/components/parameters/interactionId" },
-          { "$ref": "#/components/parameters/since" },
-          { "$ref": "#/components/parameters/limit" },
-          { "$ref": "#/components/parameters/cursor" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Reply thread.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/InteractionsListResponse" }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid interaction ID format.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" }
-        }
-      }
-    },
-    "/accounts/{id}/interactions/{iid}/reply": {
-      "post": {
-        "tags": ["Comments"],
-        "summary": "Reply to a comment or review",
-        "description": "Posts a reply to a comment (`socapi_cmt_`) or review (`socapi_rev_`).\n\nSet `private: true` to send the reply as a private message instead of a public reply (supported on some platforms, e.g. Instagram). The `private` field is ignored for reviews.",
-        "operationId": "replyToInteraction",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          { "$ref": "#/components/parameters/interactionId" }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/ReplyRequest" } }
-          }
         },
-        "responses": {
-          "201": {
-            "description": "Reply created.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/Reply" } }
+        "/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Full-text search across all platforms and interaction types. Accepts query param `q` for the search term; optionally filter by `platform` and `type`. Fan-out to all relevant connectors with merged, ranked results. **Not yet implemented** — returns 501.",
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search interactions",
+                "parameters": [
+                    {
+                        "example": "great product",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "instagram",
+                        "description": "Filter by platform",
+                        "name": "platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "comment",
+                        "description": "Filter by interaction type",
+                        "name": "type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "501": {
+                        "description": "Not yet implemented",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
             }
-          },
-          "400": {
-            "description": "Invalid interaction ID or missing text.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" },
-          "501": { "$ref": "#/components/responses/NotSupported" }
-        }
-      }
-    },
-    "/accounts/{id}/dms": {
-      "get": {
-        "tags": ["DMs"],
-        "summary": "List DM threads",
-        "description": "Returns direct message conversations for the connected account.",
-        "operationId": "getDMs",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          { "$ref": "#/components/parameters/since" },
-          { "$ref": "#/components/parameters/limit" },
-          { "$ref": "#/components/parameters/cursor" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated list of DM conversations.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/InteractionsListResponse" } }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" },
-          "501": { "$ref": "#/components/responses/NotSupported" }
-        }
-      }
-    },
-    "/accounts/{id}/dms/thread": {
-      "get": {
-        "tags": ["DMs"],
-        "summary": "Get DM thread ID for a user",
-        "description": "Returns the thread ID of an existing DM conversation with a platform user. Returns 404 if no prior conversation exists. Use `POST /accounts/{id}/interactions/{iid}/reply` with `private: true` to initiate contact from a comment instead.",
-        "operationId": "getDMThread",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          {
-            "name": "user_id",
-            "in": "query",
-            "required": true,
-            "description": "Platform-native user ID to look up.",
-            "schema": { "type": "string", "example": "17841405793187218" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Thread ID found.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/DMThreadResponse" } }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" },
-          "501": { "$ref": "#/components/responses/NotSupported" }
-        }
-      }
-    },
-    "/accounts/{id}/dms/{tid}/send": {
-      "post": {
-        "tags": ["DMs"],
-        "summary": "Send a direct message",
-        "description": "Sends a message to an existing DM thread.",
-        "operationId": "sendDM",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          {
-            "name": "tid",
-            "in": "path",
-            "required": true,
-            "description": "Thread ID from `GET /accounts/{id}/dms/thread` or the `id` field of a DM interaction.",
-            "schema": { "type": "string", "example": "t_17841405793187218" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/SendDMRequest" } }
-          }
         },
-        "responses": {
-          "201": {
-            "description": "Message sent.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/Reply" } }
+        "/usage": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the number of API calls made by this key during the current calendar month, alongside the daily call limit for the account's plan. The `daily_limit` is -1 for Enterprise (unlimited). `period_start` is always the first day of the current UTC month at 00:00:00.",
+                "tags": [
+                    "Usage"
+                ],
+                "summary": "Get API usage for the current billing period",
+                "responses": {
+                    "200": {
+                        "description": "Usage statistics for the current billing period",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.UsageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
             }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" },
-          "501": { "$ref": "#/components/responses/NotSupported" }
         }
-      }
     },
-    "/accounts/{id}/reviews": {
-      "get": {
-        "tags": ["Reviews"],
-        "summary": "List reviews",
-        "description": "Returns reviews for the connected account (e.g. Google Reviews, Trustpilot). Returns 501 for platforms that do not have a review concept (e.g. Instagram).",
-        "operationId": "getReviews",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          { "$ref": "#/components/parameters/since" },
-          { "$ref": "#/components/parameters/limit" },
-          { "$ref": "#/components/parameters/cursor" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated list of reviews.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/InteractionsListResponse" } }
+    "servers": [
+        {
+            "url": "https://api.social-api.ai/v1"
+        }
+    ],
+    "components": {
+        "securitySchemes": {
+            "BearerAuth": {
+                "description": "Prefix your API key with \"Bearer \". Example: `Authorization: Bearer soc_live_...`",
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header"
             }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" },
-          "501": { "$ref": "#/components/responses/NotSupported" }
-        }
-      }
-    },
-    "/accounts/{id}/mentions": {
-      "get": {
-        "tags": ["Mentions"],
-        "summary": "List mentions",
-        "description": "Returns posts and comments that mention the connected account.",
-        "operationId": "getMentions",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          { "$ref": "#/components/parameters/since" },
-          { "$ref": "#/components/parameters/limit" },
-          { "$ref": "#/components/parameters/cursor" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated list of mentions.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/InteractionsListResponse" } }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" },
-          "501": { "$ref": "#/components/responses/NotSupported" }
-        }
-      }
-    },
-    "/accounts/{id}/interactions/{iid}/moderate": {
-      "post": {
-        "tags": ["Moderation"],
-        "summary": "Moderate a comment",
-        "description": "Hides, unhides, or deletes a comment. Only valid for `socapi_cmt_` IDs.\n\nActions:\n- `hide` — hides the comment from public view\n- `unhide` — makes a hidden comment visible again\n- `delete` — permanently deletes the comment (irreversible)\n\nReturns 501 if the platform does not support the requested action.",
-        "operationId": "moderateComment",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          { "$ref": "#/components/parameters/interactionId" }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/ModerateCommentRequest" } }
-          }
         },
-        "responses": {
-          "200": {
-            "description": "Moderation applied.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/OKResponse" } }
+        "schemas": {
+            "api_endpoints.AccountsListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Account"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.CreateKeyRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "My App"
+                    }
+                }
+            },
+            "api_endpoints.CreateKeyResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Store this key securely. It will not be shown again."
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "raw_key": {
+                        "type": "string",
+                        "example": "sk_live_..."
+                    }
+                }
+            },
+            "api_endpoints.DMThreadResponse": {
+                "type": "object",
+                "properties": {
+                    "thread_id": {
+                        "type": "string",
+                        "example": "t_17841405793187218"
+                    }
+                }
+            },
+            "api_endpoints.ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "example": "account_not_found"
+                    },
+                    "error": {
+                        "type": "string",
+                        "example": "account not found"
+                    }
+                }
+            },
+            "api_endpoints.InteractionsListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 42
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Interaction"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.KeyListItem": {
+                "type": "object",
+                "properties": {
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-02-28T12:00:00Z"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "last_used_at": {
+                        "type": "string",
+                        "example": "2026-02-28T12:00:00Z"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "preview": {
+                        "type": "string",
+                        "example": "sk_live_a1b2..."
+                    },
+                    "rate_limit": {
+                        "type": "integer",
+                        "example": 1000
+                    }
+                }
+            },
+            "api_endpoints.KeysListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.KeyListItem"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.ModerateCommentRequest": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "description": "Action must be one of: hide, unhide, delete.",
+                        "type": "string",
+                        "enum": [
+                            "hide",
+                            "unhide",
+                            "delete"
+                        ],
+                        "example": "hide"
+                    }
+                }
+            },
+            "api_endpoints.OKResponse": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                }
+            },
+            "api_endpoints.ReplyRequest": {
+                "type": "object",
+                "properties": {
+                    "private": {
+                        "description": "Private sends the reply as a private/direct message when supported by the platform.\nIgnored for review replies.",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "text": {
+                        "description": "Text is the reply content. Required.",
+                        "type": "string",
+                        "example": "Thanks for your feedback! We're glad you enjoyed it."
+                    }
+                }
+            },
+            "api_endpoints.ReplyResponse": {
+                "type": "object",
+                "properties": {
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-02-15T14:35:00Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "socapi_cmt_cmVwbHk6MTIzNDU2Nzg5"
+                    }
+                }
+            },
+            "api_endpoints.SendDMRequest": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "description": "Text is the message content. Required.",
+                        "type": "string",
+                        "example": "Hi! How can we help you today?"
+                    }
+                }
+            },
+            "api_endpoints.TogglePostCommentsRequest": {
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "description": "Enabled enables comments when true, disables them when false.",
+                        "type": "boolean",
+                        "example": false
+                    }
+                }
+            },
+            "api_endpoints.UsageLimitsResponse": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "integer"
+                }
+            },
+            "api_endpoints.UsageResponse": {
+                "type": "object",
+                "properties": {
+                    "calls_used": {
+                        "type": "integer",
+                        "example": 247
+                    },
+                    "daily_limit": {
+                        "type": "integer",
+                        "example": 1000
+                    },
+                    "period_start": {
+                        "type": "string",
+                        "example": "2026-02-01T00:00:00Z"
+                    }
+                }
+            },
+            "api_endpoints.connectAccountResponse": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "type": "string"
+                    },
+                    "username": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.connectOAuthResponse": {
+                "type": "object",
+                "properties": {
+                    "auth_url": {
+                        "type": "string"
+                    },
+                    "state": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.connectRequest": {
+                "type": "object",
+                "properties": {
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "platform": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.exchangeRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "platform": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.Account": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Acme Corp"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "instagram"
+                    },
+                    "username": {
+                        "type": "string",
+                        "example": "acmecorp"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.Author": {
+                "type": "object",
+                "properties": {
+                    "avatar_url": {
+                        "type": "string",
+                        "example": "https://example.com/avatar.jpg"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "17841405793187218"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Jane Smith"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.Content": {
+                "type": "object",
+                "properties": {
+                    "media": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Media"
+                        }
+                    },
+                    "text": {
+                        "type": "string",
+                        "example": "Love this product! Really glad I found it."
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.Interaction": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "author": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Author"
+                    },
+                    "content": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Content"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-02-15T14:30:00Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "instagram"
+                    },
+                    "platform_id": {
+                        "type": "string",
+                        "example": "17841405793187218"
+                    },
+                    "type": {
+                        "type": "string",
+                        "example": "comment"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.Media": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "example": "image"
+                    },
+                    "url": {
+                        "type": "string",
+                        "example": "https://cdn.example.com/photo.jpg"
+                    }
+                }
             }
-          },
-          "400": {
-            "description": "Invalid action or interaction ID.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" },
-          "501": { "$ref": "#/components/responses/NotSupported" }
         }
-      }
-    },
-    "/accounts/{id}/posts/{pid}/comments/toggle": {
-      "post": {
-        "tags": ["Moderation"],
-        "summary": "Toggle comments on a post",
-        "description": "Enables or disables the ability for users to comment on a specific post. Returns 501 if the platform does not support this setting.",
-        "operationId": "togglePostComments",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" },
-          {
-            "name": "pid",
-            "in": "path",
-            "required": true,
-            "description": "Platform-native post ID.",
-            "schema": { "type": "string", "example": "17841405793187218" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/TogglePostCommentsRequest" } }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Setting applied.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/OKResponse" } }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" },
-          "501": { "$ref": "#/components/responses/NotSupported" }
-        }
-      }
-    },
-    "/usage": {
-      "get": {
-        "tags": ["Usage"],
-        "summary": "Get API usage",
-        "description": "Returns the number of API calls made in the current daily window and the limit for your plan. The window resets at midnight UTC.",
-        "operationId": "getUsage",
-        "responses": {
-          "200": {
-            "description": "Usage statistics.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/UsageResponse" },
-                "example": { "calls_used": 247, "daily_limit": 1000, "period_start": "2026-02-01T00:00:00Z" }
-              }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      }
-    },
-    "/accounts/{id}/limits": {
-      "get": {
-        "tags": ["Usage"],
-        "summary": "Get platform usage limits",
-        "description": "Returns platform-specific quota information for the connected account (e.g. remaining posts for Instagram). Keys are platform-defined. An empty object means the platform does not expose quota data.",
-        "operationId": "getAccountLimits",
-        "parameters": [
-          { "$ref": "#/components/parameters/accountId" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Platform quota data.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/UsageLimitsResponse" }
-              }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "429": { "$ref": "#/components/responses/RateLimited" }
-        }
-      }
-    },
-    "/keys": {
-      "get": {
-        "tags": ["Keys"],
-        "summary": "List API keys",
-        "description": "Returns all API keys in the workspace. The `preview` field shows only a truncated suffix — the full key is only available at creation time.",
-        "operationId": "listKeys",
-        "responses": {
-          "200": {
-            "description": "List of API keys.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/KeysListResponse" } }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      },
-      "post": {
-        "tags": ["Keys"],
-        "summary": "Create an API key",
-        "description": "Generates a new API key. The full key is returned **only once** in `raw_key` — store it immediately. Subsequent calls to `GET /keys` will only show a truncated preview.",
-        "operationId": "createKey",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/CreateKeyRequest" } }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Key created. The `raw_key` is shown only once.",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/CreateKeyResponse" } }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      }
-    },
-    "/keys/{id}": {
-      "delete": {
-        "tags": ["Keys"],
-        "summary": "Revoke an API key",
-        "description": "Permanently deactivates an API key. The key will immediately stop working for all requests.",
-        "operationId": "revokeKey",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "description": "Key ID from `GET /keys`.",
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "204": { "description": "Key revoked." },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
-      }
-    },
-    "/users/me": {
-      "delete": {
-        "tags": ["Users"],
-        "summary": "Delete your account",
-        "description": "Soft-deletes your user account. All connected social accounts and API keys are also deactivated. This action is irreversible.",
-        "operationId": "deleteUser",
-        "responses": {
-          "204": { "description": "Account deleted." },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      }
-    },
-    "/search": {
-      "get": {
-        "tags": ["Search"],
-        "summary": "Search across all accounts",
-        "description": "Fan-out search across all connected accounts and platforms. **Not yet implemented — returns 501.**",
-        "operationId": "search",
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "required": true,
-            "description": "Search query string.",
-            "schema": { "type": "string", "example": "shipping delay" }
-          }
-        ],
-        "responses": {
-          "501": { "$ref": "#/components/responses/NotSupported" },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      }
     }
-  }
 }
