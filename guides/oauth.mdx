@@ -1,0 +1,112 @@
+---
+title: Connecting Social Accounts
+description: How to connect social accounts via OAuth2 and direct auth.
+---
+
+Most social platforms use OAuth2. A few support direct API key or credential auth.
+
+## OAuth2 flow
+
+Connecting an OAuth2 platform (Instagram, Facebook, etc.) takes three steps:
+
+### Step 1: Initiate the flow
+
+Call `POST /accounts/connect` with your platform and a `redirect_uri`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "instagram",
+    "metadata": {
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response (HTTP 202):
+
+```json
+{
+  "auth_url": "https://www.instagram.com/oauth/authorize?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+}
+```
+
+### Step 2: Redirect the user
+
+Send your user to `auth_url`. They log in and grant permissions. The platform redirects back to your `redirect_uri` with `?code=...&state=...` query parameters.
+
+Store the `state` value from Step 1 — you need it in Step 3.
+
+### Step 3: Exchange the code
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "instagram",
+    "code": "AQDtbPB9X...",
+    "metadata": {
+      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "instagram",
+  "username": "acmecorp"
+}
+```
+
+The `account_id` is now ready to use in all account endpoints.
+
+<Warning>
+  The `state` token is one-time-use and expires after 10 minutes. If the exchange fails with `invalid or expired state`, restart from Step 1.
+</Warning>
+
+## State token security
+
+The `state` value is a CSRF token. It:
+1. Is generated server-side as 16 random bytes (not guessable)
+2. Is stored in Redis with a 10-minute TTL
+3. Is deleted immediately on exchange (prevents replay attacks)
+4. Is tied to your API key — another key cannot use your state
+
+If your `/oauth/exchange` call returns `403 state does not belong to this API key`, it means the key used in Step 3 is different from the one used in Step 1.
+
+## Listing connected accounts
+
+```bash
+curl https://api.social-api.ai/v1/accounts \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## Reconnecting an account
+
+If you call `POST /accounts/connect` for an account that is already connected, the upsert updates the stored token. This is safe to call when tokens expire.
+
+## Direct auth (non-OAuth platforms)
+
+Some platforms accept an API key or username/password directly. For these, `POST /accounts/connect` returns HTTP 201 immediately without a redirect:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "trustpilot",
+    "metadata": {
+      "api_key": "your-trustpilot-api-key"
+    }
+  }'
+```
+
+Check the [Connectors](/connectors/overview) section for each platform's auth type and required metadata fields.

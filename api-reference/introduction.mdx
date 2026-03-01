@@ -1,33 +1,63 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: API Reference
+description: All 20 public SocialAPI.AI endpoints.
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+## Base URL
 
-## Welcome
-
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
-
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+```
+https://api.social-api.ai/v1
+```
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+All endpoints require a Bearer token:
+
+```bash
+Authorization: Bearer sk_live_your_key_here
+```
+
+See the [Authentication guide](/guides/authentication) for how to create and manage keys.
+
+## Request format
+
+- All request bodies must be JSON with `Content-Type: application/json`
+- All timestamps are RFC3339 (e.g. `2026-02-15T14:30:00Z`)
+- Paginated endpoints accept `since`, `limit` (1–100, default 50), and `cursor` query parameters
+
+## Response format
+
+All successful responses are JSON. All errors use:
 
 ```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+{
+  "error": "human-readable message",
+  "code": "machine_readable_code"
+}
 ```
+
+## Keeping the spec up to date
+
+The API reference is generated from Go source annotations. To regenerate after changing the code:
+
+```bash
+cd core/
+make docs
+```
+
+This runs `swag init` (generates Swagger 2.0) then `swagger2openapi` (converts to OpenAPI 3.0) and writes the result to `docs/api-reference/openapi.json`.
+
+<CardGroup cols={2}>
+  <Card title="Accounts" icon="link" href="/api-reference/accounts/list-connected-accounts">
+    Connect and list social accounts.
+  </Card>
+  <Card title="Comments" icon="message" href="/api-reference/comments/list-comments">
+    Read, reply to, and fetch replies for comments.
+  </Card>
+  <Card title="DMs" icon="envelope" href="/api-reference/dms/list-dm-threads">
+    Read and send direct messages.
+  </Card>
+  <Card title="Reviews" icon="star" href="/api-reference/reviews/list-reviews">
+    Read and reply to reviews.
+  </Card>
+</CardGroup>

@@ -1,0 +1,74 @@
+---
+title: Authentication
+description: How API keys work and how to use them.
+---
+
+Every request to SocialAPI.AI requires an API key passed as a Bearer token.
+
+## Format
+
+API keys have the format:
+
+```
+sk_live_<64 hex characters>
+```
+
+Example: `sk_live_a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2`
+
+## Passing the key
+
+Include the key in the `Authorization` header of every request:
+
+```bash
+curl https://api.social-api.ai/v1/accounts \
+  -H "Authorization: Bearer sk_live_your_key_here"
+```
+
+If the key is missing or invalid, the API returns:
+
+```json
+{
+  "error": "invalid or missing API key",
+  "code": "unauthorized"
+}
+```
+
+## Creating keys
+
+Keys are created in the dashboard under **Keys** → **New Key**, or via the API:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/keys \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Production App"}'
+```
+
+The full key is returned **once** in `raw_key`. Store it immediately — subsequent reads only show a truncated preview like `sk_live_a1b2...`.
+
+## Revoking keys
+
+Keys are revoked in the dashboard, or via:
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/keys/<key-id> \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+A revoked key stops working immediately for all requests.
+
+## Listing keys
+
+```bash
+curl https://api.social-api.ai/v1/keys \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+The response includes `preview` (suffix only), `rate_limit` (daily call limit), `is_active`, and `last_used_at`.
+
+## Security best practices
+
+- **Never expose keys in frontend code** — keys must only be used server-side
+- **Use environment variables** — do not hardcode keys in source code
+- **Create one key per service** — revoke individual keys if compromised without disrupting others
+- **Monitor `last_used_at`** — unused keys should be revoked

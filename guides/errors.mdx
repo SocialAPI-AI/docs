@@ -1,0 +1,84 @@
+---
+title: Error Handling
+description: Error response format and all error codes.
+---
+
+All errors return JSON with a consistent shape:
+
+```json
+{
+  "error": "human-readable message",
+  "code": "machine_readable_code"
+}
+```
+
+Use `code` for programmatic error handling; use `error` for logging and display.
+
+## Error codes
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `missing_metadata` | A required field is missing in the request body or query |
+| 400 | `unsupported_platform` | The `platform` value is not recognized |
+| 401 | `unauthorized` | API key is missing, invalid, or revoked |
+| 401 | `invalid_token` | The connected account's OAuth token is expired or revoked |
+| 401 | `invalid_credentials` | The platform rejected the stored credentials |
+| 403 | `unauthorized` | The OAuth state token belongs to a different API key |
+| 404 | `account_not_found` | The account ID does not belong to your workspace |
+| 404 | `not_found` | The requested resource does not exist |
+| 409 | `account_already_linked` | This social account is already connected |
+| 429 | `rate_limit_exceeded` | Your daily API call limit is exceeded |
+| 429 | `platform_rate_limit` | The upstream platform's own rate limit was hit |
+| 500 | — | Internal server error (contact support) |
+| 501 | `not_supported` | This operation is not supported on this platform |
+
+## Handling specific cases
+
+### 401 invalid_token
+
+The user's OAuth token expired. Your app should reconnect the account by re-running the [OAuth flow](/guides/oauth).
+
+```python
+if error["code"] == "invalid_token":
+    # Trigger reconnect flow for this account_id
+    redirect_to_reconnect(account_id)
+```
+
+### 429 rate_limit_exceeded
+
+Back off and retry tomorrow, or upgrade your plan.
+
+### 429 platform_rate_limit
+
+The platform (not SocialAPI) is throttling. This does **not** count against your daily limit. Wait a few minutes and retry.
+
+### 501 not_supported
+
+The operation is not available on this platform. For example, Instagram does not have reviews — calling `GET /accounts/{id}/reviews` on an Instagram account returns 501. Check the [Connectors](/connectors/overview) section for each platform's supported operations.
+
+## Example error handling
+
+```typescript
+const resp = await fetch(`https://api.social-api.ai/v1/accounts/${accountId}/comments`, {
+  headers: { Authorization: `Bearer ${apiKey}` }
+});
+
+if (!resp.ok) {
+  const err = await resp.json();
+  switch (err.code) {
+    case "invalid_token":
+      await reconnectAccount(accountId);
+      break;
+    case "rate_limit_exceeded":
+      throw new Error("Daily limit hit — retry tomorrow");
+    case "platform_rate_limit":
+      await sleep(60_000);
+      return retry();
+    case "not_supported":
+      console.warn(`Platform does not support this operation: ${err.error}`);
+      return null;
+    default:
+      throw new Error(`API error: ${err.error} (${err.code})`);
+  }
+}
+```

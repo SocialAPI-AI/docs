@@ -1,0 +1,69 @@
+---
+title: Interaction IDs
+description: How SocialAPI IDs encode type and platform.
+---
+
+Every comment, DM, review, and mention returned by the API has a stable, opaque `id` field. These IDs are designed to be stored and reused across calls.
+
+## Format
+
+```
+socapi_{type}_{base64url(platform:platformID)}
+```
+
+The prefix tells you the interaction type:
+
+| Prefix | Type |
+|---|---|
+| `socapi_cmt_` | Comment |
+| `socapi_rev_` | Review |
+| `socapi_dm_` | Direct message |
+| `socapi_mnt_` | Mention |
+
+Examples:
+- `socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1` — an Instagram comment
+- `socapi_rev_Z29vZ2xlOmNoSUpBYnVu` — a Google Review
+- `socapi_dm_aW5zdGFncmFtOnQxNzg0MQ` — an Instagram DM
+
+## Why this matters
+
+The type prefix lets the API dispatch correctly without a database lookup:
+
+- `POST /interactions/{iid}/reply` → checks prefix: if `socapi_cmt_`, calls `ReplyToComment`; if `socapi_rev_`, calls `ReplyToReview`
+- `POST /interactions/{iid}/moderate` → only valid for `socapi_cmt_` IDs; returns 400 for others
+- `GET /interactions/{iid}/replies` → only valid for `socapi_cmt_` IDs
+
+If you pass a `socapi_rev_` ID to an endpoint that only accepts comments, you'll get a `400` error.
+
+## Stability
+
+IDs are deterministic — the same platform interaction always produces the same SocialAPI ID. You can safely store IDs in your database and compare them across calls.
+
+## Using IDs
+
+Fetch comments:
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/comments" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Reply using the returned `id`:
+
+```bash
+curl -X POST \
+  "https://api.social-api.ai/v1/accounts/{id}/interactions/socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1/reply" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Thank you!"}'
+```
+
+Moderate using the same `id`:
+
+```bash
+curl -X POST \
+  "https://api.social-api.ai/v1/accounts/{id}/interactions/socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1/moderate" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "hide"}'
+```

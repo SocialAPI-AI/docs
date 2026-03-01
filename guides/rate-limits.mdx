@@ -1,0 +1,86 @@
+---
+title: Rate Limits & Plans
+description: Daily API call limits and how to handle them.
+---
+
+## Plan limits
+
+Every API key has a daily call limit based on your plan tier. The window resets at midnight UTC.
+
+| Plan | Calls / day | Max platforms | DMs | Multi-tenant |
+|---|---|---|---|---|
+| Free | 100 | 2 | — | — |
+| Starter | 1,000 | 5 | ✅ | — |
+| Pro | 5,000 | 15 | ✅ | — |
+| Business | 20,000 | 50 | ✅ | ✅ |
+| Enterprise | Unlimited | Unlimited | ✅ | ✅ |
+
+Upgrade your plan at [app.social-api.ai](https://app.social-api.ai) → **Billing**.
+
+## Response headers
+
+Every API response includes:
+
+| Header | Description |
+|---|---|
+| `X-RateLimit-Limit` | Your daily call limit |
+| `X-RateLimit-Remaining` | Remaining calls for today |
+
+## When you hit the limit
+
+The API returns HTTP `429` with:
+
+```json
+{
+  "error": "daily API call limit exceeded for your plan",
+  "code": "rate_limit_exceeded"
+}
+```
+
+## Checking your usage
+
+```bash
+curl https://api.social-api.ai/v1/usage \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+```json
+{
+  "calls_used": 247,
+  "daily_limit": 1000,
+  "period_start": "2026-02-01T00:00:00Z"
+}
+```
+
+## Platform rate limits
+
+Platforms (Instagram, Google, etc.) have their own rate limits independent of ours. When a platform rejects a request due to its own limits, you receive:
+
+```json
+{
+  "error": "platform rate limit exceeded",
+  "code": "platform_rate_limit"
+}
+```
+
+This does **not** count against your SocialAPI daily limit. Retry after a short wait (typically a few minutes).
+
+## Handling 429s
+
+```python
+import time
+import requests
+
+def call_with_retry(url, headers, max_retries=3):
+    for attempt in range(max_retries):
+        resp = requests.get(url, headers=headers)
+        if resp.status_code == 429:
+            time.sleep(2 ** attempt)  # exponential backoff
+            continue
+        return resp
+    raise Exception("rate limit exceeded after retries")
+```
+
+<Tip>
+  Check `X-RateLimit-Remaining` proactively to slow down before hitting the limit.
+</Tip>
