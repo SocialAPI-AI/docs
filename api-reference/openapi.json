@@ -1685,6 +1685,50 @@
             }
         },
         "/users/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the authenticated user's profile (id, email, plan tier, onboarding flag).",
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Get current user",
+                "responses": {
+                    "200": {
+                        "description": "User profile",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.UserMeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -1703,6 +1747,71 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.OKResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the authenticated user's profile. Currently only supports setting onboarding=false to mark onboarding as complete.",
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Update current user",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.PatchMeRequest"
+                            }
+                        }
+                    },
+                    "description": "Fields to update",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated user profile",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.UserMeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or onboarding value",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
                                 }
                             }
                         }
@@ -2155,6 +2264,15 @@
                     }
                 }
             },
+            "api_endpoints.PatchMeRequest": {
+                "type": "object",
+                "properties": {
+                    "onboarding": {
+                        "type": "boolean",
+                        "example": false
+                    }
+                }
+            },
             "api_endpoints.ReplyRequest": {
                 "type": "object",
                 "properties": {
@@ -2240,6 +2358,27 @@
                     "period_start": {
                         "type": "string",
                         "example": "2026-02-01T00:00:00Z"
+                    }
+                }
+            },
+            "api_endpoints.UserMeResponse": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "example": "user@example.com"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                    },
+                    "onboarding": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "plan": {
+                        "type": "string",
+                        "example": "free"
                     }
                 }
             },
