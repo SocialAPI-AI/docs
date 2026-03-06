@@ -19,7 +19,8 @@ Instagram is the first fully supported connector. It uses the Meta Graph API for
 
 | Feature | Supported | Notes |
 |---|---|---|
-| Comments | ✅ | |
+| List posts | ✅ | Returns posts, reels, carousels |
+| Comments | ✅ | Scoped to a specific post |
 | Reply to comment | ✅ | |
 | Private reply | ✅ | Sends a DM to the commenter |
 | Comment replies (thread) | ✅ | |
@@ -70,10 +71,41 @@ curl -X POST https://api.social-api.ai/v1/oauth/exchange \
   }'
 ```
 
-## Sample: List comments
+## Sample: List posts
 
 ```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/comments?limit=10" \
+curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "17895695668004550",
+      "platform": "instagram",
+      "caption": "Hello world #socapi",
+      "media_type": "IMAGE",
+      "media_url": "https://scontent-...",
+      "permalink": "https://www.instagram.com/p/ABC123/",
+      "timestamp": "2026-03-01T12:00:00Z",
+      "like_count": 42,
+      "comments_count": 5,
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+    }
+  ],
+  "count": 1
+}
+```
+
+## Sample: List comments on a post
+
+Comments are scoped to a specific post. Use the post `id` from the response above:
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/posts/17895695668004550/comments?limit=10" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
@@ -96,7 +128,7 @@ Sample response:
         "media": []
       },
       "metadata": {
-        "post_id": "17841405793100001"
+        "post_id": "17895695668004550"
       },
       "created_at": "2026-02-15T14:30:00Z",
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",

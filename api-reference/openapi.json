@@ -126,120 +126,6 @@
                 }
             }
         },
-        "/accounts/{id}/comments": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Fetches comments for a connected account across all posts. Results are sorted newest-first. Use `cursor` for pagination and `since` to poll for new comments incrementally.",
-                "tags": [
-                    "Comments"
-                ],
-                "summary": "List comments",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "2026-02-01T00:00:00Z",
-                        "description": "Return only items created after this timestamp (RFC3339)",
-                        "name": "since",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": 50,
-                        "description": "Maximum number of results to return (1–100, default 50)",
-                        "name": "limit",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Pagination cursor returned by the previous response",
-                        "name": "cursor",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Paginated list of comments",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.InteractionsListResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid query parameters",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Daily rate limit exceeded or platform rate limit hit",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "501": {
-                        "description": "Platform does not support this operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/accounts/{id}/dms": {
             "get": {
                 "security": [
@@ -598,7 +484,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Hides, unhides, or permanently deletes a comment. The `:iid` must be a comment ID (prefixed `socapi_cmt_`). Deleted comments cannot be recovered.",
+                "description": "Hides, unhides, or permanently deletes a comment. The `:iid` must be a comment ID (prefixed `sapi_cmt_`). Deleted comments cannot be recovered.",
                 "tags": [
                     "Comments"
                 ],
@@ -615,8 +501,8 @@
                         }
                     },
                     {
-                        "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
-                        "description": "Interaction ID (socapi_cmt_...)",
+                        "example": "sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
+                        "description": "Interaction ID (sapi_cmt_...)",
                         "name": "iid",
                         "in": "path",
                         "required": true,
@@ -707,7 +593,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Fetches the reply thread for a specific comment. The `:iid` must be a comment ID (prefixed `socapi_cmt_`).",
+                "description": "Fetches the reply thread for a specific comment. The `:iid` must be a comment ID (prefixed `sapi_cmt_`).",
                 "tags": [
                     "Comments"
                 ],
@@ -724,8 +610,8 @@
                         }
                     },
                     {
-                        "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
-                        "description": "Interaction ID (socapi_cmt_...)",
+                        "example": "sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
+                        "description": "Interaction ID (sapi_cmt_...)",
                         "name": "iid",
                         "in": "path",
                         "required": true,
@@ -831,7 +717,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Posts a reply to a comment (`socapi_cmt_`) or review (`socapi_rev_`). The interaction type is automatically detected from the ID prefix. Set `private: true` to send the reply as a private/direct message on platforms that support it (e.g. Instagram).",
+                "description": "Posts a reply to a comment (`sapi_cmt_`) or review (`sapi_rev_`). The interaction type is automatically detected from the ID prefix. Set `private: true` to send the reply as a private/direct message on platforms that support it (e.g. Instagram).",
                 "tags": [
                     "Comments"
                 ],
@@ -848,8 +734,8 @@
                         }
                     },
                     {
-                        "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
-                        "description": "Interaction ID (socapi_cmt_... or socapi_rev_...)",
+                        "example": "sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
+                        "description": "Interaction ID (sapi_cmt_... or sapi_rev_...)",
                         "name": "iid",
                         "in": "path",
                         "required": true,
@@ -1114,6 +1000,244 @@
                     },
                     "501": {
                         "description": "Platform does not support mention tracking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/posts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns media objects (posts, reels, carousels) published by the connected account. Use `cursor` for pagination.",
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "List posts",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-02-01T00:00:00Z",
+                        "description": "Return only items created after this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 50,
+                        "description": "Maximum number of results to return (1–100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor returned by the previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of posts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PostsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support listing posts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/posts/{pid}/comments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetches comments for a specific post on a connected account. Results are sorted newest-first. Use `cursor` for pagination and `since` to poll for new comments incrementally.",
+                "tags": [
+                    "Comments"
+                ],
+                "summary": "List comments on a post",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17895695668004550",
+                        "description": "Platform post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-02-01T00:00:00Z",
+                        "description": "Return only items created after this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 50,
+                        "description": "Maximum number of results to return (1–100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor returned by the previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of comments",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InteractionsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Daily rate limit exceeded or platform rate limit hit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support this operation",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2273,6 +2397,21 @@
                     }
                 }
             },
+            "api_endpoints.PostsListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 10
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Post"
+                        }
+                    }
+                }
+            },
             "api_endpoints.ReplyRequest": {
                 "type": "object",
                 "properties": {
@@ -2297,7 +2436,7 @@
                     },
                     "id": {
                         "type": "string",
-                        "example": "socapi_cmt_cmVwbHk6MTIzNDU2Nzg5"
+                        "example": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U"
                     }
                 }
             },
@@ -2543,7 +2682,7 @@
                     },
                     "id": {
                         "type": "string",
-                        "example": "socapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1"
+                        "example": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U"
                     },
                     "metadata": {
                         "type": "object",
@@ -2573,6 +2712,41 @@
                     "url": {
                         "type": "string",
                         "example": "https://cdn.example.com/photo.jpg"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.Post": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    },
+                    "caption": {
+                        "type": "string"
+                    },
+                    "comments_count": {
+                        "type": "integer"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "like_count": {
+                        "type": "integer"
+                    },
+                    "media_type": {
+                        "type": "string"
+                    },
+                    "media_url": {
+                        "type": "string"
+                    },
+                    "permalink": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "string"
                     }
                 }
             }
