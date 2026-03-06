@@ -1,25 +1,186 @@
 ---
 title: Facebook
-description: Facebook connector for SocialAPI.AI.
+description: Connect and interact with Facebook Pages via the Meta Graph API.
 ---
 
-<Badge>Coming soon</Badge>
+<Badge>Available</Badge>
 
-Facebook support is in active development. It shares Meta Graph API authentication with Instagram.
+Facebook Pages are fully supported. The connector uses the Meta Graph API for posts, comments, DMs (Messenger), and mentions.
 
-## Planned features
+## Details
 
-| Feature | Planned |
+| Field | Value |
 |---|---|
-| Comments | ✅ |
-| DMs | ✅ |
-| Reviews | — |
-| Mentions | — |
+| Platform slug | `facebook` |
+| Auth type | OAuth 2.0 (Meta) |
+| API | Meta Graph API v25.0 |
 
-## Auth type
+## Feature support
 
-OAuth 2.0 (Meta — same app credentials as Instagram)
+| Feature | Supported | Notes |
+|---|---|---|
+| List posts | ✅ | Page feed posts |
+| Comments | ✅ | Scoped to a specific post |
+| Reply to comment | ✅ | |
+| Private reply | ✅ | Sends a one-time DM to the commenter |
+| Comment replies (thread) | ✅ | |
+| Moderate comment (hide/unhide/delete) | ✅ | |
+| Toggle post comments | — | Not supported by Facebook Graph API |
+| DMs | ✅ | Via Messenger (24-hour messaging window) |
+| Send DM | ✅ | |
+| Get DM thread by user | ✅ | |
+| Reviews | — | Deprecated in Graph API v22.0 |
+| Mentions | ✅ | Posts where the Page is tagged |
 
-## Notify me
+## Connecting
 
-[Contact us](mailto:support@social-api.ai) to be notified when Facebook support launches.
+Facebook OAuth connects all Pages the user manages. Each Page becomes a separate connected account.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "facebook",
+    "metadata": {
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "auth_url": "https://www.facebook.com/v25.0/dialog/oauth?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+}
+```
+
+Redirect your user to `auth_url`. After they authorize, Facebook redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "facebook",
+    "code": "AQDtbPB9X...",
+    "metadata": {
+      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+If the user manages multiple Pages, the response returns all of them:
+
+```json
+{
+  "data": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "facebook",
+      "username": ""
+    },
+    {
+      "account_id": "acc_02JA8Y4R5S6N7Q9P3W1K0X2L",
+      "platform": "facebook",
+      "username": ""
+    }
+  ],
+  "count": 2
+}
+```
+
+If only one Page, the response is flat (same as Instagram):
+
+```json
+{
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "facebook",
+  "username": ""
+}
+```
+
+## Sample: List posts
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "123456789_987654321",
+      "platform": "facebook",
+      "caption": "Check out our new product!",
+      "media_type": "status",
+      "permalink": "https://www.facebook.com/123456789/posts/987654321",
+      "timestamp": "2026-03-01T12:00:00Z",
+      "like_count": 0,
+      "comments_count": 0,
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+    }
+  ],
+  "count": 1
+}
+```
+
+## Sample: List comments on a post
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/posts/123456789_987654321/comments?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_...",
+      "platform": "facebook",
+      "type": "comment",
+      "author": {
+        "id": "111222333",
+        "name": "Jane Smith"
+      },
+      "content": {
+        "text": "Great post!"
+      },
+      "metadata": {
+        "post_id": "123456789_987654321",
+        "hidden": false,
+        "like_count": 2,
+        "reply_count": 1
+      },
+      "created_at": "2026-03-01T13:00:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_id": "987654321_111222333"
+    }
+  ],
+  "count": 1
+}
+```
+
+## Sample: List DMs
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/dms?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## Notes
+
+- **Multi-Page OAuth** — A single OAuth flow connects all Facebook Pages the user manages. Each Page gets its own `account_id`.
+- **Page tokens never expire** — Unlike Instagram, Facebook Page tokens derived from long-lived user tokens do not expire. No reconnection needed unless the user revokes access.
+- **Private replies** — Replying to a comment with `"private": true` sends a one-time DM to the commenter. Can only be sent once per comment, within 7 days of the comment.
+- **24-hour messaging window** — Pages can send any message within 24 hours of the user's last message. After that, only approved message tags are allowed. If you get an error sending a DM, the window may have closed.
+- **Reviews deprecated** — Facebook deprecated Page Recommendations/Reviews in Graph API v22.0 (March 2025). The API returns `501` for review endpoints.
+- **Required permissions** — Your Meta App must have these scopes approved: `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_messaging`.
