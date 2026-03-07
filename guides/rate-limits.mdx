@@ -1,41 +1,47 @@
 ---
-title: Rate Limits & Plans
-description: Daily API call limits and how to handle them.
+title: Credits & Plans
+description: Monthly credit allowances and how to manage them.
 ---
 
-## Plan limits
+## How credits work
 
-Every API key has a daily call limit based on your plan tier. The window resets at midnight UTC.
+Every API request consumes **credits** from your monthly allowance. Most endpoints cost 1 credit. Write operations (replies, sending DMs) cost 2 credits.
 
-| Plan | Calls / day | Max platforms | DMs | Multi-tenant |
-|---|---|---|---|---|
-| Free | 100 | 2 | — | — |
-| Starter | 1,000 | 5 | ✅ | — |
-| Pro | 5,000 | 15 | ✅ | — |
-| Business | 20,000 | 50 | ✅ | ✅ |
-| Enterprise | Unlimited | Unlimited | ✅ | ✅ |
+Credits reset at the start of each billing period — aligned with your Stripe subscription cycle. Free-tier users get a rolling 30-day window from account creation.
 
-`daily_limit` is `-1` for Enterprise (unlimited). Upgrade at [app.social-api.ai](https://app.social-api.ai) → **Billing**.
+## Plan credits
 
-## Response headers
+| Plan | Credits / month | Price |
+|---|---|---|
+| Free | 100 | $0 |
+| Starter | 2,000 | $29 |
+| Pro | 10,000 | $79 |
+| Business | 50,000 | $199 |
+| Enterprise | Unlimited | Custom |
 
-Every API response includes:
+Credits are the **only** differentiator between plans. All plans have access to all platforms, DMs, and features.
 
-| Header | Description |
-|---|---|
-| `X-RateLimit-Limit` | Your daily call limit |
-| `X-RateLimit-Remaining` | Remaining calls for today |
+Upgrade at [app.social-api.ai](https://app.social-api.ai) → **Billing**.
 
-## When you hit the limit
+## Credit costs per endpoint
+
+| Operation | Cost | Examples |
+|---|---|---|
+| Read | 1 credit | List comments, fetch DMs, list posts |
+| Write | 2 credits | Reply to comment, send DM |
+
+## When you run out
 
 The API returns HTTP `429` with:
 
 ```json
 {
-  "error": "daily API call limit exceeded for your plan",
+  "error": "monthly credit limit exceeded for your plan",
   "code": "rate_limit_exceeded"
 }
 ```
+
+Your credits reset at the start of your next billing period. To get more credits immediately, upgrade your plan.
 
 ## Checking your usage
 
@@ -46,15 +52,18 @@ curl https://api.social-api.ai/v1/usage \
 
 ```json
 {
-  "calls_used": 247,
-  "daily_limit": 1000,
-  "period_start": "2026-02-01T00:00:00Z"
+  "credits_used": 142,
+  "credits_limit": 2000,
+  "period_start": "2026-02-15T00:00:00Z",
+  "period_end": "2026-03-15T00:00:00Z"
 }
 ```
 
+`credits_limit` is `-1` for Enterprise (unlimited).
+
 ## Platform rate limits
 
-Platforms (Instagram, Google, etc.) have their own rate limits independent of ours. When a platform rejects a request due to its own limits, you receive:
+Platforms (Instagram, Facebook, etc.) have their own rate limits independent of your credit balance. When a platform rejects a request due to its own limits, you receive:
 
 ```json
 {
@@ -63,7 +72,7 @@ Platforms (Instagram, Google, etc.) have their own rate limits independent of ou
 }
 ```
 
-This does **not** count against your SocialAPI daily limit. Retry after a short wait (typically a few minutes).
+This does **not** consume credits. Retry after a short wait (typically a few minutes).
 
 ## Handling 429s
 
@@ -78,13 +87,9 @@ def call_with_retry(url, headers, max_retries=3):
             time.sleep(2 ** attempt)  # exponential backoff
             continue
         return resp
-    raise Exception("rate limit exceeded after retries")
+    raise Exception("credit limit exceeded after retries")
 ```
 
-<Tip>
-  Check `X-RateLimit-Remaining` proactively to slow down before hitting the limit.
-</Tip>
-
 <Note>
-  If the rate limiter backend is unavailable, the API **fails open** — requests are allowed through rather than blocked. This prevents infrastructure downtime from taking down your integration.
+  If the credit enforcement backend is unavailable, the API **fails open** — requests are allowed through rather than blocked. This prevents infrastructure downtime from taking down your integration.
 </Note>

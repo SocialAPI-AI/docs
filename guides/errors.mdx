@@ -27,7 +27,7 @@ Use `code` for programmatic error handling; use `error` for logging and display.
 | 404 | `account_not_found` | The account ID does not belong to your workspace |
 | 404 | `not_found` | The requested resource does not exist |
 | 409 | `account_already_linked` | This social account is already connected |
-| 429 | `rate_limit_exceeded` | Your daily API call limit is exceeded |
+| 429 | `rate_limit_exceeded` | Your monthly credit limit is exceeded |
 | 429 | `platform_rate_limit` | The upstream platform's own rate limit was hit |
 | 500 | — | Internal server error (contact support) |
 | 501 | `not_supported` | This operation is not supported on this platform |
@@ -46,11 +46,11 @@ if error["code"] == "invalid_token":
 
 ### 429 rate_limit_exceeded
 
-Back off and retry tomorrow, or upgrade your plan.
+Your monthly credit allowance is exhausted. Credits reset at the start of your next billing period, or upgrade your plan for more credits.
 
 ### 429 platform_rate_limit
 
-The platform (not SocialAPI) is throttling. This does **not** count against your daily limit. Wait a few minutes and retry.
+The platform (not SocialAPI) is throttling. This does **not** consume your credits. Wait a few minutes and retry.
 
 ### 501 not_supported
 
@@ -70,7 +70,7 @@ if (!resp.ok) {
       await reconnectAccount(accountId);
       break;
     case "rate_limit_exceeded":
-      throw new Error("Daily limit hit — retry tomorrow");
+      throw new Error("Monthly credit limit hit — upgrade or wait for reset");
     case "platform_rate_limit":
       await sleep(60_000);
       return retry();

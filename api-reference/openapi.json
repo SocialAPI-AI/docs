@@ -133,7 +133,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Fetches direct message threads for a connected account, sorted by most recently active. Each thread is returned as an `Interaction` with `type: \"dm\"`. **Requires Starter plan or higher.**",
+                "description": "Fetches direct message threads for a connected account, sorted by most recently active. Each thread is returned as an `Interaction` with `type: \"dm\"`. Consumes credits per your plan.",
                 "tags": [
                     "Direct Messages"
                 ],
@@ -207,16 +207,6 @@
                             }
                         }
                     },
-                    "403": {
-                        "description": "DMs not available on your plan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
                     "404": {
                         "description": "Account not found",
                         "content": {
@@ -257,7 +247,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the thread ID for an existing DM conversation with the given platform user. Returns 404 if no prior conversation exists with that user. Use the returned `thread_id` to send messages via `POST /accounts/:id/dms/:tid/send`. **Requires Starter plan or higher.**",
+                "description": "Returns the thread ID for an existing DM conversation with the given platform user. Returns 404 if no prior conversation exists with that user. Use the returned `thread_id` to send messages via `POST /accounts/:id/dms/:tid/send`. Consumes credits per your plan.",
                 "tags": [
                     "Direct Messages"
                 ],
@@ -365,7 +355,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sends a message to an existing DM thread. Use `GET /accounts/:id/dms/thread?user_id=...` to look up the thread ID before calling this endpoint. **Requires Starter plan or higher.**",
+                "description": "Sends a message to an existing DM thread. Use `GET /accounts/:id/dms/thread?user_id=...` to look up the thread ID before calling this endpoint. Consumes credits per your plan.",
                 "tags": [
                     "Direct Messages"
                 ],
@@ -426,16 +416,6 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "DMs not available on your plan",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1769,14 +1749,14 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the number of API calls made by this key during the current calendar month, alongside the daily call limit for the account's plan. The `daily_limit` is -1 for Enterprise (unlimited). `period_start` is always the first day of the current UTC month at 00:00:00.",
+                "description": "Returns the number of credits consumed during the current billing period, alongside the credit limit for the account's plan. The `credits_limit` is -1 for Enterprise (unlimited). Period boundaries come from Stripe subscription or rolling 30-day windows for free users.",
                 "tags": [
                     "Usage"
                 ],
-                "summary": "Get API usage for the current billing period",
+                "summary": "Get credit usage for the current billing period",
                 "responses": {
                     "200": {
-                        "description": "Usage statistics for the current billing period",
+                        "description": "Credit usage for the current billing period",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1796,7 +1776,7 @@
                         }
                     },
                     "429": {
-                        "description": "Rate limit exceeded",
+                        "description": "Credit limit exhausted",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2343,10 +2323,6 @@
                     "preview": {
                         "type": "string",
                         "example": "sapi_key_a1b2c..."
-                    },
-                    "rate_limit": {
-                        "type": "integer",
-                        "example": 1000
                     }
                 }
             },
@@ -2486,17 +2462,21 @@
             "api_endpoints.UsageResponse": {
                 "type": "object",
                 "properties": {
-                    "calls_used": {
+                    "credits_limit": {
                         "type": "integer",
-                        "example": 247
+                        "example": 2000
                     },
-                    "daily_limit": {
+                    "credits_used": {
                         "type": "integer",
-                        "example": 1000
+                        "example": 142
+                    },
+                    "period_end": {
+                        "type": "string",
+                        "example": "2026-03-15T00:00:00Z"
                     },
                     "period_start": {
                         "type": "string",
-                        "example": "2026-02-01T00:00:00Z"
+                        "example": "2026-02-15T00:00:00Z"
                     }
                 }
             },
