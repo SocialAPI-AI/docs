@@ -20,6 +20,39 @@ SocialAPI.AI uses a connector pattern — each platform implements the same inte
 
 **Legend:** ✅ Available · Soon = In development · — = Not supported by platform
 
+## Account object
+
+`GET /v1/accounts` returns an array of Account objects:
+
+```json
+{
+  "id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "instagram",
+  "name": "Acme Corp",
+  "username": "acmecorp"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Account ID. Pass this as `:id` in all account-scoped endpoints. |
+| `platform` | string | Platform identifier (e.g. `instagram`, `facebook`, `tiktok`). |
+| `name` | string | Display name of the connected page or profile. |
+| `username` | string | Platform handle or username. |
+| `metadata` | object | Optional. Platform-specific profile data. Omitted when empty. |
+
+The `metadata` object is platform-specific. Currently only TikTok populates it:
+
+| Key | Type | Platform |
+|---|---|---|
+| `avatar_url` | string | TikTok |
+| `follower_count` | integer | TikTok |
+| `following_count` | integer | TikTok |
+| `video_count` | integer | TikTok |
+| `likes_count` | integer | TikTok |
+
+Instagram, Facebook, Google, LinkedIn, and Threads do not populate `metadata`. Their Account objects omit the field entirely.
+
 ## What "not supported" means
 
 When a platform doesn't support a feature (e.g. Instagram has no reviews), calling that endpoint returns:

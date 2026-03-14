@@ -1103,6 +1103,172 @@
                         }
                     }
                 }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "Create or schedule a post",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.createPostRequest"
+                            }
+                        }
+                    },
+                    "description": "Post content",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/posts/{pid}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "Delete or cancel a post",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Scheduled post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "Update a scheduled post",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Scheduled post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.updatePostRequest"
+                            }
+                        }
+                    },
+                    "description": "Updated content",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/accounts/{id}/posts/{pid}/comments": {
@@ -1331,6 +1497,52 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/posts/{pid}/retry": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "Retry a failed post",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Scheduled post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
                                 }
                             }
                         }
@@ -1630,6 +1842,108 @@
                 }
             }
         },
+        "/media/upload-url": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Get a presigned media upload URL",
+                "parameters": [
+                    {
+                        "description": "MIME type (e.g. image/jpeg)",
+                        "name": "media_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Original filename (e.g. photo.jpg)",
+                        "name": "filename",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.MediaUploadInfoResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/media/{id}/verify": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Verify a media upload",
+                "parameters": [
+                    {
+                        "description": "Media ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/oauth/exchange": {
             "post": {
                 "security": [
@@ -1749,14 +2063,14 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the number of credits consumed during the current billing period, alongside the credit limit for the account's plan. The `credits_limit` is -1 for Enterprise (unlimited). Period boundaries come from Stripe subscription or rolling 30-day windows for free users.",
+                "description": "Returns accounts, posts, and interactions consumed during the current billing period alongside the plan limits. -1 means unlimited (Enterprise). Period boundaries come from Stripe subscription or rolling 30-day windows for free users.",
                 "tags": [
                     "Usage"
                 ],
-                "summary": "Get credit usage for the current billing period",
+                "summary": "Get resource usage for the current billing period",
                 "responses": {
                     "200": {
-                        "description": "Credit usage for the current billing period",
+                        "description": "Resource usage for the current billing period",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1767,16 +2081,6 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Credit limit exhausted",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2340,6 +2644,21 @@
                     }
                 }
             },
+            "api_endpoints.MediaUploadInfoResponse": {
+                "type": "object",
+                "properties": {
+                    "expires_at": {
+                        "type": "string",
+                        "example": "2026-03-14T09:15:00Z"
+                    },
+                    "media_id": {
+                        "type": "string"
+                    },
+                    "upload_url": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.ModerateCommentRequest": {
                 "type": "object",
                 "properties": {
@@ -2416,6 +2735,44 @@
                     }
                 }
             },
+            "api_endpoints.ScheduledPostResponse": {
+                "type": "object",
+                "properties": {
+                    "account_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-14T09:00:00Z"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "media_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "scheduled_at": {
+                        "type": "string",
+                        "example": "2026-04-01T10:00:00Z"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "scheduled"
+                    },
+                    "text": {
+                        "type": "string"
+                    },
+                    "user_id": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.SendDMRequest": {
                 "type": "object",
                 "properties": {
@@ -2462,13 +2819,21 @@
             "api_endpoints.UsageResponse": {
                 "type": "object",
                 "properties": {
-                    "credits_limit": {
+                    "accounts_limit": {
                         "type": "integer",
-                        "example": 500
+                        "example": 10
                     },
-                    "credits_used": {
+                    "accounts_used": {
                         "type": "integer",
-                        "example": 142
+                        "example": 3
+                    },
+                    "interactions_limit": {
+                        "type": "integer",
+                        "example": 5000
+                    },
+                    "interactions_used": {
+                        "type": "integer",
+                        "example": 1200
                     },
                     "period_end": {
                         "type": "string",
@@ -2477,12 +2842,24 @@
                     "period_start": {
                         "type": "string",
                         "example": "2026-02-15T00:00:00Z"
+                    },
+                    "posts_limit": {
+                        "type": "integer",
+                        "example": 200
+                    },
+                    "posts_used": {
+                        "type": "integer",
+                        "example": 42
                     }
                 }
             },
             "api_endpoints.UserMeResponse": {
                 "type": "object",
                 "properties": {
+                    "avatar_url": {
+                        "type": "string",
+                        "example": "https://example.com/avatar.jpg"
+                    },
                     "email": {
                         "type": "string",
                         "example": "user@example.com"
@@ -2575,6 +2952,33 @@
                     }
                 }
             },
+            "api_endpoints.createPostRequest": {
+                "type": "object",
+                "properties": {
+                    "account_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "media_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "platform_options": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "scheduled_at": {
+                        "type": "string"
+                    },
+                    "text": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.exchangeRequest": {
                 "type": "object",
                 "properties": {
@@ -2590,12 +2994,34 @@
                     }
                 }
             },
+            "api_endpoints.updatePostRequest": {
+                "type": "object",
+                "properties": {
+                    "media_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "platform_options": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "text": {
+                        "type": "string"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.Account": {
                 "type": "object",
                 "properties": {
                     "id": {
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {}
                     },
                     "name": {
                         "type": "string",
