@@ -126,6 +126,56 @@
                 }
             }
         },
+        "/accounts/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Soft-deletes a connected account. It will no longer appear in the accounts list\nand all API calls using this account will return 404.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Disconnect a social account",
+                "parameters": [
+                    {
+                        "description": "Account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Account disconnected"
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/accounts/{id}/dms": {
             "get": {
                 "security": [
@@ -1103,172 +1153,6 @@
                         }
                     }
                 }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "tags": [
-                    "Publishing"
-                ],
-                "summary": "Create or schedule a post",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.createPostRequest"
-                            }
-                        }
-                    },
-                    "description": "Post content",
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/accounts/{id}/posts/{pid}": {
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "tags": [
-                    "Publishing"
-                ],
-                "summary": "Delete or cancel a post",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Scheduled post ID",
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "tags": [
-                    "Publishing"
-                ],
-                "summary": "Update a scheduled post",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Scheduled post ID",
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.updatePostRequest"
-                            }
-                        }
-                    },
-                    "description": "Updated content",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
             }
         },
         "/accounts/{id}/posts/{pid}/comments": {
@@ -1497,52 +1381,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/accounts/{id}/posts/{pid}/retry": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "tags": [
-                    "Publishing"
-                ],
-                "summary": "Retry a failed post",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Scheduled post ID",
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
                                 }
                             }
                         }
@@ -1842,6 +1680,62 @@
                 }
             }
         },
+        "/media/upload": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload a media file directly through the API server. Use this when your\nenvironment cannot reach the S3 presigned URL (e.g. AI sandboxes). The\nreturned media_id is immediately ready for use in create_post — no\nseparate verify step is needed.",
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Upload media (server-side)",
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "description": "Media file to upload (max 50 MB)",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.MediaUploadResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/media/upload-url": {
             "get": {
                 "security": [
@@ -1994,6 +1888,259 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "List scheduled posts",
+                "parameters": [
+                    {
+                        "description": "Start of date range (ISO 8601)",
+                        "name": "from",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "End of date range (ISO 8601)",
+                        "name": "to",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by status",
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Max results (default 100, max 500)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "Create or schedule a post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.createPostRequest"
+                            }
+                        }
+                    },
+                    "description": "Post content",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/{pid}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "Delete or cancel a post",
+                "parameters": [
+                    {
+                        "description": "Scheduled post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "Update a scheduled post",
+                "parameters": [
+                    {
+                        "description": "Scheduled post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.updatePostRequest"
+                            }
+                        }
+                    },
+                    "description": "Updated content",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/{pid}/retry": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "Retry a failed post",
+                "parameters": [
+                    {
+                        "description": "Scheduled post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
                                 }
                             }
                         }
@@ -2659,6 +2806,14 @@
                     }
                 }
             },
+            "api_endpoints.MediaUploadResponse": {
+                "type": "object",
+                "properties": {
+                    "media_id": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.ModerateCommentRequest": {
                 "type": "object",
                 "properties": {
@@ -2689,6 +2844,23 @@
                     "onboarding": {
                         "type": "boolean",
                         "example": false
+                    }
+                }
+            },
+            "api_endpoints.PostResultResponse": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "permalink": {
+                        "type": "string",
+                        "example": "https://www.instagram.com/p/ABC123/"
+                    },
+                    "platform_post_id": {
+                        "type": "string",
+                        "example": "17899506382105207"
                     }
                 }
             },
@@ -2748,6 +2920,9 @@
                         "type": "string",
                         "example": "2026-03-14T09:00:00Z"
                     },
+                    "error_message": {
+                        "type": "string"
+                    },
                     "id": {
                         "type": "string"
                     },
@@ -2756,6 +2931,19 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "platform_options": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PostResultResponse"
+                        }
+                    },
+                    "retry_count": {
+                        "type": "integer"
                     },
                     "scheduled_at": {
                         "type": "string",
@@ -2768,8 +2956,26 @@
                     "text": {
                         "type": "string"
                     },
+                    "updated_at": {
+                        "type": "string",
+                        "example": "2026-03-14T09:00:00Z"
+                    },
                     "user_id": {
                         "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.ScheduledPostsListResponse": {
+                "type": "object",
+                "properties": {
+                    "cursor": {
+                        "type": "string"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
+                        }
                     }
                 }
             },
@@ -2939,6 +3145,9 @@
                     "auth_url": {
                         "type": "string"
                     },
+                    "message": {
+                        "type": "string"
+                    },
                     "state": {
                         "type": "string"
                     }
@@ -3001,6 +3210,12 @@
             "api_endpoints.updatePostRequest": {
                 "type": "object",
                 "properties": {
+                    "account_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "media_ids": {
                         "type": "array",
                         "items": {
@@ -3010,6 +3225,9 @@
                     "platform_options": {
                         "type": "object",
                         "additionalProperties": {}
+                    },
+                    "scheduled_at": {
+                        "type": "string"
                     },
                     "text": {
                         "type": "string"
