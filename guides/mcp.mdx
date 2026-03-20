@@ -1,6 +1,6 @@
 ---
 title: Use with AI Assistants
-description: Connect SocialAPI.AI to Claude, ChatGPT, Mistral, and other AI assistants as an MCP server.
+description: Connect SocialAPI.AI to Claude, ChatGPT, Mistral, Cursor, VS Code, and other AI tools as an MCP server.
 ---
 
 SocialAPI.AI exposes an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server. Once connected, your AI assistant can list accounts, fetch comments, reply, send DMs, publish posts, and more — all through natural language.
@@ -244,16 +244,17 @@ Authentication is handled automatically via OAuth 2.1 with PKCE — no API key i
     3. Click **Connectors**
     4. Click **+ Add Connector** on the right side
     5. Select the **Custom MCP Connector** tab
-    6. Fill in:
-       - **Connector name:** `SocialAPI`
-       - **Connection server:** `https://api.social-api.ai/mcp`
-       - **Description** (optional): `Manage social media accounts, posts, comments, DMs, and more`
-    7. Click **Connect**
 
     <img
       src="/images/mcp-lechat-settings.png"
       alt="Le Chat Custom MCP Connector configuration"
     />
+
+    6. Fill in:
+       - **Connector name:** `SocialAPI`
+       - **Connection server:** `https://api.social-api.ai/mcp`
+       - **Description** (optional): `Manage social media accounts, posts, comments, DMs, and more`
+    7. Click **Connect**
 
     Le Chat auto-detects the OAuth 2.1 authentication and guides you through the authorization flow.
 
@@ -271,6 +272,11 @@ Authentication is handled automatically via OAuth 2.1 with PKCE — no API key i
     <Note>
       The Connectors feature is currently in **Beta**. MCP connectors are also available on the Le Chat mobile apps (iOS and Android) — connectors configured on the web sync automatically.
     </Note>
+
+    <img
+      src="/images/mcp-lechat-conversation.png"
+      alt="Le Chat OAuth authorization for SocialAPI.AI"
+    />
   </Tab>
 
   <Tab title="Mobile (iOS / Android)">
@@ -279,6 +285,110 @@ Authentication is handled automatically via OAuth 2.1 with PKCE — no API key i
     1. Add SocialAPI as a connector on the web (see the **Web** tab)
     2. Open the Le Chat mobile app — the connector is already available
     3. Enable it via the **Tools** menu in a conversation
+  </Tab>
+</Tabs>
+
+## Cursor
+
+<Tabs>
+  <Tab title="Project or Global config">
+    ### Prerequisites
+
+    - [Cursor](https://cursor.com) installed
+    - A SocialAPI.AI account with at least one connected social account
+
+    ### Setup
+
+    Add to your project config (`.cursor/mcp.json`) or global config (`~/.cursor/mcp.json`):
+
+    ```json
+    {
+      "mcpServers": {
+        "SocialAPI": {
+          "url": "https://api.social-api.ai/mcp"
+        }
+      }
+    }
+    ```
+
+    No tokens or credentials are needed in the config — Cursor handles OAuth automatically.
+
+    When you first use a SocialAPI.AI tool, Cursor discovers the OAuth metadata, opens your browser for authorization, and exchanges the code using PKCE. The token is stored and refreshed automatically.
+
+    <Note>
+      Cursor supports both **SSE** and **Streamable HTTP** transports for remote servers. OAuth with Dynamic Client Registration and PKCE is handled automatically.
+    </Note>
+
+    ### Using in chat
+
+    Open **Agent** mode in Cursor. SocialAPI.AI tools appear under **Available Tools** and are invoked automatically when relevant. You can also mention a tool by name in your prompt.
+
+    ### Debugging
+
+    If the connection fails, open the **Output** panel (`Cmd+Shift+U` / `Ctrl+Shift+U`) and select **MCP Logs** from the dropdown.
+  </Tab>
+
+  <Tab title="Settings UI">
+    1. Open **Cursor Settings** (gear icon)
+    2. Go to **Tools & Integrations** in the left sidebar
+    3. Under **MCP Tools**, click **Add Custom MCP**
+    4. Enter the URL: `https://api.social-api.ai/mcp`
+    5. Click the **Needs login** button to start the OAuth flow
+    6. Authorize in the browser window that opens
+
+    <img
+      src="/images/mcp-cursor-settings.png"
+      alt="Cursor MCP Tools settings"
+    />
+  </Tab>
+</Tabs>
+
+## VS Code + GitHub Copilot
+
+<Tabs>
+  <Tab title="Config file">
+    ### Prerequisites
+
+    - [VS Code](https://code.visualstudio.com) (1.101+) with [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) extension
+    - A GitHub Copilot subscription (Individual, Business, or Enterprise)
+    - A SocialAPI.AI account with at least one connected social account
+
+    ### Setup
+
+    Create or edit `.vscode/mcp.json` in your workspace (or add to your user profile for global access):
+
+    ```json
+    {
+      "servers": {
+        "SocialAPI": {
+          "type": "http",
+          "url": "https://api.social-api.ai/mcp"
+        }
+      }
+    }
+    ```
+
+    VS Code will show a **CodeLens** action above the server entry. Click **Auth** to start the OAuth flow and authorize in the browser.
+
+    <Note>
+      VS Code supports OAuth 2.1 with Dynamic Client Registration. It auto-discovers the authorization server via `/.well-known/oauth-protected-resource`.
+    </Note>
+  </Tab>
+
+  <Tab title="Command Palette">
+    1. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+    2. Run **MCP: Add Server**
+    3. Select **HTTP** as the server type
+    4. Enter the URL: `https://api.social-api.ai/mcp`
+    5. Choose **Global** (user profile) or **Workspace** scope
+    6. Click the **Auth** CodeLens to complete the OAuth flow
+
+    <img
+      src="/images/mcp-vscode-settings.png"
+      alt="VS Code MCP server configuration"
+    />
+
+    SocialAPI.AI tools are then available in **Copilot Chat** (Agent mode).
   </Tab>
 </Tabs>
 
@@ -305,7 +415,7 @@ Your AI assistant has access to **31 tools** covering all SocialAPI.AI functiona
 
 **Authorization fails or loops** — Make sure pop-ups are not blocked in your browser when the OAuth window opens. Some browser extensions (ad blockers, privacy tools) can interfere with the redirect.
 
-**Connector not showing in conversation** — In Claude, click the **+** icon in the chat input and enable SocialAPI.AI under **Connectors**. In ChatGPT, check that the tool is enabled in your conversation settings. In Le Chat, use the **Tools** button (four squares icon).
+**Connector not showing in conversation** — In Claude, click the **+** icon in the chat input and enable SocialAPI.AI under **Connectors**. In ChatGPT, enable it via the **+** menu → **More**. In Le Chat, use the **Tools** button (four squares icon). In Cursor, check that the server is listed in **Tools & Integrations**.
 
 **Tool calls fail with 401** — Your OAuth session may have expired. Remove the SocialAPI.AI connection and re-add it to trigger a fresh authorization.
 
@@ -316,6 +426,10 @@ Your AI assistant has access to **31 tools** covering all SocialAPI.AI functiona
 **Claude Code authorization does not open browser** — Ensure your system default browser is configured. On headless/remote systems, Claude Code will print the authorization URL for you to open manually.
 
 **Le Chat connector not auto-detected** — Make sure the URL does not have a trailing slash. Enter exactly `https://api.social-api.ai/mcp`.
+
+**Cursor MCP logs** — Open the Output panel (`Cmd+Shift+U` / `Ctrl+Shift+U`) and select **MCP Logs** from the dropdown to debug connection or auth issues.
+
+**VS Code "Auth" button not showing** — Make sure you're on VS Code 1.101+ and the GitHub Copilot extension is installed and active. The CodeLens appears above the server entry in `.vscode/mcp.json`.
 
 ## Still have questions?
 
