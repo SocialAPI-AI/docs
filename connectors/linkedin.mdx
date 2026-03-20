@@ -1,25 +1,93 @@
 ---
 title: LinkedIn
-description: LinkedIn connector for SocialAPI.AI.
+description: Connect and interact with LinkedIn profiles and pages via the LinkedIn API.
 ---
 
-<Badge>Coming soon</Badge>
+<Badge>Available</Badge>
 
-LinkedIn support is in active development.
+LinkedIn is fully supported for posts, comments, moderation, and publishing.
 
-## Planned features
+## Details
 
-| Feature | Planned |
+| Field | Value |
 |---|---|
-| Comments | ✅ |
-| DMs | — |
-| Reviews | — |
-| Mentions | ✅ |
+| Platform slug | `linkedin` |
+| Auth type | OAuth 2.0 (LinkedIn) |
+| API | LinkedIn API v2 |
 
-## Auth type
+## Feature support
 
-OAuth 2.0 (LinkedIn)
+| Feature | Supported | Notes |
+|---|---|---|
+| List posts | ✅ | Profile and page posts |
+| Comments | ✅ | Scoped to a specific post |
+| Reply to comment | ✅ | |
+| Comment replies (thread) | ✅ | |
+| Moderate comment | delete only | Hide/unhide not supported by LinkedIn API |
+| Toggle post comments | ✅ | |
+| DMs | — | Not supported by LinkedIn API |
+| Reviews | — | Not applicable |
+| Mentions | — | Not supported via LinkedIn API |
+| Create post | ✅ | Text, images, articles |
+| Update post | ✅ | Text only — media cannot be updated |
+| Delete post | ✅ | |
 
-## Notify me
+## Connecting
 
-[Contact us](mailto:support@social-api.ai) to be notified when LinkedIn support launches.
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "linkedin",
+    "metadata": {
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "auth_url": "https://www.linkedin.com/oauth/v2/authorization?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+}
+```
+
+Redirect your user to `auth_url`. After they authorize, LinkedIn redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "linkedin",
+    "code": "AQR1234...",
+    "metadata": {
+      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+## Sample: List posts
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## Sample: List comments on a post
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/posts/{post_id}/comments?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## Notes
+
+- **Moderation** — LinkedIn only supports deleting comments. Hide and unhide actions return `501`.
+- **Post updates** — Only the text content of a post can be updated. Media attachments cannot be changed after publishing.
+- **Toggle comments** — You can enable or disable comments on posts you own.
+- **Token refresh** — LinkedIn OAuth tokens expire after 60 days. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.

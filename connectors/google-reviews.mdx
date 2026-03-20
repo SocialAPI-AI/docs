@@ -1,25 +1,126 @@
 ---
-title: Google Reviews
-description: Google Reviews connector for SocialAPI.AI.
+title: Google Business Profile
+description: Connect and interact with Google Business Profile locations via the Google Business Profile API.
 ---
 
-<Badge>Coming soon</Badge>
+<Badge>Available</Badge>
 
-Google Reviews support is in active development via the Google Business Profile API.
+Google Business Profile (formerly Google My Business) is fully supported. The connector covers reviews, local posts, and comments on those posts.
 
-## Planned features
+## Details
 
-| Feature | Planned |
+| Field | Value |
 |---|---|
-| Comments | — |
-| DMs | — |
-| Reviews | ✅ |
-| Mentions | — |
+| Platform slug | `google` |
+| Auth type | OAuth 2.0 (Google) |
+| API | Google Business Profile API |
 
-## Auth type
+## Feature support
 
-OAuth 2.0 (Google)
+| Feature | Supported | Notes |
+|---|---|---|
+| List posts | ✅ | GBP local posts (updates, offers, events) |
+| Comments | ✅ | Comments on local posts |
+| Reply to comment | ✅ | |
+| Comment replies (thread) | ✅ | |
+| Moderate comment | — | Not supported by Google Business Profile API |
+| Toggle post comments | — | Not supported by Google Business Profile API |
+| DMs | — | Not supported by platform |
+| Reviews | ✅ | Google Reviews on your business listing |
+| Reply to review | ✅ | |
+| Mentions | — | Not supported by platform |
+| Create post | ✅ | Local posts (updates, offers, events) |
+| Update post | ✅ | |
+| Delete post | ✅ | |
 
-## Notify me
+## Connecting
 
-[Contact us](mailto:support@social-api.ai) to be notified when Google Reviews support launches.
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "google",
+    "metadata": {
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "auth_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+}
+```
+
+Redirect your user to `auth_url`. After they authorize, Google redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "google",
+    "code": "4/0AX4XfWh...",
+    "metadata": {
+      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+## Sample: List reviews
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/reviews?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_rev_Z29vZ2xlOmNoSUpBYnVu",
+      "platform": "google",
+      "type": "review",
+      "author": {
+        "id": "accounts/123456789",
+        "name": "Jane Smith",
+        "avatar_url": "https://lh3.googleusercontent.com/..."
+      },
+      "content": {
+        "text": "Great service, highly recommend!",
+        "media": []
+      },
+      "metadata": {
+        "rating": 5
+      },
+      "created_at": "2026-03-01T14:30:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_id": "chIJAbun..."
+    }
+  ],
+  "count": 1
+}
+```
+
+## Sample: Reply to a review
+
+```bash
+curl -X POST \
+  "https://api.social-api.ai/v1/accounts/{id}/interactions/sapi_rev_Z29vZ2xlOmNoSUpBYnVu/reply" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Thank you for your kind review, Jane!"}'
+```
+
+## Notes
+
+- **Review ratings** are returned in `metadata.rating` as an integer (1-5).
+- **Local posts** include updates, offers, and event posts published through Google Business Profile.
+- **Token refresh** — Google OAuth tokens expire after 1 hour. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.

@@ -1,28 +1,77 @@
 ---
 title: TikTok
-description: TikTok connector for SocialAPI.AI.
+description: Connect and interact with TikTok accounts via the TikTok API.
 ---
 
-<Badge>Coming soon</Badge>
+<Badge>Available</Badge>
 
-TikTok support is in active development.
+TikTok is supported for listing videos and publishing new posts via the TikTok Content Posting API.
 
-## Planned features
+## Details
 
-| Feature | Planned |
+| Field | Value |
 |---|---|
-| Comments | ✅ |
-| DMs | — |
-| Reviews | — |
-| Mentions | — |
+| Platform slug | `tiktok` |
+| Auth type | OAuth 2.0 (TikTok) |
+| API | TikTok API v2 |
 
-## Auth type
+## Feature support
 
-OAuth 2.0 (TikTok)
+| Feature | Supported | Notes |
+|---|---|---|
+| List posts | ✅ | Returns published videos |
+| Comments | — | Not supported via TikTok API |
+| Reply to comment | — | |
+| Moderate comment | — | |
+| Toggle post comments | — | |
+| DMs | — | Not supported by platform API |
+| Reviews | — | Not applicable |
+| Mentions | — | Not supported via TikTok API |
+| Create post | ✅ | Via TikTok Content Posting API |
+| Delete post | — | Not supported via TikTok API |
+
+## Connecting
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "tiktok",
+    "metadata": {
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "auth_url": "https://www.tiktok.com/v2/auth/authorize/?client_key=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+}
+```
+
+Redirect your user to `auth_url`. After they authorize, TikTok redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "tiktok",
+    "code": "abc123...",
+    "metadata": {
+      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
 
 ## Account metadata
 
-When you call `GET /v1/accounts`, TikTok accounts include a `metadata` object with profile data:
+TikTok accounts include a `metadata` object with profile data:
 
 ```json
 {
@@ -48,8 +97,10 @@ When you call `GET /v1/accounts`, TikTok accounts include a `metadata` object wi
 | `video_count` | integer | Total published videos |
 | `likes_count` | integer | Total likes across all videos |
 
-Other platforms (Instagram, Facebook, Google, LinkedIn, Threads) do not currently populate `metadata`. The field is omitted from their Account objects.
+Other platforms do not currently populate `metadata`. The field is omitted from their Account objects.
 
-## Notify me
+## Notes
 
-[Contact us](mailto:support@social-api.ai) to be notified when TikTok support launches.
+- **Publishing** — Post creation uses the TikTok Content Posting API. Videos are uploaded via media upload, then published.
+- **Read-only interactions** — TikTok's API does not expose comment management or DM access. Only post listing and publishing are available.
+- **Token refresh** — TikTok OAuth tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.

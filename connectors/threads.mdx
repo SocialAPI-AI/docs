@@ -1,0 +1,114 @@
+---
+title: Threads
+description: Connect and interact with Threads accounts via the Meta Threads API.
+---
+
+<Badge>Available</Badge>
+
+Threads is fully supported for posts, comments, moderation, and publishing.
+
+## Details
+
+| Field | Value |
+|---|---|
+| Platform slug | `threads` |
+| Auth type | OAuth 2.0 (Meta / Threads) |
+| API | Meta Threads API |
+
+## Feature support
+
+| Feature | Supported | Notes |
+|---|---|---|
+| List posts | ✅ | Text posts, images, videos, carousels |
+| Comments | ✅ | Replies to a specific post |
+| Reply to comment | ✅ | |
+| Comment replies (thread) | ✅ | |
+| Moderate comment (hide/unhide/delete) | ✅ | Hide, unhide, and delete supported. Unknown actions return `501`. |
+| Toggle post comments | — | Not supported by Threads API |
+| DMs | — | Not supported by platform |
+| Reviews | — | Not applicable |
+| Mentions | — | Not supported via Threads API |
+| Create post | ✅ | Text, images, videos, carousels |
+| Delete post | ✅ | |
+| Update post | — | Not supported by Threads API |
+
+## Connecting
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "threads",
+    "metadata": {
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "auth_url": "https://threads.net/oauth/authorize?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+}
+```
+
+Redirect your user to `auth_url`. After they authorize, Threads redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "threads",
+    "code": "AQDtbPB9X...",
+    "metadata": {
+      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+## Sample: List posts
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "17895695668004550",
+      "platform": "threads",
+      "caption": "Hello from Threads!",
+      "media_type": "TEXT_POST",
+      "permalink": "https://www.threads.net/@acmecorp/post/ABC123",
+      "timestamp": "2026-03-01T12:00:00Z",
+      "like_count": 18,
+      "comments_count": 3,
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+    }
+  ],
+  "count": 1
+}
+```
+
+## Sample: List comments on a post
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/posts/17895695668004550/comments?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## Notes
+
+- **Moderation** — Hide, unhide, and delete are supported. Unsupported moderation actions return `501`.
+- **No post updates** — Threads does not support editing published posts. Use delete and re-create if needed.
+- **Publishing** — Supports text posts, single images, single videos, and carousel posts.
+- **Token refresh** — Threads tokens can expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
