@@ -27,7 +27,8 @@ Use `code` for programmatic error handling; use `error` for logging and display.
 | 404 | `account_not_found` | The account ID does not belong to your workspace |
 | 404 | `not_found` | The requested resource does not exist |
 | 409 | `account_already_linked` | This social account is already connected |
-| 429 | `rate_limit_exceeded` | Your monthly credit limit is exceeded |
+| 413 | `storage_quota_exceeded` | Media upload would exceed your plan's storage limit |
+| 429 | `rate_limit_exceeded` | Your monthly post or interaction limit is exceeded |
 | 429 | `platform_rate_limit` | The upstream platform's own rate limit was hit |
 | 500 | — | Internal server error (contact support) |
 | 501 | `not_supported` | This operation is not supported on this platform |
@@ -44,13 +45,25 @@ if error["code"] == "invalid_token":
     redirect_to_reconnect(account_id)
 ```
 
+### 413 storage_quota_exceeded
+
+Your media upload would push storage usage over the plan limit. Free plans are limited to 100 MB. Check your current usage with `GET /v1/media/storage`, delete unused media with `DELETE /v1/media/:id`, or upgrade your plan for unlimited storage.
+
+```python
+if error["code"] == "storage_quota_exceeded":
+    # Check current usage
+    usage = requests.get(f"{base_url}/v1/media/storage", headers=headers).json()
+    print(f"Storage: {usage['used_bytes']} / {usage['limit_bytes']} bytes")
+    # Consider deleting unused media or upgrading plan
+```
+
 ### 429 rate_limit_exceeded
 
-Your monthly credit allowance is exhausted. Credits reset at the start of your next billing period, or upgrade your plan for more credits.
+Your monthly post or interaction allowance is exhausted. Limits reset at the start of your next billing period, or upgrade your plan for unlimited capacity.
 
 ### 429 platform_rate_limit
 
-The platform (not SocialAPI) is throttling. This does **not** consume your credits. Wait a few minutes and retry.
+The platform (not SocialAPI) is throttling. This does **not** consume your quota. Wait a few minutes and retry.
 
 ### 501 not_supported
 
@@ -69,8 +82,10 @@ if (!resp.ok) {
     case "invalid_token":
       await reconnectAccount(accountId);
       break;
+    case "storage_quota_exceeded":
+      throw new Error("Storage full — delete unused media or upgrade plan");
     case "rate_limit_exceeded":
-      throw new Error("Monthly credit limit hit — upgrade or wait for reset");
+      throw new Error("Monthly limit hit — upgrade or wait for reset");
     case "platform_rate_limit":
       await sleep(60_000);
       return retry();

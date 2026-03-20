@@ -1,69 +1,128 @@
 ---
-title: Credits & Plans
-description: Monthly credit allowances and how to manage them.
+title: Plans & Limits
+description: Resource limits, billing periods, and how to monitor your usage.
 ---
 
-## How credits work
+## How plans work
 
-Every API request consumes **credits** from your monthly allowance. Most endpoints cost 1 credit. Write operations (replies, sending DMs) cost 2 credits.
+SocialAPI.AI uses **resource-based** limits. Every plan gives you a fixed number of connected accounts, posts per month, interactions per month, and media storage. All plans have access to all platforms, DMs, and features — plans differ only by resource limits.
 
-Credits reset at the start of each billing period — aligned with your Stripe subscription cycle. Free-tier users get a rolling 30-day window from account creation.
+Upgrade at [app.social-api.ai](https://app.social-api.ai) &rarr; **Billing**.
 
-## Plan credits
+## Plan limits
 
-| Plan | Credits / month | Price |
-|---|---|---|
-| Free | 100 | $0 |
-| Starter | 500 | $29 |
-| Pro | 5,000 | $149 |
-| Business | 50,000 | $799 |
-| Enterprise | Unlimited | Custom |
+| Plan | Accounts | Posts / month | Interactions / month | Storage | Price |
+|---|---|---|---|---|---|
+| Free | 2 | 10 | 50 | 100 MB | $0 |
+| Starter | 10 | Unlimited | Unlimited | Unlimited | $29 |
+| Pro | 50 | Unlimited | Unlimited | Unlimited | $149 |
+| Business | 200 | Unlimited | Unlimited | Unlimited | $799 |
+| Enterprise | Unlimited | Unlimited | Unlimited | Unlimited | Custom |
 
-Credits are the **only** differentiator between plans. All plans have access to all platforms, DMs, and features.
+## What counts as a post or interaction
 
-Upgrade at [app.social-api.ai](https://app.social-api.ai) → **Billing**.
+**Post operations** (each consumes 1 post from your monthly allowance):
+- `create_post` — publishing a new post
+- `retry_post` — retrying a failed post
 
-## Credit costs per endpoint
+**Interaction operations** (each consumes 1 interaction from your monthly allowance):
+- `reply` — replying to a comment, review, or mention
+- `send_dm` — sending a direct message
 
-| Operation | Cost | Examples |
-|---|---|---|
-| Read | 1 credit | List comments, fetch DMs, list posts |
-| Write | 2 credits | Reply to comment, send DM |
+**All other operations are free** — listing accounts, fetching comments, reading DMs, checking usage, managing API keys, etc. These do not consume any quota.
 
-## When you run out
+<Note>
+  Only the Free plan enforces post and interaction limits. All paid plans have unlimited posts and interactions — the counters are tracked but never block requests.
+</Note>
 
-The API returns HTTP `429` with:
+## Billing periods
+
+- **Paid plans:** Aligned with your Stripe subscription cycle. The `period_start` and `period_end` come directly from Stripe.
+- **Free plan:** Rolling 30-day window from your account creation anniversary date.
+
+Counters reset to zero at the start of each new period.
+
+## When you hit a limit
+
+When you exceed your monthly post or interaction allowance, the API returns HTTP `429`:
 
 ```json
 {
-  "error": "monthly credit limit exceeded for your plan",
+  "error": "monthly post limit exceeded for your plan",
   "code": "rate_limit_exceeded"
 }
 ```
 
-Your credits reset at the start of your next billing period. To get more credits immediately, upgrade your plan.
+Your counters reset at the start of your next billing period. To get more capacity immediately, upgrade your plan.
+
+When you exceed your storage quota, the API returns HTTP `413`:
+
+```json
+{
+  "error": "Storage quota exceeded. Free plan is limited to 100MB. Upgrade your plan for more storage.",
+  "code": "storage_quota_exceeded"
+}
+```
 
 ## Checking your usage
 
 ```bash
 curl https://api.social-api.ai/v1/usage \
-  -H "Authorization: Bearer $SOCAPI_KEY"
+  -H "Authorization: Bearer $SOCIALAPI_KEY"
 ```
 
 ```json
 {
-  "credits_used": 142,
-  "credits_limit": 500,
+  "accounts_used": 2,
+  "accounts_limit": 10,
+  "posts_used": 7,
+  "posts_limit": -1,
+  "interactions_used": 23,
+  "interactions_limit": -1,
   "period_start": "2026-02-15T00:00:00Z",
   "period_end": "2026-03-15T00:00:00Z"
 }
 ```
 
-`credits_limit` is `-1` for Enterprise (unlimited).
+A limit value of `-1` means unlimited (all paid plans).
+
+### Checking storage usage
+
+```bash
+curl https://api.social-api.ai/v1/media/storage \
+  -H "Authorization: Bearer $SOCIALAPI_KEY"
+```
+
+```json
+{
+  "used_bytes": 52428800,
+  "limit_bytes": 104857600,
+  "count": 12
+}
+```
+
+A `limit_bytes` value of `-1` means unlimited storage.
+
+### Response headers
+
+Post and interaction operations include usage headers in the response:
+
+| Header | Description |
+|---|---|
+| `X-Posts-Limit` | Monthly post limit for your plan |
+| `X-Posts-Remaining` | Posts remaining this period |
+| `X-Interactions-Limit` | Monthly interaction limit for your plan |
+| `X-Interactions-Remaining` | Interactions remaining this period |
+| `X-Storage-Used` | Current storage usage in bytes |
+| `X-Storage-Limit` | Storage limit in bytes for your plan |
+
+<Tip>
+  These headers are only set for Free plan post/interaction operations. Paid plans with unlimited resources omit them.
+</Tip>
 
 ## Platform rate limits
 
-Platforms (Instagram, Facebook, etc.) have their own rate limits independent of your credit balance. When a platform rejects a request due to its own limits, you receive:
+Platforms (Instagram, Facebook, etc.) have their own rate limits independent of your plan limits. When a platform rejects a request due to its own throttling, you receive:
 
 ```json
 {
@@ -72,7 +131,7 @@ Platforms (Instagram, Facebook, etc.) have their own rate limits independent of 
 }
 ```
 
-This does **not** consume credits. Retry after a short wait (typically a few minutes).
+This does **not** consume your post or interaction quota. Retry after a short wait (typically a few minutes).
 
 ## Handling 429s
 
@@ -87,9 +146,9 @@ def call_with_retry(url, headers, max_retries=3):
             time.sleep(2 ** attempt)  # exponential backoff
             continue
         return resp
-    raise Exception("credit limit exceeded after retries")
+    raise Exception("rate limit exceeded after retries")
 ```
 
 <Note>
-  If the credit enforcement backend is unavailable, the API **fails open** — requests are allowed through rather than blocked. This prevents infrastructure downtime from taking down your integration.
+  If the rate-limit enforcement backend (Redis) is unavailable, the API **fails open** — requests are allowed through rather than blocked. This prevents infrastructure downtime from taking down your integration.
 </Note>

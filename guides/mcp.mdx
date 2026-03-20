@@ -1,111 +1,322 @@
 ---
-title: Use with Claude
-description: Connect SocialAPI.AI to Claude as an MCP server and manage your social accounts through conversation.
+title: Use with AI Assistants
+description: Connect SocialAPI.AI to Claude, ChatGPT, Mistral, and other AI assistants as an MCP server.
 ---
 
-SocialAPI.AI exposes an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server. Once connected, Claude can list accounts, fetch comments, reply, send DMs, and more — all through natural language.
+SocialAPI.AI exposes an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server. Once connected, your AI assistant can list accounts, fetch comments, reply, send DMs, publish posts, and more — all through natural language.
 
-## Prerequisites
+**MCP Server URL:** `https://api.social-api.ai/mcp`
 
-- A SocialAPI.AI account with at least one connected social account
-- A Claude plan that supports connectors (Pro, Max, Team, or Enterprise)
+Authentication is handled automatically via OAuth 2.1 with PKCE — no API key is needed in the configuration.
 
-## 1. Open Connectors
+## Claude
 
-Click **Customize** in the left sidebar.
+<Tabs>
+  <Tab title="Web (claude.ai)">
+    ### Prerequisites
 
-<img
-  src="/images/mcp-claude-settings.png"
-  alt="Claude left sidebar with the Customize item highlighted"
-/>
+    - A SocialAPI.AI account with at least one connected social account
+    - Claude Free (1 custom connector), Pro, Max, Team, or Enterprise plan
 
-<Note>
-  If you don't see Connectors under Customize yet, go to **Settings** → **Connectors** — they are in the process of moving to the Customize page.
-</Note>
+    ### 1. Open Connectors
 
-## 2. Add a custom connector
+    Click your **profile icon**, then go to **Settings** → **Connectors**.
 
-Click on the `+` icon to add a new connector and select `Add custom connector`.
+    <img
+      src="/images/mcp-claude-settings.png"
+      alt="Claude Settings page with Connectors section"
+    />
 
-<img
-  src="/images/mcp-claude-add-server.png"
-  alt="Add custom connector dialog in Claude"
-/>
+    ### 2. Add a custom connector
 
-On the modal, enter the server name and URL:
+    Scroll to the bottom and click **Add custom connector**.
 
-```
-SocialAPI.ai
-```
+    <img
+      src="/images/mcp-claude-add-server.png"
+      alt="Add custom connector button in Claude"
+    />
 
-```
-https://api.social-api.ai/mcp
-```
+    Enter the server name and URL:
 
-Click **Add**.
+    ```
+    SocialAPI.ai
+    ```
 
-<img
-  src="/images/mcp-claude-add-server-modal.png"
-  alt="Add custom connector dialog in Claude"
-/>
+    ```
+    https://api.social-api.ai/mcp
+    ```
 
+    Click **Add**.
 
-## 3. Authorize with your account
+    <img
+      src="/images/mcp-claude-add-server-modal.png"
+      alt="Add custom connector dialog in Claude"
+    />
 
-Claude will initiate an OAuth flow. A browser window will open to the SocialAPI.AI authorization page.
+    ### 3. Authorize with your account
 
-<img
-  src="/images/mcp-claude-oauth.png"
-  alt="SocialAPI.AI OAuth authorization screen"
-/>
+    Claude will initiate an OAuth flow. A browser window will open to the SocialAPI.AI authorization page.
 
-Log in with your SocialAPI.AI credentials and click **Authorize**. The window closes automatically when done.
+    <img
+      src="/images/mcp-claude-oauth.png"
+      alt="SocialAPI.AI OAuth authorization screen"
+    />
 
-<Note>
-  This uses OAuth 2.1 with PKCE. No API key is required — your session is handled automatically.
-</Note>
+    Log in with your SocialAPI.AI credentials and click **Authorize**. The window closes automatically when done.
 
-## 4. Enable in a conversation
+    <Note>
+      This uses OAuth 2.1 with PKCE. No API key is required — your session is handled automatically.
+    </Note>
 
-Open a new Claude conversation. Click the **+** icon at the bottom-left of the input, select **Connectors**, and ensure **SocialAPI.AI** is toggled on.
+    ### 4. Enable in a conversation
 
-<img
-  src="/images/mcp-claude-conversation.png"
-  alt="Claude conversation using SocialAPI.AI tools to list accounts"
-/>
+    Open a new Claude conversation. Click the **+** icon at the bottom-left of the input, select **Connectors**, and ensure **SocialAPI.AI** is toggled on.
 
-Try asking:
+    <img
+      src="/images/mcp-claude-conversation.png"
+      alt="Claude conversation using SocialAPI.AI tools to list accounts"
+    />
 
-> "List my connected social accounts"
+    Try asking:
 
-> "Show me the latest comments on my Instagram posts"
+    > "List my connected social accounts"
 
-> "Reply to comment sapi_cmt_xxx with 'Thanks for your feedback!'"
+    > "Show me the latest comments on my Instagram posts"
+
+    > "Reply to comment sapi_cmt_xxx with 'Thanks for your feedback!'"
+
+    <Tip>
+      **Team / Enterprise:** Organization owners add connectors via **Organization settings → Connectors**. Members then go to **Settings → Connectors** and click **Connect** on the connector the owner configured.
+    </Tip>
+  </Tab>
+
+  <Tab title="Desktop App">
+    ### Prerequisites
+
+    - Claude Desktop installed ([download](https://claude.ai/download))
+    - Claude Free (1 custom connector), Pro, Max, Team, or Enterprise plan
+
+    ### Setup via the app UI (recommended)
+
+    Remote MCP servers are added through the app's **Settings → Connectors** — the same flow as claude.ai. Claude Desktop and claude.ai share the same account settings, so a connector added on either one appears on both.
+
+    1. Open Claude Desktop
+    2. Go to **Settings → Connectors**
+    3. Click **Add custom connector**
+    4. Enter `SocialAPI.ai` as the name and `https://api.social-api.ai/mcp` as the URL
+    5. Complete the OAuth authorization in the browser window that opens
+
+    <img
+      src="/images/mcp-claude-desktop-oauth.png"
+      alt="Claude Desktop OAuth authorization flow"
+    />
+
+    <Warning>
+      The `claude_desktop_config.json` file only supports **local stdio servers** (via `command` + `args`). Remote MCP servers cannot be added directly to this file — use Settings → Connectors instead.
+    </Warning>
+
+    <Note>
+      **Config file locations** (for local stdio servers only):
+      - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+      - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+    </Note>
+  </Tab>
+
+  <Tab title="Claude Code (CLI)">
+    ### Add via command line
+
+    ```bash
+    claude mcp add socialapi --transport http https://api.social-api.ai/mcp
+    ```
+
+    Claude Code will open your browser for OAuth authorization on first use.
+
+    ### Scopes
+
+    By default, the server is added to the **local** scope (current project only). Use `--scope user` for all projects or `--scope project` to share via `.mcp.json`:
+
+    ```bash
+    claude mcp add socialapi --transport http --scope user https://api.social-api.ai/mcp
+    ```
+
+    ### Manage servers
+
+    ```bash
+    claude mcp list              # list configured servers
+    claude mcp remove socialapi  # remove a server
+    ```
+
+    <Tip>
+      Claude Code uses its own subscription (Max plan or Claude Code subscription). No separate Pro plan is required.
+    </Tip>
+  </Tab>
+
+  <Tab title="Mobile (iOS / Android)">
+    Remote MCP servers work on Claude mobile. You **cannot add new servers from the mobile app** — configure them first on [claude.ai](https://claude.ai) via **Settings → Connectors**, and they automatically become available on mobile.
+
+    1. Add SocialAPI.AI as a connector on claude.ai (see the **Web** tab)
+    2. Open the Claude mobile app — the connector is already available
+    3. Enable it in a conversation via the **+** menu → **Connectors**
+
+    <Note>
+      Requires Claude Free (1 connector), Pro, Max, Team, or Enterprise plan. Same plan as your web account.
+    </Note>
+  </Tab>
+</Tabs>
+
+## ChatGPT (OpenAI)
+
+<Tabs>
+  <Tab title="Web & Desktop">
+    ### Prerequisites
+
+    - A SocialAPI.AI account with at least one connected social account
+    - Any ChatGPT plan (Apps are supported on all plans, including Free, Plus, Pro, Business, Enterprise, and Education)
+
+    ### 1. Enable Developer Mode
+
+    Go to **Settings → Apps & Connectors → Advanced settings** and toggle **Developer Mode** on.
+
+    <img
+      src="/images/mcp-chatgpt-settings.png"
+      alt="ChatGPT Apps & Connectors advanced settings"
+    />
+
+    ### 2. Create a connector
+
+    Go to **Settings → Connectors → Create** and fill in:
+
+    - **Name:** `SocialAPI.AI`
+    - **Description:** `Manage social media accounts, posts, comments, DMs, reviews, and mentions`
+    - **Connector URL:** `https://api.social-api.ai/mcp`
+
+    ChatGPT will test the connection and display the available tools if successful.
+
+    <img
+      src="/images/mcp-chatgpt-create.png"
+      alt="ChatGPT create connector dialog"
+    />
+
+    ### 3. Authorize with your account
+
+    When you first use a SocialAPI.AI tool, ChatGPT initiates an OAuth 2.1 flow with PKCE. A browser window opens to the SocialAPI.AI authorization page. Log in and click **Authorize**.
+
+    <img
+      src="/images/mcp-chatgpt-oauth.png"
+      alt="ChatGPT OAuth authorization for SocialAPI.AI"
+    />
+
+    <Note>
+      ChatGPT supports OAuth 2.1 with PKCE and Dynamic Client Registration. It auto-discovers your authorization server via `/.well-known/oauth-protected-resource` — no manual auth configuration is needed.
+    </Note>
+
+    ### 4. Enable in a conversation
+
+    Open a new conversation, click the **+** button near the message composer, select **More**, and toggle your SocialAPI.AI connector on.
+
+    <Tip>
+      As of December 2025, OpenAI renamed "connectors" to "apps" in parts of the UI. The functionality is the same.
+    </Tip>
+  </Tab>
+
+  <Tab title="Mobile (iOS / Android)">
+    Connectors created on ChatGPT web are available on the ChatGPT mobile apps (iOS and Android). You cannot create new connectors from the mobile app — set them up on the web first.
+
+    1. Add SocialAPI.AI as a connector on [chatgpt.com](https://chatgpt.com) (see the **Web & Desktop** tab)
+    2. Open the ChatGPT mobile app — the connector is already available
+    3. Enable it in a conversation via the **+** menu
+  </Tab>
+</Tabs>
+
+## Mistral / Le Chat
+
+<Tabs>
+  <Tab title="Web (chat.mistral.ai)">
+    ### Prerequisites
+
+    - A SocialAPI.AI account with at least one connected social account
+    - Any Le Chat plan (MCP connectors are available on the **free plan**)
+
+    ### Setup
+
+    1. Open Le Chat at [chat.mistral.ai](https://chat.mistral.ai)
+    2. Open the **side panel** and expand the **Intelligence** menu
+    3. Click **Connectors**
+    4. Click **+ Add Connector** on the right side
+    5. Select the **Custom MCP Connector** tab
+    6. Fill in:
+       - **Connector name:** `SocialAPI`
+       - **Connection server:** `https://api.social-api.ai/mcp`
+       - **Description** (optional): `Manage social media accounts, posts, comments, DMs, and more`
+    7. Click **Connect**
+
+    <img
+      src="/images/mcp-lechat-settings.png"
+      alt="Le Chat Custom MCP Connector configuration"
+    />
+
+    Le Chat auto-detects the OAuth 2.1 authentication and guides you through the authorization flow.
+
+    <img
+      src="/images/mcp-lechat-oauth.png"
+      alt="Le Chat OAuth authorization for SocialAPI.AI"
+    />
+
+    ### Using the connector
+
+    In a conversation, click the **Tools** button (four squares icon) below the chat input and check the box for **SocialAPI**. You can also type `/SocialAPI` in the input to activate it.
+
+    Le Chat will ask for approval before executing each tool call. You can select **Always Allow** to skip future prompts for that tool.
+
+    <Note>
+      The Connectors feature is currently in **Beta**. MCP connectors are also available on the Le Chat mobile apps (iOS and Android) — connectors configured on the web sync automatically.
+    </Note>
+  </Tab>
+
+  <Tab title="Mobile (iOS / Android)">
+    Le Chat mobile apps support MCP connectors. Configure them on the web at [chat.mistral.ai](https://chat.mistral.ai) and they sync automatically to your mobile app.
+
+    1. Add SocialAPI as a connector on the web (see the **Web** tab)
+    2. Open the Le Chat mobile app — the connector is already available
+    3. Enable it via the **Tools** menu in a conversation
+  </Tab>
+</Tabs>
 
 ## Available tools
 
-Claude has access to 31 tools covering all SocialAPI.AI functionality:
+Your AI assistant has access to **31 tools** covering all SocialAPI.AI functionality:
 
-| Category | What Claude can do |
+| Category | What the assistant can do |
 |---|---|
-| **Accounts** | List connected accounts, view platform metadata |
-| **Posts** | List posts, create, update, delete, retry |
-| **Comments** | Fetch comments, reply, moderate, toggle comments on/off |
+| **Accounts** | List connected accounts, connect new accounts, view platform metadata |
+| **Posts** | List posts, create, update, delete, retry failed posts |
+| **Publishing** | Upload media, get upload URLs, verify uploads |
+| **Comments** | Fetch comments, reply, moderate (hide/unhide/delete), toggle comments on/off |
 | **DMs** | List conversations, read threads, send messages |
-| **Reviews** | Fetch reviews, reply |
-| **Mentions** | Fetch mentions |
-| **Usage** | Check credit usage and limits |
-| **Keys** | List and create API keys |
-| **Webhooks** | Manage webhook endpoints |
+| **Reviews** | Fetch reviews, reply to reviews |
+| **Mentions** | Fetch mentions across platforms |
+| **Usage** | Check resource usage (accounts, posts, interactions, storage) and platform limits |
+| **Keys** | List, create, and revoke API keys |
+| **Webhooks** | List, create, update, and delete webhook endpoints |
+| **Users** | View and update profile, delete account |
+| **Feedback** | Send feedback to the SocialAPI.AI team |
 
 ## Troubleshooting
 
-**Authorization fails or loops** — Make sure pop-ups are not blocked in your browser when Claude opens the OAuth window.
+**Authorization fails or loops** — Make sure pop-ups are not blocked in your browser when the OAuth window opens. Some browser extensions (ad blockers, privacy tools) can interfere with the redirect.
 
-**Connector not showing in conversation** — Click the **+** icon in the chat input and enable SocialAPI.AI under **Connectors**.
+**Connector not showing in conversation** — In Claude, click the **+** icon in the chat input and enable SocialAPI.AI under **Connectors**. In ChatGPT, check that the tool is enabled in your conversation settings. In Le Chat, use the **Tools** button (four squares icon).
 
-**Tool calls fail with 401** — Your session may have expired. Open **Customize** in the left sidebar, remove SocialAPI.AI, and re-add it.
+**Tool calls fail with 401** — Your OAuth session may have expired. Remove the SocialAPI.AI connection and re-add it to trigger a fresh authorization.
+
+**"MCP server not responding"** — Verify the URL is exactly `https://api.social-api.ai/mcp`. Check [status.social-api.ai](https://status.social-api.ai) for any ongoing incidents.
+
+**Claude Desktop not picking up config changes** — After editing `claude_desktop_config.json`, you must fully restart Claude Desktop (quit and reopen, not just close the window). Note: this file is for local stdio servers only — remote servers are added via Settings → Connectors.
+
+**Claude Code authorization does not open browser** — Ensure your system default browser is configured. On headless/remote systems, Claude Code will print the authorization URL for you to open manually.
+
+**Le Chat connector not auto-detected** — Make sure the URL does not have a trailing slash. Enter exactly `https://api.social-api.ai/mcp`.
 
 ## Still have questions?
 
-If you have any issues or want to learn more about using SocialAPI.AI with Claude, please reach out to our support team at [support@social-api.ai]
+If you have any issues or want to learn more about using SocialAPI.AI with AI assistants, reach out to our support team at [support@social-api.ai](mailto:support@social-api.ai).

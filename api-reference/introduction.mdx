@@ -25,16 +25,16 @@ SocialAPI.AI IDs encode their type in a prefix so you can dispatch replies witho
 
 | Prefix | Type |
 |---|---|
-| `socapi_cmt_` | Comment |
-| `socapi_rev_` | Review |
-| `socapi_dm_` | Direct message |
-| `socapi_mnt_` | Mention |
+| `sapi_cmt_` | Comment |
+| `sapi_rev_` | Review |
+| `sapi_dm_` | Direct message |
+| `sapi_mnt_` | Mention |
 
 ## Request format
 
 - All request bodies must be JSON with `Content-Type: application/json`
 - All timestamps are RFC3339 (e.g. `2026-02-15T14:30:00Z`)
-- Paginated endpoints accept `since`, `limit` (1–100, default 50), and `cursor` query parameters
+- Paginated endpoints accept `since`, `limit` (1-100, default 50), and `cursor` query parameters
 
 ## Response format
 
@@ -53,8 +53,26 @@ All successful responses are JSON. All errors use:
 | `401` | Invalid or missing API key |
 | `403` | Feature not available on your plan |
 | `404` | Account or resource not found |
-| `429` | Monthly credit limit exceeded |
+| `413` | Storage quota exceeded |
+| `429` | Monthly resource limit exceeded |
 | `501` | Platform does not support this operation |
+
+## Endpoint groups
+
+| Group | Endpoints | Description |
+|---|---|---|
+| Accounts | `GET /accounts`, `POST /accounts/connect`, `POST /oauth/exchange` | Connect and list social accounts |
+| Posts | `GET /accounts/:id/posts`, `POST /posts`, `PATCH /posts/:pid`, `DELETE /posts/:pid`, `POST /posts/:pid/retry` | List, create, update, delete, retry posts |
+| Comments | `GET /accounts/:id/posts/:pid/comments`, `POST .../interactions/:iid/reply`, `POST .../interactions/:iid/moderate`, `GET .../interactions/:iid/replies`, `POST .../posts/:pid/comments/toggle` | Read, reply, moderate comments |
+| DMs | `GET /accounts/:id/dms`, `GET /accounts/:id/dms/thread`, `POST /accounts/:id/dms/:tid/send` | Read and send direct messages |
+| Reviews | `GET /accounts/:id/reviews` | Read reviews |
+| Mentions | `GET /accounts/:id/mentions` | Read mentions |
+| Media Library | `GET /media`, `DELETE /media/:id`, `GET /media/storage`, `GET /media/upload-url`, `POST /media/upload`, `POST /media/:id/verify` | Upload, list, delete media files and check storage |
+| Usage | `GET /usage`, `GET /accounts/:id/limits` | Check resource usage and platform limits |
+| API Keys | `GET /keys`, `POST /keys`, `DELETE /keys/:id` | Manage API keys |
+| Webhooks | `GET /webhooks`, `POST /webhooks`, `PATCH /webhooks/:id`, `DELETE /webhooks/:id` | Manage webhook endpoints |
+| Users | `GET /users/me`, `PATCH /users/me`, `DELETE /users/me` | User profile |
+| Billing | `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/checkout/status` | Stripe billing |
 
 ## Keeping the spec up to date
 

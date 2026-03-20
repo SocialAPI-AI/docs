@@ -1153,6 +1153,82 @@
                         }
                     }
                 }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "If scheduled_at is omitted, publishes immediately (sync, blocks until done).\nIf scheduled_at is set, schedules for future publication (async).",
+                "tags": [
+                    "Publishing"
+                ],
+                "summary": "Create or schedule a post",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.createPostRequest"
+                            }
+                        }
+                    },
+                    "description": "Post content",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "All accounts published (sync) or post scheduled (async)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "207": {
+                        "description": "Some accounts published, some failed (sync only)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "All accounts failed (sync only)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/accounts/{id}/posts/{pid}/comments": {
@@ -1680,6 +1756,96 @@
                 }
             }
         },
+        "/media": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of uploaded media files for the authenticated user.",
+                "tags": [
+                    "Media"
+                ],
+                "summary": "List media files",
+                "parameters": [
+                    {
+                        "description": "Max results (default 50, max 100)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor (media ID)",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.MediaListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/media/storage": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns total bytes used, the plan limit, and file count for the authenticated user.",
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Get storage usage",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.StorageUsageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/media/upload": {
             "post": {
                 "security": [
@@ -1780,6 +1946,45 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/media/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Media"
+                ],
+                "summary": "Delete a media file",
+                "parameters": [
+                    {
+                        "description": "Media ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1957,50 +2162,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ScheduledPostsListResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "tags": [
-                    "Publishing"
-                ],
-                "summary": "Create or schedule a post",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.createPostRequest"
-                            }
-                        }
-                    },
-                    "description": "Post content",
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
                                 }
                             }
                         }
@@ -2210,7 +2371,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns accounts, posts, and interactions consumed during the current billing period alongside the plan limits. -1 means unlimited (Enterprise). Period boundaries come from Stripe subscription or rolling 30-day windows for free users.",
+                "description": "Returns accounts, posts, and interactions consumed during the current billing period alongside the plan limits. -1 means unlimited (all paid plans). Period boundaries come from Stripe subscription or rolling 30-day windows for free users.",
                 "tags": [
                     "Usage"
                 ],
@@ -2791,6 +2952,57 @@
                     }
                 }
             },
+            "api_endpoints.MediaItemResponse": {
+                "type": "object",
+                "properties": {
+                    "content_type": {
+                        "type": "string",
+                        "example": "image/jpeg"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-20T09:00:00Z"
+                    },
+                    "filename": {
+                        "type": "string",
+                        "example": "photo.jpg"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                    },
+                    "size_bytes": {
+                        "type": "integer",
+                        "example": 2048576
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "ready"
+                    },
+                    "url": {
+                        "type": "string",
+                        "example": "https://s3.example.com/media/..."
+                    }
+                }
+            },
+            "api_endpoints.MediaListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 42
+                    },
+                    "cursor": {
+                        "type": "string"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MediaItemResponse"
+                        }
+                    }
+                }
+            },
             "api_endpoints.MediaUploadInfoResponse": {
                 "type": "object",
                 "properties": {
@@ -2854,13 +3066,25 @@
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
+                    "error": {
+                        "type": "string",
+                        "example": ""
+                    },
                     "permalink": {
                         "type": "string",
                         "example": "https://www.instagram.com/p/ABC123/"
                     },
+                    "platform": {
+                        "type": "string",
+                        "example": "instagram"
+                    },
                     "platform_post_id": {
                         "type": "string",
                         "example": "17899506382105207"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "published"
                     }
                 }
             },
@@ -2986,6 +3210,23 @@
                         "description": "Text is the message content. Required.",
                         "type": "string",
                         "example": "Hi! How can we help you today?"
+                    }
+                }
+            },
+            "api_endpoints.StorageUsageResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 12
+                    },
+                    "limit_bytes": {
+                        "type": "integer",
+                        "example": 104857600
+                    },
+                    "used_bytes": {
+                        "type": "integer",
+                        "example": 52428800
                     }
                 }
             },
