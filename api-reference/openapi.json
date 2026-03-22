@@ -1069,120 +1069,6 @@
                 }
             }
         },
-        "/accounts/{id}/posts": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns media objects (posts, reels, carousels) published by the connected account. Use `cursor` for pagination.",
-                "tags": [
-                    "Posts"
-                ],
-                "summary": "List posts",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "2026-02-01T00:00:00Z",
-                        "description": "Return only items created after this timestamp (RFC3339)",
-                        "name": "since",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": 50,
-                        "description": "Maximum number of results to return (1–100, default 50)",
-                        "name": "limit",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Pagination cursor returned by the previous response",
-                        "name": "cursor",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Paginated list of posts",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.PostsListResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid query parameters",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "501": {
-                        "description": "Platform does not support listing posts",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/accounts/{id}/posts/{pid}/comments": {
             "get": {
                 "security": [
@@ -1819,7 +1705,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Upload a media file directly through the API server. Use this when your\nenvironment cannot reach the S3 presigned URL (e.g. AI sandboxes). The\nreturned media_id is immediately ready for use in create_post — no\nseparate verify step is needed.",
+                "description": "Upload a media file directly through the API server.",
                 "tags": [
                     "Media"
                 ],
@@ -1847,20 +1733,6 @@
                 "responses": {
                     "201": {
                         "description": "Created",
-                        "headers": {
-                            "X-Storage-Limit": {
-                                "description": "Storage limit in bytes (-1 = unlimited)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            },
-                            "X-Storage-Used": {
-                                "description": "Bytes of storage used",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            }
-                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1939,20 +1811,6 @@
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "headers": {
-                            "X-Storage-Limit": {
-                                "description": "Storage limit in bytes (-1 = unlimited)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            },
-                            "X-Storage-Used": {
-                                "description": "Bytes of storage used",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            }
-                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2060,20 +1918,6 @@
                 "responses": {
                     "200": {
                         "description": "Upload verified",
-                        "headers": {
-                            "X-Storage-Limit": {
-                                "description": "Storage limit in bytes (-1 = unlimited)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            },
-                            "X-Storage-Used": {
-                                "description": "Bytes of storage used",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            }
-                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2169,35 +2013,22 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns scheduled, published, and failed posts within a date range. Use `status` to filter by lifecycle state.",
+                "description": "Returns posts with rich filtering and cursor pagination. Supports filtering by status, platform, account_ids, date range, and text search.",
                 "tags": [
                     "Posts"
                 ],
-                "summary": "List scheduled posts",
+                "summary": "List all posts",
                 "parameters": [
                     {
-                        "example": "2026-03-01T00:00:00Z",
-                        "description": "Start of date range (ISO 8601)",
-                        "name": "from",
+                        "description": "Comma-separated connected account IDs",
+                        "name": "account_ids",
                         "in": "query",
-                        "required": true,
                         "schema": {
                             "type": "string"
                         }
                     },
                     {
-                        "example": "2026-04-01T00:00:00Z",
-                        "description": "End of date range (ISO 8601)",
-                        "name": "to",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "scheduled",
-                        "description": "Filter by status (scheduled, published, partial, failed)",
+                        "description": "Filter by status (draft, scheduled, publishing, published, partial, failed, cancelled)",
                         "name": "status",
                         "in": "query",
                         "schema": {
@@ -2205,8 +2036,55 @@
                         }
                     },
                     {
-                        "example": 100,
-                        "description": "Max results (default 100, max 500)",
+                        "description": "Filter by platform (e.g. instagram, facebook)",
+                        "name": "platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Start of date range (RFC3339)",
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "End of date range (RFC3339)",
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Text search (case-insensitive)",
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Sort order: scheduled_asc (default), scheduled_desc, created_asc, created_desc",
+                        "name": "sort",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor from previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Max results (default 25, max 100)",
                         "name": "limit",
                         "in": "query",
                         "schema": {
@@ -2214,8 +2092,8 @@
                         }
                     },
                     {
-                        "description": "Pagination cursor from previous response",
-                        "name": "cursor",
+                        "description": "Include hidden posts (true/false, default false)",
+                        "name": "hidden",
                         "in": "query",
                         "schema": {
                             "type": "string"
@@ -2228,13 +2106,13 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostsListResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.PostsListResponse"
                                 }
                             }
                         }
                     },
                     "400": {
-                        "description": "Invalid date format or missing from/to",
+                        "description": "Invalid query parameters",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2261,7 +2139,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Publishes to one or more connected accounts. If scheduled_at is omitted the post is\npublished immediately (synchronous — blocks until all accounts respond). If scheduled_at\nis set the post is queued for future publication (asynchronous). Consumes 1 post credit.",
+                "description": "Publishes to one or more connected accounts. If scheduled_at is omitted the post is\npublished immediately (synchronous — blocks until all accounts respond). If scheduled_at\nis set the post is queued for future publication (asynchronous). Omit account_ids and\nscheduled_at to create a draft. Consumes 1 post credit.",
                 "tags": [
                     "Posts"
                 ],
@@ -2279,55 +2157,27 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "All accounts published (sync) or post scheduled (async)",
-                        "headers": {
-                            "X-Posts-Limit": {
-                                "description": "Monthly post limit (Free plan only)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            },
-                            "X-Posts-Remaining": {
-                                "description": "Posts remaining this period (Free plan only)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            }
-                        },
+                        "description": "All accounts published (sync) or post scheduled/drafted",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
                                 }
                             }
                         }
                     },
                     "207": {
                         "description": "Some accounts published, some failed (sync only)",
-                        "headers": {
-                            "X-Posts-Limit": {
-                                "description": "Monthly post limit (Free plan only)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            },
-                            "X-Posts-Remaining": {
-                                "description": "Posts remaining this period (Free plan only)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            }
-                        },
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
                                 }
                             }
                         }
                     },
                     "400": {
-                        "description": "Invalid body, missing account_ids or text",
+                        "description": "Invalid body",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2358,24 +2208,244 @@
                     },
                     "502": {
                         "description": "All accounts failed (sync only)",
-                        "headers": {
-                            "X-Posts-Limit": {
-                                "description": "Monthly post limit (Free plan only)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            },
-                            "X-Posts-Remaining": {
-                                "description": "Posts remaining this period (Free plan only)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            }
-                        },
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/import": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload a CSV file to create multiple posts. Use dry_run=true to validate without creating.",
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Bulk import posts from CSV",
+                "parameters": [
+                    {
+                        "description": "Validate only, do not create",
+                        "name": "dry_run",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "description": "CSV file (max 5 MB)",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ImportPostsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/logs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns publishing attempt logs with optional filtering by status, platform, and action.",
+                "tags": [
+                    "Logs"
+                ],
+                "summary": "List publishing logs",
+                "parameters": [
+                    {
+                        "description": "Filter: success, failed, skipped",
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by platform",
+                        "name": "platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter: publish, retry, cancel, unpublish",
+                        "name": "action",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Lookback window (max 7, default 7)",
+                        "name": "days",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Max results (max 100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PostLogsListResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/validate": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns media and text constraints for all supported platforms. Cacheable.",
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Get platform constraints",
+                "parameters": [
+                    {
+                        "description": "Filter to a single platform",
+                        "name": "platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Dry-run validation. Returns errors for hard limit violations and warnings for best-practice issues.",
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Validate post content",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.ValidatePostRequest"
+                            }
+                        }
+                    },
+                    "description": "Content to validate",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ValidatePostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
                                 }
                             }
                         }
@@ -2384,20 +2454,20 @@
             }
         },
         "/posts/{pid}": {
-            "delete": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Cancels a scheduled post or deletes a failed/published post record.",
+                "description": "Fetch a post by its ID with all platform delivery details.",
                 "tags": [
                     "Posts"
                 ],
-                "summary": "Delete or cancel a post",
+                "summary": "Get a single post",
                 "parameters": [
                     {
-                        "description": "Scheduled post ID",
+                        "description": "Post ID",
                         "name": "pid",
                         "in": "path",
                         "required": true,
@@ -2408,11 +2478,84 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Post deleted",
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Without ?platform: cancels a scheduled post or deletes a failed/published post across all platforms.\nWith ?platform=<name>: unpublishes from that single platform only (must be in published state).\nThe post record is kept; its status is recalculated based on remaining platform deliveries.",
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Delete, cancel, or unpublish a post",
+                "parameters": [
+                    {
+                        "description": "Post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Unpublish from this platform only (e.g. instagram, facebook)",
+                        "name": "platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Post deleted or unpublished",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Platform not found on post or not in published state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
                                 }
                             }
                         }
@@ -2436,6 +2579,16 @@
                                 }
                             }
                         }
+                    },
+                    "502": {
+                        "description": "Platform deletion failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -2445,14 +2598,14 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the text, media, schedule time, or target accounts of a pending post.\nOnly posts in `scheduled` or `failed` status can be updated.",
+                "description": "Updates the text, media, schedule time, target accounts, or hidden status of a pending post.\nOnly posts in `draft`, `scheduled`, or `failed` status can be updated.",
                 "tags": [
                     "Posts"
                 ],
-                "summary": "Update a scheduled post",
+                "summary": "Update a post",
                 "parameters": [
                     {
-                        "description": "Scheduled post ID",
+                        "description": "Post ID",
                         "name": "pid",
                         "in": "path",
                         "required": true,
@@ -2484,11 +2637,113 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid body or missing text",
+                        "description": "Invalid body",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/{pid}/logs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all publishing attempt logs for a specific post.",
+                "tags": [
+                    "Logs"
+                ],
+                "summary": "Get post logs",
+                "parameters": [
+                    {
+                        "description": "Post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Max results (max 100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PostLogsListResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/{pid}/metrics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetches live engagement metrics from platform APIs for a published post.",
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Get post metrics",
+                "parameters": [
+                    {
+                        "description": "Post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.MetricsResponse"
                                 }
                             }
                         }
@@ -2523,14 +2778,14 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Re-attempts publication of a post in `failed` status. Consumes 1 post credit.",
+                "description": "Re-attempts publication of a post in `failed` or `partial` status. Consumes 1 post credit.",
                 "tags": [
                     "Posts"
                 ],
                 "summary": "Retry a failed post",
                 "parameters": [
                     {
-                        "description": "Scheduled post ID",
+                        "description": "Post ID",
                         "name": "pid",
                         "in": "path",
                         "required": true,
@@ -2542,20 +2797,6 @@
                 "responses": {
                     "200": {
                         "description": "Post re-enqueued",
-                        "headers": {
-                            "X-Posts-Limit": {
-                                "description": "Monthly post limit (Free plan only)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            },
-                            "X-Posts-Remaining": {
-                                "description": "Posts remaining this period (Free plan only)",
-                                "schema": {
-                                    "type": "integer"
-                                }
-                            }
-                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3291,6 +3532,48 @@
                     }
                 }
             },
+            "api_endpoints.ImportPostsResponse": {
+                "type": "object",
+                "properties": {
+                    "created": {
+                        "type": "integer",
+                        "example": 8
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.ImportRowError"
+                        }
+                    },
+                    "failed": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "posts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PostResponse"
+                        }
+                    },
+                    "total_rows": {
+                        "type": "integer",
+                        "example": 10
+                    }
+                }
+            },
+            "api_endpoints.ImportRowError": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "invalid date format for scheduled_at"
+                    },
+                    "row": {
+                        "type": "integer",
+                        "example": 3
+                    }
+                }
+            },
             "api_endpoints.InteractionsListResponse": {
                 "type": "object",
                 "properties": {
@@ -3420,6 +3703,20 @@
                     }
                 }
             },
+            "api_endpoints.MetricsResponse": {
+                "type": "object",
+                "properties": {
+                    "platforms": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PostPlatformResponse"
+                        }
+                    },
+                    "post_id": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.ModerateCommentRequest": {
                 "type": "object",
                 "properties": {
@@ -3444,6 +3741,21 @@
                     }
                 }
             },
+            "api_endpoints.PaginationInfo": {
+                "type": "object",
+                "properties": {
+                    "has_more": {
+                        "type": "boolean"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "example": 25
+                    },
+                    "next_cursor": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.PatchMeRequest": {
                 "type": "object",
                 "properties": {
@@ -3453,16 +3765,97 @@
                     }
                 }
             },
-            "api_endpoints.PostResultResponse": {
+            "api_endpoints.PostLogResponse": {
                 "type": "object",
                 "properties": {
                     "account_id": {
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
-                    "error": {
+                    "action": {
                         "type": "string",
-                        "example": ""
+                        "example": "publish"
+                    },
+                    "attempt": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-22T10:00:05Z"
+                    },
+                    "duration_ms": {
+                        "type": "integer",
+                        "example": 2340
+                    },
+                    "error_message": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "instagram"
+                    },
+                    "post_id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "success"
+                    },
+                    "status_code": {
+                        "type": "integer",
+                        "example": 200
+                    }
+                }
+            },
+            "api_endpoints.PostLogsListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PostLogResponse"
+                        }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/api_endpoints.PaginationInfo"
+                    }
+                }
+            },
+            "api_endpoints.PostPlatformResponse": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "comments_count": {
+                        "type": "integer",
+                        "example": 7
+                    },
+                    "error_category": {
+                        "type": "string"
+                    },
+                    "error_caused_by": {
+                        "type": "string"
+                    },
+                    "error_message": {
+                        "type": "string"
+                    },
+                    "extra_metrics": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "like_count": {
+                        "type": "integer",
+                        "example": 42
+                    },
+                    "metrics_synced_at": {
+                        "type": "string",
+                        "example": "2026-04-01T11:00:00Z"
                     },
                     "permalink": {
                         "type": "string",
@@ -3476,24 +3869,91 @@
                         "type": "string",
                         "example": "17899506382105207"
                     },
+                    "published_at": {
+                        "type": "string",
+                        "example": "2026-04-01T10:00:05Z"
+                    },
+                    "saves_count": {
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "shares_count": {
+                        "type": "integer",
+                        "example": 0
+                    },
                     "status": {
                         "type": "string",
                         "example": "published"
                     }
                 }
             },
+            "api_endpoints.PostResponse": {
+                "type": "object",
+                "properties": {
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-14T09:00:00Z"
+                    },
+                    "error_message": {
+                        "type": "string"
+                    },
+                    "hidden": {
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "media_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "platform_options": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "platforms": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PostPlatformResponse"
+                        }
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "example": "2026-04-01T10:00:05Z"
+                    },
+                    "retry_count": {
+                        "type": "integer"
+                    },
+                    "scheduled_at": {
+                        "type": "string",
+                        "example": "2026-04-01T10:00:00Z"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "published"
+                    },
+                    "text": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "example": "2026-03-14T09:00:00Z"
+                    }
+                }
+            },
             "api_endpoints.PostsListResponse": {
                 "type": "object",
                 "properties": {
-                    "count": {
-                        "type": "integer",
-                        "example": 10
-                    },
                     "data": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Post"
+                            "$ref": "#/components/schemas/api_endpoints.PostResponse"
                         }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/api_endpoints.PaginationInfo"
                     }
                 }
             },
@@ -3522,78 +3982,6 @@
                     "id": {
                         "type": "string",
                         "example": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U"
-                    }
-                }
-            },
-            "api_endpoints.ScheduledPostResponse": {
-                "type": "object",
-                "properties": {
-                    "account_ids": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "example": "2026-03-14T09:00:00Z"
-                    },
-                    "error_message": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "string"
-                    },
-                    "media_ids": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "platform_options": {
-                        "type": "object",
-                        "additionalProperties": {}
-                    },
-                    "results": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/api_endpoints.PostResultResponse"
-                        }
-                    },
-                    "retry_count": {
-                        "type": "integer"
-                    },
-                    "scheduled_at": {
-                        "type": "string",
-                        "example": "2026-04-01T10:00:00Z"
-                    },
-                    "status": {
-                        "type": "string",
-                        "example": "scheduled"
-                    },
-                    "text": {
-                        "type": "string"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "example": "2026-03-14T09:00:00Z"
-                    },
-                    "user_id": {
-                        "type": "string"
-                    }
-                }
-            },
-            "api_endpoints.ScheduledPostsListResponse": {
-                "type": "object",
-                "properties": {
-                    "cursor": {
-                        "type": "string"
-                    },
-                    "data": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/api_endpoints.ScheduledPostResponse"
-                        }
                     }
                 }
             },
@@ -3653,6 +4041,10 @@
                             "type": "string"
                         }
                     },
+                    "hidden": {
+                        "description": "Hidden hides or unhides the post from list responses.",
+                        "type": "boolean"
+                    },
                     "media_ids": {
                         "description": "MediaIDs replaces the media files attached to the post.",
                         "type": "array",
@@ -3671,7 +4063,7 @@
                         "example": "2026-04-01T10:00:00Z"
                     },
                     "text": {
-                        "description": "Text is the updated post caption / body. Required.",
+                        "description": "Text is the updated post caption / body.",
                         "type": "string",
                         "example": "Updated caption!"
                     }
@@ -3763,6 +4155,76 @@
                     "plan": {
                         "type": "string",
                         "example": "free"
+                    }
+                }
+            },
+            "api_endpoints.ValidatePostRequest": {
+                "type": "object",
+                "properties": {
+                    "account_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "media_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "platform_options": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "platforms": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "scheduled_at": {
+                        "type": "string"
+                    },
+                    "text": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.ValidatePostResponse": {
+                "type": "object",
+                "properties": {
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.ValidationIssue"
+                        }
+                    },
+                    "valid": {
+                        "type": "boolean"
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.ValidationIssue"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.ValidationIssue": {
+                "type": "object",
+                "properties": {
+                    "field": {
+                        "type": "string",
+                        "example": "text"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "exceeds 2200 character limit (2350/2200)"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "instagram"
                     }
                 }
             },
@@ -3909,41 +4371,6 @@
                     "url": {
                         "type": "string",
                         "example": "https://cdn.example.com/photo.jpg"
-                    }
-                }
-            },
-            "social-api_ai_core_api_connectors_base.Post": {
-                "type": "object",
-                "properties": {
-                    "account_id": {
-                        "type": "string"
-                    },
-                    "caption": {
-                        "type": "string"
-                    },
-                    "comments_count": {
-                        "type": "integer"
-                    },
-                    "id": {
-                        "type": "string"
-                    },
-                    "like_count": {
-                        "type": "integer"
-                    },
-                    "media_type": {
-                        "type": "string"
-                    },
-                    "media_url": {
-                        "type": "string"
-                    },
-                    "permalink": {
-                        "type": "string"
-                    },
-                    "platform": {
-                        "type": "string"
-                    },
-                    "timestamp": {
-                        "type": "string"
                     }
                 }
             }
