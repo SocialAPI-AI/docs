@@ -1905,11 +1905,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Without ?platform: cancels a scheduled post or deletes a failed/published post across all platforms.\nWith ?platform=<name>: unpublishes from that single platform only (must be in published state).\nThe post record is kept; its status is recalculated based on remaining platform deliveries.",
+                "description": "Cancels a scheduled post or deletes a failed/published post across all platforms.",
                 "tags": [
                     "Posts"
                 ],
-                "summary": "Delete, cancel, or unpublish a post",
+                "summary": "Delete or cancel a post",
                 "parameters": [
                     {
                         "description": "Post ID",
@@ -1919,33 +1919,15 @@
                         "schema": {
                             "type": "string"
                         }
-                    },
-                    {
-                        "description": "Unpublish from this platform only (e.g. instagram, facebook)",
-                        "name": "platform",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Post deleted or unpublished",
+                        "description": "Post deleted",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Platform not found on post or not in published state",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
                                 }
                             }
                         }
@@ -1969,16 +1951,6 @@
                                 }
                             }
                         }
-                    },
-                    "502": {
-                        "description": "Platform deletion failed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
                     }
                 }
             },
@@ -1988,7 +1960,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the text, media, schedule time, target accounts, or hidden status of a pending post.\nOnly posts in `draft`, `scheduled`, or `failed` status can be updated.",
+                "description": "Updates the text, media, schedule time, targets, or hidden status of a pending post.\nOnly posts in `draft`, `scheduled`, or `failed` status can be updated.",
                 "tags": [
                     "Posts"
                 ],
@@ -2021,7 +1993,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
                                 }
                             }
                         }
@@ -2217,6 +2189,73 @@
                     },
                     "429": {
                         "description": "Monthly post limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/{pid}/unpublish": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Unpublishes a published post from a specific account (if account_id provided) or all accounts.",
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Unpublish a post",
+                "parameters": [
+                    {
+                        "description": "Post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.UnpublishRequest"
+                            }
+                        }
+                    },
+                    "description": "Optional account_id to unpublish from"
+                },
+                "responses": {
+                    "200": {
+                        "description": "Post unpublished",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2809,37 +2848,38 @@
             "api_endpoints.CreatePostRequest": {
                 "type": "object",
                 "properties": {
-                    "account_ids": {
-                        "description": "AccountIDs lists the connected accounts to publish to. At least one is required.",
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "example": [
-                            "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
-                        ]
+                    "first_comment": {
+                        "type": "string"
                     },
                     "media_ids": {
-                        "description": "MediaIDs references previously uploaded media files to attach.",
                         "type": "array",
                         "items": {
                             "type": "string"
                         }
                     },
-                    "platform_options": {
-                        "description": "PlatformOptions passes platform-specific settings (e.g. topicType for Google).",
-                        "type": "object",
-                        "additionalProperties": {}
+                    "publish_now": {
+                        "type": "boolean"
                     },
                     "scheduled_at": {
-                        "description": "ScheduledAt schedules the post for future publication. Omit for immediate publish.",
-                        "type": "string",
-                        "example": "2026-04-01T10:00:00Z"
+                        "type": "string"
+                    },
+                    "skip_duplicate_check": {
+                        "type": "boolean"
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.TargetRequest"
+                        }
                     },
                     "text": {
-                        "description": "Text is the post caption / body. Required.",
-                        "type": "string",
-                        "example": "Check out our new product!"
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "visibility": {
+                        "type": "string"
                     }
                 }
             },
@@ -3087,14 +3127,14 @@
             "api_endpoints.MetricsResponse": {
                 "type": "object",
                 "properties": {
-                    "platforms": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/api_endpoints.PostPlatformResponse"
-                        }
-                    },
                     "post_id": {
                         "type": "string"
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PostTargetResponse"
+                        }
                     }
                 }
             },
@@ -3191,77 +3231,12 @@
                     }
                 }
             },
-            "api_endpoints.PostPlatformResponse": {
-                "type": "object",
-                "properties": {
-                    "account_id": {
-                        "type": "string",
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
-                    },
-                    "comments_count": {
-                        "type": "integer",
-                        "example": 7
-                    },
-                    "error_category": {
-                        "type": "string"
-                    },
-                    "error_caused_by": {
-                        "type": "string"
-                    },
-                    "error_message": {
-                        "type": "string"
-                    },
-                    "extra_metrics": {
-                        "type": "object",
-                        "additionalProperties": {}
-                    },
-                    "like_count": {
-                        "type": "integer",
-                        "example": 42
-                    },
-                    "metrics_synced_at": {
-                        "type": "string",
-                        "example": "2026-04-01T11:00:00Z"
-                    },
-                    "permalink": {
-                        "type": "string",
-                        "example": "https://www.instagram.com/p/ABC123/"
-                    },
-                    "platform": {
-                        "type": "string",
-                        "example": "instagram"
-                    },
-                    "platform_post_id": {
-                        "type": "string",
-                        "example": "17899506382105207"
-                    },
-                    "published_at": {
-                        "type": "string",
-                        "example": "2026-04-01T10:00:05Z"
-                    },
-                    "saves_count": {
-                        "type": "integer",
-                        "example": 3
-                    },
-                    "shares_count": {
-                        "type": "integer",
-                        "example": 0
-                    },
-                    "status": {
-                        "type": "string",
-                        "example": "published"
-                    }
-                }
-            },
             "api_endpoints.PostResponse": {
                 "type": "object",
                 "properties": {
                     "created_at": {
                         "type": "string",
                         "example": "2026-03-14T09:00:00Z"
-                    },
-                    "error_message": {
-                        "type": "string"
                     },
                     "hidden": {
                         "type": "boolean"
@@ -3273,16 +3248,6 @@
                         "type": "array",
                         "items": {
                             "type": "string"
-                        }
-                    },
-                    "platform_options": {
-                        "type": "object",
-                        "additionalProperties": {}
-                    },
-                    "platforms": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/api_endpoints.PostPlatformResponse"
                         }
                     },
                     "published_at": {
@@ -3300,12 +3265,106 @@
                         "type": "string",
                         "example": "published"
                     },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PostTargetResponse"
+                        }
+                    },
                     "text": {
+                        "type": "string"
+                    },
+                    "title": {
                         "type": "string"
                     },
                     "updated_at": {
                         "type": "string",
                         "example": "2026-03-14T09:00:00Z"
+                    },
+                    "visibility": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.PostTargetErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string"
+                    },
+                    "caused_by": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.PostTargetMetricsResponse": {
+                "type": "object",
+                "properties": {
+                    "comments": {
+                        "type": "integer"
+                    },
+                    "extra": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "likes": {
+                        "type": "integer"
+                    },
+                    "saves": {
+                        "type": "integer"
+                    },
+                    "shares": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "api_endpoints.PostTargetResponse": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    },
+                    "error": {
+                        "$ref": "#/components/schemas/api_endpoints.PostTargetErrorResponse"
+                    },
+                    "first_comment": {
+                        "type": "string"
+                    },
+                    "metrics": {
+                        "$ref": "#/components/schemas/api_endpoints.PostTargetMetricsResponse"
+                    },
+                    "metrics_synced_at": {
+                        "type": "string"
+                    },
+                    "permalink": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "type": "string"
+                    },
+                    "platform_post_id": {
+                        "type": "string"
+                    },
+                    "published_at": {
+                        "type": "string"
+                    },
+                    "scheduled_at": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "text": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "visibility": {
+                        "type": "string"
                     }
                 }
             },
@@ -3370,41 +3429,79 @@
                     }
                 }
             },
-            "api_endpoints.UpdatePostRequest": {
+            "api_endpoints.TargetRequest": {
                 "type": "object",
                 "properties": {
-                    "account_ids": {
-                        "description": "AccountIDs changes the target accounts.",
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
+                    "account_id": {
+                        "type": "string"
                     },
-                    "hidden": {
-                        "description": "Hidden hides or unhides the post from list responses.",
-                        "type": "boolean"
+                    "first_comment": {
+                        "type": "string"
                     },
                     "media_ids": {
-                        "description": "MediaIDs replaces the media files attached to the post.",
                         "type": "array",
                         "items": {
                             "type": "string"
                         }
                     },
-                    "platform_options": {
-                        "description": "PlatformOptions passes platform-specific settings.",
+                    "platform_data": {
                         "type": "object",
                         "additionalProperties": {}
                     },
                     "scheduled_at": {
-                        "description": "ScheduledAt changes the scheduled publication time.",
-                        "type": "string",
-                        "example": "2026-04-01T10:00:00Z"
+                        "type": "string"
                     },
                     "text": {
-                        "description": "Text is the updated post caption / body.",
-                        "type": "string",
-                        "example": "Updated caption!"
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "visibility": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.UnpublishRequest": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.UpdatePostRequest": {
+                "type": "object",
+                "properties": {
+                    "first_comment": {
+                        "type": "string"
+                    },
+                    "hidden": {
+                        "type": "boolean"
+                    },
+                    "media_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "scheduled_at": {
+                        "type": "string"
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.TargetRequest"
+                        }
+                    },
+                    "text": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "visibility": {
+                        "type": "string"
                     }
                 }
             },
@@ -3512,10 +3609,6 @@
                             "type": "string"
                         }
                     },
-                    "platform_options": {
-                        "type": "object",
-                        "additionalProperties": {}
-                    },
                     "platforms": {
                         "type": "array",
                         "items": {
@@ -3524,6 +3617,12 @@
                     },
                     "scheduled_at": {
                         "type": "string"
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.TargetRequest"
+                        }
                     },
                     "text": {
                         "type": "string"
@@ -3564,6 +3663,10 @@
                     "platform": {
                         "type": "string",
                         "example": "instagram"
+                    },
+                    "target": {
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     }
                 }
             },
