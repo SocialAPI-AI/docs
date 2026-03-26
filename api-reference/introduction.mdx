@@ -11,7 +11,13 @@ https://api.social-api.ai/v1
 
 ## Authentication
 
-All endpoints require a Bearer token:
+All endpoints require a Bearer token. The API accepts three token types:
+
+| Token type | Format | Use case |
+|---|---|---|
+| API key | `sapi_key_...` | External API clients |
+| Auth service JWT | EdDSA signed JWT | Dashboard frontend |
+| OAuth 2.1 access token | EdDSA signed JWT | MCP / AI assistant clients |
 
 ```bash
 Authorization: Bearer sapi_key_your_key_here
@@ -19,22 +25,11 @@ Authorization: Bearer sapi_key_your_key_here
 
 See the [Authentication guide](/guides/authentication) for how to create and manage keys.
 
-## Interaction ID prefixes
-
-[SocialAPI.AI](https://social-api.ai) IDs encode their type in a prefix so you can dispatch replies without a database lookup:
-
-| Prefix | Type |
-|---|---|
-| `sapi_cmt_` | Comment |
-| `sapi_rev_` | Review |
-| `sapi_dm_` | Direct message |
-| `sapi_mnt_` | Mention |
-
 ## Request format
 
 - All request bodies must be JSON with `Content-Type: application/json`
-- All timestamps are RFC3339 (e.g. `2026-02-15T14:30:00Z`)
-- Paginated endpoints accept `since`, `limit` (1-100, default 50), and `cursor` query parameters
+- All timestamps are RFC 3339 (e.g. `2026-02-15T14:30:00Z`)
+- Paginated endpoints accept `limit` (1-100, default 25), `cursor`, and filtering parameters
 
 ## Response format
 
@@ -53,6 +48,7 @@ All successful responses are JSON. All errors use:
 | `401` | Invalid or missing API key |
 | `403` | Feature not available on your plan |
 | `404` | Account or resource not found |
+| `409` | Account already linked |
 | `413` | Storage quota exceeded |
 | `429` | Monthly resource limit exceeded |
 | `501` | Platform does not support this operation |
@@ -61,16 +57,16 @@ All successful responses are JSON. All errors use:
 
 | Group | Endpoints | Description |
 |---|---|---|
-| Accounts | `GET /accounts`, `POST /accounts/connect`, `POST /oauth/exchange` | Connect and list social accounts |
-| Posts | `GET /accounts/:id/posts`, `POST /posts`, `PATCH /posts/:pid`, `DELETE /posts/:pid`, `POST /posts/:pid/retry` | List, create, update, delete, retry posts |
-| Comments | `GET /accounts/:id/posts/:pid/comments`, `POST .../interactions/:iid/reply`, `POST .../interactions/:iid/moderate`, `GET .../interactions/:iid/replies`, `POST .../posts/:pid/comments/toggle` | Read, reply, moderate comments |
-| DMs | `GET /accounts/:id/dms`, `GET /accounts/:id/dms/thread`, `POST /accounts/:id/dms/:tid/send` | Read and send direct messages |
-| Reviews | `GET /accounts/:id/reviews` | Read reviews |
+| Accounts | `GET /accounts`, `POST /accounts/connect`, `POST /oauth/exchange`, `DELETE /accounts/:id` | Connect, list, and disconnect social accounts |
+| Inbox — Comments | `GET /inbox/comments`, `GET /inbox/comments/:postId`, `POST /inbox/comments/:postId`, `DELETE /inbox/comments/:postId/:commentId`, `POST .../hide`, `DELETE .../hide`, `POST .../like`, `DELETE .../like`, `POST .../private-reply` | List commented posts, read and reply to comments, moderate (hide, like, delete, private reply) |
+| Inbox — Conversations | `GET /inbox/conversations`, `GET /inbox/conversations/:id`, `PATCH /inbox/conversations/:id`, `GET .../messages`, `POST .../messages`, `POST .../read` | List conversations, read and send DMs, mark as read |
+| Inbox — Reviews | `GET /inbox/reviews`, `POST /inbox/reviews/:id/reply`, `PUT /inbox/reviews/:id/reply`, `DELETE /inbox/reviews/:id/reply` | Read reviews, reply, update, and delete replies |
 | Mentions | `GET /accounts/:id/mentions` | Read mentions |
+| Publishing | `POST /posts`, `GET /posts`, `GET /posts/:pid`, `PATCH /posts/:pid`, `DELETE /posts/:pid`, `POST /posts/:pid/retry`, `POST /posts/:pid/unpublish`, `GET /posts/:pid/metrics`, `GET /posts/:pid/logs`, `GET /posts/logs`, `POST /posts/import`, `GET /posts/validate`, `POST /posts/validate` | Create, schedule, update, delete, retry, and monitor posts |
 | Media Library | `GET /media`, `DELETE /media/:id`, `GET /media/storage`, `GET /media/upload-url`, `POST /media/upload`, `POST /media/:id/verify` | Upload, list, delete media files and check storage |
 | Usage | `GET /usage`, `GET /accounts/:id/limits` | Check resource usage and platform limits |
 | API Keys | `GET /keys`, `POST /keys`, `DELETE /keys/:id` | Manage API keys |
-| Webhooks | `GET /webhooks`, `POST /webhooks`, `PATCH /webhooks/:id`, `DELETE /webhooks/:id` | Manage webhook endpoints |
+| Webhooks | `GET /webhooks`, `POST /webhooks`, `PATCH /webhooks/:id`, `DELETE /webhooks/:id` | Manage outbound webhook endpoints |
 | Users | `GET /users/me`, `PATCH /users/me`, `DELETE /users/me` | User profile |
 | Billing | `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/checkout/status` | Stripe billing |
 
@@ -82,7 +78,7 @@ The API reference is generated from Go source annotations. To regenerate after c
 # From core/
 make docs
 
-# Commit the updated spec (docs/ is a separate git submodule)
+# Commit the updated spec (docs/ is a separate repo)
 cd ../docs/
 git add api-reference/openapi.json
 git commit -m "docs: regenerate OpenAPI spec"
@@ -90,19 +86,15 @@ git commit -m "docs: regenerate OpenAPI spec"
 
 This runs `swag init` (generates Swagger 2.0) then `swagger2openapi` (converts to OpenAPI 3.0) and writes the result to `docs/api-reference/openapi.json`.
 
-<Note>
-  `docs/` is a separate git submodule - not the same as `core/docs/` which contains the raw swagger output. Always `cd ../docs/` (not `cd docs/`) after running `make docs` from `core/`.
-</Note>
-
 <CardGroup cols={2}>
-  <Card title="Accounts" icon="link" href="/guides/oauth">
-    Connect and list social accounts.
+  <Card title="Inbox" icon="inbox" href="/guides/platforms">
+    Comments, DMs, and reviews across platforms.
   </Card>
-  <Card title="Comments & Reviews" icon="message" href="/connectors/instagram">
-    Read and reply to comments and reviews.
+  <Card title="Publishing" icon="paper-plane" href="/quickstart">
+    Create, schedule, and manage posts.
   </Card>
-  <Card title="DMs" icon="envelope" href="/connectors/overview">
-    Read and send direct messages.
+  <Card title="Webhooks" icon="bolt" href="/guides/webhooks">
+    Get notified of events in real time.
   </Card>
   <Card title="Error Handling" icon="triangle-exclamation" href="/guides/errors">
     All error codes and how to handle them.

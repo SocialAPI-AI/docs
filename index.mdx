@@ -1,34 +1,129 @@
 ---
 title: SocialAPI.AI
-description: Unified social media inbox API. Read and respond to comments, DMs, reviews, and mentions across Instagram, Facebook, Google Reviews, TikTok, YouTube, X/Twitter, Trustpilot, and LinkedIn - through a single REST API.
+description: Unified social media API. Manage your inbox, publish content, and monitor engagement across Instagram, Facebook, Threads, Google Business, TikTok, and LinkedIn through a single REST API.
 ---
 
 ## What is SocialAPI.AI?
 
-[SocialAPI.AI](https://social-api.ai) gives your application a single endpoint to read and respond to every customer interaction across platforms. Instead of integrating 8+ social APIs, you integrate once.
+[SocialAPI.AI](https://social-api.ai) gives your application a single API to manage social media across platforms. Read and reply to comments, DMs, and reviews. Create and schedule posts. Upload media. Get engagement metrics. Instead of integrating 6+ platform APIs, you integrate once.
 
-<CardGroup cols={2}>
+<CardGroup cols={3}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Make your first API call in 5 minutes.
   </Card>
   <Card title="API Reference" icon="terminal" href="/api-reference/introduction">
     Full reference for every endpoint.
   </Card>
-  <Card title="Platform support" icon="grid-2" href="/guides/platforms">
-    Which platforms support which interaction types.
+  <Card title="Platform Support" icon="grid-2" href="/guides/platforms">
+    Capabilities by platform.
   </Card>
-  <Card title="Use with AI Assistants" icon="wand-magic-sparkles" href="/integrations/overview">
-    Connect to Claude, ChatGPT, Mistral, Cursor, and VS Code.
+  <Card title="AI Assistants" icon="wand-magic-sparkles" href="/integrations/overview">
+    Connect to Claude, ChatGPT, Cursor, and more.
+  </Card>
+  <Card title="Webhooks" icon="bolt" href="/guides/webhooks">
+    Get notified of new comments, messages, and events.
+  </Card>
+  <Card title="Plans & Limits" icon="gauge" href="/guides/rate-limits">
+    Resource limits and billing.
   </Card>
 </CardGroup>
 
+## Core capabilities
+
+### Unified inbox
+
+Read and respond to every customer interaction from a single API. Comments, DMs, and reviews are organized under `/v1/inbox` with consistent response shapes across all platforms.
+
+```bash
+# List posts with comments
+curl https://api.social-api.ai/v1/inbox/comments \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+
+# Reply to a comment
+curl -X POST https://api.social-api.ai/v1/inbox/comments/POST_ID \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Thanks for your feedback!"}'
+
+# List DM conversations
+curl https://api.social-api.ai/v1/inbox/conversations \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+
+# List reviews
+curl https://api.social-api.ai/v1/inbox/reviews \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### Publishing
+
+Create, schedule, and manage posts across platforms. Publish to multiple accounts at once, track delivery status per platform, and monitor engagement metrics.
+
+```bash
+# Create and schedule a post to Instagram and Facebook
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Hello from SocialAPI!",
+    "targets": [
+      {"account_id": "acc_instagram", "platform": "instagram"},
+      {"account_id": "acc_facebook", "platform": "facebook"}
+    ],
+    "scheduled_at": "2026-04-01T12:00:00Z"
+  }'
+
+# Check post metrics
+curl https://api.social-api.ai/v1/posts/POST_ID/metrics \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### Media library
+
+Upload images and videos, then reuse them across posts. Presigned upload URLs keep your media pipeline fast and secure.
+
+```bash
+# Get a presigned upload URL
+curl "https://api.social-api.ai/v1/media/upload-url?filename=photo.jpg&content_type=image/jpeg" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### AI assistant integrations
+
+SocialAPI.AI exposes a full MCP server with 42 tools, so AI assistants like Claude, ChatGPT, and Cursor can manage your social accounts directly. OAuth 2.1 with PKCE keeps everything secure.
+
+[Set up AI integrations &rarr;](/integrations/overview)
+
 ## How it works
 
-1. **Connect** a social account via OAuth (`POST /v1/accounts/connect`)
-2. **Read** comments, DMs, reviews, or mentions (`GET /v1/accounts/:id/comments`)
-3. **Respond** with a single reply endpoint (`POST /v1/accounts/:id/interactions/:iid/reply`)
+1. **Connect** a social account via OAuth
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"platform": "instagram"}'
+```
 
-All interaction IDs are prefixed by type (`sapi_cmt_`, `sapi_rev_`, `sapi_dm_`, `sapi_mnt_`) so your code can dispatch without a database lookup.
+2. **Read** your inbox (comments, DMs, reviews)
+```bash
+curl https://api.social-api.ai/v1/inbox/comments \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+3. **Respond** to any interaction
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/comments/POST_ID \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Thanks!"}'
+```
+
+4. **Publish** content across platforms
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "New post!", "targets": [...]}'
+```
 
 ## Authentication
 
@@ -38,7 +133,7 @@ All requests require a Bearer token:
 Authorization: Bearer sapi_key_...
 ```
 
-See [Authentication](/guides/authentication) for details.
+See [Authentication](/guides/authentication) for details on API keys, JWTs, and OAuth tokens.
 
 ## Supported platforms
 

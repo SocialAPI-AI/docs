@@ -1,40 +1,41 @@
 ---
 title: "Pagination"
-description: "Page through large result sets using cursors and the since parameter."
+description: "Page through large result sets using cursors."
 ---
 
 ## Cursor-based pagination
 
-All list endpoints (`/comments`, `/reviews`, `/dms`, `/mentions`) return up to 100 results per page. To page through more, use the `cursor` returned in the previous response.
+All list endpoints return paginated results. To page through them, use the `cursor` returned in the previous response.
 
 ```bash
 # First page
-GET /v1/accounts/:id/comments?limit=50
+GET /v1/inbox/comments?limit=25
 
 # Next page (use cursor from previous response)
-GET /v1/accounts/:id/comments?limit=50&cursor=eyJpZCI6IjE3ODQx...
+GET /v1/inbox/comments?limit=25&cursor=eyJpZCI6IjE3ODQx...
 ```
 
 When there are no more results, the response will not include a `cursor` field.
 
-## Polling for new items with `since`
+This pattern applies to all list endpoints: `/v1/inbox/comments`, `/v1/inbox/conversations`, `/v1/inbox/reviews`, `/v1/posts`, `/v1/media`, and others.
 
-To incrementally poll for new interactions, use the `since` parameter with an RFC3339 timestamp:
+## Filtering
+
+Most list endpoints support filtering parameters. For example:
 
 ```bash
-GET /v1/accounts/:id/comments?since=2026-02-15T00:00:00Z
+# Posts with comments, filtered by account and platform
+GET /v1/inbox/comments?account_id=acc_01HZ...&platform=instagram&limit=25
+
+# Published posts, sorted by date
+GET /v1/posts?status=published&sort=created_at&order=desc&limit=25
 ```
 
-**Recommended polling strategy:**
-1. Store the `created_at` of the newest item from your last response
-2. On the next poll, pass it as `since`
-3. Process and store the new items
-4. Repeat on a schedule (e.g. every 60 seconds)
+See the [API Reference](/api-reference) for the full set of query parameters on each endpoint.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `limit` | integer | 50 | Results per page. Min 1, max 100. |
+| `limit` | integer | 25 | Results per page. Min 1, max 100. |
 | `cursor` | string | - | Opaque pagination cursor from previous response. |
-| `since` | string | - | RFC3339 timestamp. Return only items created after this time. |

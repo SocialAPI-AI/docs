@@ -368,6 +368,233 @@
                 }
             }
         },
+        "/brands": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all brands for the authenticated user with their connected account counts.",
+                "tags": [
+                    "Brands"
+                ],
+                "summary": "List brands",
+                "responses": {
+                    "200": {
+                        "description": "List of brands",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.BrandsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new brand for grouping connected social accounts. Each brand can have one account per platform.",
+                "tags": [
+                    "Brands"
+                ],
+                "summary": "Create a brand",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.CreateBrandRequest"
+                            }
+                        }
+                    },
+                    "description": "Brand name",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Brand created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.BrandResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or missing name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Brand limit reached for plan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/brands/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a brand and disconnects all its connected accounts.",
+                "tags": [
+                    "Brands"
+                ],
+                "summary": "Delete a brand",
+                "parameters": [
+                    {
+                        "description": "Brand ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Brand deleted"
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Brand not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Renames a brand.",
+                "tags": [
+                    "Brands"
+                ],
+                "summary": "Update a brand",
+                "parameters": [
+                    {
+                        "description": "Brand ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.UpdateBrandRequest"
+                            }
+                        }
+                    },
+                    "description": "New name",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Brand updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.BrandResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or missing name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Brand not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/inbox/conversations": {
             "get": {
                 "security": [
@@ -2329,7 +2556,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns accounts, posts, and interactions consumed during the current billing period alongside the plan limits. -1 means unlimited (all paid plans). Period boundaries come from Stripe subscription or rolling 30-day windows for free users.",
+                "description": "Returns brands, posts, and interactions consumed during the current billing period alongside the plan limits. -1 means unlimited (all paid plans). Period boundaries come from Stripe subscription or rolling 30-day windows for free users.",
                 "tags": [
                     "Usage"
                 ],
@@ -2768,6 +2995,71 @@
                     }
                 }
             },
+            "api_endpoints.BrandListItem": {
+                "type": "object",
+                "properties": {
+                    "accounts_count": {
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-14T09:00:00Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "b_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Acme Corporation"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "example": "2026-03-14T09:00:00Z"
+                    }
+                }
+            },
+            "api_endpoints.BrandResponse": {
+                "type": "object",
+                "properties": {
+                    "accounts_count": {
+                        "type": "integer",
+                        "example": 0
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-14T09:00:00Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "b_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Acme Corporation"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "example": "2026-03-14T09:00:00Z"
+                    }
+                }
+            },
+            "api_endpoints.BrandsListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.BrandListItem"
+                        }
+                    }
+                }
+            },
             "api_endpoints.ConnectAccountResponse": {
                 "type": "object",
                 "properties": {
@@ -2805,6 +3097,11 @@
             "api_endpoints.ConnectRequest": {
                 "type": "object",
                 "properties": {
+                    "brand_id": {
+                        "description": "BrandID optionally specifies which brand to attach the account to. If omitted, a new brand is auto-created.",
+                        "type": "string",
+                        "example": "b_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
                     "metadata": {
                         "description": "Metadata contains platform-specific connection data (e.g. redirect_uri for OAuth2 platforms).",
                         "type": "object",
@@ -2814,6 +3111,15 @@
                         "description": "Platform identifies the social platform to connect (e.g. instagram, facebook, google, threads, tiktok, linkedin).",
                         "type": "string",
                         "example": "instagram"
+                    }
+                }
+            },
+            "api_endpoints.CreateBrandRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Acme Corporation"
                     }
                 }
             },
@@ -3470,6 +3776,15 @@
                     }
                 }
             },
+            "api_endpoints.UpdateBrandRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Acme Corp"
+                    }
+                }
+            },
             "api_endpoints.UpdatePostRequest": {
                 "type": "object",
                 "properties": {
@@ -3531,11 +3846,11 @@
             "api_endpoints.UsageResponse": {
                 "type": "object",
                 "properties": {
-                    "accounts_limit": {
+                    "brands_limit": {
                         "type": "integer",
                         "example": 10
                     },
-                    "accounts_used": {
+                    "brands_used": {
                         "type": "integer",
                         "example": 3
                     },
@@ -3710,6 +4025,9 @@
             "social-api_ai_core_api_connectors_base.Account": {
                 "type": "object",
                 "properties": {
+                    "brand_id": {
+                        "type": "string"
+                    },
                     "id": {
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"

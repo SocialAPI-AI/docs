@@ -1,25 +1,43 @@
 ---
 title: "Platform Support"
-description: "Which platforms support which interaction types."
+description: "Which platforms support which capabilities."
 ---
 
 ## Capability matrix
 
-| Platform | Posts | Comments | Reply | Moderate | Toggle Comments | DMs | Reviews | Mentions | Publishing |
-|---|---|---|---|---|---|---|---|---|---|
-| Instagram | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ |
-| Facebook | ✅ | ✅ | ✅ | ✅ | - | ✅ | - | ✅ | ✅ |
-| Threads | ✅ | ✅ | ✅ | ✅ | - | - | - | - | ✅ |
-| Google | ✅ | ✅ | ✅ | - | - | - | ✅ | - | ✅ |
-| TikTok | ✅ | - | - | - | - | - | - | - | ✅ |
-| LinkedIn | ✅ | ✅ | ✅ | delete only | ✅ | - | - | - | ✅ |
-| YouTube | Soon | Soon | - | - | - | - | - | - | - |
-| X / Twitter | Soon | Soon | - | - | - | Soon | - | Soon | - |
-| Trustpilot | - | - | - | - | - | - | Soon | - | - |
+| Platform | Posts | Comments | Reply | Hide | Like | Delete | Private Reply | DMs | Reviews | Mentions | Publishing |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Instagram | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ |
+| Facebook | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ |
+| Threads | ✅ | ✅ | ✅ | ✅ | - | - | - | - | - | - | ✅ |
+| Google | ✅ | ✅ | ✅ | - | - | - | - | - | ✅ | - | ✅ |
+| TikTok | ✅ | - | - | - | - | - | - | - | - | - | ✅ |
+| LinkedIn | ✅ | ✅ | ✅ | - | - | ✅ | - | - | - | - | ✅ |
+| YouTube | Soon | Soon | - | - | - | - | - | - | - | - | - |
+| X / Twitter | Soon | Soon | - | - | - | - | - | Soon | - | Soon | - |
+| Trustpilot | - | - | - | - | - | - | - | - | Soon | - | - |
 
-**Legend:** ✅ Available · Soon = In development · - = Not supported by platform
+**Legend:** ✅ Supported · Soon = Coming soon · - = Not supported by platform
 
-All platforms and capabilities are available on every plan, including the Free tier. Plans differ only by [resource limits](/guides/rate-limits) (accounts, posts, interactions, storage).
+All platforms and capabilities are available on every plan, including the Free tier. Plans differ only by [resource limits](/guides/rate-limits) (brands, posts, interactions, storage).
+
+## Comment moderation
+
+Each comment returned from the inbox includes a `capabilities` object indicating which actions are available for that platform:
+
+```json
+{
+  "capabilities": {
+    "can_reply": true,
+    "can_delete": true,
+    "can_hide": true,
+    "can_like": true,
+    "can_private_reply": true
+  }
+}
+```
+
+Use these flags to conditionally render UI controls or decide which actions to attempt.
 
 ## Media library
 
@@ -30,7 +48,7 @@ All plans support media uploads for post publishing. Uploaded media is stored in
 | Free | 100 MB |
 | Starter+ | Unlimited |
 
-Manage your media library via the `/v1/media` endpoints - list, delete, and check storage usage. See the [API Reference](/api-reference) for details.
+Manage your media library via the `/v1/media` endpoints: list, delete, and check storage usage. See the [API Reference](/api-reference) for details.
 
 ## Unsupported operations
 
@@ -43,4 +61,4 @@ When you call an endpoint for a capability a platform does not support, [SocialA
 }
 ```
 
-Your code should handle `501` gracefully - it is not an error in your integration, it is a platform limitation.
+Your code should handle `501` gracefully. It's not an error in your integration, just a platform limitation.
