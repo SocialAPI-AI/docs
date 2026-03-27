@@ -1033,6 +1033,223 @@
                 }
             }
         },
+        "/invite/{token}": {
+            "get": {
+                "description": "Public endpoint (no auth). Validates the invite token and redirects the user\nto the platform's OAuth authorization page. On successful OAuth callback,\nthe account is connected to the invite creator's brand.",
+                "tags": [
+                    "Invites"
+                ],
+                "summary": "Redeem an invite link",
+                "parameters": [
+                    {
+                        "description": "Invite token",
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to platform OAuth"
+                    },
+                    "404": {
+                        "description": "Invite not found",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "Invite expired or already used",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/invites": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all invites (active and used/expired) for a brand, ordered by created_at DESC.",
+                "tags": [
+                    "Invites"
+                ],
+                "summary": "List invites for a brand",
+                "parameters": [
+                    {
+                        "description": "Brand ID",
+                        "name": "brand_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of invites",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InviteListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing brand_id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Brand not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a single-use invite link for an external user to connect a social account to a brand.\nThe brand must not already have a connected account for the specified platform, and\nno active (unused, unexpired) invite may exist for the same brand+platform combination.",
+                "tags": [
+                    "Invites"
+                ],
+                "summary": "Create an invite link",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.CreateInviteRequest"
+                            }
+                        }
+                    },
+                    "description": "Invite details",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Invite created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InviteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing or invalid fields",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Brand not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Account or active invite already exists",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/invites/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Marks an invite as used (revoked), preventing it from being redeemed.",
+                "tags": [
+                    "Invites"
+                ],
+                "summary": "Revoke an invite",
+                "parameters": [
+                    {
+                        "description": "Invite ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Invite revoked"
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Invite not found or already used",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/keys": {
             "get": {
                 "security": [
@@ -1912,82 +2129,6 @@
                 }
             }
         },
-        "/posts/logs": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns publishing attempt logs with optional filtering by status, platform, and action.",
-                "tags": [
-                    "Logs"
-                ],
-                "summary": "List publishing logs",
-                "parameters": [
-                    {
-                        "description": "Filter: success, failed, skipped",
-                        "name": "status",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Filter by platform",
-                        "name": "platform",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Filter: publish, retry, cancel, unpublish",
-                        "name": "action",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Lookback window (max 7, default 7)",
-                        "name": "days",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Max results (max 100, default 50)",
-                        "name": "limit",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Pagination cursor",
-                        "name": "cursor",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.PostLogsListResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/posts/validate": {
             "get": {
                 "security": [
@@ -2251,51 +2392,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/posts/{pid}/logs": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns all publishing attempt logs for a specific post.",
-                "tags": [
-                    "Logs"
-                ],
-                "summary": "Get post logs",
-                "parameters": [
-                    {
-                        "description": "Post ID",
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Max results (max 100, default 50)",
-                        "name": "limit",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.PostLogsListResponse"
                                 }
                             }
                         }
@@ -3123,6 +3219,23 @@
                     }
                 }
             },
+            "api_endpoints.CreateInviteRequest": {
+                "type": "object",
+                "properties": {
+                    "brand_id": {
+                        "type": "string",
+                        "example": "b_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "expires_in_days": {
+                        "type": "integer",
+                        "example": 7
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "facebook"
+                    }
+                }
+            },
             "api_endpoints.CreateKeyRequest": {
                 "type": "object",
                 "properties": {
@@ -3316,6 +3429,79 @@
                     }
                 }
             },
+            "api_endpoints.InviteListItem": {
+                "type": "object",
+                "properties": {
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-27T12:00:00Z"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "example": "2026-04-03T12:00:00Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "inv_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "facebook"
+                    },
+                    "token": {
+                        "type": "string",
+                        "example": "a55755cf..."
+                    },
+                    "url": {
+                        "type": "string",
+                        "example": "https://api.social-api.ai/invite/a55755cf..."
+                    }
+                }
+            },
+            "api_endpoints.InviteListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.InviteListItem"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.InviteResponse": {
+                "type": "object",
+                "properties": {
+                    "expires_at": {
+                        "type": "string",
+                        "example": "2026-04-03T12:00:00Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "inv_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "facebook"
+                    },
+                    "token": {
+                        "type": "string",
+                        "example": "a55755cf75f73b56deb3dfe0c993fd36fc4c2bfa7"
+                    },
+                    "url": {
+                        "type": "string",
+                        "example": "https://api.social-api.ai/invite/a55755cf..."
+                    }
+                }
+            },
             "api_endpoints.KeyListItem": {
                 "type": "object",
                 "properties": {
@@ -3474,66 +3660,14 @@
                     "onboarding": {
                         "type": "boolean",
                         "example": false
-                    }
-                }
-            },
-            "api_endpoints.PostLogResponse": {
-                "type": "object",
-                "properties": {
-                    "account_id": {
+                    },
+                    "referral": {
                         "type": "string",
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                        "example": "Google search"
                     },
-                    "action": {
+                    "use_case": {
                         "type": "string",
-                        "example": "publish"
-                    },
-                    "attempt": {
-                        "type": "integer",
-                        "example": 1
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "example": "2026-03-22T10:00:05Z"
-                    },
-                    "duration_ms": {
-                        "type": "integer",
-                        "example": 2340
-                    },
-                    "error_message": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "string"
-                    },
-                    "platform": {
-                        "type": "string",
-                        "example": "instagram"
-                    },
-                    "post_id": {
-                        "type": "string"
-                    },
-                    "status": {
-                        "type": "string",
-                        "example": "success"
-                    },
-                    "status_code": {
-                        "type": "integer",
-                        "example": 200
-                    }
-                }
-            },
-            "api_endpoints.PostLogsListResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/api_endpoints.PostLogResponse"
-                        }
-                    },
-                    "pagination": {
-                        "$ref": "#/components/schemas/api_endpoints.PaginationInfo"
+                        "example": "Managing my own brand's social accounts"
                     }
                 }
             },
@@ -3883,6 +4017,16 @@
             "api_endpoints.UserMeResponse": {
                 "type": "object",
                 "properties": {
+                    "allowed_platforms": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "instagram",
+                            "facebook"
+                        ]
+                    },
                     "avatar_url": {
                         "type": "string",
                         "example": "https://example.com/avatar.jpg"
