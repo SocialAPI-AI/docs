@@ -595,6 +595,936 @@
                 }
             }
         },
+        "/inbox/comments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns inbox posts that have comments, ordered by most-recently-commented. Supports filtering by account, platform, minimum comment count, and date range. Uses cursor-based pagination.",
+                "tags": [
+                    "Inbox Comments"
+                ],
+                "summary": "List commented posts",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Filter by connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "instagram",
+                        "description": "Filter by platform (instagram, facebook, threads, tiktok, linkedin, google)",
+                        "name": "platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 1,
+                        "description": "Only return posts with at least this many comments (default 0)",
+                        "name": "min_comments",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "example": "2026-01-01T00:00:00Z",
+                        "description": "Only return posts commented after this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "date",
+                        "description": "Sort field: date (default)",
+                        "name": "sort_by",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "desc",
+                        "description": "Sort direction: desc (default) or asc",
+                        "name": "sort_order",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 25,
+                        "description": "Max results per page (default 25)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor from previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of commented posts with pagination metadata",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/inbox/comments/{postId}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns comments for a specific inbox post, including per-platform capability flags (can_reply, can_delete, can_hide, can_like, can_private_reply). Uses cursor-based pagination.",
+                "tags": [
+                    "Inbox Comments"
+                ],
+                "summary": "List comments on a post",
+                "parameters": [
+                    {
+                        "example": "17895695668004550",
+                        "description": "Platform post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID that owns the post",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 25,
+                        "description": "Max results per page (default 25)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor from previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of comments with capabilities",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found in inbox",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Posts a reply on the platform. If comment_id is provided, replies to that specific comment (threaded reply); otherwise replies to the post itself (top-level comment). Consumes 1 interaction credit.",
+                "tags": [
+                    "Inbox Comments"
+                ],
+                "summary": "Reply to a comment",
+                "parameters": [
+                    {
+                        "example": "17895695668004550",
+                        "description": "Platform post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "account_id": {
+                                        "type": "string"
+                                    },
+                                    "comment_id": {
+                                        "type": "string"
+                                    },
+                                    "text": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "description": "Reply content",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reply posted successfully with comment_id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required fields",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Monthly interaction limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support comment replies",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/inbox/comments/{postId}/{commentId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a comment on the platform and removes it from the inbox. Not all platforms support comment deletion — check the can_delete capability flag.",
+                "tags": [
+                    "Inbox Comments"
+                ],
+                "summary": "Delete a comment",
+                "parameters": [
+                    {
+                        "example": "17895695668004550",
+                        "description": "Platform post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17858893269577012",
+                        "description": "Platform comment ID to delete",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Comment deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support comment deletion",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/inbox/comments/{postId}/{commentId}/hide": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, and Threads. Check the can_hide capability flag.",
+                "tags": [
+                    "Inbox Comments"
+                ],
+                "summary": "Hide a comment",
+                "parameters": [
+                    {
+                        "example": "17895695668004550",
+                        "description": "Platform post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17858893269577012",
+                        "description": "Platform comment ID to hide",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "account_id": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "description": "Account that owns the post",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Comment hidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support hiding comments",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, and Threads.",
+                "tags": [
+                    "Inbox Comments"
+                ],
+                "summary": "Unhide a comment",
+                "parameters": [
+                    {
+                        "example": "17895695668004550",
+                        "description": "Platform post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17858893269577012",
+                        "description": "Platform comment ID to unhide",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Comment unhidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support hiding comments",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/inbox/comments/{postId}/{commentId}/like": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Likes a comment on the platform as the connected account. Supported on Instagram, Facebook, Twitter/X, and Reddit. Check the can_like capability flag.",
+                "tags": [
+                    "Inbox Comments"
+                ],
+                "summary": "Like a comment",
+                "parameters": [
+                    {
+                        "example": "17895695668004550",
+                        "description": "Platform post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17858893269577012",
+                        "description": "Platform comment ID to like",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "account_id": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "description": "Account to like as",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Comment liked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support comment likes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes a like from a comment on the platform. Supported on Instagram, Facebook, Twitter/X, and Reddit.",
+                "tags": [
+                    "Inbox Comments"
+                ],
+                "summary": "Unlike a comment",
+                "parameters": [
+                    {
+                        "example": "17895695668004550",
+                        "description": "Platform post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17858893269577012",
+                        "description": "Platform comment ID to unlike",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Comment unliked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support comment likes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/inbox/comments/{postId}/{commentId}/private-reply": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends a direct message to the author of a comment. This is a one-time DM triggered by a specific comment — only supported on Instagram and Facebook. Check the can_private_reply capability flag.",
+                "tags": [
+                    "Inbox Comments"
+                ],
+                "summary": "Send a private reply to a commenter",
+                "parameters": [
+                    {
+                        "example": "17895695668004550",
+                        "description": "Platform post ID",
+                        "name": "postId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17858893269577012",
+                        "description": "Platform comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "account_id": {
+                                        "type": "string"
+                                    },
+                                    "text": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "description": "Private reply content",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Private reply sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required fields",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support private replies",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/inbox/conversations": {
             "get": {
                 "security": [
@@ -1022,6 +1952,349 @@
                     },
                     "404": {
                         "description": "Conversation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/inbox/reviews": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetches reviews across connected accounts via real-time fan-out to platform APIs. Supports filtering by account and platform. Reviews are proxied live and not stored — results may vary based on platform availability. Currently only Google Business Profile returns reviews.",
+                "tags": [
+                    "Inbox Reviews"
+                ],
+                "summary": "List reviews",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Filter by connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "google",
+                        "description": "Filter by platform (google)",
+                        "name": "platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-01-01T00:00:00Z",
+                        "description": "Only return reviews created after this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 25,
+                        "description": "Maximum number of results (1-100, default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor from previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reviews with fan-out metadata",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/inbox/reviews/{id}/reply": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the text of an existing review reply. Not yet implemented — returns 501.",
+                "tags": [
+                    "Inbox Reviews"
+                ],
+                "summary": "Update a review reply",
+                "parameters": [
+                    {
+                        "example": "AbCdEf123456",
+                        "description": "Review ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "account_id": {
+                                        "type": "string"
+                                    },
+                                    "text": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "description": "Updated reply text",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reply updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not yet implemented",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Posts a public reply to a review on the platform (e.g. Google Business Profile). The reply is visible to anyone who views the review. Consumes 1 interaction credit.",
+                "tags": [
+                    "Inbox Reviews"
+                ],
+                "summary": "Reply to a review",
+                "parameters": [
+                    {
+                        "example": "AbCdEf123456",
+                        "description": "Review ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "account_id": {
+                                        "type": "string"
+                                    },
+                                    "text": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "description": "Reply content",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reply posted with reply_id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required fields",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Monthly interaction limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support review replies",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes an existing review reply from the platform. Not yet implemented — returns 501.",
+                "tags": [
+                    "Inbox Reviews"
+                ],
+                "summary": "Delete a review reply",
+                "parameters": [
+                    {
+                        "example": "AbCdEf123456",
+                        "description": "Review ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reply deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Not yet implemented",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3268,37 +4541,58 @@
                 "type": "object",
                 "properties": {
                     "first_comment": {
-                        "type": "string"
+                        "description": "FirstComment is auto-posted as the first comment after publishing (Instagram, LinkedIn).",
+                        "type": "string",
+                        "example": "Follow us for more updates!"
                     },
                     "media_ids": {
+                        "description": "MediaIDs are previously uploaded media file IDs to attach.",
                         "type": "array",
                         "items": {
                             "type": "string"
                         }
                     },
                     "publish_now": {
-                        "type": "boolean"
+                        "description": "PublishNow immediately publishes if targets are provided (ignores scheduled_at).",
+                        "type": "boolean",
+                        "example": false
                     },
                     "scheduled_at": {
-                        "type": "string"
+                        "description": "ScheduledAt queues the post for future publication. Omit to publish immediately or create a draft.",
+                        "type": "string",
+                        "example": "2026-04-01T10:00:00Z"
                     },
                     "skip_duplicate_check": {
-                        "type": "boolean"
+                        "description": "SkipDuplicateCheck bypasses the duplicate content detection.",
+                        "type": "boolean",
+                        "example": false
                     },
                     "targets": {
+                        "description": "Targets specifies which connected accounts to publish to, with optional per-target overrides.",
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.TargetRequest"
                         }
                     },
                     "text": {
-                        "type": "string"
+                        "description": "Text is the post body content. Required.",
+                        "type": "string",
+                        "example": "Check out our new product launch! #newproduct"
                     },
                     "title": {
-                        "type": "string"
+                        "description": "Title is an optional post title (used by LinkedIn, Google).",
+                        "type": "string",
+                        "example": "Exciting News from Acme Corp"
                     },
                     "visibility": {
-                        "type": "string"
+                        "description": "Visibility controls who can see the post. Platform-dependent values: public, private, connections_only.",
+                        "type": "string",
+                        "enum": [
+                            "public",
+                            "private",
+                            "connections_only"
+                        ],
+                        "example": "public"
                     }
                 }
             },
@@ -3306,13 +4600,26 @@
                 "type": "object",
                 "properties": {
                     "events": {
+                        "description": "Events is the list of event types to subscribe to.",
                         "type": "array",
                         "items": {
-                            "type": "string"
-                        }
+                            "type": "string",
+                            "enum": [
+                                "comment.received",
+                                "dm.received",
+                                "review.received",
+                                "mention.received"
+                            ]
+                        },
+                        "example": [
+                            "comment.received",
+                            "dm.received"
+                        ]
                     },
                     "url": {
-                        "type": "string"
+                        "description": "URL is the HTTPS endpoint that will receive webhook POST requests.",
+                        "type": "string",
+                        "example": "https://example.com/webhooks/socialapi"
                     }
                 }
             },
@@ -3323,19 +4630,27 @@
                         "type": "array",
                         "items": {
                             "type": "string"
-                        }
+                        },
+                        "example": [
+                            "comment.received",
+                            "dm.received"
+                        ]
                     },
                     "id": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "wh_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "message": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "Store the secret securely. It will not be shown again."
                     },
                     "secret": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "whsec_a1b2c3d4e5f6..."
                     },
                     "url": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "https://example.com/webhooks/socialapi"
                     }
                 }
             },
@@ -3679,10 +4994,12 @@
                         "example": "2026-03-14T09:00:00Z"
                     },
                     "hidden": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "example": false
                     },
                     "id": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "p_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "media_ids": {
                         "type": "array",
@@ -3695,7 +5012,8 @@
                         "example": "2026-04-01T10:00:05Z"
                     },
                     "retry_count": {
-                        "type": "integer"
+                        "type": "integer",
+                        "example": 0
                     },
                     "scheduled_at": {
                         "type": "string",
@@ -3703,6 +5021,15 @@
                     },
                     "status": {
                         "type": "string",
+                        "enum": [
+                            "draft",
+                            "scheduled",
+                            "publishing",
+                            "published",
+                            "partial",
+                            "failed",
+                            "cancelled"
+                        ],
                         "example": "published"
                     },
                     "targets": {
@@ -3712,17 +5039,25 @@
                         }
                     },
                     "text": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "Check out our new product launch!"
                     },
                     "title": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "Exciting News"
                     },
                     "updated_at": {
                         "type": "string",
                         "example": "2026-03-14T09:00:00Z"
                     },
                     "visibility": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "public",
+                            "private",
+                            "connections_only"
+                        ],
+                        "example": "public"
                     }
                 }
             },
@@ -3730,13 +5065,28 @@
                 "type": "object",
                 "properties": {
                     "category": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "validation",
+                            "auth",
+                            "rate_limit",
+                            "platform",
+                            "internal"
+                        ],
+                        "example": "validation"
                     },
                     "caused_by": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "user",
+                            "platform",
+                            "internal"
+                        ],
+                        "example": "platform"
                     },
                     "message": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "The post exceeds the character limit for this platform"
                     }
                 }
             },
@@ -3744,20 +5094,24 @@
                 "type": "object",
                 "properties": {
                     "comments": {
-                        "type": "integer"
+                        "type": "integer",
+                        "example": 23
                     },
                     "extra": {
                         "type": "object",
                         "additionalProperties": {}
                     },
                     "likes": {
-                        "type": "integer"
+                        "type": "integer",
+                        "example": 142
                     },
                     "saves": {
-                        "type": "integer"
+                        "type": "integer",
+                        "example": 31
                     },
                     "shares": {
-                        "type": "integer"
+                        "type": "integer",
+                        "example": 8
                     }
                 }
             },
@@ -3765,7 +5119,8 @@
                 "type": "object",
                 "properties": {
                     "account_id": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "error": {
                         "$ref": "#/components/schemas/api_endpoints.PostTargetErrorResponse"
@@ -3777,25 +5132,46 @@
                         "$ref": "#/components/schemas/api_endpoints.PostTargetMetricsResponse"
                     },
                     "metrics_synced_at": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "2026-04-01T12:00:00Z"
                     },
                     "permalink": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "https://www.instagram.com/p/ABC123/"
                     },
                     "platform": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "instagram",
+                            "facebook",
+                            "threads",
+                            "tiktok",
+                            "linkedin",
+                            "google"
+                        ],
+                        "example": "instagram"
                     },
                     "platform_post_id": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "17895695668004550"
                     },
                     "published_at": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "2026-04-01T10:00:05Z"
                     },
                     "scheduled_at": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "2026-04-01T10:00:00Z"
                     },
                     "status": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "publishing",
+                            "published",
+                            "failed"
+                        ],
+                        "example": "published"
                     },
                     "text": {
                         "type": "string"
@@ -3804,7 +5180,8 @@
                         "type": "string"
                     },
                     "visibility": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "public"
                     }
                 }
             },
@@ -3873,32 +5250,50 @@
                 "type": "object",
                 "properties": {
                     "account_id": {
-                        "type": "string"
+                        "description": "AccountID is the connected account to publish to. Required.",
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "first_comment": {
+                        "description": "FirstComment overrides the post-level first comment for this target.",
                         "type": "string"
                     },
                     "media_ids": {
+                        "description": "MediaIDs overrides the post-level media for this target.",
                         "type": "array",
                         "items": {
                             "type": "string"
                         }
                     },
                     "platform_data": {
+                        "description": "PlatformData passes platform-specific fields (e.g. TikTok privacy settings, LinkedIn article metadata).",
                         "type": "object",
                         "additionalProperties": {}
                     },
                     "scheduled_at": {
-                        "type": "string"
+                        "description": "ScheduledAt overrides the post-level schedule time for this target.",
+                        "type": "string",
+                        "example": "2026-04-01T10:00:00Z"
                     },
                     "text": {
-                        "type": "string"
+                        "description": "Text overrides the post-level text for this target.",
+                        "type": "string",
+                        "example": "Platform-specific version of the post"
                     },
                     "title": {
-                        "type": "string"
+                        "description": "Title overrides the post-level title for this target.",
+                        "type": "string",
+                        "example": "Custom title for LinkedIn"
                     },
                     "visibility": {
-                        "type": "string"
+                        "description": "Visibility overrides the post-level visibility for this target.",
+                        "type": "string",
+                        "enum": [
+                            "public",
+                            "private",
+                            "connections_only"
+                        ],
+                        "example": "public"
                     }
                 }
             },
@@ -3906,7 +5301,9 @@
                 "type": "object",
                 "properties": {
                     "account_id": {
-                        "type": "string"
+                        "description": "AccountID optionally scopes the unpublish to a single platform target.",
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     }
                 }
             },
@@ -3923,34 +5320,52 @@
                 "type": "object",
                 "properties": {
                     "first_comment": {
+                        "description": "FirstComment replaces the auto-first-comment.",
                         "type": "string"
                     },
                     "hidden": {
-                        "type": "boolean"
+                        "description": "Hidden archives the post from default list views when true.",
+                        "type": "boolean",
+                        "example": false
                     },
                     "media_ids": {
+                        "description": "MediaIDs replaces the attached media files.",
                         "type": "array",
                         "items": {
                             "type": "string"
                         }
                     },
                     "scheduled_at": {
-                        "type": "string"
+                        "description": "ScheduledAt changes the scheduled publication time (RFC3339).",
+                        "type": "string",
+                        "example": "2026-04-02T14:00:00Z"
                     },
                     "targets": {
+                        "description": "Targets replaces or updates per-platform target configuration.",
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.TargetRequest"
                         }
                     },
                     "text": {
-                        "type": "string"
+                        "description": "Text replaces the post body. Only for draft/scheduled/failed posts.",
+                        "type": "string",
+                        "example": "Updated post content"
                     },
                     "title": {
-                        "type": "string"
+                        "description": "Title replaces the post title.",
+                        "type": "string",
+                        "example": "Updated Title"
                     },
                     "visibility": {
-                        "type": "string"
+                        "description": "Visibility changes who can see the post.",
+                        "type": "string",
+                        "enum": [
+                            "public",
+                            "private",
+                            "connections_only"
+                        ],
+                        "example": "public"
                     }
                 }
             },
@@ -3958,16 +5373,27 @@
                 "type": "object",
                 "properties": {
                     "events": {
+                        "description": "Events replaces the subscribed event types.",
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                                "comment.received",
+                                "dm.received",
+                                "review.received",
+                                "mention.received"
+                            ]
                         }
                     },
                     "is_active": {
-                        "type": "boolean"
+                        "description": "IsActive enables or disables delivery to this endpoint.",
+                        "type": "boolean",
+                        "example": true
                     },
                     "url": {
-                        "type": "string"
+                        "description": "URL changes the webhook delivery endpoint. Must be HTTPS.",
+                        "type": "string",
+                        "example": "https://example.com/webhooks/socialapi"
                     }
                 }
             },
@@ -4057,34 +5483,42 @@
                 "type": "object",
                 "properties": {
                     "account_ids": {
+                        "description": "AccountIDs lists connected account IDs — their platforms are resolved automatically.",
                         "type": "array",
                         "items": {
                             "type": "string"
                         }
                     },
                     "media_ids": {
+                        "description": "MediaIDs are media file IDs to validate (checks count and type limits).",
                         "type": "array",
                         "items": {
                             "type": "string"
                         }
                     },
                     "platforms": {
+                        "description": "Platforms lists platform names to validate against (e.g. [\"instagram\", \"linkedin\"]).",
                         "type": "array",
                         "items": {
                             "type": "string"
                         }
                     },
                     "scheduled_at": {
-                        "type": "string"
+                        "description": "ScheduledAt validates the schedule time (must be in the future, within platform limits).",
+                        "type": "string",
+                        "example": "2026-04-01T10:00:00Z"
                     },
                     "targets": {
+                        "description": "Targets validates per-target overrides if provided.",
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.TargetRequest"
                         }
                     },
                     "text": {
-                        "type": "string"
+                        "description": "Text is the post content to validate against platform constraints.",
+                        "type": "string",
+                        "example": "Check out our new product! #launch"
                     }
                 }
             },
@@ -4133,22 +5567,30 @@
                 "type": "object",
                 "properties": {
                     "created_at": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "2026-03-14T09:00:00Z"
                     },
                     "events": {
                         "type": "array",
                         "items": {
                             "type": "string"
-                        }
+                        },
+                        "example": [
+                            "comment.received",
+                            "dm.received"
+                        ]
                     },
                     "id": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "wh_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "is_active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "example": true
                     },
                     "url": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "https://example.com/webhooks/socialapi"
                     }
                 }
             },
