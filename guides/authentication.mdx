@@ -1,23 +1,33 @@
 ---
 title: Authentication
-description: How API keys work and how to use them.
+description: How to authenticate requests using API keys, dashboard JWTs, or OAuth 2.1 tokens.
 ---
 
-Every request to [SocialAPI.AI](https://social-api.ai) requires an API key passed as a Bearer token.
+Every request to the SocialAPI `/v1` endpoints requires a Bearer token in the `Authorization` header. The API accepts three token types.
 
-## Format
+## Token types
 
-API keys have the format:
+| Token type | Who uses it | Format | Validation method |
+|---|---|---|---|
+| **API key** | External developers, API clients | `sapi_key_<hex>` prefix | SHA-256 lookup hash, then bcrypt verify against `api_keys` table |
+| **Auth service JWT** | Dashboard frontend (Next.js) | EdDSA/Ed25519 signed JWT | Signature verified via JWKS endpoint on the auth service (cached 15 min) |
+| **OAuth 2.1 access token** | MCP clients (Claude, ChatGPT, Cursor) | EdDSA/Ed25519 signed JWT | Signature verified via the API's own OAuth public key |
+
+The middleware detects the token type automatically. Tokens starting with `sapi_key_` are treated as API keys. All other tokens are validated as JWTs: first against the auth service public key, then (if that fails) against the OAuth 2.1 public key.
+
+## API keys
+
+API keys are the primary authentication method for external integrations.
+
+### Format
 
 ```
 sapi_key_<62 hex characters>
 ```
 
-Example: `sapi_key_<62_hex_chars>`
+### Passing the key
 
-## Passing the key
-
-Include the key in the `Authorization` header of every request:
+Include the key in the `Authorization` header:
 
 ```bash
 curl https://api.social-api.ai/v1/accounts \
@@ -28,14 +38,14 @@ If the key is missing or invalid, the API returns:
 
 ```json
 {
-  "error": "invalid or missing API key",
+  "error": "invalid or inactive API key",
   "code": "unauthorized"
 }
 ```
 
-## Creating keys
+### Creating keys
 
-Keys are created in the dashboard under **Keys** → **New Key**, or via the API:
+Keys are created in the dashboard under **Keys** > **New Key**, or via the API:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/keys \
@@ -44,11 +54,9 @@ curl -X POST https://api.social-api.ai/v1/keys \
   -d '{"name": "Production App"}'
 ```
 
-The full key is returned **once** in `raw_key`. Store it immediately - subsequent reads only show a truncated preview like `sapi_key_a1b2c...`.
+The full key is returned **once** in `raw_key`. Store it immediately. Subsequent reads only show a truncated preview like `sapi_key_a1b2c...`.
 
-## Revoking keys
-
-Keys are revoked in the dashboard, or via:
+### Revoking keys
 
 ```bash
 curl -X DELETE https://api.social-api.ai/v1/keys/<key-id> \
@@ -57,7 +65,7 @@ curl -X DELETE https://api.social-api.ai/v1/keys/<key-id> \
 
 A revoked key stops working immediately for all requests.
 
-## Listing keys
+### Listing keys
 
 ```bash
 curl https://api.social-api.ai/v1/keys \
@@ -66,9 +74,39 @@ curl https://api.social-api.ai/v1/keys \
 
 The response includes `preview` (suffix only), `is_active`, and `last_used_at`.
 
+## Auth service JWTs (dashboard)
+
+The SocialAPI dashboard authenticates users through a standalone auth service that issues EdDSA/Ed25519 signed JWTs. When a dashboard user makes an API call, their JWT is sent as a Bearer token.
+
+The API validates the JWT signature by fetching the auth service's public key from its JWKS endpoint (`AUTH_SERVICE_URL/internal/.well-known/jwks.json`). The public key is cached for 15 minutes.
+
+The JWT's `sub` (subject) claim contains the auth service user UUID, which is mapped to a user record in the API database via `POST /v1/users/provision`.
+
+<Note>
+  Before a dashboard user can call any endpoint, they must be provisioned via `POST /v1/users/provision`. This creates the user record that JWT authentication depends on. The dashboard calls this automatically after every login. If this record is missing, JWT-authenticated requests return `401 user not provisioned`.
+</Note>
+
+## OAuth 2.1 access tokens (MCP clients)
+
+MCP clients (Claude, ChatGPT, Cursor) authenticate via the API's built-in OAuth 2.1 authorization server. After completing the OAuth flow (see [OAuth guide](/guides/oauth)), the client receives an EdDSA/Ed25519 signed JWT access token.
+
+These tokens look identical to auth service JWTs at the wire level, but they are signed with the API's own OAuth private key (configured via `OAUTH_JWT_PRIVATE_KEY`) and contain a `type: "oauth_access"` claim.
+
+Access tokens expire after **1 hour**. Use the refresh token to obtain a new access token without re-authorization.
+
+## How the middleware resolves tokens
+
+1. If the token starts with `sapi_key_`, it is validated as an API key (SHA-256 lookup hash, bcrypt verify).
+2. Otherwise, the token is validated as an auth service JWT (EdDSA signature check against the JWKS endpoint).
+3. If auth service JWT validation fails, the token is validated as an OAuth 2.1 access token (EdDSA signature check against the OAuth public key).
+4. If all checks fail, the request is rejected with `401`.
+
+All three paths result in the same internal representation: an `APIKey` record attached to the request context with the user's ID and plan tier.
+
 ## Security best practices
 
-- **Never expose keys in frontend code** - keys must only be used server-side
-- **Use environment variables** - do not hardcode keys in source code
-- **Create one key per service** - revoke individual keys if compromised without disrupting others
-- **Monitor `last_used_at`** - unused keys should be revoked
+- **Never expose keys in frontend code.** Keys must only be used server-side.
+- **Use environment variables.** Do not hardcode keys in source code.
+- **Create one key per service.** Revoke individual keys if compromised without disrupting others.
+- **Monitor `last_used_at`.** Unused keys should be revoked.
+- **Rotate OAuth refresh tokens.** The API enforces refresh token rotation. Each refresh grants a new token pair.

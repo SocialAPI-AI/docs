@@ -1,17 +1,20 @@
 ---
-title: Connecting Social Accounts
-description: How to connect social accounts via OAuth2 and direct auth.
+title: OAuth Flows
+description: Connecting social accounts via platform OAuth and authenticating MCP clients via OAuth 2.1.
 ---
 
-Most social platforms use OAuth2. A few support direct API key or credential auth.
+SocialAPI uses OAuth in two distinct contexts:
 
-## OAuth2 flow
+1. **Connecting platform accounts** (Instagram, Facebook, etc.) to your SocialAPI account so you can manage them through the API.
+2. **Authenticating MCP/API clients** (Claude, ChatGPT, Cursor) via the built-in OAuth 2.1 authorization server so they can call the API on your behalf.
 
-Connecting an OAuth2 platform (Instagram, Facebook, etc.) takes three steps:
+## Connecting platform accounts
+
+Most social platforms use OAuth 2.0. Connecting a platform account takes three steps.
 
 ### Step 1: Initiate the flow
 
-Call `POST /accounts/connect` with your platform and a `redirect_uri`:
+Call `POST /v1/accounts/connect` with the platform and a `redirect_uri`:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
@@ -38,7 +41,7 @@ Response (HTTP 202):
 
 Send your user to `auth_url`. They log in and grant permissions. The platform redirects back to your `redirect_uri` with `?code=...&state=...` query parameters.
 
-Store the `state` value from Step 1 - you need it in Step 3.
+Store the `state` value from Step 1. You need it in Step 3.
 
 ### Step 3: Exchange the code
 
@@ -72,30 +75,30 @@ The `account_id` is now ready to use in all account endpoints.
   The `state` token is one-time-use and expires after 10 minutes. If the exchange fails with `invalid or expired state`, restart from Step 1.
 </Warning>
 
-## State token security
+### State token security
 
 The `state` value is a CSRF token. It:
 1. Is generated server-side as 16 random bytes (not guessable)
 2. Is stored in Redis with a 10-minute TTL
 3. Is deleted immediately on exchange (prevents replay attacks)
-4. Is tied to your API key - another key cannot use your state
+4. Is tied to your API key. Another key cannot use your state.
 
-If your `/oauth/exchange` call returns `403 state does not belong to this API key`, it means the key used in Step 3 is different from the one used in Step 1.
+If your `/oauth/exchange` call returns `403 state does not belong to this API key`, the key used in Step 3 is different from the one used in Step 1.
 
-## Listing connected accounts
+### Listing connected accounts
 
 ```bash
 curl https://api.social-api.ai/v1/accounts \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-## Reconnecting an account
+### Reconnecting an account
 
-If you call `POST /accounts/connect` for an account that is already connected, the upsert updates the stored token. This is safe to call when tokens expire.
+If you call `POST /v1/accounts/connect` for an account that is already connected, the upsert updates the stored token. This is safe to call when tokens expire.
 
-## Direct auth (non-OAuth platforms)
+### Direct auth (non-OAuth platforms)
 
-Some platforms accept an API key or username/password directly. For these, `POST /accounts/connect` returns HTTP 201 immediately without a redirect:
+Some platforms accept an API key or credentials directly. For these, `POST /v1/accounts/connect` returns HTTP 201 immediately without a redirect:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
@@ -110,3 +113,175 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
 ```
 
 Check the [Connectors](/connectors/overview) section for each platform's auth type and required metadata fields.
+
+---
+
+## OAuth 2.1 for MCP and API clients
+
+SocialAPI includes a built-in OAuth 2.1 authorization server that enables MCP clients (Claude, ChatGPT, Cursor) and other third-party applications to authenticate users and call the API on their behalf.
+
+The implementation follows these RFCs:
+- **RFC 8414** for authorization server metadata discovery
+- **RFC 7591** for dynamic client registration
+- **RFC 7636** for PKCE (required)
+- **RFC 7009** for token revocation
+
+### Discovery
+
+Clients can discover the authorization server configuration at:
+
+```
+GET /.well-known/oauth-authorization-server
+```
+
+Response:
+
+```json
+{
+  "issuer": "https://api.social-api.ai",
+  "authorization_endpoint": "https://api.social-api.ai/oauth/authorize",
+  "token_endpoint": "https://api.social-api.ai/oauth/token",
+  "registration_endpoint": "https://api.social-api.ai/oauth/register",
+  "revocation_endpoint": "https://api.social-api.ai/oauth/revoke",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "token_endpoint_auth_methods_supported": ["client_secret_post"],
+  "code_challenge_methods_supported": ["S256"],
+  "scopes_supported": ["social:all"]
+}
+```
+
+### Step 1: Register a client
+
+Register your application using dynamic client registration:
+
+```bash
+curl -X POST https://api.social-api.ai/oauth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_name": "My MCP Client",
+    "redirect_uris": ["https://app.example.com/callback"]
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "client_id": "a1b2c3d4e5f6...",
+  "client_secret": "s3cr3t...",
+  "client_name": "My MCP Client",
+  "redirect_uris": ["https://app.example.com/callback"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "client_secret_post"
+}
+```
+
+<Warning>
+  The `client_secret` is returned once. Store it securely. It cannot be retrieved again.
+</Warning>
+
+### Step 2: Authorize the user
+
+Redirect the user to the authorization endpoint with PKCE parameters:
+
+```
+GET /oauth/authorize
+  ?client_id=a1b2c3d4e5f6...
+  &redirect_uri=https://app.example.com/callback
+  &response_type=code
+  &scope=social:all
+  &state=random_csrf_value
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  &code_challenge_method=S256
+```
+
+The API validates the client and redirect URI, then redirects the user to the SocialAPI dashboard consent screen. After the user approves, they are redirected back to your `redirect_uri` with `?code=...&state=...`.
+
+<Note>
+  PKCE is required. The only supported challenge method is `S256`. Requests without a `code_challenge` are rejected with `400`.
+</Note>
+
+**Single scope.** The only supported scope is `social:all`, which grants full access to the user's account. This is the default if no scope is specified.
+
+### Step 3: Exchange the code for tokens
+
+```bash
+curl -X POST https://api.social-api.ai/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code" \
+  -d "code=AUTH_CODE_HERE" \
+  -d "client_id=a1b2c3d4e5f6..." \
+  -d "client_secret=s3cr3t..." \
+  -d "code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk" \
+  -d "redirect_uri=https://app.example.com/callback"
+```
+
+Response:
+
+```json
+{
+  "access_token": "eyJhbGciOiJFZERTQSIs...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "rt_a1b2c3d4...",
+  "scope": "social:all"
+}
+```
+
+The access token is an EdDSA/Ed25519 signed JWT valid for **1 hour**. Use it as a Bearer token for all `/v1` endpoints.
+
+### Step 4: Refresh the access token
+
+When the access token expires, use the refresh token to get a new pair:
+
+```bash
+curl -X POST https://api.social-api.ai/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=rt_a1b2c3d4..." \
+  -d "client_id=a1b2c3d4e5f6..."
+```
+
+The response contains a new access token and a new refresh token. The old refresh token is invalidated (rotation is enforced). Refresh tokens expire after **30 days**.
+
+### Revoking tokens
+
+To revoke a refresh token (for example, on user logout):
+
+```bash
+curl -X POST https://api.social-api.ai/oauth/revoke \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "token=rt_a1b2c3d4..." \
+  -d "client_id=a1b2c3d4e5f6..."
+```
+
+Per RFC 7009, this endpoint always returns `200`, even if the token is already invalid.
+
+### Supporting endpoints
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/.well-known/oauth-authorization-server` | GET | RFC 8414 metadata discovery |
+| `/oauth/register` | POST | RFC 7591 dynamic client registration |
+| `/oauth/authorize` | GET | Authorization with PKCE |
+| `/oauth/authorize/request` | GET | Fetch pending authorization request details (used by dashboard) |
+| `/oauth/authorize/confirm` | POST | Consent confirmation (called by dashboard, requires auth service JWT) |
+| `/oauth/token` | POST | Code exchange and refresh token rotation |
+| `/oauth/revoke` | POST | RFC 7009 token revocation |
+
+### MCP server card
+
+MCP clients can discover SocialAPI as a tool provider via the server card:
+
+```
+GET /.well-known/mcp/server-card.json
+```
+
+The protected resource metadata (RFC 9470) is available at:
+
+```
+GET /.well-known/oauth-protected-resource
+GET /.well-known/oauth-protected-resource/mcp
+```
