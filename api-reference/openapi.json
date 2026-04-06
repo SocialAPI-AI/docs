@@ -176,6 +176,73 @@
                 }
             }
         },
+        "/accounts/{id}/creator-info": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns platform-specific creator settings needed before publishing (privacy levels, interaction toggles, posting availability). Currently supported for TikTok only; other platforms return 501.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Get creator info for publishing",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Creator info",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.CreatorInfoResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support creator info",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/accounts/{id}/limits": {
             "get": {
                 "security": [
@@ -5103,6 +5170,35 @@
                     }
                 }
             },
+            "api_endpoints.CreatorInfoResponse": {
+                "type": "object",
+                "properties": {
+                    "avatar_url": {
+                        "type": "string"
+                    },
+                    "can_post": {
+                        "type": "boolean"
+                    },
+                    "interaction_settings": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.InteractionSettings"
+                    },
+                    "max_video_duration_sec": {
+                        "type": "integer"
+                    },
+                    "nickname": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "type": "string"
+                    },
+                    "privacy_level_options": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
             "api_endpoints.ErrorResponse": {
                 "type": "object",
                 "properties": {
@@ -6403,6 +6499,13 @@
                         "type": "string",
                         "example": "instagram"
                     },
+                    "reconnect_reason": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "active"
+                    },
                     "username": {
                         "type": "string",
                         "example": "acmecorp"
@@ -6477,6 +6580,20 @@
                     "type": {
                         "type": "string",
                         "example": "comment"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.InteractionSettings": {
+                "type": "object",
+                "properties": {
+                    "comment_disabled": {
+                        "type": "boolean"
+                    },
+                    "duet_disabled": {
+                        "type": "boolean"
+                    },
+                    "stitch_disabled": {
+                        "type": "boolean"
                     }
                 }
             },

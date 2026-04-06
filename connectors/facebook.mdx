@@ -178,6 +178,40 @@ curl "https://api.social-api.ai/v1/accounts/{id}/dms?limit=10" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
+## Publishing
+
+Create a Facebook Page post with optional platform-specific fields:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Check out our new product!",
+    "platform_data": {
+      "facebook": {
+        "link": "https://example.com/product"
+      }
+    }
+  }'
+```
+
+### PlatformData fields
+
+Pass these inside `platform_data.facebook` when creating a text post.
+
+| Field | Type | Description |
+|---|---|---|
+| `link` | string | URL to attach as a link preview in the post. |
+| `picture` | string | Image URL to use as the link preview thumbnail. |
+
+These fields are passed directly as query parameters to the Facebook Graph API feed endpoint. Any additional string key-value pairs in `platform_data.facebook` are forwarded as-is.
+
+<Note>
+PlatformData fields only apply to text posts. Photo posts use `media_ids` for the image URL and do not pass through platform data.
+</Note>
+
 ## Notes
 
 - **Multi-Page OAuth** - A single OAuth flow connects all Facebook Pages the user manages. Each Page gets its own `account_id`.

@@ -178,6 +178,40 @@ Sample response:
 }
 ```
 
+## Publishing
+
+Create an Instagram post with optional platform-specific fields:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Hello world #socapi",
+    "media_ids": ["https://cdn.example.com/photo.jpg"],
+    "platform_data": {
+      "instagram": {
+        "alt_text": "A product photo showing our new widget",
+        "share_to_feed": true
+      }
+    }
+  }'
+```
+
+### PlatformData fields
+
+Pass these inside `platform_data.instagram` when creating a post.
+
+| Field | Type | Description |
+|---|---|---|
+| `alt_text` | string | Alt text for images (accessibility). Applied to the image container. |
+| `location_id` | string | Facebook location page ID to tag the post with a location. |
+| `share_to_feed` | bool | For Reels, whether to also share to the main profile feed. |
+| `cover_url` | string | Custom cover image URL for video or Reel posts. |
+
+These fields are passed directly as parameters to the Instagram Graph API container creation endpoint. Any additional key-value pairs in `platform_data.instagram` are forwarded as-is.
+
 ## Notes
 
 - **Private replies** - Replying to a comment with `"private": true` sends a DM to the commenter. This is Instagram's native "Send Private Reply" feature, not a SocialAPI workaround.

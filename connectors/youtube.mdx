@@ -1,25 +1,163 @@
 ---
 title: YouTube
-description: YouTube connector for SocialAPI.AI.
+description: Connect and interact with YouTube channels via the YouTube Data API.
 ---
 
-<Badge>Coming soon</Badge>
+<Badge>Available</Badge>
 
-YouTube support is in active development via the YouTube Data API.
+YouTube is fully supported for posts (videos), comments, moderation, and publishing via the YouTube Data API v3.
 
-## Planned features
+## Details
 
-| Feature | Planned |
+| Field | Value |
 |---|---|
-| Comments | ✅ |
-| DMs | - |
-| Reviews | - |
-| Mentions | - |
+| Platform slug | `youtube` |
+| Auth type | OAuth 2.0 (Google) |
+| API | YouTube Data API v3 |
 
-## Auth type
+## Feature support
 
-OAuth 2.0 (Google)
+| Feature | Supported | Notes |
+|---|---|---|
+| List posts | ✅ | Returns uploaded videos |
+| Comments | ✅ | Scoped to a specific video |
+| Reply to comment | ✅ | |
+| Comment replies (thread) | ✅ | |
+| Moderate comment (hide/delete) | ✅ | Hide sets moderation status; delete removes permanently |
+| Like comment | - | Not supported by YouTube API |
+| Private reply | - | Not applicable |
+| DMs | - | Not supported by platform |
+| Reviews | - | Not applicable |
+| Mentions | - | Not supported via YouTube API |
+| Create post | ✅ | Upload and publish videos |
+| Update post | ✅ | Update title, description, tags, privacy, and other metadata |
+| Delete post | ✅ | |
 
-## Notify me
+## Connecting
 
-[Contact us](mailto:support@social-api.ai) to be notified when YouTube support launches.
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "youtube",
+    "metadata": {
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "auth_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+}
+```
+
+Redirect your user to `auth_url`. After they authorize, Google redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "youtube",
+    "code": "4/0AanRR...",
+    "metadata": {
+      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+## Publishing
+
+Create a video post by providing a video URL and optional metadata via `platform_data`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Check out our latest video!",
+    "media_ids": ["https://cdn.example.com/video.mp4"],
+    "visibility": "public",
+    "platform_data": {
+      "youtube": {
+        "category_id": "22",
+        "tags": ["tutorial", "demo"],
+        "made_for_kids": false,
+        "embeddable": true,
+        "notify_subscribers": true
+      }
+    }
+  }'
+```
+
+### PlatformData fields
+
+Pass these inside `platform_data.youtube` when creating or updating a post.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `category_id` | string | `"22"` (People & Blogs) | YouTube video category ID. See [YouTube category list](https://developers.google.com/youtube/v3/docs/videoCategories/list). |
+| `tags` | string[] | none | Video tags for discoverability. |
+| `default_language` | string | none | BCP-47 language code (e.g. `"en"`, `"fr"`). |
+| `made_for_kids` | bool | `false` | Whether the video is made for children (COPPA). |
+| `embeddable` | bool | `true` | Whether the video can be embedded on other sites. |
+| `license` | string | `"youtube"` | `"youtube"` for standard YouTube license, `"creativeCommon"` for CC BY. |
+| `public_stats_viewable` | bool | `true` | Whether view counts and likes are publicly visible. |
+| `publish_at` | string | none | RFC 3339 timestamp for scheduled publish (e.g. `"2026-04-10T15:00:00Z"`). Only applies when `visibility` is `"private"`. |
+| `recording_date` | string | none | Date the video was recorded, in `YYYY-MM-DD` format. |
+| `contains_synthetic_media` | bool | `false` | Whether the video contains AI-generated or synthetic content. |
+| `notify_subscribers` | bool | `true` | Whether to send a notification to channel subscribers. |
+| `playlist_id` | string | none | YouTube playlist ID. The video is added to this playlist after publishing. |
+
+## Sample: List comments on a video
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/{videoId}" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_eW91dHViZTpVZ3h...",
+      "platform": "youtube",
+      "type": "comment",
+      "author": {
+        "id": "UCxyz123",
+        "name": "Jane Smith",
+        "avatar_url": "https://yt3.ggpht.com/..."
+      },
+      "content": {
+        "text": "Great video!"
+      },
+      "metadata": {
+        "post_id": "dQw4w9WgXcQ",
+        "like_count": 5,
+        "reply_count": 2
+      },
+      "created_at": "2026-03-15T10:30:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_id": "Ugxyz..."
+    }
+  ],
+  "count": 1
+}
+```
+
+## Notes
+
+- **No DMs or mentions.** YouTube does not expose a messaging or mention API. These endpoints return `501`.
+- **No webhook handler.** YouTube does not push real-time events. Posts and comments are fetched on demand.
+- **Comment moderation.** Hide sets the comment's moderation status (held for review). Delete removes it permanently. Like is not supported.
+- **Token refresh.** Google OAuth tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
+- **Required scopes.** Your Google Cloud project must enable the YouTube Data API v3 and request the appropriate OAuth scopes.

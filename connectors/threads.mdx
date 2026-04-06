@@ -106,6 +106,36 @@ curl "https://api.social-api.ai/v1/accounts/{id}/posts/17895695668004550/comment
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
+## Publishing
+
+Create a Threads post with optional platform-specific fields:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Hello from Threads!",
+    "platform_data": {
+      "threads": {
+        "reply_control": "accounts_you_follow"
+      }
+    }
+  }'
+```
+
+### PlatformData fields
+
+Pass these inside `platform_data.threads` when creating a post.
+
+| Field | Type | Description |
+|---|---|---|
+| `reply_control` | string | Who can reply. Options: `"everyone"`, `"accounts_you_follow"`, `"mentioned_only"`. |
+| `link_attachment` | string | URL to attach as a link preview. |
+
+These fields are passed directly as query parameters to the Threads API container creation endpoint. Any additional key-value pairs in `platform_data.threads` are forwarded as-is, as long as the values are strings.
+
 ## Notes
 
 - **Moderation** - Hide, unhide, and delete are supported. Unsupported moderation actions return `501`.
