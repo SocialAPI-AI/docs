@@ -1,7 +1,7 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "description": "Unified social media inbox API. Read and respond to comments, DMs, reviews, and mentions across Instagram, Facebook, Threads, Google Business Profile, TikTok, and LinkedIn through a single REST API. YouTube, X/Twitter, and Trustpilot coming soon.",
+        "description": "Unified social media inbox API. Read and respond to comments, DMs, reviews, and mentions across Instagram, Facebook, Threads, Google Business Profile, TikTok, LinkedIn, and YouTube through a single REST API. X/Twitter and Trustpilot coming soon.",
         "title": "SocialAPI.AI",
         "contact": {
             "name": "SocialAPI.AI Support",
@@ -3342,6 +3342,14 @@
                         }
                     },
                     {
+                        "description": "Filter by specific page ID (for multi-page accounts like Facebook)",
+                        "name": "page_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "description": "Start of date range (RFC3339)",
                         "name": "from",
                         "in": "query",
@@ -3494,22 +3502,22 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "publishing.delivery.all_failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
+                                }
+                            }
+                        }
+                    },
                     "429": {
                         "description": "Monthly post limit exceeded",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "All accounts failed (sync only)",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
                                 }
                             }
                         }
@@ -4388,6 +4396,125 @@
                 }
             }
         },
+        "/v1/accounts/{id}/pages": {
+            "get": {
+                "description": "Returns pages (e.g. Facebook Pages) associated with a connected account.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "List account pages",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/accounts/{id}/pages/{pageId}": {
+            "patch": {
+                "description": "Update a page's is_default or is_active status.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Update account page",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page ID",
+                        "name": "pageId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.updatePageRequest"
+                            }
+                        }
+                    },
+                    "description": "Page update",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/exports": {
             "get": {
                 "security": [
@@ -5199,16 +5326,28 @@
                     }
                 }
             },
-            "api_endpoints.ErrorResponse": {
+            "api_endpoints.ErrorBody": {
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "example": "account_not_found"
+                        "example": "resource.not_found"
                     },
-                    "error": {
+                    "message": {
                         "type": "string",
-                        "example": "account not found"
+                        "example": "Account not found"
+                    },
+                    "meta": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                }
+            },
+            "api_endpoints.ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "$ref": "#/components/schemas/api_endpoints.ErrorBody"
                     }
                 }
             },
@@ -5839,7 +5978,7 @@
                             "auth",
                             "rate_limit",
                             "platform",
-                            "internal"
+                            "system"
                         ],
                         "example": "validation"
                     },
@@ -5848,13 +5987,17 @@
                         "enum": [
                             "user",
                             "platform",
-                            "internal"
+                            "system"
                         ],
-                        "example": "platform"
+                        "example": "user"
+                    },
+                    "code": {
+                        "type": "string",
+                        "example": "platform.tiktok.media_required"
                     },
                     "message": {
                         "type": "string",
-                        "example": "The post exceeds the character limit for this platform"
+                        "example": "Video posts require at least one media URL"
                     }
                 }
             },
@@ -6119,6 +6262,11 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "page_id": {
+                        "description": "PageID optionally targets a specific page within the account (e.g. Facebook Page).",
+                        "type": "string",
+                        "example": "sapi_page_01JRQX..."
                     },
                     "platform_data": {
                         "description": "PlatformData passes platform-specific fields (e.g. TikTok privacy settings, LinkedIn article metadata).",
@@ -6474,6 +6622,17 @@
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.WebhookEndpointItem"
                         }
+                    }
+                }
+            },
+            "api_endpoints.updatePageRequest": {
+                "type": "object",
+                "properties": {
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "is_default": {
+                        "type": "boolean"
                     }
                 }
             },
