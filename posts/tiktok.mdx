@@ -1,0 +1,307 @@
+---
+title: TikTok publishing
+description: Full reference for publishing TikTok videos and photo carousels via SocialAPI, including platform-specific parameters, creator validation, and polling behavior.
+---
+
+## 1. Overview
+
+TikTok publishing uses the TikTok Content Posting API v2 (PULL\_FROM\_URL flow). SocialAPI queries creator info to validate settings, submits a publish job, then polls the status endpoint until the post reaches `PUBLISH_COMPLETE` or `FAILED`. Both video and photo carousel formats are supported.
+
+| Field | Value |
+|---|---|
+| Platform slug | `tiktok` |
+| Auth type | OAuth 2.0 (TikTok) |
+| API | TikTok Content Posting API v2 |
+| Create post | Yes |
+| Update post | No (not supported by platform) |
+| Delete post | No (not supported by platform) |
+| Schedule | No |
+| First comment | No |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Single video | `platform_data.tiktok.media_type: "video"` or omit (default) | One `media_ids` entry required; MP4 recommended |
+| Photo carousel | `platform_data.tiktok.media_type: "photo"` | 2 to 35 images required; `disable_duet` and `disable_stitch` are ignored |
+
+Single images are not supported. Mixed media (video plus images) is not supported. The `media_ids` field should contain publicly accessible HTTPS URLs that TikTok will pull directly.
+
+**Video duration:** The maximum video duration is per-creator and returned by the TikTok creator info endpoint. SocialAPI validates duration during `POST /v1/posts/validate` when the media item includes a `duration_seconds` field.
+
+**Photo carousel count:** Exactly 2 to 35 images. Fewer than 2 or more than 35 will produce a validation error.
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `account_ids` targeting a TikTok account. The `text` field becomes the post title or description. `privacy_level` is required in `platform_data.tiktok`.
+
+Before publishing, SocialAPI calls the TikTok creator info endpoint to validate the privacy level, check posting availability, and inherit creator-level defaults for comment, duet, and stitch settings.
+
+### Video post
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "My latest video #fyp",
+    "media_ids": ["https://cdn.example.com/video.mp4"],
+    "platform_data": {
+      "tiktok": {
+        "privacy_level": "PUBLIC_TO_EVERYONE",
+        "disable_comment": false,
+        "disable_duet": false,
+        "disable_stitch": false,
+        "video_cover_timestamp_ms": 3000
+      }
+    }
+  }'
+```
+
+### Photo carousel post
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Swipe through the highlights",
+    "media_ids": [
+      "https://cdn.example.com/photo1.jpg",
+      "https://cdn.example.com/photo2.jpg",
+      "https://cdn.example.com/photo3.jpg"
+    ],
+    "platform_data": {
+      "tiktok": {
+        "media_type": "photo",
+        "privacy_level": "FRIENDS_ONLY",
+        "disable_comment": true
+      }
+    }
+  }'
+```
+
+### platform\_data.tiktok fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `privacy_level` | string | Yes | Audience setting. Must be one of the values returned by the creator info endpoint for this account. Common values: `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, `FOLLOWER_OF_CREATOR`, `SELF_ONLY`. |
+| `media_type` | string | No | `"video"` (default) or `"photo"`. |
+| `brand_content_toggle` | bool | No | Marks the post as branded or sponsored content. Cannot be combined with `SELF_ONLY` privacy. |
+| `brand_organic_toggle` | bool | No | Organic branded content disclosure flag. |
+| `disable_comment` | bool | No | Disables comments on the post. Merged with the creator's default setting (creator-level disable takes precedence). |
+| `disable_duet` | bool | No | Disables duet. Only applies to video posts; ignored for photo carousels. |
+| `disable_stitch` | bool | No | Disables stitch. Only applies to video posts; ignored for photo carousels. |
+| `is_aigc` | bool | No | Discloses the post as AI-generated content. |
+| `video_cover_timestamp_ms` | number | No | Timestamp in milliseconds for the video cover frame. Only applies to video posts. |
+
+### Creator info and valid privacy levels
+
+Privacy level options differ per creator. Always call `POST /v1/posts/validate` before publishing to confirm the target privacy level is allowed for the specific account. SocialAPI fetches creator info from TikTok and caches it for 10 minutes.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/validate \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "My post caption",
+    "media_ids": ["https://cdn.example.com/video.mp4"],
+    "platform_data": {
+      "tiktok": {
+        "privacy_level": "PUBLIC_TO_EVERYONE"
+      }
+    }
+  }'
+```
+
+### Publish flow
+
+1. SocialAPI calls `POST /v2/post/publish/creator_info/query/` to get creator settings and allowed privacy levels.
+2. SocialAPI validates the draft (privacy level required, duet/stitch for video, brand content rules).
+3. For video: SocialAPI calls `POST /v2/post/publish/video/init/` (PULL\_FROM\_URL, single media URL).
+4. For photo: SocialAPI calls `POST /v2/post/publish/content/init/` (PULL\_FROM\_URL, array of image URLs).
+5. SocialAPI polls `POST /v2/post/publish/status/fetch/` every 3 seconds until `PUBLISH_COMPLETE` or `FAILED`, or until a 60-second timeout.
+6. On success, the published item ID is stored and returned.
+
+---
+
+## 4. Update post
+
+TikTok does not support editing posts after publication. `PATCH /v1/posts/:pid` returns `501 Not Supported` for TikTok post platforms.
+
+---
+
+## 5. Delete post
+
+TikTok does not expose a post deletion endpoint in its Content Posting API. `DELETE /v1/posts/:pid` returns `501 Not Supported` for TikTok post platforms.
+
+---
+
+## 6. Retrieve posts
+
+`GET /v1/posts` returns TikTok posts stored in the SocialAPI database. The TikTok `GetPosts` connector method is currently a stub that returns an empty list, so background sync does not pull posts from TikTok into the database.
+
+**What this means in practice:**
+
+- Posts created through SocialAPI are stored immediately after a successful publish and are returned by `GET /v1/posts`.
+- Posts created natively on TikTok (outside SocialAPI) are not synced and will not appear.
+- Engagement metrics (likes, comments, shares, views) are not refreshed via the standard sync path for TikTok.
+
+**Analytics exports** (`POST /v1/accounts/:id/export`) do retrieve full TikTok video data including `like_count`, `comment_count`, `share_count`, `view_count`, `duration`, `width`, and `height`.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### privacy\_level is required and per-creator
+
+`privacy_level` has no default. Omitting it causes a `400` validation error. The allowed values are not static: they are returned by the TikTok creator info endpoint and vary per account. Always validate before publishing.
+
+### Photo carousels require 2 to 35 images
+
+Sending fewer than 2 or more than 35 `media_ids` when `media_type` is `"photo"` returns a `400` validation error immediately. Single-image photo posts are not supported by TikTok.
+
+### disable\_duet and disable\_stitch are silently ignored for photo posts
+
+Setting `disable_duet: true` or `disable_stitch: true` on a photo carousel post has no effect. TikTok does not expose these controls for photo posts. `POST /v1/posts/validate` will return a warning (not an error) if these fields are set on a photo post.
+
+### brand\_content\_toggle is incompatible with SELF\_ONLY privacy
+
+Setting `brand_content_toggle: true` alongside `privacy_level: "SELF_ONLY"` is rejected by TikTok. SocialAPI validates this combination before submitting and returns a `400` error.
+
+### video\_cover\_timestamp\_ms applies only to videos
+
+This field is sent only when `media_type` is `"video"`. It is not included in photo carousel requests.
+
+### Creator daily posting limit
+
+When a creator has reached their daily TikTok posting limit, the creator info endpoint returns an empty `privacy_level_options` list. SocialAPI detects this and returns a `400` validation error with field `posting_limit`.
+
+### Token auto-refresh
+
+TikTok access tokens expire. SocialAPI automatically refreshes them using the stored refresh token before each request. If the refresh token has also expired, the connector returns `401 invalid_token` and the account must be reconnected.
+
+### Publish timeout
+
+SocialAPI polls the publish status for up to 60 seconds. If TikTok has not completed processing within that window, the post status is set to `failed` with error code `publish_timeout`. Retry via `POST /v1/posts/:pid/retry`.
+
+### Error categories
+
+| Error code prefix | Category | Caused by | Description |
+|---|---|---|---|
+| `platform.tiktok.api_error` | `platform` | `platform` | Generic TikTok API error (includes publish failures and timeouts) |
+| `platform.tiktok.auth` | `auth` | `platform` | Invalid or expired token, missing scope |
+| `validation.*` | `validation` | `user` | Missing or invalid `platform_data.tiktok` fields (privacy level, media count, etc.) |
+
+### Pass-through fields
+
+SocialAPI forwards any additional keys in `platform_data.tiktok` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See the [TikTok Content Posting API reference](https://developers.tiktok.com/doc/content-posting-api-reference-direct-post) for the full list of supported parameters.
+
+---
+
+## 8. Full worked example
+
+This example publishes a video, validates the request first, then creates the post.
+
+### Step 1: validate
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/validate \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Behind the scenes of our product shoot #bts #brand",
+    "media_ids": ["https://cdn.example.com/bts-video.mp4"],
+    "platform_data": {
+      "tiktok": {
+        "privacy_level": "PUBLIC_TO_EVERYONE",
+        "brand_content_toggle": true,
+        "brand_organic_toggle": false,
+        "disable_comment": false,
+        "disable_duet": true,
+        "disable_stitch": true,
+        "video_cover_timestamp_ms": 2000
+      }
+    }
+  }'
+```
+
+Expected response (no issues):
+
+```json
+{
+  "valid": true,
+  "issues": []
+}
+```
+
+### Step 2: create post
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Behind the scenes of our product shoot #bts #brand",
+    "media_ids": ["https://cdn.example.com/bts-video.mp4"],
+    "platform_data": {
+      "tiktok": {
+        "privacy_level": "PUBLIC_TO_EVERYONE",
+        "brand_content_toggle": true,
+        "brand_organic_toggle": false,
+        "disable_comment": false,
+        "disable_duet": true,
+        "disable_stitch": true,
+        "video_cover_timestamp_ms": 2000
+      }
+    }
+  }'
+```
+
+Expected response:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "status": "published",
+  "platforms": [
+    {
+      "platform": "tiktok",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "status": "published",
+      "platform_post_id": "7380000000000000001"
+    }
+  ],
+  "created_at": "2026-04-10T12:00:00Z"
+}
+```
+
+### Handling a failed publish
+
+If TikTok rejects the video during processing, the platform status is `failed` with an error detail. Inspect the error and retry:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J/retry \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+---
+
+## 9. Required OAuth scopes
+
+| Scope | Purpose |
+|---|---|
+| `user.info.basic` | Read account profile (open ID, username, display name, avatar) |
+| `video.publish` | Publish videos and photo carousels via PULL\_FROM\_URL |
+| `video.upload` | Upload video files directly (used for file-based publish flows) |
+
+These scopes are requested automatically during the OAuth connect flow (`POST /v1/accounts/connect`). No additional configuration is required.

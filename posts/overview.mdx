@@ -1,0 +1,81 @@
+---
+title: Posts overview
+description: Compare post publishing capabilities across all supported platforms.
+---
+
+Publishing uses a single endpoint, `POST /v1/posts`, with per-platform behavior controlled by the `platform_data` field. This page compares capabilities across all platforms at a glance. For full details on a specific platform, see the deep-dive pages linked below.
+
+Use `POST /v1/posts/validate` to check constraints before publishing, and `GET /v1/posts/validate` to fetch platform-specific constraints (e.g. TikTok's per-creator privacy levels and duration limits).
+
+## Capability matrix
+
+| Capability | Instagram | Facebook | Google | LinkedIn | Threads | TikTok |
+|---|---|---|---|---|---|---|
+| Create post | Yes | Yes | Yes | Yes | Yes | Yes |
+| Update post | No | Yes (text only) | Yes | Yes (text only) | No | No |
+| Delete post | Yes | Yes | Yes | Yes | Yes | No |
+| Schedule | Yes | Yes | No | Yes | Yes | No |
+| First comment | Yes (best-effort) | No | No | No | No | No |
+| Image | Yes | Yes | Yes | Yes | Yes | Yes (carousel only, 2-35) |
+| Video | Yes (as Reel) | Yes | No | Yes | Yes | Yes |
+| Carousel | Yes (2-10 items) | No | No | Yes (multi-image) | Yes | No |
+| Reel | Yes | No | No | No | No | N/A (all videos are TikToks) |
+| Max media per post | 10 | 1 | 1 | 20 | 20 | 35 (photo) / 1 (video) |
+
+## Core field handling
+
+How each platform interprets the shared `PostDraft` fields:
+
+| Field | Instagram | Facebook | Google | LinkedIn | Threads | TikTok |
+|---|---|---|---|---|---|---|
+| `text` | Caption (max 2200 chars) | Post message | Summary | Commentary | Post text (max 500 chars) | Video description |
+| `media_ids` | Presigned URLs; determines image/video/carousel | First URL only; photo or video | Image URL for the post | Presigned URLs; image or video | Presigned URLs | Presigned URLs; video or photo carousel |
+| `first_comment` | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported | Not supported | Not supported | Not supported |
+| `schedule_at` | Deferred publish | Deferred publish | Not supported | Deferred publish | Deferred publish | Not supported |
+
+## Platform-specific `platform_data` summary
+
+Each platform accepts optional fields inside `platform_data.<platform>`. For the full reference, see the per-platform page.
+
+| Platform | Required fields | Notable optional fields |
+|---|---|---|
+| [Instagram](/posts/instagram) | None | `alt_text`, `location_id`, `share_to_feed`, `cover_url` |
+| [Facebook](/posts/facebook) | None | `link`, `picture` (text posts only; photo posts ignore platform_data) |
+| [Google](/posts/google) | None (defaults to STANDARD) | `topicType` (STANDARD, EVENT, OFFER, ALERT), `updateMask` |
+| [LinkedIn](/posts/linkedin) | None | No platform_data keys supported |
+| [Threads](/posts/threads) | None | `reply_control`, `link_attachment` |
+| [TikTok](/posts/tiktok) | `privacy_level` | `media_type`, `brand_content_toggle`, `disable_duet`, `disable_stitch`, `disable_comment`, `is_aigc`, `video_cover_timestamp_ms` |
+
+## Required OAuth scopes
+
+| Platform | Scopes |
+|---|---|
+| Instagram | `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages`, `instagram_business_content_publish` |
+| Facebook | `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_messaging`, `pages_manage_posts`, `public_profile` |
+| Google | `https://www.googleapis.com/auth/business.manage` |
+| LinkedIn | `r_organization_social`, `w_organization_social`, `rw_organization_admin` |
+| Threads | `threads_basic`, `threads_content_publish`, `threads_read_replies`, `threads_manage_replies`, `threads_delete` |
+| TikTok | `user.info.basic`, `video.publish`, `video.upload` |
+
+## Per-platform deep dives
+
+<CardGroup cols={3}>
+  <Card title="Instagram" href="/posts/instagram">
+    Images, videos, reels, carousels. Meta Graph API.
+  </Card>
+  <Card title="Facebook" href="/posts/facebook">
+    Text, photo, and video posts. Facebook Pages API.
+  </Card>
+  <Card title="Google" href="/posts/google">
+    Business Profile local posts. Google Business API.
+  </Card>
+  <Card title="LinkedIn" href="/posts/linkedin">
+    Organization page posts. LinkedIn Marketing API.
+  </Card>
+  <Card title="Threads" href="/posts/threads">
+    Text, image, video posts. Threads API.
+  </Card>
+  <Card title="TikTok" href="/posts/tiktok">
+    Video and photo carousel posts. TikTok Content Posting API.
+  </Card>
+</CardGroup>

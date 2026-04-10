@@ -1,25 +1,123 @@
 ---
 title: X / Twitter
-description: X (Twitter) connector for SocialAPI.AI.
+description: Connect and interact with X (Twitter) accounts via the X API v2.
 ---
 
-<Badge>Coming soon</Badge>
+<Badge>Available</Badge>
 
-X / Twitter support is in active development via the X API v2.
+X / Twitter is fully supported for posts (tweets), comments (replies), DMs, mentions, and comment moderation via the X API v2.
 
-## Planned features
+## Details
 
-| Feature | Planned |
+| Field | Value |
 |---|---|
-| Comments | ✅ |
-| DMs | ✅ |
-| Reviews | - |
-| Mentions | ✅ |
+| Platform slug | `twitter` |
+| Auth type | OAuth 2.0 (X / Twitter v2) |
+| API | X API v2 |
 
-## Auth type
+## Feature support
 
-OAuth 2.0 (X / Twitter v2)
+| Feature | Supported | Notes |
+|---|---|---|
+| List posts | ✅ | Returns user tweets |
+| Comments | ✅ | Replies to a specific tweet |
+| Reply to comment | ✅ | |
+| Comment replies (thread) | ✅ | |
+| Moderate comment (hide/delete) | ✅ | Hide a reply, or delete your own reply |
+| Like comment | ✅ | Like/unlike a tweet or reply |
+| Private reply | - | Not applicable |
+| DMs | ✅ | Direct Messages via X API v2 |
+| Send DM | ✅ | |
+| Reviews | - | Not applicable |
+| Mentions | ✅ | Tweets mentioning the authenticated user |
+| Create post | ✅ | Text tweets, with optional media |
+| Update post | - | X does not expose a public edit endpoint |
+| Delete post | ✅ | |
 
-## Notify me
+## Connecting
 
-[Contact us](mailto:support@social-api.ai) to be notified when X / Twitter support launches.
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "twitter",
+    "metadata": {
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "auth_url": "https://twitter.com/i/oauth2/authorize?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+}
+```
+
+Redirect your user to `auth_url`. After they authorize, X redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "twitter",
+    "code": "abc123...",
+    "metadata": {
+      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+      "redirect_uri": "https://app.example.com/oauth/callback"
+    }
+  }'
+```
+
+## Publishing
+
+Create a tweet with optional reply settings:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Hello from SocialAPI!",
+    "platform_data": {
+      "twitter": {
+        "reply_settings": "everyone"
+      }
+    }
+  }'
+```
+
+### PlatformData fields
+
+Pass these inside `platform_data.twitter` when creating a post.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `reply_settings` | string | `"everyone"` | Who can reply to this tweet. Options: `"everyone"`, `"following"` (only people you follow), `"verified"` (only verified accounts). |
+
+## Sample: List mentions
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/mentions?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## Sample: List DMs
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id={id}" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## Notes
+
+- **No post editing.** X does not expose a public edit API. `UpdatePost` returns `501`. Delete and re-create if needed.
+- **No webhook handler.** X does not push real-time events via this integration. Posts and comments are fetched on demand.
+- **Comment moderation.** Hide toggles reply visibility. Delete removes your own replies. Like/unlike is supported.
+- **Token refresh.** X OAuth 2.0 tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
+- **Required scopes.** Your X Developer App must have the appropriate OAuth 2.0 scopes for reading tweets, posting, DMs, and user lookup.

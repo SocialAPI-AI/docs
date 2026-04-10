@@ -1,0 +1,348 @@
+---
+title: Facebook publishing
+description: Full reference for publishing Facebook Page posts via SocialAPI, including text, link preview, photo, and video posts.
+---
+
+## 1. Overview
+
+Facebook publishing uses the Meta Graph API directly against your connected Facebook Page. SocialAPI selects the correct Graph API endpoint based on the content type: text and link posts go to `/{page-id}/feed`, photo posts to `/{page-id}/photos`, and video posts to `/{page-id}/videos`.
+
+| Field | Value |
+|---|---|
+| Platform slug | `facebook` |
+| Auth type | OAuth 2.0 (Meta) |
+| API | Meta Graph API (Facebook Pages) |
+| Create post | Yes |
+| Update post | Yes (message text only) |
+| Delete post | Yes |
+| Schedule | Yes (deferred publish via `schedule_at`) |
+| First comment | No |
+| Carousel | No |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Text only | No `media_ids`; no `link` in `platform_data` | Publishes a plain text status update |
+| Link preview | No `media_ids`; include `link` in `platform_data.facebook` | Facebook generates an Open Graph preview card |
+| Single photo | One image URL in `media_ids` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
+| Single video | One video URL in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos` |
+
+Route selection is automatic. If `media_ids` is non-empty, SocialAPI inspects the first entry's file extension to choose between the photo and video endpoints. If `media_ids` is empty, the feed endpoint is used and any keys in `platform_data.facebook` are forwarded.
+
+**Caption limit:** Follows Facebook's standard post message limit (approximately 63,206 characters, though shorter posts perform better).
+
+**Multi-media and carousels:** Not supported. Only the first entry in `media_ids` is used.
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `account_ids` targeting a Facebook Page account. The `text` field becomes the post message.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Exciting news from our team. Read the full announcement on our website.",
+    "platform_data": {
+      "facebook": {
+        "link": "https://example.com/announcement"
+      }
+    }
+  }'
+```
+
+### Platform data fields
+
+Pass these inside `platform_data.facebook`. These fields apply to text and link posts only. Photo and video posts ignore `platform_data` entirely.
+
+| Field | Type | Description |
+|---|---|---|
+| `link` | string | URL to attach as a link preview card. Facebook generates the Open Graph preview automatically. |
+| `picture` | string | Image URL to use as the link preview thumbnail. Overrides the Open Graph image from the linked URL. |
+
+SocialAPI forwards any additional keys in `platform_data.facebook` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See [Facebook Pages API reference](https://developers.facebook.com/docs/pages-api/posts) for the full list of supported parameters.
+
+### Photo post
+
+Provide a single image URL in `media_ids`. The `platform_data` block is ignored for photo posts.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Our new product is here.",
+    "media_ids": ["https://cdn.example.com/product.jpg"]
+  }'
+```
+
+### Video post
+
+Provide a single video URL in `media_ids`. SocialAPI detects the video extension and routes to `/{page-id}/videos`.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Watch our latest brand film.",
+    "media_ids": ["https://cdn.example.com/brand-film.mp4"]
+  }'
+```
+
+### Scheduling
+
+Set `schedule_at` to an ISO 8601 timestamp (UTC) to defer publishing:
+
+```json
+{
+  "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+  "text": "Scheduled announcement.",
+  "schedule_at": "2026-04-15T10:00:00Z"
+}
+```
+
+---
+
+## 4. Update post
+
+Facebook supports editing the message text of a post that was created by the same app. Media cannot be changed after publish. Use `PATCH /v1/posts/:pid` with a `text` field:
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Updated message text."
+  }'
+```
+
+SocialAPI calls `POST /{page-id}_{post-id}` with the new `message` value. Only the `text` field is forwarded; all other patch fields are ignored for Facebook targets.
+
+**Limitation:** Only posts created by your app can be updated. Posts imported from the platform (via sync) may return a `400` from Facebook if the app does not own them.
+
+---
+
+## 5. Delete post
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Or, to delete only the Facebook target of a cross-platform post:
+
+```bash
+curl -X DELETE "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J?platform=facebook" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Deletion calls `DELETE /{page-id}_{post-id}` on the Graph API. If the post no longer exists on Facebook, the call returns success.
+
+---
+
+## 6. Retrieve posts
+
+Use `GET /v1/posts` to list posts. Filter by platform or account:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?platform=facebook&account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each post includes a `targets` array with per-platform status and engagement metrics:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "Exciting news from our team.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "facebook",
+      "platform_post_id": "123456789012345_987654321098765",
+      "status": "published",
+      "permalink": "https://www.facebook.com/permalink/123456789012345",
+      "metrics": {
+        "likes": 15,
+        "comments": 3,
+        "shares": 7,
+        "saves": 0,
+        "extra": null,
+        "metrics_synced_at": "2026-04-10T12:00:00Z"
+      }
+    }
+  ]
+}
+```
+
+**Metrics notes:**
+- `likes` and `comments` are synced periodically from the Graph API.
+- `shares` is populated for Facebook posts. Facebook is the only platform where SocialAPI reports a non-zero share count.
+- `saves` is not exposed by the Facebook Pages API and is always `0`.
+- `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Facebook.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### Page token lifetime
+
+Facebook Page tokens derived from long-lived user tokens do not expire. Once an account is connected, the token remains valid indefinitely unless the user revokes app access or changes their password. Reconnection is only needed if you see an `auth` error.
+
+### Multi-page OAuth
+
+When a user completes the Facebook OAuth flow, SocialAPI connects all Facebook Pages that the user manages in a single OAuth exchange. Each page becomes a separate connected account entry. Users do not need to repeat the OAuth flow for additional pages.
+
+### platform_data ignored for media posts
+
+The `platform_data.facebook` block is only forwarded to the Graph API for text and link posts (the `/{page-id}/feed` endpoint). For photo and video posts, the block is silently ignored. Pass all image or video content exclusively via `media_ids` and `text`.
+
+### Only first media_ids entry is used
+
+Facebook does not support multi-photo albums or carousels via this API path. If you pass more than one URL in `media_ids`, only the first is used. The others are silently dropped.
+
+### Reviews deprecated
+
+The Facebook Graph API v22.0 removed the reviews edge. `GET /v1/inbox/reviews` for a Facebook account returns `501 Not Implemented`. This is a platform-level deprecation and cannot be worked around.
+
+### DM 24-hour window
+
+Facebook Messenger only allows pages to send outbound DMs within a 24-hour window after the user last messaged the page. Attempting to send outside this window returns a platform error. SocialAPI surfaces this as an `api_error`.
+
+### Error shapes
+
+When a publish fails, the post target's `error` field contains a structured error:
+
+```json
+{
+  "code": "platform.facebook.api_error",
+  "message": "Invalid OAuth access token.",
+  "category": "platform",
+  "caused_by": "platform"
+}
+```
+
+| Error code | Category | Caused by | Meaning |
+|---|---|---|---|
+| `platform.facebook.api_error` | `platform` | `platform` | The Graph API rejected the request. Check `message` for details. |
+| `platform.facebook.rate_limit` | `rate_limit` | `platform` | Facebook rate limit hit. Retry after a delay. |
+| `platform.facebook.auth` | `auth` | `platform` | Access token invalid or revoked. Reconnect the account. |
+
+### Recovery
+
+- **Rate limit:** Retry the post via `POST /v1/posts/:pid/retry` after waiting. SocialAPI applies exponential backoff for scheduled retries.
+- **Auth error:** Disconnect and reconnect the Facebook account through the OAuth flow to obtain a fresh token.
+- **API error:** Check the `message` field for the Graph API error description. Common causes include missing page permissions, a post that no longer exists, or an invalid media URL.
+
+---
+
+## 8. Full worked example
+
+The following example publishes a link preview post with a custom thumbnail, then checks the metrics after publish.
+
+**Step 1: Publish the post**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "We just launched our spring collection. Shop now and get 20% off your first order.",
+    "platform_data": {
+      "facebook": {
+        "link": "https://example.com/spring-collection",
+        "picture": "https://cdn.example.com/spring-og.jpg"
+      }
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "We just launched our spring collection. Shop now and get 20% off your first order.",
+  "status": "publishing",
+  "targets": [
+    {
+      "platform": "facebook",
+      "status": "publishing"
+    }
+  ],
+  "created_at": "2026-04-10T09:00:00Z"
+}
+```
+
+**Step 2: Check status**
+
+```bash
+curl "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response once published:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "We just launched our spring collection. Shop now and get 20% off your first order.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "facebook",
+      "platform_post_id": "123456789012345_987654321098765",
+      "status": "published",
+      "permalink": "https://www.facebook.com/permalink/123456789012345",
+      "metrics": {
+        "likes": 15,
+        "comments": 3,
+        "shares": 7,
+        "saves": 0,
+        "extra": null,
+        "metrics_synced_at": "2026-04-10T12:00:00Z"
+      }
+    }
+  ],
+  "created_at": "2026-04-10T09:00:00Z",
+  "published_at": "2026-04-10T09:00:12Z"
+}
+```
+
+**Step 3: Refresh metrics on demand**
+
+```bash
+curl "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J/metrics" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+---
+
+## 9. Required OAuth scopes
+
+The following Meta app scopes must be approved for your application before publishing will work:
+
+| Scope | Purpose |
+|---|---|
+| `pages_show_list` | List the pages the user manages |
+| `pages_read_engagement` | Read likes, comments, and shares on page posts |
+| `pages_read_user_content` | Read posts and comments made by users on the page |
+| `pages_manage_engagement` | Reply to and delete comments |
+| `pages_manage_metadata` | Access page metadata and settings |
+| `pages_messaging` | Send and receive Messenger DMs |
+| `pages_manage_posts` | Create, update, and delete page posts |
+| `public_profile` | Access the user's basic public profile |
+
+All publishing scopes (`pages_manage_posts`, `pages_show_list`) are required for create, update, and delete operations. If any required scope is missing, the Graph API returns a `200` with an error object or a `403`, depending on the operation.
+
+To verify which scopes your connected account has, call `GET /v1/accounts/:id/limits`.

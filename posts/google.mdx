@@ -1,0 +1,379 @@
+---
+title: Google Business Profile publishing
+description: Full reference for publishing Google Business Profile local posts via SocialAPI, including text, image, event, offer, and alert posts.
+---
+
+## 1. Overview
+
+Google Business Profile (GBP) publishing uses the Google My Business API (v4) against your connected GBP location. SocialAPI creates local posts via the `/{location}/localPosts` endpoint. Each post publishes immediately and appears in your business knowledge panel on Google Search and Google Maps.
+
+| Field | Value |
+|---|---|
+| Platform slug | `google` |
+| Auth type | OAuth 2.0 (Google) |
+| API | Google My Business API v4 |
+| Create post | Yes (immediate publish via `createLocalPost`) |
+| Update post | Yes (PATCH with `updateMask`) |
+| Delete post | Yes |
+| Schedule | No |
+| First comment | No |
+| Carousel | No |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Text only | No `media_ids` | Publishes a plain text local post |
+| Single image | One image URL in `media_ids` | GBP supports one image per post; additional entries are ignored |
+
+**Video:** Not supported. The Google My Business API does not accept video uploads for local posts.
+
+**Caption limit:** GBP does not publish a documented character limit, but posts display best under 1,500 characters. Very long posts may be truncated in the knowledge panel display.
+
+**Carousels and multi-image posts:** Not supported. Only the first entry in `media_ids` is used.
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `account_ids` targeting a connected GBP location. The `text` field maps to the `summary` field in the GBP API.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Join us this Saturday for our grand reopening. Free coffee for the first 100 visitors.",
+    "platform_data": {
+      "google": {
+        "topicType": "STANDARD"
+      }
+    }
+  }'
+```
+
+### Platform data fields
+
+Pass these inside `platform_data.google`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `topicType` | string | `STANDARD` | Post type. One of `STANDARD`, `EVENT`, `OFFER`, or `ALERT`. Must match the post content structure. |
+| `updateMask` | string | `summary` | Used only on updates (PATCH). Comma-separated list of field paths to update. Ignored on create. |
+
+**topicType details:**
+
+- `STANDARD`: A general informational post. No extra fields required.
+- `EVENT`: Requires an `event` object with `title`, `schedule.startDate`, and `schedule.endDate`. Pass via `platform_data.google`.
+- `OFFER`: Requires an `offer` object with `couponCode`, `redeemOnlineUrl`, or `termsConditions`. Pass via `platform_data.google`.
+- `ALERT`: Reserved for urgent or time-sensitive announcements. Treated similarly to `STANDARD` but may render differently in the knowledge panel.
+
+### Event post example
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Come celebrate our 10th anniversary with us.",
+    "platform_data": {
+      "google": {
+        "topicType": "EVENT",
+        "event": {
+          "title": "10th Anniversary Celebration",
+          "schedule": {
+            "startDate": { "year": 2026, "month": 5, "day": 1 },
+            "endDate": { "year": 2026, "month": 5, "day": 1 }
+          }
+        }
+      }
+    }
+  }'
+```
+
+### Image post example
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Our spring menu is now available.",
+    "media_ids": ["https://cdn.example.com/spring-menu.jpg"],
+    "platform_data": {
+      "google": {
+        "topicType": "STANDARD"
+      }
+    }
+  }'
+```
+
+SocialAPI forwards any additional keys in `platform_data.google` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See [Google Business Profile API reference](https://developers.google.com/my-business/reference/rest/v4/accounts.locations.localPosts) for the full list of supported parameters.
+
+---
+
+## 4. Update post
+
+GBP supports patching the `summary` and other fields of an existing local post. Use `PATCH /v1/posts/:pid` with a `text` field to update the post body.
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Updated: Join us this Saturday and Sunday for our grand reopening.",
+    "platform_data": {
+      "google": {
+        "updateMask": "summary"
+      }
+    }
+  }'
+```
+
+### updateMask
+
+The `updateMask` field controls which fields are sent to the GBP PATCH endpoint. It defaults to `"summary"` when omitted. To update additional fields (for example, an event schedule), pass them in `platform_data.google` alongside an explicit `updateMask` listing all changed paths as a comma-separated string.
+
+```json
+{
+  "platform_data": {
+    "google": {
+      "updateMask": "summary,event.schedule.endDate",
+      "event": {
+        "schedule": {
+          "endDate": { "year": 2026, "month": 5, "day": 2 }
+        }
+      }
+    }
+  }
+}
+```
+
+**Limitation:** `topicType` cannot be changed after a post is created. Attempting to include it in an update will result in a GBP API error.
+
+---
+
+## 5. Delete post
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Or, to delete only the Google target of a cross-platform post:
+
+```bash
+curl -X DELETE "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J?platform=google" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+SocialAPI calls `DELETE` on the full post resource name (for example, `accounts/123/locations/456/localPosts/789`). If the post no longer exists on GBP, the call returns success.
+
+**Retry not supported:** The GBP connector does not support `POST /v1/posts/:pid/retry`. If a post fails, delete it and create a new one.
+
+---
+
+## 6. Retrieve posts
+
+Use `GET /v1/posts` to list posts stored in SocialAPI. Filter by platform or account:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?platform=google&account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each post includes a `targets` array with per-platform status. Engagement metrics are not available for Google Business Profile posts:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "Join us this Saturday for our grand reopening.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "google",
+      "platform_post_id": "accounts/123/locations/456/localPosts/789",
+      "status": "published",
+      "permalink": "https://maps.google.com/?cid=...",
+      "metrics": {
+        "likes": 0,
+        "comments": 0,
+        "shares": 0,
+        "saves": 0,
+        "extra": null,
+        "metrics_synced_at": null
+      }
+    }
+  ]
+}
+```
+
+**Metrics notes:**
+
+The Google My Business API does not expose per-post engagement metrics (likes, comments, shares, or saves) via the local posts endpoint. All metric fields are always `0` and `metrics_synced_at` is `null`. Use the Google Business Profile dashboard or Insights API for performance data.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### No scheduling
+
+The GBP local posts API publishes immediately on create. There is no scheduled or draft publish capability. If you set `schedule_at` on a post targeting a Google account, SocialAPI will create the post at the scheduled time but Google will publish it immediately at that point, not at a future time of your choosing within GBP's own UI.
+
+### topicType must be set for non-standard posts
+
+Omitting `topicType` defaults to `STANDARD`, which is correct for general updates. For event, offer, or alert posts, you must explicitly set `topicType` and provide the required nested fields. Sending an `event` or `offer` object without the matching `topicType` results in a GBP API validation error.
+
+### Post IDs are full resource names
+
+The `platform_post_id` returned for a Google post is the full GBP resource name, for example `accounts/123456789/locations/987654321/localPosts/abcdef`. This is the ID required by the update and delete endpoints. SocialAPI stores and forwards this value automatically.
+
+### Location ID format
+
+Each connected GBP location has an account ID in the format `accounts/{accountId}/locations/{locationId}`. When a user connects their Google account, SocialAPI discovers all locations they manage and creates one connected account entry per location. Users do not need to reconnect for additional locations owned by the same Google account as long as they were present at the time of the initial OAuth exchange.
+
+### Token auto-refresh
+
+Google OAuth 2.0 access tokens expire after one hour. SocialAPI automatically refreshes the token using the stored refresh token before each API call when the token is within five minutes of expiry. The refreshed token is written back to the database. No action is required from your application.
+
+### Rate limits
+
+The GBP API enforces a 300 QPM (queries per minute) quota per Google Cloud project, shared across all locations. SocialAPI applies an internal throttle at 240 QPM (80% of the limit) to leave headroom for bursts. When the throttle is active, requests return `429 Too Many Requests`. Retry after a short delay.
+
+### Error shapes
+
+When a publish fails, the post target's `error` field contains a structured error:
+
+```json
+{
+  "code": "platform.google.api_error",
+  "message": "Request contains an invalid argument.",
+  "category": "platform",
+  "caused_by": "platform"
+}
+```
+
+| Error code | Category | Caused by | Meaning |
+|---|---|---|---|
+| `platform.google.api_error` | `platform` | `platform` | The GBP API rejected the request. Check `message` for details, typically a missing required field or invalid value. |
+| `platform.google.auth` | `auth` | `platform` | Access token invalid, expired, or revoked. SocialAPI attempts auto-refresh; if this error persists, reconnect the account. |
+
+### Recovery
+
+- **Auth error:** If auto-refresh fails, disconnect and reconnect the Google account through the OAuth flow to obtain a new refresh token.
+- **API error:** Check the `message` field. Common causes include a missing `topicType` for event or offer posts, an invalid event date format, or attempting to update a field not included in `updateMask`.
+- **Rate limit:** Retry via `POST /v1/posts/:pid/retry` after waiting. Note that retry is not supported for the Google connector; delete and recreate the post instead.
+
+---
+
+## 8. Full worked example
+
+The following example creates an offer post, checks its status, then updates the summary text.
+
+**Step 1: Create the offer post**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Get 20% off all services this week only. Use code SPRING20 at checkout.",
+    "platform_data": {
+      "google": {
+        "topicType": "OFFER",
+        "offer": {
+          "couponCode": "SPRING20",
+          "redeemOnlineUrl": "https://example.com/book"
+        }
+      }
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "Get 20% off all services this week only. Use code SPRING20 at checkout.",
+  "status": "publishing",
+  "targets": [
+    {
+      "platform": "google",
+      "status": "publishing"
+    }
+  ],
+  "created_at": "2026-04-10T09:00:00Z"
+}
+```
+
+**Step 2: Check status**
+
+```bash
+curl "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response once published:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "Get 20% off all services this week only. Use code SPRING20 at checkout.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "google",
+      "platform_post_id": "accounts/123456789/locations/987654321/localPosts/abcdef",
+      "status": "published",
+      "permalink": "https://maps.google.com/?cid=123456789",
+      "metrics": {
+        "likes": 0,
+        "comments": 0,
+        "shares": 0,
+        "saves": 0,
+        "extra": null,
+        "metrics_synced_at": null
+      }
+    }
+  ],
+  "created_at": "2026-04-10T09:00:00Z",
+  "published_at": "2026-04-10T09:00:08Z"
+}
+```
+
+**Step 3: Update the post summary**
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Get 20% off all services this week only. Use code SPRING20 at checkout. Offer ends Sunday.",
+    "platform_data": {
+      "google": {
+        "updateMask": "summary"
+      }
+    }
+  }'
+```
+
+---
+
+## 9. Required OAuth scopes
+
+The following Google OAuth 2.0 scope must be granted during the authorization flow:
+
+| Scope | Purpose |
+|---|---|
+| `https://www.googleapis.com/auth/business.manage` | Read and write access to all Google Business Profile locations, posts, reviews, and Q&A for the authenticated user |
+
+This single scope covers all GBP API operations (listing locations, creating and managing local posts, reading and replying to reviews, and answering Q&A questions). Google requires this scope to be enabled in your Google Cloud project's OAuth consent screen before users can complete the authorization flow.
+
+If the GBP API is not enabled in your Google Cloud project, the connector returns an `auth` error with the message `ACCESS_NOT_CONFIGURED`. Enable the "My Business API" and "Business Profile APIs" in the Google Cloud Console under APIs and Services.

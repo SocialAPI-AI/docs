@@ -1,0 +1,352 @@
+---
+title: LinkedIn publishing
+description: Full reference for publishing LinkedIn organization page posts via SocialAPI, including text, image, video, and multi-image carousel posts.
+---
+
+## 1. Overview
+
+LinkedIn publishing uses the LinkedIn Marketing API REST v202603 against your connected organization page. SocialAPI handles media uploading internally: images and videos are transferred from your S3 media library to LinkedIn's hosted media service before the post is created.
+
+| Field | Value |
+|---|---|
+| Platform slug | `linkedin` |
+| Auth type | OAuth 2.0 (LinkedIn) |
+| API | LinkedIn Marketing API (REST v202603) |
+| Create post | Yes |
+| Update post | Yes (commentary text only) |
+| Delete post | Yes |
+| Schedule | Yes (deferred publish via `schedule_at`) |
+| First comment | No |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Text only | No `media_ids` | Plain text post; `commentary` maps to `text` |
+| Single image | One image URL in `media_ids` | Uploaded via 3-step LinkedIn image upload flow |
+| Single video | One video URL in `media_ids` (`.mp4`, etc.) | Uploaded via 5-step multipart LinkedIn video upload flow |
+| Multi-image carousel | Two or more image URLs in `media_ids` | Up to 20 images; uses LinkedIn `multiImage` content block |
+
+Route selection is automatic based on the number of `media_ids` entries and their MIME type. SocialAPI probes the file type from the S3 URL response header before deciding whether to use the image or video upload path.
+
+**Commentary limit:** LinkedIn does not publish a hard character limit in their API docs, but posts over 3000 characters are truncated in most feed views. Keep posts under 3000 characters for reliable display.
+
+**Multi-image carousels:** Supported with up to 20 images. Mixed media carousels (images and videos together in one post) are not supported by LinkedIn. If you include a video URL alongside image URLs in `media_ids`, the upload will fail at the LinkedIn API level because all items are treated as images.
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `account_ids` targeting a LinkedIn organization page. The `text` field becomes the `commentary` field in the LinkedIn post body.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "We are excited to announce our new product line. Learn more on our website."
+  }'
+```
+
+### Validated fields
+
+LinkedIn does not support any `platform_data` keys. The connector uses standard PostDraft fields only.
+
+| Field | Maps to | Notes |
+|---|---|---|
+| `text` | `commentary` | Post caption or body text |
+| `media_ids` | `content.media` or `content.multiImage` | S3 URLs; uploaded by SocialAPI before posting |
+| `schedule_at` | Deferred publish | ISO 8601 UTC timestamp |
+
+SocialAPI forwards any additional keys in `platform_data.linkedin` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See [LinkedIn Posts API reference](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api) for the full list of supported parameters.
+
+### Image post
+
+Provide a single image URL in `media_ids`. SocialAPI uploads it to LinkedIn using the 3-step image upload flow (initialize, PUT binary, poll until `AVAILABLE`) before creating the post.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Our latest campaign is live.",
+    "media_ids": ["https://cdn.example.com/media/photo.jpg"]
+  }'
+```
+
+### Video post
+
+Provide a single video URL in `media_ids`. SocialAPI uses the LinkedIn 5-step multipart video upload flow (initialize with file size, upload each part with Range requests, finalize with ETags, poll until `AVAILABLE`). Video processing on LinkedIn can take up to 5 minutes; SocialAPI polls until the video is ready before creating the post.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Watch our product demo.",
+    "media_ids": ["https://cdn.example.com/media/demo.mp4"]
+  }'
+```
+
+### Multi-image carousel
+
+Provide two or more image URLs in `media_ids`. All items are uploaded as images. LinkedIn renders them as a swipeable multi-image card.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Behind the scenes of our team retreat.",
+    "media_ids": [
+      "https://cdn.example.com/media/photo1.jpg",
+      "https://cdn.example.com/media/photo2.jpg",
+      "https://cdn.example.com/media/photo3.jpg"
+    ]
+  }'
+```
+
+### Scheduling
+
+Set `schedule_at` to an ISO 8601 timestamp (UTC) to defer publishing:
+
+```json
+{
+  "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+  "text": "Our annual report is now available.",
+  "schedule_at": "2026-04-15T09:00:00Z"
+}
+```
+
+---
+
+## 4. Update post
+
+`PATCH /v1/posts/:pid` is supported for LinkedIn posts but is restricted to updating the `commentary` (text) only. LinkedIn does not allow changing attached media after a post is published.
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Updated commentary with a corrected link."
+  }'
+```
+
+If `media_ids` is included in the update request body, SocialAPI returns `501 Not Implemented`. Remove `media_ids` from the request to update text only.
+
+---
+
+## 5. Delete post
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Or, to delete only the LinkedIn target of a cross-platform post:
+
+```bash
+curl -X DELETE "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J?platform=linkedin" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Deletion calls `DELETE /rest/posts/{encodedURN}` on the LinkedIn API. The post URN is URL-encoded before use in the path (for example, `urn:li:share:12345` becomes `urn%3Ali%3Ashare%3A12345`).
+
+---
+
+## 6. Retrieve posts
+
+Use `GET /v1/posts` to list posts. Filter by platform or account:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?platform=linkedin&account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each post includes a `targets` array with per-platform status and engagement metrics:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "Our latest campaign is live.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "linkedin",
+      "platform_post_id": "urn:li:share:7123456789012345678",
+      "status": "published",
+      "permalink": null,
+      "metrics": {
+        "likes": 0,
+        "comments": 0,
+        "shares": 0,
+        "saves": 0,
+        "extra": null,
+        "metrics_synced_at": null
+      }
+    }
+  ]
+}
+```
+
+**Metrics notes:**
+
+The LinkedIn listing API (`GET /rest/posts`) does not return engagement metrics in post list responses. All metric fields (`likes`, `comments`, `shares`, `saves`) are always `0` after sync. SocialAPI does not make separate per-post metrics calls during listing. If you need engagement data, retrieve it directly from the LinkedIn Analytics API.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### URN-based IDs
+
+LinkedIn post IDs are URNs, not numeric IDs. Examples: `urn:li:share:12345` for regular posts and `urn:li:ugcPost:12345` for UGC posts. SocialAPI stores these URNs verbatim in `platform_post_id`. All API calls to LinkedIn that include a post ID URL-encode the URN using `url.QueryEscape` before inserting it into the path.
+
+### Versioned API headers
+
+Every request to the LinkedIn REST API must include two headers:
+- `LinkedIn-Version: 202603` (the API version SocialAPI targets)
+- `X-Restli-Protocol-Version: 2.0.0`
+
+Missing these headers causes the LinkedIn API to reject the request with a `400` or `404`. You do not need to set these headers yourself; SocialAPI adds them automatically.
+
+### Update rejects media changes
+
+`PATCH /v1/posts/:pid` with `media_ids` present returns `501 Not Implemented`. This is a hard limitation of the LinkedIn API: once a post is published, its media cannot be swapped, added, or removed via the API. To change media, delete the post and republish.
+
+### No mixed media in carousels
+
+LinkedIn's `multiImage` content block only accepts images. Mixing a video URL with image URLs in `media_ids` will cause the video to be passed through the image upload path, which will likely fail with a processing error from LinkedIn. Always use a single `media_id` entry for videos.
+
+### Video processing timeout
+
+LinkedIn video uploads use a 5-step process and can take several minutes to process. SocialAPI polls the video status for up to 5 minutes (polling every 2 seconds). If the video does not reach `AVAILABLE` within that window, the publish fails with a `504 Gateway Timeout` and the post target is marked `failed`. Large video files or high-traffic periods can trigger this timeout.
+
+### Image processing timeout
+
+SocialAPI polls the image status for up to 30 seconds (polling every 500 ms). If the image does not reach `AVAILABLE`, the publish fails with a `504 Gateway Timeout`.
+
+### Error shapes
+
+When a publish fails, the post target's `error` field contains a structured error:
+
+```json
+{
+  "code": "platform.linkedin.api_error",
+  "message": "The request was rejected by LinkedIn",
+  "category": "platform",
+  "caused_by": "platform"
+}
+```
+
+| Error code | Category | Caused by | Meaning |
+|---|---|---|---|
+| `platform.linkedin.api_error` | `platform` | `platform` | LinkedIn API rejected the request. Check `message` for details. |
+| `platform.linkedin.auth` | `auth` | `platform` | Access token expired or revoked. Reconnect the account. |
+| `platform.linkedin.processing_failed` | `platform` | `platform` | LinkedIn media processing failed after upload. Re-upload the media and retry. |
+
+### Recovery
+
+- **API error:** Inspect the `message` field for the specific LinkedIn error. Common causes are malformed content, missing scopes, or an organization page that no longer exists.
+- **Auth error:** Disconnect and reconnect the LinkedIn account through the OAuth flow. LinkedIn access tokens are long-lived but can be revoked by the user or expired by LinkedIn.
+- **Processing failed:** Delete the post, re-upload the media file via `POST /v1/media/upload`, and create a new post.
+- **Processing timeout:** Usually caused by a very large video file. Compress the video, re-upload, and retry.
+
+---
+
+## 8. Full worked example
+
+The following example uploads an image and publishes a LinkedIn organization page post.
+
+**Step 1: Upload media**
+
+```bash
+# Get a presigned upload URL
+curl "https://api.social-api.ai/v1/media/upload-url?filename=photo.jpg&content_type=image/jpeg" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "upload_url": "https://r2.example.com/media/photo.jpg?X-Amz-Signature=...",
+  "media_id": "med_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "public_url": "https://cdn.example.com/media/photo.jpg"
+}
+```
+
+Upload the file to the presigned URL, then verify:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/media/med_01HZ9X3Q4R5M6N7P8V2K0W1J/verify \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+**Step 2: Publish the post**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Proud to share our Q1 results. Record growth driven by our incredible team.",
+    "media_ids": ["https://cdn.example.com/media/photo.jpg"]
+  }'
+```
+
+**Step 3: Check status**
+
+```bash
+curl "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response once published:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "Proud to share our Q1 results. Record growth driven by our incredible team.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "linkedin",
+      "platform_post_id": "urn:li:share:7123456789012345678",
+      "status": "published",
+      "permalink": null,
+      "metrics": {
+        "likes": 0,
+        "comments": 0,
+        "shares": 0,
+        "saves": 0,
+        "extra": null,
+        "metrics_synced_at": null
+      }
+    }
+  ],
+  "created_at": "2026-04-10T09:00:00Z",
+  "published_at": "2026-04-10T09:00:12Z"
+}
+```
+
+---
+
+## 9. Required OAuth scopes
+
+The following LinkedIn OAuth scopes must be approved for your application:
+
+| Scope | Purpose |
+|---|---|
+| `r_organization_social` | Read posts and social data for organization pages |
+| `w_organization_social` | Create, update, and delete posts on organization pages |
+| `rw_organization_admin` | List and manage organization page admin roles (required to enumerate connected pages) |
+
+All three scopes are required. If `w_organization_social` is missing, post creation and deletion will fail with a `403 Forbidden` from the LinkedIn API. If `rw_organization_admin` is missing, account connection will fail because SocialAPI cannot enumerate the organization pages the user administers.

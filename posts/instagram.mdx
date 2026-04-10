@@ -1,0 +1,325 @@
+---
+title: Instagram publishing
+description: Full reference for publishing Instagram posts via SocialAPI, including images, videos, reels, carousels, and platform-specific parameters.
+---
+
+## 1. Overview
+
+Instagram publishing uses the Meta Graph API two-step flow: SocialAPI creates a media container, polls until the container is ready, then publishes it. All post types (image, video, reel, carousel, story) go through this same pipeline.
+
+| Field | Value |
+|---|---|
+| Platform slug | `instagram` |
+| Auth type | OAuth 2.0 (Meta) |
+| API | Meta Graph API |
+| Create post | Yes |
+| Update post | No (not supported by platform) |
+| Delete post | Yes |
+| Schedule | Yes (deferred publish via `schedule_at`) |
+| First comment | Yes (best-effort, non-blocking) |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Single image | `platform_data.instagram.content_type: "feed"` or omit with one `media_ids` entry | Standard image post |
+| Single video (Reel) | URL ending in `.mp4`, `.mov`, etc., or `content_type: "reel"` | Published as `media_type: REELS` |
+| Carousel | Two or more `media_ids` entries, or `content_type: "carousel"` | 2 to 10 items; mix of images and videos allowed |
+| Story | `platform_data.instagram.content_type: "stories"` | Single image or video; captions not supported |
+
+When `content_type` is omitted, SocialAPI auto-detects: multiple `media_ids` produce a carousel, a single entry produces a feed image or reel depending on file extension.
+
+Story publishing is supported via the API using `content_type: "stories"`. Note that stories expire after 24 hours and the Instagram platform does not support captions on stories.
+
+**Caption limit:** 2200 characters.
+
+**Carousel limits:** 2 to 10 items. Carousel child containers do not accept captions; only the parent container carries the caption.
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `account_ids` targeting an Instagram account. The `text` field becomes the caption.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Check out our new collection. #fashion #style",
+    "media_ids": ["https://cdn.example.com/photo.jpg"],
+    "platform_data": {
+      "instagram": {
+        "alt_text": "A flat-lay photo of our spring collection",
+        "location_id": "110506962309835"
+      }
+    }
+  }'
+```
+
+### Platform data fields
+
+Pass these inside `platform_data.instagram`:
+
+| Field | Type | Description |
+|---|---|---|
+| `content_type` | string | One of `"feed"`, `"reel"`, `"carousel"`, `"stories"`. Overrides auto-detection. |
+| `alt_text` | string | Accessibility alt text applied to the image container. |
+| `location_id` | string | Facebook location page ID to geo-tag the post. |
+| `share_to_feed` | bool | For Reels, also share to the main profile feed. |
+| `cover_url` | string | Custom cover image URL for video or Reel posts. |
+| `collaborators` | string or array | Instagram usernames to tag as collaborators. Leading `@` is stripped automatically. Accepts a single string, a comma-separated string, or a JSON array. |
+| `video_cover_timestamp_ms` | number | Millisecond offset into the video to use as the cover frame. Ignored if `cover_url` is set. |
+
+SocialAPI forwards any additional keys in `platform_data.instagram` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See [Instagram Publishing API reference](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/content-publishing) for the full list of supported parameters.
+
+### Scheduling
+
+Set `schedule_at` to an ISO 8601 timestamp (UTC) to defer publishing:
+
+```json
+{
+  "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+  "text": "Scheduled caption",
+  "media_ids": ["https://cdn.example.com/photo.jpg"],
+  "schedule_at": "2026-04-15T10:00:00Z"
+}
+```
+
+### First comment
+
+Set `first_comment` to a string to post an automated comment immediately after publish. This is best-effort: if the comment fails (for example due to a temporary rate limit), the post is still considered published.
+
+```json
+{
+  "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+  "text": "New drop. Link in bio.",
+  "media_ids": ["https://cdn.example.com/reel.mp4"],
+  "first_comment": "Shop now: https://example.com/shop"
+}
+```
+
+---
+
+## 4. Update post
+
+Instagram does not support editing a published post's caption or media via the API. `PATCH /v1/posts/:pid` for an Instagram target returns `501 Not Implemented`.
+
+If you need to correct a caption, delete the post and recreate it.
+
+---
+
+## 5. Delete post
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Or, to delete only the Instagram target of a cross-platform post:
+
+```bash
+curl -X DELETE "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J?platform=instagram" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Deletion calls `DELETE /{ig-media-id}` on the Meta Graph API. If the media ID no longer exists on Instagram, the API returns success.
+
+---
+
+## 6. Retrieve posts
+
+Use `GET /v1/posts` to list posts. Filter by platform or account:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?platform=instagram&account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each post includes a `targets` array with per-platform status and engagement metrics:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "Check out our new collection.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "instagram",
+      "platform_post_id": "17895695668004550",
+      "status": "published",
+      "permalink": "https://www.instagram.com/p/ABC123/",
+      "metrics": {
+        "likes": 42,
+        "comments": 5,
+        "shares": 0,
+        "saves": 0,
+        "extra": null,
+        "metrics_synced_at": "2026-04-10T12:00:00Z"
+      }
+    }
+  ]
+}
+```
+
+**Metrics notes:**
+- `likes`, `comments`, and `shares` are synced periodically from the Meta Graph API.
+- `saves` is not available from the Instagram API and is always `0`.
+- `shares` is typically `0` for Instagram (the platform does not expose a public share count).
+- `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Instagram.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### Container polling
+
+After creating a media container, SocialAPI polls the container status before publishing. Instagram processes images almost instantly, but videos and reels can take up to 60 seconds (12 attempts at 5-second intervals). If the container does not reach `FINISHED` within that window, the publish fails with `504 Gateway Timeout` and the post target is marked `failed`.
+
+Because presigned S3 URLs do not reliably expose file extensions in the path, SocialAPI polls all containers unconditionally, not only video ones.
+
+### Carousel captions
+
+Only the parent carousel container accepts a caption. Child item containers are created without captions. Passing a caption on a carousel child is silently ignored by the Meta Graph API; SocialAPI does not forward captions to child containers.
+
+### First comment is non-blocking
+
+If `first_comment` is set and the comment fails after publish, the post remains `published`. The comment failure is logged but does not roll back or change the post status.
+
+### Stories expire
+
+Instagram Stories expire 24 hours after posting. The post record in SocialAPI is not automatically removed when the story expires on Instagram.
+
+### Error shapes
+
+When a publish fails, the post target's `error` field contains a structured error:
+
+```json
+{
+  "code": "platform.instagram.api_error",
+  "message": "The media could not be processed",
+  "category": "platform",
+  "caused_by": "platform"
+}
+```
+
+| Error code | Category | Caused by | Meaning |
+|---|---|---|---|
+| `platform.instagram.api_error` | `platform` | `platform` | Meta Graph API rejected the request. Check `message` for details. |
+| `platform.instagram.rate_limit` | `rate_limit` | `platform` | Instagram rate limit hit. Retry after a delay. |
+| `platform.instagram.auth` | `auth` | `platform` | Access token expired or revoked. Reconnect the account. |
+
+### Recovery
+
+- **Rate limit:** Retry the post via `POST /v1/posts/:pid/retry` after waiting. SocialAPI applies exponential backoff for scheduled retries.
+- **Auth error:** Disconnect and reconnect the Instagram account through the OAuth flow to obtain a fresh token.
+- **Container timeout:** Usually caused by a large video file or a slow upstream URL. Re-upload the media and retry.
+
+---
+
+## 8. Full worked example
+
+The following example publishes a Reel with a cover image, a collaborator tag, and a first comment.
+
+**Step 1: Upload media**
+
+```bash
+# Get a presigned upload URL
+curl "https://api.social-api.ai/v1/media/upload-url?filename=reel.mp4&content_type=video/mp4" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "upload_url": "https://r2.example.com/media/reel.mp4?X-Amz-Signature=...",
+  "media_id": "med_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "public_url": "https://cdn.example.com/media/reel.mp4"
+}
+```
+
+Upload the file, then verify:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/media/med_01HZ9X3Q4R5M6N7P8V2K0W1J/verify \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+**Step 2: Publish the post**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Behind the scenes from our studio shoot. #bts #fashion",
+    "media_ids": ["https://cdn.example.com/media/reel.mp4"],
+    "first_comment": "Full video on YouTube: https://youtube.com/watch?v=example",
+    "platform_data": {
+      "instagram": {
+        "content_type": "reel",
+        "share_to_feed": true,
+        "cover_url": "https://cdn.example.com/media/reel-cover.jpg",
+        "collaborators": "@partner_brand",
+        "alt_text": "Studio shoot behind the scenes"
+      }
+    }
+  }'
+```
+
+**Step 3: Check status**
+
+```bash
+curl "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response once published:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "Behind the scenes from our studio shoot. #bts #fashion",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "instagram",
+      "platform_post_id": "17895695668004550",
+      "status": "published",
+      "permalink": "https://www.instagram.com/reel/ABC123/",
+      "metrics": {
+        "likes": 42,
+        "comments": 5,
+        "shares": 0,
+        "saves": 0,
+        "extra": null,
+        "metrics_synced_at": "2026-04-10T12:00:00Z"
+      }
+    }
+  ],
+  "created_at": "2026-04-10T09:00:00Z",
+  "published_at": "2026-04-10T09:00:47Z"
+}
+```
+
+---
+
+## 9. Required OAuth scopes
+
+The following Meta app scopes must be approved for your application before publishing will work:
+
+| Scope | Purpose |
+|---|---|
+| `instagram_business_basic` | Read basic account info and media |
+| `instagram_business_manage_comments` | Post and manage comments (required for first comment) |
+| `instagram_business_manage_messages` | Send and receive DMs |
+| `instagram_business_content_publish` | Create and publish media containers |
+
+All four scopes are required. If any scope is missing, container creation or publish calls will return a `400` or `403` from the Meta Graph API.
+
+To verify which scopes your connected account has, call `GET /v1/accounts/:id/limits`.
