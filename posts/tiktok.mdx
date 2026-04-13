@@ -37,7 +37,7 @@ Single images are not supported. Mixed media (video plus images) is not supporte
 
 ## 3. Create post
 
-Use `POST /v1/posts` with `account_ids` targeting a TikTok account. The `text` field becomes the post title or description. `privacy_level` is required in `platform_data.tiktok`.
+Use `POST /v1/posts` with `account_ids` targeting a TikTok account. The `text` field becomes the post title or description. `privacy_level` in `platform_data.tiktok` is optional: if omitted, SocialAPI picks a compliance-safe default from the creator's allowed options (`SELF_ONLY` when available, otherwise the first allowed option). You should still set it explicitly for production use so the audience is predictable.
 
 Before publishing, SocialAPI calls the TikTok creator info endpoint to validate the privacy level, check posting availability, and inherit creator-level defaults for comment, duet, and stitch settings.
 
@@ -91,7 +91,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `privacy_level` | string | Yes | Audience setting. Must be one of the values returned by the creator info endpoint for this account. Common values: `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, `FOLLOWER_OF_CREATOR`, `SELF_ONLY`. |
+| `privacy_level` | string | No | Audience setting. Must be one of the values returned by the creator info endpoint for this account. Common values: `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, `FOLLOWER_OF_CREATOR`, `SELF_ONLY`. If omitted, SocialAPI defaults to `SELF_ONLY` when the creator allows it, otherwise to the first allowed option. Set explicitly for production use. |
 | `media_type` | string | No | `"video"` (default) or `"photo"`. |
 | `brand_content_toggle` | bool | No | Marks the post as branded or sponsored content. Cannot be combined with `SELF_ONLY` privacy. |
 | `brand_organic_toggle` | bool | No | Organic branded content disclosure flag. |
@@ -160,9 +160,11 @@ TikTok does not expose a post deletion endpoint in its Content Posting API. `DEL
 
 ## 7. Quirks, errors, and recovery
 
-### privacy\_level is required and per-creator
+### privacy\_level is optional and per-creator
 
-`privacy_level` has no default. Omitting it causes a `400` validation error. The allowed values are not static: they are returned by the TikTok creator info endpoint and vary per account. Always validate before publishing.
+`privacy_level` is optional. If omitted, SocialAPI selects a compliance-safe default from the creator's allowed options: `SELF_ONLY` when available (the forced default for unaudited apps), otherwise the first allowed option. `POST /v1/posts/validate` returns a warning (not an error) when `privacy_level` is missing, with a message like `privacy_level not set, defaulting to "SELF_ONLY"`.
+
+The allowed values are not static: they are returned by the TikTok creator info endpoint and vary per account. For production traffic, set `privacy_level` explicitly so the audience is predictable and validate before publishing to confirm it is allowed for the target account.
 
 ### Photo carousels require 2 to 35 images
 
