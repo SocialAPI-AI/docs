@@ -1,0 +1,61 @@
+---
+title: Twitter BYOK setup
+description: Bring your own Twitter Developer app to connect Twitter accounts to SocialAPI.
+---
+
+Twitter requires each SocialAPI user to supply their own Twitter Developer app. Twitter's free API tier is scoped per-app, so using a single shared app across tenants hits rate limits immediately. BYOK (Bring Your Own Keys) gives each user their own rate-limit bucket.
+
+## 1. Create a Twitter Developer project and app
+
+1. Sign in at [developer.x.com](https://developer.x.com) and create a Free or Basic project.
+2. Inside the project, create a new **App**.
+3. Open the app's **Settings** page.
+
+## 2. Configure user authentication settings
+
+Under **User authentication settings**, set:
+
+- **App permissions:** Read and write and Direct message
+- **Type of App:** Web App, Automated App or Bot
+- **Callback URI / Redirect URL:** copy the exact URL from the SocialAPI setup dialog (format: `https://api.social-api.ai/oauth/callback/twitter`)
+- **Website URL:** your own site or `https://social-api.ai`
+
+## 3. Enable OAuth 2.0 scopes
+
+Enable these scopes:
+
+```
+tweet.read tweet.write tweet.moderate.write users.read dm.read dm.write like.write offline.access
+```
+
+Missing any of these will cause the OAuth flow to succeed but API calls to fail with permission errors afterwards.
+
+## 4. Copy your OAuth 2.0 keys
+
+Open **Keys and tokens → OAuth 2.0 Client ID and Client Secret**. Copy both values.
+
+## 5. Paste into SocialAPI
+
+In the SocialAPI dashboard, go to **Settings → Twitter integration**. Paste the Client ID and Client Secret, click **Test credentials** to verify, then **Save**. You can now click Connect on any Twitter platform card to complete the OAuth flow.
+
+## Brand overrides
+
+If you manage multiple brands (agency use case), you can add a different Twitter Developer app per brand from the same settings page. Brand-scoped credentials take precedence over the default when connecting a Twitter account to that brand.
+
+## Rotation
+
+Rotating the Client Secret in Twitter's developer portal invalidates all tokens issued by the app. After rotation:
+
+1. Paste the new secret into SocialAPI.
+2. Reconnect any Twitter accounts that were using the old credentials (they will be marked as needing reconnection on the next API call).
+
+## Troubleshooting
+
+- **`invalid_client` on save or connect:** Client ID or Client Secret is incorrect, or the secret was rotated in Twitter's dashboard without updating SocialAPI. Copy the current pair from developer.x.com.
+- **OAuth flow succeeds but API calls return 403:** Scopes are missing. Enable all scopes listed in step 3 and reconnect.
+- **Callback URL mismatch error:** The Twitter app's callback URL doesn't match what SocialAPI sent. Copy the URL from the setup dialog exactly — no trailing slash, no environment suffix.
+
+## Security
+
+- Your Client Secret is encrypted at rest with AES-256-GCM and is never returned by any API endpoint. Only the first six characters of the Client ID are stored in plaintext for UI preview.
+- Credential CRUD endpoints (`/v1/integrations/twitter/credentials`) are dashboard-only — a leaked API key cannot read or write BYOK credentials.
