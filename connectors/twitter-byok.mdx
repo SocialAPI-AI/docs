@@ -5,36 +5,39 @@ description: Bring your own Twitter Developer app to connect Twitter accounts to
 
 Twitter requires each SocialAPI user to supply their own Twitter Developer app. Twitter's free API tier is scoped per-app, so using a single shared app across tenants hits rate limits immediately. BYOK (Bring Your Own Keys) gives each user their own rate-limit bucket.
 
+<Note>
+When you create the app, X immediately shows you a **Bearer Token** and **OAuth 1.0 Keys** (Consumer Key, Access Token). These are *not* the credentials SocialAPI uses. SocialAPI uses **OAuth 2.0**, which you have to enable separately by completing step 2 below. The OAuth 2.0 Client ID and Client Secret will appear in the app panel only after you finish that setup.
+</Note>
+
 ## 1. Create a Twitter Developer project and app
 
 1. Sign in at [developer.x.com](https://developer.x.com) and create a Free or Basic project.
 2. Inside the project, create a new **App**.
-3. Open the app's **Settings** page.
+3. Click your app in the **Apps** sidebar to open its detail panel on the right side of the console.
 
-## 2. Configure user authentication settings
+## 2. Set up User authentication settings
 
-Under **User authentication settings**, set:
+In the app's detail panel, scroll to **User authentication settings** and click **Set up**. On the form that opens, configure all of the following on the same screen:
 
 - **App permissions:** Read and write and Direct message
 - **Type of App:** Web App, Automated App or Bot
 - **Callback URI / Redirect URL:** copy the exact URL from the SocialAPI setup dialog (format: `https://api.social-api.ai/oauth/callback/twitter`)
 - **Website URL:** your own site or `https://social-api.ai`
+- **Scopes** (sometimes shown on the same form, sometimes in a sub-step): enable
 
-## 3. Enable OAuth 2.0 scopes
+  ```
+  tweet.read tweet.write tweet.moderate.write users.read dm.read dm.write like.write offline.access
+  ```
 
-Enable these scopes:
+  Missing any of these will cause the OAuth flow to succeed but API calls to fail with permission errors afterwards.
 
-```
-tweet.read tweet.write tweet.moderate.write users.read dm.read dm.write like.write offline.access
-```
+Click **Save**.
 
-Missing any of these will cause the OAuth flow to succeed but API calls to fail with permission errors afterwards.
+## 3. Copy your OAuth 2.0 Client ID and Client Secret
 
-## 4. Copy your OAuth 2.0 keys
+After saving, an **OAuth 2.0** section appears in the app's detail panel. Copy both the **Client ID** and **Client Secret**. Store the secret somewhere safe, X only shows it once on first generation.
 
-Open **Keys and tokens → OAuth 2.0 Client ID and Client Secret**. Copy both values.
-
-## 5. Paste into SocialAPI
+## 4. Paste into SocialAPI
 
 In the SocialAPI dashboard, go to **Settings → Twitter integration**. Paste the Client ID and Client Secret, click **Test credentials** to verify, then **Save**. You can now click Connect on any Twitter platform card to complete the OAuth flow.
 
@@ -51,11 +54,13 @@ Rotating the Client Secret in Twitter's developer portal invalidates all tokens 
 
 ## Troubleshooting
 
-- **`invalid_client` on save or connect:** Client ID or Client Secret is incorrect, or the secret was rotated in Twitter's dashboard without updating SocialAPI. Copy the current pair from developer.x.com.
-- **OAuth flow succeeds but API calls return 403:** Scopes are missing. Enable all scopes listed in step 3 and reconnect.
-- **Callback URL mismatch error:** The Twitter app's callback URL doesn't match what SocialAPI sent. Copy the URL from the setup dialog exactly — no trailing slash, no environment suffix.
+- **Pasted credentials don't work / `invalid_client` on save:** Double-check you're pasting the **OAuth 2.0** Client ID and Client Secret from the app panel, not the Consumer Key, Secret Key, or Bearer Token shown right after app creation. Those are OAuth 1.0a and app-only credentials and won't work with SocialAPI's OAuth 2.0 flow.
+- **`invalid_client` on connect:** The secret was rotated in Twitter's dashboard without updating SocialAPI. Copy the current pair from developer.x.com.
+- **OAuth flow succeeds but API calls return 403:** Scopes are missing. Enable all scopes listed in step 2 and reconnect.
+- **Callback URL mismatch error:** The Twitter app's callback URL doesn't match what SocialAPI sent. Copy the URL from the setup dialog exactly, no trailing slash, no environment suffix.
+- **Hitting rate limits immediately:** Check which environment your X app is in (development, staging, or production) and what your X developer plan tier is. The OAuth 2.0 setup mechanics are identical across all three environments, but the rate-limit quotas attached to each environment depend on your paid tier. The Free tier is heavily throttled; Basic and above unlock higher quotas in production.
 
 ## Security
 
 - Your Client Secret is encrypted at rest with AES-256-GCM and is never returned by any API endpoint. Only the first six characters of the Client ID are stored in plaintext for UI preview.
-- Credential CRUD endpoints (`/v1/integrations/twitter/credentials`) are dashboard-only — a leaked API key cannot read or write BYOK credentials.
+- Credential CRUD endpoints (`/v1/integrations/twitter/credentials`) are dashboard-only, so a leaked API key cannot read or write BYOK credentials.
