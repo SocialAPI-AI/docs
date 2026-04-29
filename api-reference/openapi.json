@@ -3304,6 +3304,187 @@
                 }
             }
         },
+        "/oauth/redirect-uris": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all whitelisted OAuth redirect URIs for the authenticated user.\nThese URIs can be used as the redirect_uri parameter in POST /v1/accounts/connect.",
+                "tags": [
+                    "OAuth"
+                ],
+                "summary": "List allowed redirect URIs",
+                "responses": {
+                    "200": {
+                        "description": "List of redirect URIs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.RedirectURIListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Requires dashboard authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Registers a new redirect URI in the whitelist. Maximum 20 per user.\nThe URI must use HTTPS (HTTP is allowed only for localhost and 127.0.0.1).",
+                "tags": [
+                    "OAuth"
+                ],
+                "summary": "Add an allowed redirect URI",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.CreateRedirectURIRequest"
+                            }
+                        }
+                    },
+                    "description": "Redirect URI to register",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "URI registered",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.RedirectURIResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid URI format",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Requires dashboard authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "URI already registered",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/oauth/redirect-uris/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a redirect URI from the whitelist by ID.",
+                "tags": [
+                    "OAuth"
+                ],
+                "summary": "Remove an allowed redirect URI",
+                "parameters": [
+                    {
+                        "description": "Redirect URI ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "URI removed"
+                    },
+                    "401": {
+                        "description": "Invalid or missing token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Requires dashboard authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "URI not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/posts": {
             "get": {
                 "security": [
@@ -5016,6 +5197,16 @@
                         "description": "Platform identifies the social platform to connect (e.g. instagram, facebook, google, threads, tiktok, linkedin).",
                         "type": "string",
                         "example": "instagram"
+                    },
+                    "redirect_uri": {
+                        "description": "RedirectURI is the customer's URL to redirect the user to after OAuth completes.\nMust be pre-registered in the dashboard whitelist. If omitted, the default HTML success page is shown.",
+                        "type": "string",
+                        "example": "https://app.acme.com/oauth/done"
+                    },
+                    "state": {
+                        "description": "CustomerState is an opaque value echoed back to the customer's redirect URI. Max 512 chars.",
+                        "type": "string",
+                        "example": "session_abc123"
                     }
                 }
             },
@@ -5236,6 +5427,21 @@
                             "connections_only"
                         ],
                         "example": "public"
+                    }
+                }
+            },
+            "api_endpoints.CreateRedirectURIRequest": {
+                "type": "object",
+                "properties": {
+                    "label": {
+                        "description": "Label is an optional human-readable label for this URI.",
+                        "type": "string",
+                        "example": "production"
+                    },
+                    "uri": {
+                        "description": "URI is the redirect URI to whitelist (must be https, or http for localhost).",
+                        "type": "string",
+                        "example": "https://app.acme.com/oauth/done"
                     }
                 }
             },
@@ -6111,6 +6317,41 @@
                     },
                     "pagination": {
                         "$ref": "#/components/schemas/api_endpoints.PaginationInfo"
+                    }
+                }
+            },
+            "api_endpoints.RedirectURIListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.RedirectURIResponse"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.RedirectURIResponse": {
+                "type": "object",
+                "properties": {
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-04-10T12:00:00Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "sapi_ruri_a1b2c3d4e5f6"
+                    },
+                    "label": {
+                        "type": "string",
+                        "example": "production"
+                    },
+                    "uri": {
+                        "type": "string",
+                        "example": "https://app.acme.com/oauth/done"
                     }
                 }
             },
