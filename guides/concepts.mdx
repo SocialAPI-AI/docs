@@ -1,0 +1,130 @@
+---
+title: Core concepts
+description: The five nouns SocialAPI's API exposes (Brand, Account, Post, Interaction, Capability) and how they fit together.
+---
+
+SocialAPI's REST API is shaped around five nouns. Once you know what each one means, every endpoint slots into place: brands group accounts, accounts hold posts and interactions, and capabilities tell you which actions are valid for any given interaction.
+
+This page is a short tour. The [API Reference](/api-reference/introduction) has the exhaustive field-by-field schema for each one.
+
+## Brand
+
+A **Brand** is the top-level grouping in SocialAPI. One brand corresponds to one business, client, or project. All connected social accounts, posts, and interactions live under a brand.
+
+Brands matter for two reasons:
+
+1. **Billing.** Plans are sized in brands. Free includes 2 brands, Starter 10, Pro 50, Business 200, Enterprise unlimited.
+2. **Isolation.** Accounts under one brand cannot see accounts under another. Use brands to keep agency clients separated, or to split staging from production.
+
+```json
+{
+  "id": "brand_01HZAB12CDEFGHJKMNPQRSTUVW",
+  "name": "Acme Corp",
+  "created_at": "2026-04-12T09:30:00Z"
+}
+```
+
+See [`/v1/brands`](/api-reference/introduction) for the full schema and CRUD endpoints.
+
+## Account
+
+An **Account** is a connected social profile under a brand. One brand can hold many accounts, across any mix of platforms. SocialAPI stores the OAuth tokens (encrypted at rest) and refreshes them automatically.
+
+You connect an account by calling `POST /v1/accounts/connect` and walking the user through OAuth. After connection, the account ID (prefixed `acc_`) is what you pass to every account-scoped endpoint.
+
+```json
+{
+  "id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "instagram",
+  "name": "Acme Corp",
+  "username": "acmecorp",
+  "profile_picture_url": "https://scontent.cdninstagram.com/v/...",
+  "bio": "Sustainable apparel. Shipping worldwide."
+}
+```
+
+The full Account schema, including the per-platform `metadata` object, is documented in [Connectors overview](/connectors/overview#account-object).
+
+See also: [Authentication](/guides/authentication), [OAuth](/guides/oauth).
+
+## Post
+
+A **Post** is one piece of outbound content. A post can target multiple accounts at publishing time, so a single `POST /v1/posts` call can fan out to Instagram, Facebook, and Threads in one shot.
+
+Internally a post has two parts: the post itself (text, media, scheduled time) and a per-platform delivery row that tracks status, errors, and engagement metrics for each target. That split is what lets a single post object report "published on Instagram, failed on Facebook" cleanly.
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "text": "Spring collection is live.",
+  "status": "published",
+  "scheduled_at": null,
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "instagram",
+      "status": "published",
+      "platform_post_id": "17895695668004550",
+      "permalink": "https://www.instagram.com/p/ABC123/",
+      "metrics": { "like_count": 42, "comments_count": 5 }
+    }
+  ],
+  "created_at": "2026-04-15T11:00:00Z"
+}
+```
+
+Posts move through a state machine: `draft`, `scheduled`, `publishing`, then `published` (or `partial`, `failed`). See the [Posts tab](/posts/overview) for per-platform field references.
+
+## Interaction
+
+An **Interaction** is anything inbound: a comment on one of your posts, a DM, a review, or a mention. SocialAPI never stores interaction *content* (always proxied live from the platform), but it does mint stable IDs so your app can reference them.
+
+Interaction IDs encode their type as a prefix:
+
+| Prefix | Type |
+|---|---|
+| `sapi_cmt_` | Comment |
+| `sapi_dm_` | DM |
+| `sapi_rev_` | Review |
+| `sapi_mnt_` | Mention |
+
+```json
+{
+  "id": "sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1NzkzMTg3MjE4",
+  "platform": "instagram",
+  "type": "comment",
+  "author": {
+    "id": "17841405793187218",
+    "name": "Jane Smith"
+  },
+  "content": { "text": "Love this product!" },
+  "created_at": "2026-04-15T14:30:00Z",
+  "capabilities": {
+    "can_reply": true,
+    "can_delete": true,
+    "can_hide": true,
+    "can_like": false,
+    "can_private_reply": true
+  }
+}
+```
+
+The prefix lets the API dispatch a reply without a database lookup. See [Interaction IDs](/guides/interaction-ids) for the encoding details.
+
+## Capability
+
+A **Capability** is a per-platform per-feature flag returned on every interaction so your code knows which actions are valid right now. Instead of branching on platform names ("if instagram, can like; if linkedin, can not"), you read the `capabilities` object on the interaction and disable UI controls accordingly.
+
+```json
+{
+  "capabilities": {
+    "can_reply": true,
+    "can_delete": true,
+    "can_hide": true,
+    "can_like": false,
+    "can_private_reply": true
+  }
+}
+```
+
+If you call an action whose flag is `false`, the API returns `501` with `code: "not_supported"`. Treat 501 as a permanent platform limitation, not a bug. See [Platform support](/guides/platforms) for the full per-platform breakdown.

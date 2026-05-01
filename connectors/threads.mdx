@@ -9,30 +9,31 @@ description: Connect and interact with Threads accounts via the Meta Threads API
 
 Threads is fully supported for posts, comments, moderation, and publishing.
 
-## Details
+## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `threads` |
-| Auth type | OAuth 2.0 (Meta / Threads) |
-| API | Meta Threads API |
+| Auth type | OAuth 2.0 (Meta) |
+| API | Threads Graph API |
+| Best for | Text-first posting and replying on Threads. |
 
-## Feature support
+## Capabilities
 
 | Feature | Supported | Notes |
 |---|---|---|
-| List posts | ✅ | Text posts, images, videos, carousels |
-| Comments | ✅ | Replies to a specific post |
-| Reply to comment | ✅ | |
+| List posts | Yes | Text posts, images, videos, carousels |
+| Comments | Yes | Replies to a specific post |
+| Reply to comment | Yes | |
 | Comment replies (thread) | Coming soon | Not yet implemented |
-| Moderate comment (hide/unhide/delete) | ✅ | Hide, unhide, and delete supported. Unknown actions return `501`. |
-| Toggle post comments | - | Not supported by Threads API |
-| DMs | - | Not supported by platform |
-| Reviews | - | Not applicable |
-| Mentions | - | Not supported via Threads API |
-| Create post | ✅ | Text, images, videos, carousels |
-| Delete post | ✅ | |
-| Update post | - | Not supported by Threads API |
+| Moderate comment (hide/unhide/delete) | Yes | Hide, unhide, and delete supported. Unknown actions return `501`. |
+| Toggle post comments | No | Not supported by Threads API |
+| DMs | No | Not supported by platform |
+| Reviews | No | Not applicable |
+| Mentions | No | Not supported via Threads API |
+| Create post | Yes | Text, images, videos, carousels |
+| Delete post | Yes | |
+| Update post | No | Not supported by Threads API |
 
 ## Connecting
 
@@ -73,7 +74,9 @@ curl -X POST https://api.social-api.ai/v1/oauth/exchange \
   }'
 ```
 
-## Sample: List posts
+## Reading samples
+
+### List posts
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
@@ -101,7 +104,7 @@ Sample response:
 }
 ```
 
-## Sample: List comments on a post
+### List comments on a post
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/{id}/posts/17895695668004550/comments?limit=10" \
@@ -129,10 +132,21 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 For the full field reference, media constraints, and error recovery, see [Threads posts](/posts/threads).
 
-## Notes
+## Limitations and gotchas
 
-- **Moderation** - Hide, unhide, and delete are supported. Unsupported moderation actions return `501`.
-- **No post updates** - Threads does not support editing published posts. Use delete and re-create if needed.
-- **Publishing** - Supports text posts, single images, single videos, and carousel posts.
-- **Token refresh** - Threads tokens can expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
-- **Permissions** - SocialAPI's managed Meta Threads App already requests these scopes on your behalf: `threads_basic`, `threads_content_publish`, `threads_read_replies`, `threads_manage_replies`, `threads_delete`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
+- **Moderation.** Hide, unhide, and delete are supported. Unsupported moderation actions return `501`.
+- **No post updates.** Threads does not support editing published posts. Use delete and re-create if needed.
+- **Publishing.** Supports text posts, single images, single videos, and carousel posts.
+- **Token refresh.** Threads tokens can expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
+
+## Permissions
+
+SocialAPI's managed Meta Threads App already requests these scopes on your behalf: `threads_basic`, `threads_content_publish`, `threads_read_replies`, `threads_manage_replies`, `threads_delete`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
+
+## Related
+
+- [Platform credentials](/guides/platform-credentials)
+- [OAuth flows](/guides/oauth)
+- [Publishing to Threads](/posts/threads)
+- [Errors](/guides/errors)
+- [Interaction IDs](/guides/interaction-ids)

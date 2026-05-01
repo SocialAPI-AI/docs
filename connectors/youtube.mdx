@@ -7,33 +7,32 @@ description: Connect and interact with YouTube channels via the YouTube Data API
 
 **Managed connector** — SocialAPI handles the Google Cloud project and YouTube Data API access for you. No customer-side Google Cloud setup required. See [Platform credentials](/guides/platform-credentials).
 
-YouTube is fully supported for posts (videos), comments, moderation, and publishing via the YouTube Data API v3.
-
-## Details
+## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `youtube` |
 | Auth type | OAuth 2.0 (Google) |
 | API | YouTube Data API v3 |
+| Best for | Comment moderation and metadata on owned YouTube channels. |
 
-## Feature support
+## Capabilities
 
 | Feature | Supported | Notes |
 |---|---|---|
-| List posts | ✅ | Returns uploaded videos |
-| Comments | ✅ | Scoped to a specific video |
-| Reply to comment | ✅ | |
-| Comment replies (thread) | ✅ | |
-| Moderate comment (hide/delete) | ✅ | Hide sets moderation status; delete removes permanently |
-| Like comment | - | Not supported by YouTube API |
-| Private reply | - | Not applicable |
-| DMs | - | Not supported by platform |
-| Reviews | - | Not applicable |
-| Mentions | - | Not supported via YouTube API |
-| Create post | ✅ | Upload and publish videos |
-| Update post | ✅ | Update title, description, tags, privacy, and other metadata |
-| Delete post | ✅ | |
+| List posts | Yes | Returns uploaded videos |
+| Comments | Yes | Scoped to a specific video |
+| Reply to comment | Yes | |
+| Comment replies (thread) | Yes | |
+| Moderate comment (hide/delete) | Yes | Hide sets moderation status; delete removes permanently |
+| Like comment | No | Not supported by YouTube API |
+| Private reply | No | Not applicable |
+| DMs | No | Not supported by platform |
+| Reviews | No | Not applicable |
+| Mentions | No | Not supported via YouTube API |
+| Create post | Yes | Upload and publish videos |
+| Update post | Yes | Update title, description, tags, privacy, and other metadata |
+| Delete post | Yes | |
 
 ## Connecting
 
@@ -74,9 +73,56 @@ curl -X POST https://api.social-api.ai/v1/oauth/exchange \
   }'
 ```
 
+## Reading samples
+
+### List posts
+
+```bash
+curl "https://api.social-api.ai/v1/posts?account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### List comments on a post
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/{videoId}" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_eW91dHViZTpVZ3h...",
+      "platform": "youtube",
+      "type": "comment",
+      "author": {
+        "id": "UCxyz123",
+        "name": "Jane Smith",
+        "avatar_url": "https://yt3.ggpht.com/..."
+      },
+      "content": {
+        "text": "Great video!"
+      },
+      "metadata": {
+        "post_id": "dQw4w9WgXcQ",
+        "like_count": 5,
+        "reply_count": 2
+      },
+      "created_at": "2026-03-15T10:30:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_id": "Ugxyz..."
+    }
+  ],
+  "count": 1
+}
+```
+
 ## Publishing
 
-Create a video post by providing a video URL and optional metadata via `platform_data`:
+Create a video post by providing a video URL and optional metadata via `platform_data`. See the [API reference](/api-reference/introduction) for the full request schema.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -118,48 +164,20 @@ Pass these inside `platform_data.youtube` when creating or updating a post.
 | `notify_subscribers` | bool | `true` | Whether to send a notification to channel subscribers. |
 | `playlist_id` | string | none | YouTube playlist ID. The video is added to this playlist after publishing. |
 
-## Sample: List comments on a video
-
-```bash
-curl "https://api.social-api.ai/v1/inbox/comments/{videoId}" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-Sample response:
-
-```json
-{
-  "data": [
-    {
-      "id": "sapi_cmt_eW91dHViZTpVZ3h...",
-      "platform": "youtube",
-      "type": "comment",
-      "author": {
-        "id": "UCxyz123",
-        "name": "Jane Smith",
-        "avatar_url": "https://yt3.ggpht.com/..."
-      },
-      "content": {
-        "text": "Great video!"
-      },
-      "metadata": {
-        "post_id": "dQw4w9WgXcQ",
-        "like_count": 5,
-        "reply_count": 2
-      },
-      "created_at": "2026-03-15T10:30:00Z",
-      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-      "platform_id": "Ugxyz..."
-    }
-  ],
-  "count": 1
-}
-```
-
-## Notes
+## Limitations and gotchas
 
 - **No DMs or mentions.** YouTube does not expose a messaging or mention API. These endpoints return `501`.
 - **No webhook handler.** YouTube does not push real-time events. Posts and comments are fetched on demand.
 - **Comment moderation.** Hide sets the comment's moderation status (held for review). Delete removes it permanently. Like is not supported.
 - **Token refresh.** Google OAuth tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
-- **Permissions.** SocialAPI's managed Google Cloud project already enables the YouTube Data API v3 and requests the OAuth scopes needed to read and manage comments on owned channels. You don't need to set up your own Google Cloud project or apply for any verification. See [Platform credentials](/guides/platform-credentials).
+
+## Permissions
+
+SocialAPI's managed Google Cloud OAuth app already requests YouTube Data API v3 scopes for reading and managing comments on your owned channels. You don't need to set up a Google Cloud project. See [Platform credentials](/guides/platform-credentials).
+
+## Related
+
+- [Platform credentials](/guides/platform-credentials)
+- [OAuth flows](/guides/oauth)
+- [Errors](/guides/errors)
+- [Interaction IDs](/guides/interaction-ids)

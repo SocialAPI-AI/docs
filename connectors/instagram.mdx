@@ -7,34 +7,33 @@ description: Connect and interact with Instagram accounts via the Meta Graph API
 
 **Managed connector** — SocialAPI handles the Meta App and platform app review for you. No customer-side Meta for Developers registration required. See [Platform credentials](/guides/platform-credentials).
 
-Instagram is the first fully supported connector. It uses the Meta Graph API for comments and DMs.
-
-## Details
+## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `instagram` |
 | Auth type | OAuth 2.0 (Meta) |
 | API | Meta Graph API |
+| Best for | Largest reach for visual brands; full inbound and outbound surface. |
 
-## Feature support
+## Capabilities
 
 | Feature | Supported | Notes |
 |---|---|---|
-| List posts | ✅ | Returns posts, reels, carousels |
-| Comments | ✅ | Scoped to a specific post |
-| Reply to comment | ✅ | |
-| Private reply | ✅ | Sends a DM to the commenter |
-| Comment replies (thread) | ✅ | |
-| Moderate comment (hide/unhide/delete) | ✅ | |
-| Toggle post comments | ✅ | |
-| DMs | ✅ | |
-| Send DM | ✅ | |
-| Get DM thread by user | ✅ | |
-| Reviews | - | Instagram has no review feature |
-| Mentions | ✅ | |
-| Create post | ✅ | Images, videos, reels, carousels |
-| Delete post | ✅ | |
+| List posts | Yes | Returns posts, reels, carousels |
+| Comments | Yes | Scoped to a specific post |
+| Reply to comment | Yes | |
+| Private reply | Yes | Sends a DM to the commenter |
+| Comment replies (thread) | Yes | |
+| Moderate comment (hide/unhide/delete) | Yes | |
+| Toggle post comments | Yes | |
+| DMs | Yes | |
+| Send DM | Yes | |
+| Get DM thread by user | Yes | |
+| Reviews | No | Instagram has no review feature |
+| Mentions | Yes | |
+| Create post | Yes | Images, videos, reels, carousels |
+| Delete post | Yes | |
 
 ## Connecting
 
@@ -75,7 +74,9 @@ curl -X POST https://api.social-api.ai/v1/oauth/exchange \
   }'
 ```
 
-## Sample: List posts
+## Reading samples
+
+### List posts
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
@@ -104,7 +105,7 @@ Sample response:
 }
 ```
 
-## Sample: List comments on a post
+### List comments on a post
 
 Comments are scoped to a specific post. Use the post `id` from the response above:
 
@@ -143,7 +144,7 @@ Sample response:
 }
 ```
 
-## Sample: List DMs
+### List DMs
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/{id}/dms?limit=10" \
@@ -203,8 +204,20 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 For the full field reference, media constraints, and error recovery, see [Instagram posts](/posts/instagram).
 
-## Notes
+## Limitations and gotchas
 
-- **Private replies** - Replying to a comment with `"private": true` sends a DM to the commenter. This is Instagram's native "Send Private Reply" feature, not a SocialAPI workaround.
-- **Token expiry** - Instagram access tokens can expire. If you receive `401` with `code: "invalid_token"`, reconnect the account using the OAuth flow.
-- **Permissions** - SocialAPI's managed Meta App already requests these scopes on your behalf: `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages`, `instagram_business_content_publish`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
+- **Private replies.** Replying to a comment with `"private": true` sends a DM to the commenter. This is Instagram's native "Send Private Reply" feature, not a SocialAPI workaround.
+- **Token expiry.** Instagram access tokens can expire. If you receive `401` with `code: "invalid_token"`, reconnect the account using the OAuth flow.
+- **Account fields.** See the shared [account object](/connectors/overview#account-object) reference for the fields returned by `/v1/accounts`.
+
+## Permissions
+
+- **Permissions.** SocialAPI's managed Meta App already requests these scopes on your behalf: `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages`, `instagram_business_content_publish`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
+
+## Related
+
+- [Platform credentials](/guides/platform-credentials)
+- [OAuth flows](/guides/oauth)
+- [Publishing to Instagram](/posts/instagram)
+- [Errors](/guides/errors)
+- [Interaction IDs](/guides/interaction-ids)

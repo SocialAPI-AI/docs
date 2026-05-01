@@ -1,26 +1,42 @@
 ---
 title: SocialAPI.AI
-description: Unified social media API. Manage your inbox, publish content, and monitor engagement across Instagram, Facebook, Threads, Google Business, TikTok, and LinkedIn through a single REST API.
+description: Unified social media API. Manage your inbox, publish content, and monitor engagement across Instagram, Facebook, Threads, Google Business, TikTok, LinkedIn, and YouTube through a single REST API.
 ---
 
 ## What is SocialAPI.AI?
 
-[SocialAPI.AI](https://social-api.ai) gives your application a single API to manage social media across platforms. Read and reply to comments, DMs, and reviews. Create and schedule posts. Upload media. Get engagement metrics. Instead of integrating 6+ platform APIs, you integrate once.
+SocialAPI replaces your Meta Graph, TikTok, LinkedIn, Google Business, and YouTube integrations with one REST API. Read and reply to comments, DMs, and reviews. Create and schedule posts. Upload media. Get engagement metrics. Integrate once, ship everywhere.
 
 You don't need to set up developer apps with Meta, TikTok, Google, LinkedIn, or YouTube — SocialAPI's apps are already approved and we handle the OAuth. Twitter is the one exception ([why](/guides/platform-credentials#why-twitter-is-different)).
+
+## Supported platforms
+
+| Platform | Inbox | Publishing | Status |
+|---|---|---|---|
+| Instagram | ✅ | ✅ | Available |
+| Facebook | ✅ | ✅ | Available |
+| Threads | ✅ | ✅ | Available |
+| Google | ✅ | ✅ | Available |
+| TikTok | - | ✅ | Available |
+| LinkedIn | ✅ | ✅ | Available |
+| YouTube | ✅ | ✅ | Available |
+| X / Twitter | Soon | Soon | Coming soon |
+| Trustpilot | Soon | - | Coming soon |
+
+For per-feature support (reply, hide, like, delete, private reply, DMs, reviews, mentions), see [Platform support](/guides/platforms).
 
 <CardGroup cols={3}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Make your first API call in 5 minutes.
   </Card>
-  <Card title="API Reference" icon="terminal" href="/api-reference/introduction">
-    Full reference for every endpoint.
-  </Card>
-  <Card title="Platform Support" icon="grid-2" href="/guides/platforms">
+  <Card title="Platform support" icon="grid-2" href="/guides/platforms">
     Capabilities by platform.
   </Card>
   <Card title="AI Assistants" icon="wand-magic-sparkles" href="/integrations/overview">
     Connect to Claude, ChatGPT, Cursor, and more.
+  </Card>
+  <Card title="API Reference" icon="terminal" href="/api-reference/introduction">
+    Full reference for every endpoint.
   </Card>
   <Card title="Webhooks" icon="bolt" href="/guides/webhooks">
     Get notified of new comments, messages, and events.
@@ -34,7 +50,7 @@ You don't need to set up developer apps with Meta, TikTok, Google, LinkedIn, or 
 
 ### Unified inbox
 
-Read and respond to every customer interaction from a single API. Comments, DMs, and reviews are organized under `/v1/inbox` with consistent response shapes across all platforms.
+Use this when your app needs to read or respond to anything inbound across platforms (comments, DMs, reviews) without writing per-platform glue. Comments, DMs, and reviews are organized under `/v1/inbox` with consistent response shapes across all platforms.
 
 ```bash
 # List posts with comments
@@ -58,7 +74,7 @@ curl https://api.social-api.ai/v1/inbox/reviews \
 
 ### Publishing
 
-Create, schedule, and manage posts across platforms. Publish to multiple accounts at once, track delivery status per platform, and monitor engagement metrics.
+Use this when your users publish from your app and you want one API call to fan out to multiple connected accounts. Create, schedule, and manage posts across platforms; track delivery status per platform; monitor engagement metrics.
 
 ```bash
 # Create and schedule a post to Instagram and Facebook
@@ -81,7 +97,7 @@ curl https://api.social-api.ai/v1/posts/POST_ID/metrics \
 
 ### Media library
 
-Upload images and videos, then reuse them across posts. Presigned upload URLs keep your media pipeline fast and secure.
+Use this when you upload media in advance (content calendar, batch uploads) and reference it from later post creates. Presigned upload URLs keep your media pipeline fast and secure.
 
 ```bash
 # Get a presigned upload URL
@@ -91,41 +107,9 @@ curl "https://api.social-api.ai/v1/media/upload-url?filename=photo.jpg&content_t
 
 ### AI assistant integrations
 
-SocialAPI.AI exposes a full MCP server with 42 tools, so AI assistants like Claude, ChatGPT, and Cursor can manage your social accounts directly. OAuth 2.1 with PKCE keeps everything secure.
+Use this when an AI agent (Claude, ChatGPT, Cursor) should manage social accounts directly via tool calls. SocialAPI.AI exposes a full MCP server with 75 tools and OAuth 2.1 with PKCE for secure agent access.
 
 [Set up AI integrations &rarr;](/integrations/overview)
-
-## How it works
-
-1. **Connect** a social account via OAuth
-```bash
-curl -X POST https://api.social-api.ai/v1/accounts/connect \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"platform": "instagram"}'
-```
-
-2. **Read** your inbox (comments, DMs, reviews)
-```bash
-curl https://api.social-api.ai/v1/inbox/comments \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-3. **Respond** to any interaction
-```bash
-curl -X POST https://api.social-api.ai/v1/inbox/comments/POST_ID \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Thanks!"}'
-```
-
-4. **Publish** content across platforms
-```bash
-curl -X POST https://api.social-api.ai/v1/posts \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"text": "New post!", "targets": [...]}'
-```
 
 ## Authentication
 
@@ -136,17 +120,3 @@ Authorization: Bearer sapi_key_...
 ```
 
 See [Authentication](/guides/authentication) for details on API keys, JWTs, and OAuth tokens.
-
-## Supported platforms
-
-| Platform | Posts | Comments | DMs | Reviews | Mentions | Publishing |
-|---|---|---|---|---|---|---|
-| Instagram | ✅ | ✅ | ✅ | - | ✅ | ✅ |
-| Facebook | ✅ | ✅ | ✅ | - | ✅ | ✅ |
-| Threads | ✅ | ✅ | - | - | - | ✅ |
-| Google | ✅ | ✅ | - | ✅ | - | ✅ |
-| TikTok | ✅ | - | - | - | - | ✅ |
-| LinkedIn | ✅ | ✅ | - | - | - | ✅ |
-| YouTube | ✅ | ✅ | - | - | - | ✅ |
-| X / Twitter | Soon | Soon | Soon | - | Soon | - |
-| Trustpilot | - | - | - | Soon | - | - |

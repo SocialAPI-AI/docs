@@ -9,32 +9,33 @@ description: Connect and interact with Facebook Pages via the Meta Graph API.
 
 Facebook Pages are fully supported. The connector uses the Meta Graph API for posts, comments, DMs (Messenger), and mentions.
 
-## Details
+## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `facebook` |
 | Auth type | OAuth 2.0 (Meta) |
-| API | Meta Graph API v25.0 |
+| API | Meta Graph API |
+| Best for | Page-level engagement: post and reply on Facebook Pages. |
 
-## Feature support
+## Capabilities
 
 | Feature | Supported | Notes |
 |---|---|---|
-| List posts | ✅ | Page feed posts |
-| Comments | ✅ | Scoped to a specific post |
-| Reply to comment | ✅ | |
-| Private reply | ✅ | Sends a one-time DM to the commenter |
+| List posts | Yes | Page feed posts |
+| Comments | Yes | Scoped to a specific post |
+| Reply to comment | Yes | |
+| Private reply | Yes | Sends a one-time DM to the commenter |
 | Comment replies (thread) | Coming soon | Not yet implemented |
-| Moderate comment (hide/unhide/delete) | ✅ | |
-| Toggle post comments | - | Not supported by Facebook Graph API |
-| DMs | ✅ | Via Messenger (24-hour messaging window) |
-| Send DM | ✅ | |
-| Get DM thread by user | ✅ | |
-| Reviews | - | Deprecated in Graph API v22.0 |
-| Mentions | ✅ | Posts where the Page is tagged |
-| Create post | ✅ | Text, photos, links |
-| Delete post | ✅ | |
+| Moderate comment (hide/unhide/delete) | Yes | |
+| Toggle post comments | No | Not supported by Facebook Graph API |
+| DMs | Yes | Via Messenger (24-hour messaging window) |
+| Send DM | Yes | |
+| Get DM thread by user | Yes | |
+| Reviews | No | Deprecated in Graph API v22.0 |
+| Mentions | Yes | Posts where the Page is tagged |
+| Create post | Yes | Text, photos, links |
+| Delete post | Yes | |
 
 ## Connecting
 
@@ -107,7 +108,9 @@ If only one Page, the response is flat (same as Instagram):
 }
 ```
 
-## Sample: List posts
+## Reading samples
+
+### List posts
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
@@ -135,7 +138,7 @@ Sample response:
 }
 ```
 
-## Sample: List comments on a post
+### List comments on a post
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/{id}/posts/123456789_987654321/comments?limit=10" \
@@ -173,7 +176,7 @@ Sample response:
 }
 ```
 
-## Sample: List DMs
+### List DMs
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/{id}/dms?limit=10" \
@@ -201,11 +204,22 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 For the full field reference, media constraints, and error recovery, see [Facebook posts](/posts/facebook).
 
-## Notes
+## Limitations and gotchas
 
-- **Multi-Page OAuth** - A single OAuth flow connects all Facebook Pages the user manages. Each Page gets its own `account_id`.
-- **Page tokens never expire** - Unlike Instagram, Facebook Page tokens derived from long-lived user tokens do not expire. No reconnection needed unless the user revokes access.
-- **Private replies** - Replying to a comment with `"private": true` sends a one-time DM to the commenter. Can only be sent once per comment, within 7 days of the comment.
-- **24-hour messaging window** - Pages can send any message within 24 hours of the user's last message. After that, only approved message tags are allowed. If you get an error sending a DM, the window may have closed.
-- **Reviews deprecated** - Facebook deprecated Page Recommendations/Reviews in Graph API v22.0 (March 2025). The API returns `501` for review endpoints.
-- **Permissions** - SocialAPI's managed Meta App already requests these scopes on your behalf: `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_messaging`, `pages_manage_posts`, `public_profile`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
+- **Multi-Page OAuth**: a single OAuth flow connects all Facebook Pages the user manages. Each Page gets its own `account_id`.
+- **Page tokens never expire**: unlike Instagram, Facebook Page tokens derived from long-lived user tokens do not expire. No reconnection needed unless the user revokes access.
+- **Private replies**: replying to a comment with `"private": true` sends a one-time DM to the commenter. Can only be sent once per comment, within 7 days of the comment.
+- **24-hour messaging window**: Pages can send any message within 24 hours of the user's last message. After that, only approved message tags are allowed. If you get an error sending a DM, the window may have closed.
+- **Reviews deprecated**: Facebook deprecated Page Recommendations/Reviews in Graph API v22.0 (March 2025). The API returns `501` for review endpoints.
+
+## Permissions
+
+SocialAPI's managed Meta App already requests these scopes on your behalf: `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_messaging`, `pages_manage_posts`, `public_profile`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
+
+## Related
+
+- [Platform credentials](/guides/platform-credentials)
+- [OAuth flows](/guides/oauth)
+- [Publishing to Facebook](/posts/facebook)
+- [Errors](/guides/errors)
+- [Interaction IDs](/guides/interaction-ids)

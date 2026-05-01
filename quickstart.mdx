@@ -3,16 +3,18 @@ title: Quickstart
 description: Make your first API call in under 5 minutes.
 ---
 
+This walks you from zero to a published post in seven steps. By the end you will have a working API key, a connected social account, a comment listed and replied to, and a post live on at least one platform. Total time: about five minutes if your social account is ready, ten if you need to create one.
+
 ## 1. Create your account
 
 Sign up at [app.social-api.ai](https://app.social-api.ai). Verify your email and log in.
 
 ## 2. Get an API key
 
-In the dashboard, go to **Keys** → **New Key**. Give it a name and click **Create**.
+In the dashboard, go to **Keys**, then **New Key**. Give it a name and click **Create**.
 
 <Warning>
-  Copy the key immediately - it is shown only once. It starts with `sapi_key_`.
+  Copy the key immediately, it is shown only once. It starts with `sapi_key_`.
 </Warning>
 
 Store it in your environment:
@@ -21,13 +23,17 @@ Store it in your environment:
 export SOCAPI_KEY="sapi_key_your_key_here"
 ```
 
+<Tip>
+  If the dashboard does not show a key after creation, refresh the Keys list. The key value itself is shown only once; if you missed it, revoke and create another.
+</Tip>
+
 ## 3. Connect a social account
 
 <Note>
   No platform developer app required. Click Connect and you're authorizing through SocialAPI's pre-approved app. Twitter is the one exception — it requires a one-time [BYOK setup](/connectors/twitter-byok). See [Platform credentials](/guides/platform-credentials) for the full story.
 </Note>
 
-In the dashboard, go to **Accounts** → **Connect** and choose your platform. Complete the OAuth flow in your browser.
+In the dashboard, go to **Accounts**, then **Connect**, and choose your platform. Complete the OAuth flow in your browser.
 
 Or connect programmatically:
 
@@ -39,6 +45,10 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
 ```
 
 The response includes an `auth_url`. Redirect the user there to complete OAuth.
+
+<Tip>
+  If `auth_url` is missing from the response, check that `platform` matches one of `instagram`, `facebook`, `threads`, `google`, `tiktok`, `linkedin`, `youtube`, `twitter`. See [OAuth flows](/guides/oauth#step-1-initiate-the-flow) for the full handshake.
+</Tip>
 
 ## 4. List your accounts
 
@@ -62,6 +72,10 @@ curl https://api.social-api.ai/v1/accounts \
 ```
 
 Copy the `id`. You'll use it to scope inbox queries and publish posts.
+
+<Tip>
+  If the response is empty, the OAuth flow did not complete. Re-run step 3 and follow the redirect through to the end.
+</Tip>
 
 ## 5. Read your inbox
 
@@ -91,7 +105,7 @@ curl "https://api.social-api.ai/v1/inbox/comments/POST_ID?limit=5" \
         "avatar_url": "https://example.com/avatar.jpg"
       },
       "text": "Love this product!",
-      "created_at": "2026-02-15T14:30:00Z",
+      "created_at": "2026-04-15T14:30:00Z",
       "capabilities": {
         "can_reply": true,
         "can_delete": true,
@@ -104,6 +118,10 @@ curl "https://api.social-api.ai/v1/inbox/comments/POST_ID?limit=5" \
   "count": 1
 }
 ```
+
+<Tip>
+  If `data` is empty, the account has no comments yet, or the post being queried has none. Try a different `account_id`, or post a comment from another account first.
+</Tip>
 
 ## 6. Reply to a comment
 
@@ -118,9 +136,13 @@ curl -X POST \
 ```json
 {
   "id": "sapi_cmt_cmVwbHk6MTIzNDU2Nzg5",
-  "created_at": "2026-02-15T14:35:00Z"
+  "created_at": "2026-04-15T14:35:00Z"
 }
 ```
+
+<Tip>
+  If you receive `501 not_supported`, the platform does not allow programmatic reply for that interaction type. Check `capabilities.can_reply` on the comment first.
+</Tip>
 
 ## 7. Publish a post
 
@@ -153,25 +175,41 @@ curl -X POST https://api.social-api.ai/v1/posts \
       "status": "publishing"
     }
   ],
-  "created_at": "2026-03-15T12:00:00Z"
+  "created_at": "2026-04-15T12:00:00Z"
 }
 ```
 
 Set `scheduled_at` to schedule the post for later. Omit it to publish immediately.
 
-## What's next
+<Tip>
+  If `status` is `failed`, inspect `targets[].error` for the per-platform reason. The most common failure is missing required fields per platform: see [Posts](/posts/overview).
+</Tip>
+
+## What you just built
+
+You now have a working integration: an API key authenticated through SocialAPI, a connected social account whose tokens we manage for you, the ability to read and respond to comments, and the ability to publish posts. Everything else in the docs builds on these primitives.
+
+If you want to understand the data model behind what you just used, read [Core concepts](/guides/concepts). It explains the five nouns the API exposes (Brand, Account, Post, Interaction, Capability) in about five minutes.
+
+## Where to go next
 
 <CardGroup cols={2}>
+  <Card title="Core concepts" icon="diagram-project" href="/guides/concepts">
+    Brand, Account, Post, Interaction, Capability.
+  </Card>
   <Card title="Authentication" icon="key" href="/guides/authentication">
     API keys, JWTs, and OAuth tokens.
   </Card>
-  <Card title="Publishing" icon="paper-plane" href="/api-reference/introduction">
-    Create, schedule, and manage posts.
+  <Card title="Publishing" icon="paper-plane" href="/posts/overview">
+    Per-platform fields, media constraints, scheduling.
   </Card>
   <Card title="Pagination" icon="list" href="/guides/pagination">
     Page through large result sets with cursors.
   </Card>
-  <Card title="Platform Support" icon="grid-2" href="/guides/platforms">
+  <Card title="Webhooks" icon="bolt" href="/guides/webhooks">
+    Get notified of new comments, messages, and events.
+  </Card>
+  <Card title="Platform support" icon="grid-2" href="/guides/platforms">
     Capabilities by platform.
   </Card>
 </CardGroup>

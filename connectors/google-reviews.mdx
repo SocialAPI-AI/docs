@@ -9,31 +9,32 @@ description: Connect and interact with Google Business Profile locations via the
 
 Google Business Profile (formerly Google My Business) is fully supported. The connector covers reviews, local posts, and comments on those posts.
 
-## Details
+## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `google` |
 | Auth type | OAuth 2.0 (Google) |
 | API | Google Business Profile API |
+| Best for | Local business presence: posts, reviews, and Q&A on Google Business Profile. |
 
-## Feature support
+## Capabilities
 
 | Feature | Supported | Notes |
 |---|---|---|
-| List posts | ✅ | GBP local posts (updates, offers, events) |
-| Comments | ✅ | Comments on local posts |
-| Reply to comment | ✅ | |
-| Comment replies (thread) | ✅ | |
-| Moderate comment | - | Not supported by Google Business Profile API |
-| Toggle post comments | - | Not supported by Google Business Profile API |
-| DMs | - | Not supported by platform |
-| Reviews | ✅ | Google Reviews on your business listing |
-| Reply to review | ✅ | |
-| Mentions | - | Not supported by platform |
-| Create post | ✅ | Local posts (updates, offers, events) |
-| Update post | ✅ | |
-| Delete post | ✅ | |
+| List posts | Yes | GBP local posts (updates, offers, events) |
+| Comments | Yes | Comments on local posts |
+| Reply to comment | Yes | |
+| Comment replies (thread) | Yes | |
+| Moderate comment | No | Not supported by Google Business Profile API |
+| Toggle post comments | No | Not supported by Google Business Profile API |
+| DMs | No | Not supported by platform |
+| Reviews | Yes | Google Reviews on your business listing |
+| Reply to review | Yes | |
+| Mentions | No | Not supported by platform |
+| Create post | Yes | Local posts (updates, offers, events) |
+| Update post | Yes | |
+| Delete post | Yes | |
 
 ## Connecting
 
@@ -74,7 +75,23 @@ curl -X POST https://api.social-api.ai/v1/oauth/exchange \
   }'
 ```
 
-## Sample: List reviews
+## Reading samples
+
+### List posts
+
+```bash
+curl "https://api.social-api.ai/v1/posts?account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### List comments on a post
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/posts/{pid}/comments?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### List reviews
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/{id}/reviews?limit=10" \
@@ -111,7 +128,7 @@ Sample response:
 }
 ```
 
-## Sample: Reply to a review
+To reply to a review:
 
 ```bash
 curl -X POST \
@@ -123,23 +140,22 @@ curl -X POST \
 
 ## Publishing
 
-Create a Google Business Profile local post:
+For the full field reference, media constraints, and error recovery, see [Publishing to Google](/posts/google).
 
-```bash
-curl -X POST https://api.social-api.ai/v1/posts \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
-    "text": "Visit us this weekend for special offers!"
-  }'
-```
-
-For the full field reference, media constraints, and error recovery, see [Google posts](/posts/google).
-
-## Notes
+## Limitations and gotchas
 
 - **Review ratings** are returned in `metadata.rating` as an integer (1-5).
 - **Local posts** include updates, offers, and event posts published through Google Business Profile.
-- **Token refresh** - Google OAuth tokens expire after 1 hour. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
-- **Permissions** - SocialAPI's managed Google Cloud OAuth 2.0 client already requests the `https://www.googleapis.com/auth/business.manage` scope on your behalf. You don't need to set up your own Google Cloud project or apply for any verification. See [Platform credentials](/guides/platform-credentials).
+- **Token refresh**: Google OAuth tokens expire after 1 hour. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
+
+## Permissions
+
+SocialAPI's managed Google Cloud OAuth app already requests these scopes on your behalf: `https://www.googleapis.com/auth/business.manage`. You don't need to set up a Google Cloud project. See [Platform credentials](/guides/platform-credentials).
+
+## Related
+
+- [Platform credentials](/guides/platform-credentials)
+- [OAuth flows](/guides/oauth)
+- [Publishing to Google](/posts/google)
+- [Errors](/guides/errors)
+- [Interaction IDs](/guides/interaction-ids)

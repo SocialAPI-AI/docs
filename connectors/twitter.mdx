@@ -7,38 +7,37 @@ description: Connect and interact with X (Twitter) accounts via the X API v2.
 
 **BYOK connector** — Twitter requires you to bring your own Twitter Developer app. Setup takes about ten minutes. See [Platform credentials](/guides/platform-credentials) for why Twitter is the only platform that works this way.
 
-X / Twitter is fully supported for posts (tweets), comments (replies), DMs, mentions, and comment moderation via the X API v2.
-
-<Note>
-Twitter uses **BYOK** (Bring Your Own Keys): before connecting any Twitter account, you must provide your own Twitter Developer app Client ID and Client Secret via the dashboard. See the [Twitter BYOK setup guide](/connectors/twitter-byok) for step-by-step instructions.
-</Note>
-
-## Details
+## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `twitter` |
-| Auth type | OAuth 2.0 (X / Twitter v2) |
+| Auth type | OAuth 2.0 (BYOK) |
 | API | X API v2 |
+| Best for | Real-time conversation: tweets, replies, DMs, mentions on X. |
 
-## Feature support
+## Setup
+
+Before you can connect any Twitter account, register a Twitter Developer app and paste your Client ID and Client Secret into your SocialAPI dashboard. See the [Twitter BYOK setup guide](/connectors/twitter-byok) for the ten-minute walkthrough.
+
+## Capabilities
 
 | Feature | Supported | Notes |
 |---|---|---|
-| List posts | ✅ | Returns user tweets |
-| Comments | ✅ | Replies to a specific tweet |
-| Reply to comment | ✅ | |
-| Comment replies (thread) | ✅ | |
-| Moderate comment (hide/delete) | ✅ | Hide a reply, or delete your own reply |
-| Like comment | ✅ | Like/unlike a tweet or reply |
-| Private reply | - | Not applicable |
-| DMs | ✅ | Direct Messages via X API v2 |
-| Send DM | ✅ | |
-| Reviews | - | Not applicable |
-| Mentions | ✅ | Tweets mentioning the authenticated user |
-| Create post | ✅ | Text tweets, with optional media |
-| Update post | - | X does not expose a public edit endpoint |
-| Delete post | ✅ | |
+| List posts | Yes | Returns user tweets |
+| Comments | Yes | Replies to a specific tweet |
+| Reply to comment | Yes | |
+| Comment replies (thread) | Yes | |
+| Moderate comment (hide/delete) | Yes | Hide a reply, or delete your own reply |
+| Like comment | Yes | Like/unlike a tweet or reply |
+| Private reply | No | Not applicable |
+| DMs | Yes | Direct Messages via X API v2 |
+| Send DM | Yes | |
+| Reviews | No | Not applicable |
+| Mentions | Yes | Tweets mentioning the authenticated user |
+| Create post | Yes | Text tweets, with optional media |
+| Update post | No | X does not expose a public edit endpoint |
+| Delete post | Yes | |
 
 ## Connecting
 
@@ -79,6 +78,36 @@ curl -X POST https://api.social-api.ai/v1/oauth/exchange \
   }'
 ```
 
+## Reading samples
+
+### List posts
+
+```bash
+curl "https://api.social-api.ai/v1/posts?account_ids={id}&limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### List comments on a post
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/posts/{pid}/comments?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### List DMs
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id={id}" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### List mentions
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/{id}/mentions?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
 ## Publishing
 
 Create a tweet with optional reply settings:
@@ -98,32 +127,30 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-### PlatformData fields
-
-Pass these inside `platform_data.twitter` when creating a post.
+PlatformData fields. Pass these inside `platform_data.twitter` when creating a post.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `reply_settings` | string | `"everyone"` | Who can reply to this tweet. Options: `"everyone"`, `"following"` (only people you follow), `"verified"` (only verified accounts). |
 
-## Sample: List mentions
+See [Twitter posts reference](/posts/twitter) for full publishing details.
 
-```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/mentions?limit=10" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-## Sample: List DMs
-
-```bash
-curl "https://api.social-api.ai/v1/inbox/conversations?account_id={id}" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-## Notes
+## Limitations and gotchas
 
 - **No post editing.** X does not expose a public edit API. `UpdatePost` returns `501`. Delete and re-create if needed.
 - **No webhook handler.** X does not push real-time events via this integration. Posts and comments are fetched on demand.
 - **Comment moderation.** Hide toggles reply visibility. Delete removes your own replies. Like/unlike is supported.
 - **Token refresh.** X OAuth 2.0 tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
 - **Required scopes.** Your X Developer App must have the appropriate OAuth 2.0 scopes for reading tweets, posting, DMs, and user lookup.
+
+## Permissions
+
+Because Twitter is BYOK, you control the OAuth scopes on your own Twitter Developer app. We recommend enabling these scopes for full functionality: read and write tweets, read and send DMs, user lookup. See the [Twitter BYOK setup guide](/connectors/twitter-byok) for the exact scope list to select in the X Developer Portal.
+
+## Related
+
+- [Twitter BYOK setup guide](/connectors/twitter-byok)
+- [Platform credentials](/guides/platform-credentials)
+- [OAuth flows](/guides/oauth)
+- [Errors](/guides/errors)
+- [Interaction IDs](/guides/interaction-ids)
