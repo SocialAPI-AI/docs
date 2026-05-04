@@ -1,0 +1,115 @@
+---
+title: Scheduling posts
+description: Schedule posts across platforms via the unified social media API. One call, multiple targets, one scheduled time.
+---
+
+Schedule a post by passing the `scheduled_at` field to `POST /v1/posts`. SocialAPI holds the post and publishes it at the scheduled time. Multi-platform fan-out works the same way as immediate publishing: one post object, multiple targets, one scheduled time applied to all of them.
+
+## How scheduling works
+
+Set `scheduled_at` to an ISO 8601 timestamp in the future. SocialAPI validates the request immediately and queues it for delivery at the specified time.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Launching next week.",
+    "targets": [
+      { "account_id": "acc_instagram_01", "platform": "instagram" },
+      { "account_id": "acc_facebook_01", "platform": "facebook" }
+    ],
+    "scheduled_at": "2026-06-01T09:00:00Z"
+  }'
+```
+
+Response:
+
+```json
+{
+  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "status": "scheduled",
+  "scheduled_at": "2026-06-01T09:00:00Z",
+  "targets": [
+    { "account_id": "acc_instagram_01", "platform": "instagram", "status": "scheduled" },
+    { "account_id": "acc_facebook_01", "platform": "facebook", "status": "scheduled" }
+  ]
+}
+```
+
+Omit `scheduled_at` (or set it to `null`) to publish immediately.
+
+## Managing scheduled posts
+
+### List scheduled posts
+
+Filter by status to see all upcoming posts:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?status=scheduled" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### Reschedule a post
+
+Update the scheduled time with `PATCH`:
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "scheduled_at": "2026-06-02T14:00:00Z" }'
+```
+
+### Cancel a scheduled post
+
+Delete it before it publishes:
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Only posts in `scheduled` or `draft` status can be cancelled. Once a post enters `publishing`, it cannot be stopped.
+
+## Status lifecycle
+
+Every post moves through this state machine:
+
+```
+draft --> scheduled --> publishing --> published
+                                  \-> partial
+                                  \-> failed
+```
+
+| Status | Meaning |
+|--------|---------|
+| `draft` | Created but not yet scheduled or published |
+| `scheduled` | Queued for future delivery at `scheduled_at` |
+| `publishing` | SocialAPI is actively sending the post to platforms |
+| `published` | All targets delivered successfully |
+| `partial` | Some targets succeeded, some failed (check per-target status) |
+| `failed` | All targets failed |
+
+A post can also be set to `cancelled` by deleting it while it is in `draft` or `scheduled` status.
+
+## Platform scheduling support
+
+Not all platforms support deferred publishing through their APIs. For platforms that do not support scheduling natively, SocialAPI holds the post server-side and publishes it at the scheduled time.
+
+| Platform | Native scheduling | Media types | Notes |
+|----------|-------------------|-------------|-------|
+| Instagram | Yes | Image, Video (Reel), Carousel (2-10) | Min 10 min in future, max 75 days |
+| Facebook | Yes | Image, Video | Min 10 min in future |
+| Threads | Yes | Image, Video, Carousel | Min 10 min in future |
+| LinkedIn | Yes | Image, Video, Carousel | Min 10 min in future |
+| Google | No (server-side) | Image | SocialAPI holds and publishes at scheduled time |
+| TikTok | No (server-side) | Video, Photo carousel (2-35) | SocialAPI holds and publishes at scheduled time |
+| YouTube | Coming soon | Video | Not yet available |
+| X / Twitter | Coming soon | - | Not yet available |
+
+## Related
+
+- [Posts overview](/posts/overview) for the full publishing capability matrix
+- [Platform support](/guides/platforms) for per-platform feature coverage
+- [API Reference](/api-reference/introduction) for the complete `POST /v1/posts` schema
