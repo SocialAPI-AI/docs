@@ -1,0 +1,167 @@
+---
+title: Unified inbox
+description: Read and respond to comments, DMs, reviews, and mentions across platforms through a single social media inbox API.
+---
+
+SocialAPI provides a unified inbox API for reading and responding to all inbound engagement across your connected accounts. Comments, DMs, reviews, and mentions are accessed through consistent endpoints with the same response shape regardless of platform.
+
+SocialAPI never stores interaction content in its database. Every inbox call proxies live data from the platform API, so you always see the latest state.
+
+## Comments
+
+List comments across all connected accounts, reply, and moderate.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/inbox/comments` | List comments across all accounts |
+| `POST` | `/v1/inbox/comments/:id` | Reply to a comment |
+| `POST` | `/v1/inbox/comments/:id/moderate` | Hide, delete, or like a comment |
+
+### Platform capabilities
+
+| Platform | Reply | Hide | Like | Delete | Private reply |
+|----------|-------|------|------|--------|---------------|
+| Instagram | Yes | Yes | Yes | Yes | Yes |
+| Facebook | Yes | Yes | Yes | Yes | Yes |
+| Threads | Yes | Yes | No | No | No |
+| Google | Yes | No | No | No | No |
+| LinkedIn | Yes | No | No | Yes | No |
+| YouTube | Yes | Yes | No | Yes | No |
+| TikTok | No | No | No | No | No |
+
+Each comment includes a `capabilities` object so your code can check what actions are available before attempting them.
+
+### Example: list and reply
+
+```bash
+# List comments
+curl https://api.social-api.ai/v1/inbox/comments \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+
+# Reply to a comment
+curl -X POST https://api.social-api.ai/v1/inbox/comments/sapi_cmt_aW5zdGF.../reply \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "text": "Thanks for the feedback!" }'
+```
+
+## Direct messages
+
+Read conversations and send messages across platforms that support DMs.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/inbox/conversations` | List DM conversations |
+| `GET` | `/v1/inbox/conversations/:id/messages` | Get messages in a conversation |
+| `POST` | `/v1/inbox/conversations/:id/messages` | Send a message |
+
+### Platform support
+
+| Platform | DMs supported | Notes |
+|----------|---------------|-------|
+| Instagram | Yes | 24-hour messaging window for non-followers |
+| Facebook | Yes | Via Messenger Send API, 24-hour response window |
+| LinkedIn | No | Platform API does not expose DMs |
+| TikTok | No | Not available via API |
+| Google | No | Not applicable |
+| Threads | No | Not available via API |
+| YouTube | No | Not available via API |
+
+### Example: list conversations and send a message
+
+```bash
+# List conversations
+curl https://api.social-api.ai/v1/inbox/conversations \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+
+# Send a message in a conversation
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_bWV0YS4.../messages \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "text": "Your order has shipped!" }'
+```
+
+## Reviews
+
+Read and reply to reviews on platforms that support them.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/inbox/reviews` | List reviews |
+| `POST` | `/v1/inbox/reviews/:id` | Reply to a review |
+
+### Platform support
+
+| Platform | Reviews |
+|----------|---------|
+| Google | Yes (Google Business Profile) |
+| All others | No |
+
+### Example
+
+```bash
+# List reviews
+curl https://api.social-api.ai/v1/inbox/reviews \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+
+# Reply to a review
+curl -X POST https://api.social-api.ai/v1/inbox/reviews/sapi_rev_Z29vZ2xl.../reply \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "text": "Thank you for the review!" }'
+```
+
+## Mentions
+
+Read mentions of your accounts across platforms.
+
+### Endpoint
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/inbox/mentions` | List mentions |
+
+### Platform support
+
+| Platform | Mentions |
+|----------|----------|
+| Instagram | Yes |
+| Facebook | Yes |
+| All others | No |
+
+### Example
+
+```bash
+curl https://api.social-api.ai/v1/inbox/mentions \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## Interaction IDs
+
+Every interaction returned by the inbox has a stable ID with a type prefix:
+
+| Prefix | Type |
+|--------|------|
+| `sapi_cmt_` | Comment |
+| `sapi_dm_` | DM |
+| `sapi_rev_` | Review |
+| `sapi_mnt_` | Mention |
+
+The suffix encodes the platform and the platform-native ID, so you can route actions without a database lookup. See [Interaction IDs](/guides/interaction-ids) for the full encoding scheme.
+
+## Webhooks
+
+SocialAPI can notify your server when new inbound interactions arrive (new comment, new DM, new review). Register a webhook endpoint and subscribe to the event types you care about. See [Webhooks](/guides/webhooks) for setup and event reference.
+
+## Related
+
+- [Platform support](/guides/platforms) for the full capability matrix
+- [Interaction IDs](/guides/interaction-ids) for the ID encoding scheme
+- [Webhooks](/guides/webhooks) for real-time event delivery
+- [API Reference](/api-reference/introduction) for complete endpoint schemas
