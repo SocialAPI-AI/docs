@@ -42,19 +42,23 @@ The `secret` is returned **once**. Store it immediately in your environment. It 
 | Event | When it fires |
 |---|---|
 | `comment.received` | A new comment arrives on any connected account |
-| `dm.received` | A new direct message arrives |
+| `dm.received` | A new direct message arrives (may include `metadata.referral` if the DM originated from an ad) |
+| `dm.sent` | Your account sent a direct message (echo confirmation from Meta). |
+| `dm.referral` | A user clicked an ad or referral link without sending a message. The interaction has empty content and includes `metadata.referral`. |
 | `review.received` | A new review arrives (Google Business Profile) |
 | `mention.received` | Your account is mentioned on a supported platform |
 | `post.published` | A scheduled post is successfully published to a platform |
 | `post.failed` | A scheduled post fails to publish |
 | `post.scheduled` | A new post is scheduled for future publishing |
 
-You can subscribe to any combination. Pass all seven event types to receive everything:
+You can subscribe to any combination. Pass all nine event types to receive everything:
 
 ```json
 [
   "comment.received",
   "dm.received",
+  "dm.sent",
+  "dm.referral",
   "review.received",
   "mention.received",
   "post.published",
@@ -74,7 +78,6 @@ Every webhook POST has a JSON body with an `event` field and a `data` field cont
     "id": "sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
     "type": "comment",
     "platform": "instagram",
-    "platform_id": "17841405793187218",
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
     "author": {
       "id": "10215054824",
@@ -85,13 +88,45 @@ Every webhook POST has a JSON body with an `event` field and a `data` field cont
       "text": "Love this product!",
       "media": []
     },
-    "created_at": "2026-03-01T14:30:00Z",
+    "received_at": "2026-03-01T14:30:00Z",
     "metadata": {}
   }
 }
 ```
 
 The `data` object is the same `Interaction` shape returned by `GET /accounts/{id}/comments` (and the equivalent DM, review, and mention endpoints). The `id` field is a stable SocialAPI interaction ID - see [Interaction IDs](/guides/interaction-ids).
+
+### Referral metadata
+
+When a DM originates from an ad click (Instagram CTD or Facebook CTM ads), the interaction includes referral context in `metadata.referral`:
+
+```json
+{
+  "event": "dm.received",
+  "data": {
+    "id": "sapi_dm_aW5zdGFncmFtOm1pZC5yZWYx",
+    "type": "dm",
+    "platform": "instagram",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "author": { "id": "17846744073097661" },
+    "content": { "text": "I saw your ad!" },
+    "received_at": "2026-03-01T14:30:00Z",
+    "metadata": {
+      "referral": {
+        "ad_id": "120210572164750432",
+        "source": "ADS",
+        "type": "OPEN_THREAD",
+        "ads_context_data": {
+          "ad_title": "Spring Sale 25% Off",
+          "photo_url": "https://scontent.xx.fbcdn.net/..."
+        }
+      }
+    }
+  }
+}
+```
+
+Only non-empty referral fields are included. `dm.referral` events (standalone ad clicks without a message) have empty `content.text` and always include `metadata.referral`.
 
 ## Request headers
 
