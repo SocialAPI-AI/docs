@@ -4889,6 +4889,61 @@
             }
         },
         "/webhooks/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a single webhook endpoint with delivery statistics and a secret hint (last 4 characters).",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Get webhook endpoint details",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Endpoint detail with stats",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.WebhookDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -4984,6 +5039,305 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.WebhookEndpointItem"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/{id}/deliveries": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns paginated deliveries for a webhook endpoint. Filterable by status and event_type.",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "List webhook deliveries",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by delivery status (pending, delivered, failed)",
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by event type",
+                        "name": "event_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor from previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Results per page (default 50, max 100)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated delivery list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.DeliveryListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/{id}/deliveries/{did}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a single delivery including the full payload and all attempt records.",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Get delivery detail",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Delivery ID",
+                        "name": "did",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Delivery with payload and attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/social-api_ai_core_api_service.DeliveryDetail"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/{id}/deliveries/{did}/retry": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Re-enqueues a delivery for another attempt. Creates a new delivery record linked to the original.",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Retry a failed delivery",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Delivery ID to retry",
+                        "name": "did",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "New delivery record",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/social-api_ai_core_api_service.DeliveryDetail"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/{id}/test": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends a test payload to the endpoint synchronously and returns the result.",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Send a test delivery",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.TestWebhookRequest"
+                            }
+                        }
+                    },
+                    "description": "Test payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Test delivery result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.TestDeliveryResponse"
                                 }
                             }
                         }
@@ -5456,6 +5810,8 @@
                             "enum": [
                                 "comment.received",
                                 "dm.received",
+                                "dm.sent",
+                                "dm.referral",
                                 "review.received",
                                 "mention.received"
                             ]
@@ -5529,6 +5885,23 @@
                         "items": {
                             "type": "string"
                         }
+                    }
+                }
+            },
+            "api_endpoints.DeliveryListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.DeliveryListItem"
+                        }
+                    },
+                    "next_cursor": {
+                        "type": "string"
                     }
                 }
             },
@@ -6545,6 +6918,40 @@
                     }
                 }
             },
+            "api_endpoints.TestDeliveryResponse": {
+                "type": "object",
+                "properties": {
+                    "delivery_id": {
+                        "type": "string"
+                    },
+                    "response_body": {
+                        "type": "string"
+                    },
+                    "response_duration_ms": {
+                        "type": "integer"
+                    },
+                    "response_status_code": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.TestWebhookRequest": {
+                "type": "object",
+                "properties": {
+                    "event_type": {
+                        "type": "string"
+                    },
+                    "payload": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            },
             "api_endpoints.UnpublishRequest": {
                 "type": "object",
                 "properties": {
@@ -6642,6 +7049,8 @@
                             "enum": [
                                 "comment.received",
                                 "dm.received",
+                                "dm.sent",
+                                "dm.referral",
                                 "review.received",
                                 "mention.received"
                             ]
@@ -6825,6 +7234,35 @@
                     }
                 }
             },
+            "api_endpoints.WebhookDetailResponse": {
+                "type": "object",
+                "properties": {
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "secret_hint": {
+                        "type": "string"
+                    },
+                    "stats": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.WebhookStats"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.WebhookEndpointItem": {
                 "type": "object",
                 "properties": {
@@ -6967,6 +7405,10 @@
                     "content": {
                         "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Content"
                     },
+                    "conversation_id": {
+                        "type": "string",
+                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                    },
                     "id": {
                         "type": "string",
                         "example": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U"
@@ -6979,9 +7421,20 @@
                         "type": "string",
                         "example": "instagram"
                     },
+                    "platform_post_id": {
+                        "type": "string",
+                        "example": "17895695668004550"
+                    },
+                    "post_id": {
+                        "type": "string",
+                        "example": "01HZ9X3Q4R5M6N7P8V2K0W1J42"
+                    },
                     "received_at": {
                         "type": "string",
                         "example": "2026-02-15T14:30:00Z"
+                    },
+                    "recipient": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Author"
                     },
                     "type": {
                         "type": "string",
@@ -7013,6 +7466,124 @@
                     "url": {
                         "type": "string",
                         "example": "https://cdn.example.com/photo.jpg"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.DeliveryAttempt": {
+                "type": "object",
+                "properties": {
+                    "attempt_number": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "duration_ms": {
+                        "type": "integer"
+                    },
+                    "error_message": {
+                        "type": "string"
+                    },
+                    "response_body": {
+                        "type": "string"
+                    },
+                    "status_code": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.DeliveryDetail": {
+                "type": "object",
+                "properties": {
+                    "attempt_count": {
+                        "type": "integer"
+                    },
+                    "attempts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.DeliveryAttempt"
+                        }
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "endpoint_id": {
+                        "type": "string"
+                    },
+                    "event_type": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "payload": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "response_duration_ms": {
+                        "type": "integer"
+                    },
+                    "response_status_code": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.DeliveryListItem": {
+                "type": "object",
+                "properties": {
+                    "attempt_count": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "event_type": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "response_duration_ms": {
+                        "type": "integer"
+                    },
+                    "response_status_code": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.DeliveryStatBucket": {
+                "type": "object",
+                "properties": {
+                    "delivered": {
+                        "type": "integer"
+                    },
+                    "failed": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.WebhookStats": {
+                "type": "object",
+                "properties": {
+                    "last_24h": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.DeliveryStatBucket"
+                    },
+                    "last_7d": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.DeliveryStatBucket"
                     }
                 }
             }
