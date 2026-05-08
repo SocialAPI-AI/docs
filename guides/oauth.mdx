@@ -22,9 +22,7 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "instagram",
-    "metadata": {
-      "redirect_uri": "https://app.example.com/oauth/callback"
-    }
+    "redirect_uri": "https://app.example.com/oauth/callback"
   }'
 ```
 
@@ -52,10 +50,8 @@ curl -X POST https://api.social-api.ai/v1/oauth/exchange \
   -d '{
     "platform": "instagram",
     "code": "AQDtbPB9X...",
-    "metadata": {
-      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
-      "redirect_uri": "https://app.example.com/oauth/callback"
-    }
+    "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+    "redirect_uri": "https://app.example.com/oauth/callback"
   }'
 ```
 
@@ -95,24 +91,6 @@ curl https://api.social-api.ai/v1/accounts \
 ### Reconnecting an account
 
 If you call `POST /v1/accounts/connect` for an account that is already connected, the upsert updates the stored token. This is safe to call when tokens expire.
-
-### Direct auth (non-OAuth platforms)
-
-Some platforms accept an API key or credentials directly. For these, `POST /v1/accounts/connect` returns HTTP 201 immediately without a redirect:
-
-```bash
-curl -X POST https://api.social-api.ai/v1/accounts/connect \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "platform": "trustpilot",
-    "metadata": {
-      "api_key": "your-trustpilot-api-key"
-    }
-  }'
-```
-
-Check the [Connectors](/connectors/overview) section for each platform's auth type and required metadata fields.
 
 ---
 
@@ -266,8 +244,6 @@ Per RFC 7009, this endpoint always returns `200`, even if the token is already i
 | `/.well-known/oauth-authorization-server` | GET | RFC 8414 metadata discovery |
 | `/oauth/register` | POST | RFC 7591 dynamic client registration |
 | `/oauth/authorize` | GET | Authorization with PKCE |
-| `/oauth/authorize/request` | GET | Fetch pending authorization request details (used by dashboard) |
-| `/oauth/authorize/confirm` | POST | Consent confirmation (called by dashboard, requires auth service JWT) |
 | `/oauth/token` | POST | Code exchange and refresh token rotation |
 | `/oauth/revoke` | POST | RFC 7009 token revocation |
 
