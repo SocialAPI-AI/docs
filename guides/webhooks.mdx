@@ -37,6 +37,10 @@ The `secret` is returned **once**. Store it immediately in your environment. It 
   Endpoint URLs must use HTTPS. HTTP URLs are rejected with `400`.
 </Warning>
 
+<Info>
+  When you create an endpoint, SocialAPI sends a verification ping to your URL. Your server must respond with a `2xx` status code or the endpoint will not be saved. Make sure your server is running and reachable before registering.
+</Info>
+
 ## Event types
 
 | Event | When it fires |
@@ -226,38 +230,54 @@ After 5 failed attempts, the delivery is marked `failed` and no further retries 
 
 ## Managing endpoints
 
-Endpoints can also be listed and deleted in the dashboard under **Webhooks**.
-
-**List your endpoints:**
+### List endpoints
 
 ```bash
 curl https://api.social-api.ai/v1/webhooks \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-```json
-{
-  "data": [
-    {
-      "id": "wh_01HZ9X3Q4R5M6N7P8V2K0W1J",
-      "url": "https://app.example.com/webhooks/socapi",
-      "events": ["comment.received", "dm.received"],
-      "is_active": true,
-      "created_at": "2026-03-01T10:00:00Z"
-    }
-  ],
-  "count": 1
-}
-```
+### Get endpoint details
 
-**Delete an endpoint:**
+Retrieve a single endpoint with delivery statistics (delivered/failed counts for the last 24 hours and 7 days). The secret is shown as a hint (last 4 characters only).
 
 ```bash
-curl -X DELETE https://api.social-api.ai/v1/webhooks/wh_01HZ9X3Q4R5M6N7P8V2K0W1J \
+curl https://api.social-api.ai/v1/webhooks/{id} \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### Update an endpoint
+
+Change the URL, subscribed events, or toggle delivery on/off. All fields are optional; provide at least one.
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/webhooks/{id} \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"is_active": false}'
+```
+
+### Delete an endpoint
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/webhooks/{id} \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
 Deleting an endpoint stops all future deliveries immediately. In-flight jobs already queued may still attempt delivery once.
+
+## Delivery monitoring
+
+Every webhook delivery is recorded with its status, HTTP response code, and duration. You can inspect delivery history, view individual attempts, send test payloads, and retry failed deliveries.
+
+| Endpoint | Description |
+|---|---|
+| `GET /v1/webhooks/{id}/deliveries` | List deliveries (filterable by `status` and `event_type`, cursor-paginated) |
+| `GET /v1/webhooks/{id}/deliveries/{did}` | Full delivery detail including payload and all retry attempts |
+| `POST /v1/webhooks/{id}/deliveries/{did}/retry` | Re-enqueue a failed delivery |
+| `POST /v1/webhooks/{id}/test` | Send a test payload to verify your endpoint is working |
+
+See the [API Reference](/api-reference) for full request and response schemas.
 
 ## Security best practices
 
