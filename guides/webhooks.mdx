@@ -1,9 +1,9 @@
 ---
 title: Webhooks
-description: Receive real-time notifications when interactions arrive and posts are published on your connected accounts.
+description: Receive real-time notifications when interactions arrive on your connected accounts.
 ---
 
-Instead of polling the API, register a webhook endpoint and SocialAPI will POST a signed payload to your server whenever a new comment, DM, review, or mention arrives, or when a scheduled post is published (or fails).
+Instead of polling the API, register a webhook endpoint and SocialAPI will POST a signed payload to your server whenever a new comment, DM, review, or mention arrives.
 
 ## Register an endpoint
 
@@ -15,7 +15,7 @@ curl -X POST https://api.social-api.ai/v1/webhooks \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://app.example.com/webhooks/socapi",
-    "events": ["comment.received", "dm.received", "post.published", "post.failed"]
+    "events": ["comment.received", "dm.received", "review.received"]
   }'
 ```
 
@@ -25,7 +25,7 @@ Response (HTTP 201):
 {
   "id": "wh_01HZ9X3Q4R5M6N7P8V2K0W1J",
   "url": "https://app.example.com/webhooks/socapi",
-  "events": ["comment.received", "dm.received", "post.published", "post.failed"],
+  "events": ["comment.received", "dm.received", "review.received"],
   "secret": "a3f8c2e1b9d4f7a6c5e0b3d2f1a8e7c4b9d6f3a2e5c8b1d4f7a0e3c6b9d2f5a8",
   "message": "Store the secret securely. It will not be shown again."
 }
@@ -47,11 +47,8 @@ The `secret` is returned **once**. Store it immediately in your environment. It 
 | `dm.referral` | A user clicked an ad or referral link without sending a message. The interaction has empty content and includes `metadata.referral`. |
 | `review.received` | A new review arrives (Google Business Profile) |
 | `mention.received` | Your account is mentioned on a supported platform |
-| `post.published` | A scheduled post is successfully published to a platform |
-| `post.failed` | A scheduled post fails to publish |
-| `post.scheduled` | A new post is scheduled for future publishing |
 
-You can subscribe to any combination. Pass all nine event types to receive everything:
+You can subscribe to any combination. Pass all six to receive everything:
 
 ```json
 [
@@ -60,10 +57,7 @@ You can subscribe to any combination. Pass all nine event types to receive every
   "dm.sent",
   "dm.referral",
   "review.received",
-  "mention.received",
-  "post.published",
-  "post.failed",
-  "post.scheduled"
+  "mention.received"
 ]
 ```
 
@@ -162,7 +156,7 @@ function verifySignature(secret, rawBody, signatureHeader) {
 
 // Express example
 app.post("/webhooks/socapi", express.raw({ type: "application/json" }), (req, res) => {
-  const sig = req.headers["x-socapi-signature"];
+  const sig = req.headers["x-socialapi-signature"];
   if (!verifySignature(process.env.SOCAPI_WEBHOOK_SECRET, req.body, sig)) {
     return res.status(401).send("Invalid signature");
   }
