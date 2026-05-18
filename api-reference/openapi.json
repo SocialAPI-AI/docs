@@ -250,7 +250,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns platform-specific quota data for a connected account as a key/value map where values are remaining counts. Keys are platform-defined — for example Instagram returns `posts_remaining`. An empty object is returned for platforms without usage limits.",
+                "description": "Returns platform-specific quota data for a connected account as a key/value map where values are remaining counts. Keys are platform-defined - for example Instagram returns `posts_remaining`. An empty object is returned for platforms without usage limits.",
                 "tags": [
                     "Usage"
                 ],
@@ -1023,7 +1023,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes a comment on the platform and removes it from the inbox. Not all platforms support comment deletion — check the can_delete capability flag.",
+                "description": "Deletes a comment on the platform and removes it from the inbox. Not all platforms support comment deletion - check the can_delete capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -1521,7 +1521,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sends a direct message to the author of a comment. This is a one-time DM triggered by a specific comment — only supported on Instagram and Facebook. Check the can_private_reply capability flag.",
+                "description": "Sends a direct message to the author of a comment. This is a one-time DM triggered by a specific comment - only supported on Instagram and Facebook. Check the can_private_reply capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -2164,7 +2164,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Fetches reviews across connected accounts via real-time fan-out to platform APIs. Supports filtering by account and platform. Reviews are proxied live and not stored — results may vary based on platform availability. Currently only Google Business Profile returns reviews.",
+                "description": "Fetches reviews across connected accounts via real-time fan-out to platform APIs. Supports filtering by account and platform. Reviews are proxied live and not stored - results may vary based on platform availability. Currently only Google Business Profile returns reviews.",
                 "tags": [
                     "Inbox Reviews"
                 ],
@@ -2256,7 +2256,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the text of an existing review reply. Not yet implemented — returns 501.",
+                "description": "Updates the text of an existing review reply. Not yet implemented - returns 501.",
                 "tags": [
                     "Inbox Reviews"
                 ],
@@ -2436,7 +2436,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes an existing review reply from the platform. Not yet implemented — returns 501.",
+                "description": "Deletes an existing review reply from the platform. Not yet implemented - returns 501.",
                 "tags": [
                     "Inbox Reviews"
                 ],
@@ -3626,7 +3626,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Publishes to one or more connected accounts. If scheduled_at is omitted the post is\npublished immediately (synchronous — blocks until all accounts respond). If scheduled_at\nis set the post is queued for future publication (asynchronous). Omit account_ids and\nscheduled_at to create a draft. Consumes 1 post credit.",
+                "description": "Publishes to one or more connected accounts. If scheduled_at is omitted the post is\npublished immediately (synchronous - blocks until all accounts respond). If scheduled_at\nis set the post is queued for future publication (asynchronous). Omit account_ids and\nscheduled_at to create a draft. Consumes 1 post credit.",
                 "tags": [
                     "Posts"
                 ],
@@ -3926,7 +3926,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Cancels a scheduled post or deletes a failed/published post across all platforms.",
+                "description": "Deletes a draft/scheduled/failed post locally, or deletes a published post from every platform that supports it. Platforms that do not support deletion (or fail) keep their copy live and the post is kept (shrunk) rather than removed. Returns a per-platform result.",
                 "tags": [
                     "Posts"
                 ],
@@ -3944,11 +3944,11 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Post deleted",
+                        "description": "Delete result",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.DeletePostResponse"
                                 }
                             }
                         }
@@ -4250,7 +4250,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Full-text search across all platforms and interaction types. Accepts query param `q` for the search term; optionally filter by `platform` and `type`. Fan-out to all relevant connectors with merged, ranked results. **Not yet implemented** — returns 501.",
+                "description": "Full-text search across all platforms and interaction types. Accepts query param `q` for the search term; optionally filter by `platform` and `type`. Fan-out to all relevant connectors with merged, ranked results. **Not yet implemented** - returns 501.",
                 "tags": [
                     "Search"
                 ],
@@ -4838,7 +4838,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Registers a new webhook endpoint. The generated secret is returned once — store it securely.",
+                "description": "Registers a new webhook endpoint. The generated secret is returned once - store it securely.",
                 "tags": [
                     "Webhooks"
                 ],
@@ -6236,6 +6236,25 @@
                     }
                 }
             },
+            "api_endpoints.DeletePostResponse": {
+                "type": "object",
+                "properties": {
+                    "deleted": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.TargetDeleteOutcomeResponse"
+                        }
+                    },
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                }
+            },
             "api_endpoints.ErrorBody": {
                 "type": "object",
                 "properties": {
@@ -7189,6 +7208,32 @@
                     }
                 }
             },
+            "api_endpoints.TargetDeleteOutcomeResponse": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Operation not supported for this platform"
+                    },
+                    "outcome": {
+                        "type": "string",
+                        "enum": [
+                            "deleted",
+                            "not_supported",
+                            "failed"
+                        ],
+                        "example": "not_supported"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "tiktok"
+                    }
+                }
+            },
             "api_endpoints.TargetRequest": {
                 "type": "object",
                 "properties": {
@@ -7445,7 +7490,7 @@
                 "type": "object",
                 "properties": {
                     "account_ids": {
-                        "description": "AccountIDs lists connected account IDs — their platforms are resolved automatically.",
+                        "description": "AccountIDs lists connected account IDs - their platforms are resolved automatically.",
                         "type": "array",
                         "items": {
                             "type": "string"

@@ -22,6 +22,30 @@ Use `POST /v1/posts/validate` to check constraints before publishing, and `GET /
 | Reel | Yes | No | No | No | No | N/A (all videos are TikToks) |
 | Max media per post | 10 | 1 | 1 | 20 | 20 | 35 (photo) / 1 (video) |
 
+## Deleting posts
+
+`DELETE /v1/posts/{pid}` is best-effort and never lets the dashboard drift from the platform.
+
+For a draft, scheduled, or failed post (nothing was ever published), the post is removed locally. For a published post, SocialAPI calls each platform's delete API in turn:
+
+- If the platform deletes the copy, that target is cleared.
+- If the platform does not support deletion (for example TikTok) or the delete call fails, that copy stays live and the post is kept (shrunk to the targets that are still live), not removed. A post is fully removed only when no live copy remains.
+
+The response is a per-platform result, not a bare acknowledgement:
+
+```json
+{
+  "success": true,
+  "deleted": false,
+  "results": [
+    { "platform": "instagram", "account_id": "acc_...", "outcome": "deleted" },
+    { "platform": "tiktok", "account_id": "acc_...", "outcome": "not_supported", "message": "Operation not supported for this platform" }
+  ]
+}
+```
+
+`deleted` is `true` only when the post was fully removed. Each entry in `results` has an `outcome` of `deleted`, `not_supported`, or `failed`. A `failed` target can be retried; a `not_supported` target must be removed on the platform itself. See `DELETE /v1/posts/{pid}` in the API reference for the full schema.
+
 ## Core field handling
 
 How each platform interprets the shared `PostDraft` fields:
