@@ -51,8 +51,10 @@ The `secret` is returned **once**. Store it immediately in your environment. It 
 | `dm.referral` | A user clicked an ad or referral link without sending a message. The interaction has empty content and includes `metadata.referral`. |
 | `review.received` | A new review arrives (Google Business Profile) |
 | `mention.received` | Your account is mentioned on a supported platform |
+| `account.connected` | A social account finished connecting. Payload includes username, display name, profile picture, bio, and a public profile link. |
+| `account.disconnected` | A connected account was revoked by the user on the platform side (Meta deauthorize webhook, TikTok deauthorize webhook). |
 
-You can subscribe to any combination. Pass all six to receive everything:
+You can subscribe to any combination. Pass all eight to receive everything:
 
 ```json
 [
@@ -61,9 +63,36 @@ You can subscribe to any combination. Pass all six to receive everything:
   "dm.sent",
   "dm.referral",
   "review.received",
-  "mention.received"
+  "mention.received",
+  "account.connected",
+  "account.disconnected"
 ]
 ```
+
+### `account.connected` payload
+
+Fires once per connected account after a successful OAuth exchange or direct connection. Use this to render the connected profile in your UI or kick off post-connect work.
+
+```json
+{
+  "event": "account.connected",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "br_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform": "instagram",
+    "platform_user_id": "17841405793187218",
+    "username": "acmecorp",
+    "display_name": "ACME Corp",
+    "profile_picture_url": "https://scontent.cdninstagram.com/...",
+    "bio": "Official ACME account",
+    "profile_url": "https://www.instagram.com/acmecorp/",
+    "user_email": "owner@acme.com",
+    "connected_at": "2026-05-25T14:30:00Z"
+  }
+}
+```
+
+`profile_url` is built per platform from `username` (Instagram, Threads, TikTok, X) or `platform_user_id` (Facebook, LinkedIn, YouTube, Google Business Profile). It is empty when neither is available.
 
 ## Payload format
 
