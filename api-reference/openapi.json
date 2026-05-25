@@ -2376,979 +2376,6 @@
                 }
             }
         },
-        "/integrations/whatsapp/accounts/{id}/send-template": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Sends an approved WhatsApp template message to a recipient phone number. Template messages can be sent outside the 24-hour customer service window. The template must already be APPROVED on the WABA, and the language code must match an approved variant. Component parameter order must match the template's placeholders.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Send a template message",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID (sapi_acc_...)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.WhatsAppSendTemplateRequest"
-                            }
-                        }
-                    },
-                    "description": "Recipient, template name, language, and components",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "Message accepted by WhatsApp",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppSendTemplateResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Missing required field (to, template_name, language)",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found or not owned by caller",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Monthly interaction limit exceeded or platform rate limit",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error (template not approved, invalid parameters)",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/integrations/whatsapp/accounts/{id}/templates": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns all message templates configured on the WhatsApp Business Account (WABA) associated with this connected account. Templates include approved, pending, rejected, and paused entries. Use the after cursor from paging.cursors to fetch subsequent pages.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "List message templates",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID (sapi_acc_...)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": 25,
-                        "description": "Maximum number of templates to return (1-100)",
-                        "name": "limit",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Pagination cursor (after) from a previous response",
-                        "name": "cursor",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Templates with pagination cursors",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppTemplateListResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found or not owned by caller",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Submits a new message template to the WhatsApp Business Account (WABA) for review. The request body is the raw WhatsApp Cloud API template payload (name, category, language, components). New templates start in PENDING status; Meta reviews them and the status transitions to APPROVED or REJECTED asynchronously.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Create a message template",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID (sapi_acc_...)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    },
-                    "description": "WhatsApp Cloud API template definition (name, category, language, components)",
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created template (initial status)",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppTemplateCreateResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Empty or invalid payload",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found or not owned by caller",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "409": {
-                        "description": "Template name already exists",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Deletes a template by name from the WhatsApp Business Account (WABA) associated with this connected account. WhatsApp deletes all language variants that share the given name. Templates cannot be deleted while they are being used in active campaigns.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Delete a message template",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID (sapi_acc_...)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "order_confirmation",
-                        "description": "Template name to delete",
-                        "name": "name",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "Template deleted"
-                    },
-                    "400": {
-                        "description": "Missing name query parameter",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found or template does not exist",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/integrations/whatsapp/phone-numbers/{id}/business-profile": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns the public business profile for a WhatsApp phone number, including about text, address, description, contact email, websites, and vertical. The profile is visible to customers in the WhatsApp chat header.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Get a WhatsApp Business Profile",
-                "parameters": [
-                    {
-                        "example": "106540352242922",
-                        "description": "WhatsApp phone number platform ID (numeric ID, not the E.164 number)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Business profile (single entry in data array)",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppBusinessProfileResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Phone number not owned by caller or not connected",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Updates one or more fields of the public business profile (about, address, description, email, profile_picture_url, websites, vertical). Only provided fields are changed. Profile updates may take a few minutes to propagate.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Update a WhatsApp Business Profile",
-                "parameters": [
-                    {
-                        "example": "106540352242922",
-                        "description": "WhatsApp phone number platform ID (numeric ID, not the E.164 number)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.WhatsAppBusinessProfile"
-                            }
-                        }
-                    },
-                    "description": "Profile fields to update (only provided keys are changed)",
-                    "required": true
-                },
-                "responses": {
-                    "204": {
-                        "description": "Profile updated"
-                    },
-                    "400": {
-                        "description": "Empty or invalid payload",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Phone number not owned by caller or not connected",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/integrations/whatsapp/phone-numbers/{id}/deregister": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Releases the phone number from WhatsApp Business, freeing it for use with another Business Solution Provider (BSP). This does not delete the connected account on SocialAPI; the account remains until it is disconnected explicitly.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Deregister a phone number from WhatsApp Business",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID (sapi_acc_...)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "Phone number deregistered"
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found or not owned by caller",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/integrations/whatsapp/phone-numbers/{id}/register": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Registers a previously verified phone number with WhatsApp Business and sets the 6-digit two-step verification PIN. The PIN protects future re-registration and must be retained by the caller (it cannot be retrieved later). The phone number must be verified via verify-code first.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Register a phone number with WhatsApp Business",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID (sapi_acc_...)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.WhatsAppRegisterRequest"
-                            }
-                        }
-                    },
-                    "description": "6-digit two-step verification PIN",
-                    "required": true
-                },
-                "responses": {
-                    "204": {
-                        "description": "Phone number registered"
-                    },
-                    "400": {
-                        "description": "Missing or invalid PIN",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found or not owned by caller",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "409": {
-                        "description": "Phone number not verified or already registered with another BSP",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/integrations/whatsapp/phone-numbers/{id}/request-code": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Asks WhatsApp to send a verification code (SMS or voice call) to the phone number. The number must already be connected as a WhatsApp account on SocialAPI; the code is delivered to the underlying phone line, not to the API caller. Follow up with verify-code once the user receives it.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Request a phone number verification code",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID (sapi_acc_...)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.WhatsAppRequestCodeRequest"
-                            }
-                        }
-                    },
-                    "description": "Verification channel and locale",
-                    "required": true
-                },
-                "responses": {
-                    "204": {
-                        "description": "Code dispatched"
-                    },
-                    "400": {
-                        "description": "Missing or invalid method/language",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found or not owned by caller",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/integrations/whatsapp/phone-numbers/{id}/verify-code": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Submits the 6-digit code received via SMS or voice to prove ownership of the phone number. Once verified, the phone number can be registered with WhatsApp Business. Codes expire quickly; if verification fails, request a new code.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Verify a phone number with a code",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID (sapi_acc_...)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.WhatsAppVerifyCodeRequest"
-                            }
-                        }
-                    },
-                    "description": "Verification code",
-                    "required": true
-                },
-                "responses": {
-                    "204": {
-                        "description": "Phone number verified"
-                    },
-                    "400": {
-                        "description": "Missing or invalid code",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found or not owned by caller",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error (code mismatch or expired)",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/integrations/whatsapp/templates/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns a single message template by its WhatsApp template ID. Any active WhatsApp account on the caller's workspace is used to authorize the lookup; the template itself is scoped by its platform ID.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Get a message template",
-                "parameters": [
-                    {
-                        "example": "1234567890123456",
-                        "description": "WhatsApp template platform ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Template details",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppTemplateInfo"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Template not found or no WhatsApp account connected",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Updates an existing message template by its WhatsApp template ID. Only certain fields are editable per WhatsApp policy (typically components and category, depending on template status). Edits to APPROVED templates re-trigger Meta review.",
-                "tags": [
-                    "WhatsApp"
-                ],
-                "summary": "Edit a message template",
-                "parameters": [
-                    {
-                        "example": "1234567890123456",
-                        "description": "WhatsApp template platform ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    },
-                    "description": "Editable template fields (raw WhatsApp Cloud API payload)",
-                    "required": true
-                },
-                "responses": {
-                    "204": {
-                        "description": "Template updated"
-                    },
-                    "400": {
-                        "description": "Empty or invalid payload",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Template not found or no WhatsApp account connected",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "WhatsApp/Meta upstream error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/invite/{token}": {
             "get": {
                 "description": "Public endpoint (no auth). Validates the invite token and redirects the user\nto the platform's OAuth authorization page. On successful OAuth callback,\nthe account is connected to the invite creator's brand.",
@@ -4326,6 +3353,979 @@
                     },
                     "404": {
                         "description": "URI not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/whatsapp/accounts/{id}/send-template": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends an approved WhatsApp template message to a recipient phone number. Template messages can be sent outside the 24-hour customer service window. The template must already be APPROVED on the WABA, and the language code must match an approved variant. Component parameter order must match the template's placeholders.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Send a template message",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (sapi_acc_...)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.WhatsAppSendTemplateRequest"
+                            }
+                        }
+                    },
+                    "description": "Recipient, template name, language, and components",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Message accepted by WhatsApp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppSendTemplateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required field (to, template_name, language)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or not owned by caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Monthly interaction limit exceeded or platform rate limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error (template not approved, invalid parameters)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/whatsapp/accounts/{id}/templates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all message templates configured on the WhatsApp Business Account (WABA) associated with this connected account. Templates include approved, pending, rejected, and paused entries. Use the after cursor from paging.cursors to fetch subsequent pages.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "List message templates",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (sapi_acc_...)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 25,
+                        "description": "Maximum number of templates to return (1-100)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor (after) from a previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Templates with pagination cursors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppTemplateListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or not owned by caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submits a new message template to the WhatsApp Business Account (WABA) for review. The request body is the raw WhatsApp Cloud API template payload (name, category, language, components). New templates start in PENDING status; Meta reviews them and the status transitions to APPROVED or REJECTED asynchronously.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Create a message template",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (sapi_acc_...)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "description": "WhatsApp Cloud API template definition (name, category, language, components)",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created template (initial status)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppTemplateCreateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Empty or invalid payload",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or not owned by caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Template name already exists",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a template by name from the WhatsApp Business Account (WABA) associated with this connected account. WhatsApp deletes all language variants that share the given name. Templates cannot be deleted while they are being used in active campaigns.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Delete a message template",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (sapi_acc_...)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "order_confirmation",
+                        "description": "Template name to delete",
+                        "name": "name",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Template deleted"
+                    },
+                    "400": {
+                        "description": "Missing name query parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or template does not exist",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/whatsapp/phone-numbers/{id}/business-profile": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the public business profile for a WhatsApp phone number, including about text, address, description, contact email, websites, and vertical. The profile is visible to customers in the WhatsApp chat header.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Get a WhatsApp Business Profile",
+                "parameters": [
+                    {
+                        "example": "106540352242922",
+                        "description": "WhatsApp phone number platform ID (numeric ID, not the E.164 number)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Business profile (single entry in data array)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppBusinessProfileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Phone number not owned by caller or not connected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates one or more fields of the public business profile (about, address, description, email, profile_picture_url, websites, vertical). Only provided fields are changed. Profile updates may take a few minutes to propagate.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Update a WhatsApp Business Profile",
+                "parameters": [
+                    {
+                        "example": "106540352242922",
+                        "description": "WhatsApp phone number platform ID (numeric ID, not the E.164 number)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.WhatsAppBusinessProfile"
+                            }
+                        }
+                    },
+                    "description": "Profile fields to update (only provided keys are changed)",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Profile updated"
+                    },
+                    "400": {
+                        "description": "Empty or invalid payload",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Phone number not owned by caller or not connected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/whatsapp/phone-numbers/{id}/deregister": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Releases the phone number from WhatsApp Business, freeing it for use with another Business Solution Provider (BSP). This does not delete the connected account on SocialAPI; the account remains until it is disconnected explicitly.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Deregister a phone number from WhatsApp Business",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (sapi_acc_...)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Phone number deregistered"
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or not owned by caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/whatsapp/phone-numbers/{id}/register": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Registers a previously verified phone number with WhatsApp Business and sets the 6-digit two-step verification PIN. The PIN protects future re-registration and must be retained by the caller (it cannot be retrieved later). The phone number must be verified via verify-code first.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Register a phone number with WhatsApp Business",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (sapi_acc_...)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.WhatsAppRegisterRequest"
+                            }
+                        }
+                    },
+                    "description": "6-digit two-step verification PIN",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Phone number registered"
+                    },
+                    "400": {
+                        "description": "Missing or invalid PIN",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or not owned by caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Phone number not verified or already registered with another BSP",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/whatsapp/phone-numbers/{id}/request-code": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Asks WhatsApp to send a verification code (SMS or voice call) to the phone number. The number must already be connected as a WhatsApp account on SocialAPI; the code is delivered to the underlying phone line, not to the API caller. Follow up with verify-code once the user receives it.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Request a phone number verification code",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (sapi_acc_...)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.WhatsAppRequestCodeRequest"
+                            }
+                        }
+                    },
+                    "description": "Verification channel and locale",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Code dispatched"
+                    },
+                    "400": {
+                        "description": "Missing or invalid method/language",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or not owned by caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/whatsapp/phone-numbers/{id}/verify-code": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submits the 6-digit code received via SMS or voice to prove ownership of the phone number. Once verified, the phone number can be registered with WhatsApp Business. Codes expire quickly; if verification fails, request a new code.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Verify a phone number with a code",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (sapi_acc_...)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.WhatsAppVerifyCodeRequest"
+                            }
+                        }
+                    },
+                    "description": "Verification code",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Phone number verified"
+                    },
+                    "400": {
+                        "description": "Missing or invalid code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or not owned by caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error (code mismatch or expired)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/whatsapp/templates/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a single message template by its WhatsApp template ID. Any active WhatsApp account on the caller's workspace is used to authorize the lookup; the template itself is scoped by its platform ID.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Get a message template",
+                "parameters": [
+                    {
+                        "example": "1234567890123456",
+                        "description": "WhatsApp template platform ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Template details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppTemplateInfo"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Template not found or no WhatsApp account connected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates an existing message template by its WhatsApp template ID. Only certain fields are editable per WhatsApp policy (typically components and category, depending on template status). Edits to APPROVED templates re-trigger Meta review.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Edit a message template",
+                "parameters": [
+                    {
+                        "example": "1234567890123456",
+                        "description": "WhatsApp template platform ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "description": "Editable template fields (raw WhatsApp Cloud API payload)",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Template updated"
+                    },
+                    "400": {
+                        "description": "Empty or invalid payload",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Template not found or no WhatsApp account connected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
                         "content": {
                             "application/json": {
                                 "schema": {
