@@ -3574,11 +3574,11 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object"
+                                "$ref": "#/components/schemas/api_endpoints.WhatsAppCreateTemplateRequest"
                             }
                         }
                     },
-                    "description": "WhatsApp Cloud API template definition (name, category, language, components)",
+                    "description": "Template definition",
                     "required": true
                 },
                 "responses": {
@@ -3593,7 +3593,7 @@
                         }
                     },
                     "400": {
-                        "description": "Empty or invalid payload",
+                        "description": "Missing or invalid field",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3797,7 +3797,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates one or more fields of the public business profile (about, address, description, email, profile_picture_url, websites, vertical). Only provided fields are changed. Profile updates may take a few minutes to propagate.",
+                "description": "Updates one or more fields of the public business profile (about, address, description, email, websites, vertical, profile_picture_handle). Only provided fields are changed. The profile picture itself is changed by passing a profile_picture_handle obtained from the Resumable Upload API; profile_picture_url is read-only.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -3818,11 +3818,11 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.WhatsAppBusinessProfile"
+                                "$ref": "#/components/schemas/api_endpoints.WhatsAppUpdateBusinessProfileRequest"
                             }
                         }
                     },
-                    "description": "Profile fields to update (only provided keys are changed)",
+                    "description": "Profile fields to update",
                     "required": true
                 },
                 "responses": {
@@ -3940,7 +3940,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Registers a previously verified phone number with WhatsApp Business and sets the 6-digit two-step verification PIN. The PIN protects future re-registration and must be retained by the caller (it cannot be retrieved later). The phone number must be verified via verify-code first.",
+                "description": "Registers a previously verified phone number with WhatsApp Business and sets the 6-digit two-step verification PIN. The phone number must be verified via verify-code first. The PIN must be retained by the caller: losing it triggers a mandatory 7-day wait before it can be reset.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -4032,7 +4032,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Asks WhatsApp to send a verification code (SMS or voice call) to the phone number. The number must already be connected as a WhatsApp account on SocialAPI; the code is delivered to the underlying phone line, not to the API caller. Follow up with verify-code once the user receives it.",
+                "description": "Asks WhatsApp to send a one-time verification code to the phone number via SMS or voice call. The code is delivered to the underlying phone line, not to the API caller; follow up with verify-code once the user receives it. Step 1 of the phone-number registration flow (request-code, verify-code, register).",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -4262,7 +4262,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates an existing message template by its WhatsApp template ID. Only certain fields are editable per WhatsApp policy (typically components and category, depending on template status). Edits to APPROVED templates re-trigger Meta review.",
+                "description": "Updates the components of an existing message template by its WhatsApp template ID. Only APPROVED templates can be edited, and editing resets the template to PENDING for re-review. APPROVED templates are limited to one edit per day.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -4283,11 +4283,11 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object"
+                                "$ref": "#/components/schemas/api_endpoints.WhatsAppEditTemplateRequest"
                             }
                         }
                     },
-                    "description": "Editable template fields (raw WhatsApp Cloud API payload)",
+                    "description": "Replacement components",
                     "required": true
                 },
                 "responses": {
@@ -4295,7 +4295,7 @@
                         "description": "Template updated"
                     },
                     "400": {
-                        "description": "Empty or invalid payload",
+                        "description": "Missing or invalid components",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7735,30 +7735,62 @@
                 "type": "object",
                 "properties": {
                     "about": {
+                        "description": "About is the profile tagline shown in the chat header.",
                         "type": "string",
                         "example": "Reach us 9-5 weekdays."
                     },
                     "address": {
+                        "description": "Address is the business address (max 256 characters).",
                         "type": "string",
                         "example": "1 Hacker Way, Menlo Park, CA"
                     },
                     "description": {
+                        "description": "Description is the business description.",
                         "type": "string",
                         "example": "Acme Corp customer support."
                     },
                     "email": {
+                        "description": "Email is the contact email.",
                         "type": "string",
                         "example": "support@acme.com"
                     },
+                    "messaging_product": {
+                        "description": "MessagingProduct is always \"whatsapp\".",
+                        "type": "string",
+                        "example": "whatsapp"
+                    },
                     "profile_picture_url": {
+                        "description": "ProfilePictureURL is the public URL of the current profile picture (read-only; use profile_picture_handle to update).",
                         "type": "string",
                         "example": "https://cdn.example.com/logo.png"
                     },
                     "vertical": {
+                        "description": "Vertical is the business category.",
                         "type": "string",
+                        "enum": [
+                            "OTHER",
+                            "AUTO",
+                            "BEAUTY",
+                            "APPAREL",
+                            "EDU",
+                            "ENTERTAIN",
+                            "EVENT_PLAN",
+                            "FINANCE",
+                            "GROCERY",
+                            "GOVT",
+                            "HOTEL",
+                            "HEALTH",
+                            "NONPROFIT",
+                            "PROF_SERVICES",
+                            "RETAIL",
+                            "TRAVEL",
+                            "RESTAURANT",
+                            "ALCOHOL"
+                        ],
                         "example": "RETAIL"
                     },
                     "websites": {
+                        "description": "Websites lists the business websites (max 2).",
                         "type": "array",
                         "items": {
                             "type": "string"
@@ -7793,6 +7825,38 @@
                     }
                 }
             },
+            "api_endpoints.WhatsAppCreateTemplateRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "description": "Category is the message category. Marketing intent in a UTILITY template triggers automatic rejection.",
+                        "type": "string",
+                        "enum": [
+                            "MARKETING",
+                            "UTILITY",
+                            "AUTHENTICATION"
+                        ],
+                        "example": "UTILITY"
+                    },
+                    "components": {
+                        "description": "Components define the template body, optional header, optional footer, and optional buttons.\nAt minimum one BODY component is required.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.WhatsAppTemplateComponentDef"
+                        }
+                    },
+                    "language": {
+                        "description": "Language is the BCP-47 language code (e.g. en_US, fr_FR, pt_BR).",
+                        "type": "string",
+                        "example": "en_US"
+                    },
+                    "name": {
+                        "description": "Name is the template identifier. Lowercase letters, digits, underscores only; no spaces.",
+                        "type": "string",
+                        "example": "order_confirmation"
+                    }
+                }
+            },
             "api_endpoints.WhatsAppCursors": {
                 "type": "object",
                 "properties": {
@@ -7803,6 +7867,18 @@
                     "before": {
                         "type": "string",
                         "example": "QVFIUjJ..."
+                    }
+                }
+            },
+            "api_endpoints.WhatsAppEditTemplateRequest": {
+                "type": "object",
+                "properties": {
+                    "components": {
+                        "description": "Components replaces the template's components.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.WhatsAppTemplateComponentDef"
+                        }
                     }
                 }
             },
@@ -7899,6 +7975,36 @@
                     }
                 }
             },
+            "api_endpoints.WhatsAppTemplateButtonDef": {
+                "type": "object",
+                "properties": {
+                    "phone_number": {
+                        "description": "PhoneNumber is required when Type is PHONE_NUMBER. E.164 format with leading \"+\".",
+                        "type": "string",
+                        "example": "+15551234567"
+                    },
+                    "text": {
+                        "description": "Text is the button label.",
+                        "type": "string",
+                        "example": "Visit"
+                    },
+                    "type": {
+                        "description": "Type is the button kind.",
+                        "type": "string",
+                        "enum": [
+                            "QUICK_REPLY",
+                            "URL",
+                            "PHONE_NUMBER"
+                        ],
+                        "example": "URL"
+                    },
+                    "url": {
+                        "description": "URL is required when Type is URL. May contain a single {{1}} placeholder.",
+                        "type": "string",
+                        "example": "https://example.com/{{1}}"
+                    }
+                }
+            },
             "api_endpoints.WhatsAppTemplateComponent": {
                 "type": "object",
                 "properties": {
@@ -7918,6 +8024,45 @@
                             "button"
                         ],
                         "example": "body"
+                    }
+                }
+            },
+            "api_endpoints.WhatsAppTemplateComponentDef": {
+                "type": "object",
+                "properties": {
+                    "buttons": {
+                        "description": "Buttons populate a BUTTONS component (one of QUICK_REPLY, URL, PHONE_NUMBER).",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.WhatsAppTemplateButtonDef"
+                        }
+                    },
+                    "format": {
+                        "description": "Format is required for HEADER components.",
+                        "type": "string",
+                        "enum": [
+                            "TEXT",
+                            "IMAGE",
+                            "VIDEO",
+                            "DOCUMENT"
+                        ],
+                        "example": "TEXT"
+                    },
+                    "text": {
+                        "description": "Text is the literal text for HEADER (when Format is TEXT), BODY, or FOOTER components.\nMay contain 1-indexed placeholders such as {{1}}, {{2}}.",
+                        "type": "string",
+                        "example": "Hello {{1}}, your order {{2}} is confirmed."
+                    },
+                    "type": {
+                        "description": "Type is the component slot.",
+                        "type": "string",
+                        "enum": [
+                            "HEADER",
+                            "BODY",
+                            "FOOTER",
+                            "BUTTONS"
+                        ],
+                        "example": "BODY"
                     }
                 }
             },
@@ -8029,6 +8174,71 @@
                             "text"
                         ],
                         "example": "text"
+                    }
+                }
+            },
+            "api_endpoints.WhatsAppUpdateBusinessProfileRequest": {
+                "type": "object",
+                "properties": {
+                    "about": {
+                        "description": "About is the profile tagline (max 139 characters).",
+                        "type": "string",
+                        "example": "Reach us 9-5 weekdays."
+                    },
+                    "address": {
+                        "description": "Address is the business address (max 256 characters).",
+                        "type": "string",
+                        "example": "1 Hacker Way, Menlo Park, CA"
+                    },
+                    "description": {
+                        "description": "Description is the business description.",
+                        "type": "string",
+                        "example": "Acme Corp customer support."
+                    },
+                    "email": {
+                        "description": "Email is the contact email.",
+                        "type": "string",
+                        "example": "support@acme.com"
+                    },
+                    "profile_picture_handle": {
+                        "description": "ProfilePictureHandle is a handle returned by the Resumable Upload API.\nUse this to change the profile picture; the picture URL is read-only.",
+                        "type": "string",
+                        "example": "4::aW1hZ2UvanBlZw=="
+                    },
+                    "vertical": {
+                        "description": "Vertical is the business category.",
+                        "type": "string",
+                        "enum": [
+                            "OTHER",
+                            "AUTO",
+                            "BEAUTY",
+                            "APPAREL",
+                            "EDU",
+                            "ENTERTAIN",
+                            "EVENT_PLAN",
+                            "FINANCE",
+                            "GROCERY",
+                            "GOVT",
+                            "HOTEL",
+                            "HEALTH",
+                            "NONPROFIT",
+                            "PROF_SERVICES",
+                            "RETAIL",
+                            "TRAVEL",
+                            "RESTAURANT",
+                            "ALCOHOL"
+                        ],
+                        "example": "RETAIL"
+                    },
+                    "websites": {
+                        "description": "Websites lists the business websites (max 2).",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "https://acme.com"
+                        ]
                     }
                 }
             },
