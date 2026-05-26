@@ -243,6 +243,94 @@
                 }
             }
         },
+        "/accounts/{id}/export": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Enqueue an async analytics export job for a connected account. Subject to plan limits (exports per month, cooldown hours, concurrent export cap).",
+                "tags": [
+                    "Exports"
+                ],
+                "summary": "Create analytics export",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.CreateExportRequest"
+                            }
+                        }
+                    },
+                    "description": "Export options",
+                    "required": true
+                },
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/accounts/{id}/limits": {
             "get": {
                 "security": [
@@ -428,6 +516,125 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/pages": {
+            "get": {
+                "description": "Returns pages (e.g. Facebook Pages) associated with a connected account.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "List account pages",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/pages/{pageId}": {
+            "patch": {
+                "description": "Update a page's is_default or is_active status.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Update account page",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page ID",
+                        "name": "pageId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.updatePageRequest"
+                            }
+                        }
+                    },
+                    "description": "Page update",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
                                 }
                             }
                         }
@@ -655,6 +862,279 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/events": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a paginated, filtered slice of the unified event log. Events cover post lifecycle, inbox activity, account changes, and webhook deliveries. Retention varies by plan tier; the response includes the user's current retention window.",
+                "tags": [
+                    "Events"
+                ],
+                "summary": "List developer events",
+                "parameters": [
+                    {
+                        "description": "Filter by event category",
+                        "name": "category",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by status (ok, failed)",
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by platform",
+                        "name": "platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by resource ID (post, conversation, ...)",
+                        "name": "resource_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by action (e.g. post.published)",
+                        "name": "action",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Lower time bound (RFC3339)",
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Upper time bound (RFC3339)",
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor from a previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page size (default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.EventsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/events/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns aggregated event counts for the requested window: totals, failure counts, breakdowns by category and error category, plus inbox-specific breakdown. Useful for dashboard summary cards.",
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Event summary counts",
+                "parameters": [
+                    {
+                        "description": "Lower time bound (RFC3339)",
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Upper time bound (RFC3339)",
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.EventsSummaryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/exports": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the 50 most recent export jobs for the authenticated user. Optionally filter by status.",
+                "tags": [
+                    "Exports"
+                ],
+                "summary": "List analytics exports",
+                "parameters": [
+                    {
+                        "description": "Filter by status (pending, processing, completed, failed)",
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/exports/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the current status, progress, result download URL (presigned Excel), and report URL for an export job.",
+                "tags": [
+                    "Exports"
+                ],
+                "summary": "Get export status and result",
+                "parameters": [
+                    {
+                        "description": "Export ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
                                 }
                             }
                         }
@@ -3364,6 +3844,249 @@
                 }
             }
         },
+        "/platforms/twitter/credentials": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the user's Twitter (X) bring-your-own-key credential entries. The full client secret is never returned, only a hint of the client ID. Dashboard JWT only; API keys are rejected.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "List Twitter BYOK credentials",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Dashboard JWT required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stores or rotates the default Twitter (X) OAuth app credentials for the user. Applies to all brands without their own brand-scoped entry. Dashboard JWT only.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Set default Twitter BYOK credentials",
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/api_endpoints.twitterByokBody"
+                },
+                "responses": {
+                    "204": {
+                        "description": "Credentials stored"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Dashboard JWT required",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes the user's default Twitter (X) OAuth app credentials. Brand-scoped entries are not affected. Dashboard JWT only.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Delete default Twitter BYOK credentials",
+                "responses": {
+                    "204": {
+                        "description": "Credentials removed"
+                    },
+                    "403": {
+                        "description": "Dashboard JWT required",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/twitter/credentials/brand/{brand_id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stores or rotates Twitter (X) OAuth app credentials for a specific brand. Overrides the default credentials for that brand only. Dashboard JWT only.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Set brand-scoped Twitter BYOK credentials",
+                "parameters": [
+                    {
+                        "description": "Brand ID",
+                        "name": "brand_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "$ref": "#/components/requestBodies/api_endpoints.twitterByokBody"
+                },
+                "responses": {
+                    "204": {
+                        "description": "Credentials stored"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Dashboard JWT required",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes Twitter (X) OAuth app credentials for a specific brand. The brand falls back to the default credentials. Dashboard JWT only.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Delete brand-scoped Twitter BYOK credentials",
+                "parameters": [
+                    {
+                        "description": "Brand ID",
+                        "name": "brand_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Credentials removed"
+                    },
+                    "403": {
+                        "description": "Dashboard JWT required",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/twitter/credentials/test": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Validates a pair of Twitter (X) OAuth app credentials without storing them. Returns whether the credentials are usable and, if not, a human-readable reason. Dashboard JWT only.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Test Twitter BYOK credentials",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.twitterByokBody"
+                            }
+                        }
+                    },
+                    "description": "Twitter OAuth app credentials to test",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Dashboard JWT required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/whatsapp/accounts/{id}/send-template": {
             "post": {
                 "security": [
@@ -5354,314 +6077,6 @@
                 }
             }
         },
-        "/v1/accounts/{id}/export": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Enqueue an async analytics export job for a connected account. Subject to plan limits (exports per month, cooldown hours, concurrent export cap).",
-                "tags": [
-                    "Exports"
-                ],
-                "summary": "Create analytics export",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.CreateExportRequest"
-                            }
-                        }
-                    },
-                    "description": "Export options",
-                    "required": true
-                },
-                "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/accounts/{id}/pages": {
-            "get": {
-                "description": "Returns pages (e.g. Facebook Pages) associated with a connected account.",
-                "tags": [
-                    "Accounts"
-                ],
-                "summary": "List account pages",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/accounts/{id}/pages/{pageId}": {
-            "patch": {
-                "description": "Update a page's is_default or is_active status.",
-                "tags": [
-                    "Accounts"
-                ],
-                "summary": "Update account page",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Page ID",
-                        "name": "pageId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.updatePageRequest"
-                            }
-                        }
-                    },
-                    "description": "Page update",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/exports": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns the 50 most recent export jobs for the authenticated user. Optionally filter by status.",
-                "tags": [
-                    "Exports"
-                ],
-                "summary": "List analytics exports",
-                "parameters": [
-                    {
-                        "description": "Filter by status (pending, processing, completed, failed)",
-                        "name": "status",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/exports/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns the current status, progress, result download URL (presigned Excel), and report URL for an export job.",
-                "tags": [
-                    "Exports"
-                ],
-                "summary": "Get export status and result",
-                "parameters": [
-                    {
-                        "description": "Export ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": true
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/webhooks": {
             "get": {
                 "security": [
@@ -5790,6 +6205,51 @@
             }
         },
         "/webhooks/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the configuration and aggregate delivery stats for a single webhook endpoint owned by the caller.",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Get webhook endpoint",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.WebhookDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -5921,6 +6381,328 @@
                     }
                 }
             }
+        },
+        "/webhooks/{id}/deliveries": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns recent delivery attempts for a webhook endpoint. Optionally filter by status (success, failed, pending) or event_type. Cursor-paginated.",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "List webhook deliveries",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by delivery status",
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by event type",
+                        "name": "event_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page size (default 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.DeliveryListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/{id}/deliveries/{did}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the full record of a single webhook delivery attempt, including request payload, response status, response body excerpt, and timing.",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Get webhook delivery",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Delivery ID",
+                        "name": "did",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/{id}/deliveries/{did}/retry": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Requeues a failed webhook delivery for another attempt. Returns the updated delivery record.",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Retry webhook delivery",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Delivery ID",
+                        "name": "did",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/{id}/test": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends a synthetic event payload to the webhook endpoint to validate signature, reachability, and consumer handling. Returns the delivery result.",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Send test webhook delivery",
+                "parameters": [
+                    {
+                        "description": "Webhook endpoint ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.TestWebhookRequest"
+                            }
+                        }
+                    },
+                    "description": "Event type and payload to send",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/whitelist": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submits a request for access to a platform that is currently in restricted beta. Notifies the SocialAPI team and persists the request. Returns a message indicating submission, existing access, or already-granted access.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Request platform whitelist access",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.WhitelistRequest"
+                            }
+                        }
+                    },
+                    "description": "Platform and contact info",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "servers": [
@@ -5929,6 +6711,19 @@
         }
     ],
     "components": {
+        "requestBodies": {
+            "api_endpoints.twitterByokBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/api_endpoints.twitterByokBody"
+                        }
+                    }
+                },
+                "description": "Twitter OAuth app client_id and client_secret",
+                "required": true
+            }
+        },
         "securitySchemes": {
             "BearerAuth": {
                 "description": "Prefix your API key with \"Bearer \". Example: `Authorization: Bearer sapi_key_...`",
@@ -6371,6 +7166,10 @@
                                 "dm.received",
                                 "dm.sent",
                                 "dm.referral",
+                                "dm.status.sent",
+                                "dm.status.delivered",
+                                "dm.status.read",
+                                "dm.status.failed",
                                 "review.received",
                                 "mention.received",
                                 "account.connected",
@@ -6479,6 +7278,23 @@
                     }
                 }
             },
+            "api_endpoints.DeliveryListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.DeliveryListItem"
+                        }
+                    },
+                    "next_cursor": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.ErrorBody": {
                 "type": "object",
                 "properties": {
@@ -6501,6 +7317,116 @@
                 "properties": {
                     "error": {
                         "$ref": "#/components/schemas/api_endpoints.ErrorBody"
+                    }
+                }
+            },
+            "api_endpoints.EventResponse": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    },
+                    "action": {
+                        "type": "string",
+                        "example": "publish"
+                    },
+                    "category": {
+                        "type": "string",
+                        "example": "post"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-27T10:00:00Z"
+                    },
+                    "duration_ms": {
+                        "type": "integer",
+                        "example": 230
+                    },
+                    "error_category": {
+                        "type": "string",
+                        "example": "validation"
+                    },
+                    "error_message": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "instagram"
+                    },
+                    "resource_id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "success"
+                    },
+                    "status_code": {
+                        "type": "integer",
+                        "example": 400
+                    },
+                    "summary": {
+                        "type": "string",
+                        "example": "Published to Instagram"
+                    }
+                }
+            },
+            "api_endpoints.EventsListResponse": {
+                "type": "object",
+                "properties": {
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.EventResponse"
+                        }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/api_endpoints.PaginationInfo"
+                    },
+                    "retention_days": {
+                        "type": "integer",
+                        "example": 30
+                    }
+                }
+            },
+            "api_endpoints.EventsSummaryResponse": {
+                "type": "object",
+                "properties": {
+                    "by_category": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "by_error_category": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "failed": {
+                        "type": "integer"
+                    },
+                    "inbox_breakdown": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "retention_days": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    },
+                    "total_previous": {
+                        "type": "integer"
                     }
                 }
             },
@@ -7528,6 +8454,20 @@
                     }
                 }
             },
+            "api_endpoints.TestWebhookRequest": {
+                "type": "object",
+                "properties": {
+                    "event_type": {
+                        "type": "string"
+                    },
+                    "payload": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            },
             "api_endpoints.UnpublishRequest": {
                 "type": "object",
                 "properties": {
@@ -7635,6 +8575,10 @@
                                 "dm.received",
                                 "dm.sent",
                                 "dm.referral",
+                                "dm.status.sent",
+                                "dm.status.delivered",
+                                "dm.status.read",
+                                "dm.status.failed",
                                 "review.received",
                                 "mention.received",
                                 "account.connected",
@@ -7817,6 +8761,35 @@
                     "target": {
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    }
+                }
+            },
+            "api_endpoints.WebhookDetailResponse": {
+                "type": "object",
+                "properties": {
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "secret_hint": {
+                        "type": "string"
+                    },
+                    "stats": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.WebhookStats"
+                    },
+                    "url": {
+                        "type": "string"
                     }
                 }
             },
@@ -8386,6 +9359,30 @@
                     }
                 }
             },
+            "api_endpoints.WhitelistRequest": {
+                "type": "object",
+                "properties": {
+                    "contact_info": {
+                        "type": "string",
+                        "example": "@myusername"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "instagram"
+                    }
+                }
+            },
+            "api_endpoints.twitterByokBody": {
+                "type": "object",
+                "properties": {
+                    "client_id": {
+                        "type": "string"
+                    },
+                    "client_secret": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.updatePageRequest": {
                 "type": "object",
                 "properties": {
@@ -8595,6 +9592,46 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.DeliveryListItem": {
+                "type": "object",
+                "properties": {
+                    "attempt_count": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "event_type": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "response_duration_ms": {
+                        "type": "integer"
+                    },
+                    "response_status_code": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.DeliveryStatBucket": {
+                "type": "object",
+                "properties": {
+                    "delivered": {
+                        "type": "integer"
+                    },
+                    "failed": {
+                        "type": "integer"
+                    }
+                }
+            },
             "social-api_ai_core_api_service.WebhookEventInfo": {
                 "type": "object",
                 "properties": {
@@ -8607,6 +9644,17 @@
                     },
                     "event": {
                         "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.WebhookStats": {
+                "type": "object",
+                "properties": {
+                    "last_24h": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.DeliveryStatBucket"
+                    },
+                    "last_7d": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.DeliveryStatBucket"
                     }
                 }
             }

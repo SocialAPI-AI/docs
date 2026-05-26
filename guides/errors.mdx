@@ -1,6 +1,6 @@
 ---
 title: Error Handling
-description: Error response format and all error codes.
+description: Error response format and the catalog of error codes returned by the API.
 ---
 
 All errors return JSON with a consistent shape:
@@ -8,66 +8,188 @@ All errors return JSON with a consistent shape:
 ```json
 {
   "error": "human-readable message",
-  "code": "machine_readable_code"
+  "code": "namespace.specific_code"
 }
 ```
 
-Use `code` for programmatic error handling; use `error` for logging and display.
+Use `code` for programmatic handling; use `error` for logging and display. Codes are stable and namespaced with dot-separated segments, so you can match on a prefix (for example `platform.*` for any upstream platform failure, or `byok.*` for any bring-your-own-key issue).
 
-## Error codes
+## Code namespaces
+
+The first segment of the code tells you where the failure originated.
+
+| Namespace | Meaning |
+|---|---|
+| `auth.*` | Authentication and authorization at the SocialAPI layer |
+| `account.*` | Connected account issues (linking, state, supported features) |
+| `platform.<name>.*` | The upstream platform (Instagram, TikTok, etc.) returned an error |
+| `validation.*` | Request body, query parameter, or path parameter is invalid |
+| `resource.*` | Generic resource lookup, conflict, or capability error |
+| `billing.*` | Plan limit reached or feature gated by tier |
+| `brand.*`, `media.*`, `post.*`, `conversation.*`, `invite.*` | Resource-specific errors on those object types |
+| `byok.*` | Bring-your-own-key credentials (Twitter app, etc.) |
+| `publishing.delivery.*` | A platform delivery worker failed mid-publish |
+| `whatsapp.*` | WhatsApp Cloud API specific failures (window, frequency, template state) |
+| `system.internal` | Unexpected server error; safe to retry idempotent requests |
+
+## Authentication
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 400 | `missing_metadata` | A required field is missing in the request body or query |
-| 400 | `unsupported_platform` | The `platform` value is not recognized |
-| 401 | `unauthorized` | API key is missing, invalid, or revoked |
-| 401 | `invalid_token` | The connected account's OAuth token is expired or revoked |
-| 401 | `invalid_credentials` | The platform rejected the stored credentials |
-| 403 | `unauthorized` | The OAuth state token belongs to a different API key |
-| 404 | `account_not_found` | The account ID does not belong to your workspace |
-| 404 | `not_found` | The requested resource does not exist |
-| 409 | `account_already_linked` | This social account is already connected |
-| 413 | `storage_quota_exceeded` | Media upload would exceed your plan's storage limit |
-| 429 | `rate_limit_exceeded` | Your monthly post or interaction limit is exceeded |
-| 429 | `platform_rate_limit` | The upstream platform's own rate limit was hit |
-| 500 | - | Internal server error (contact support) |
-| 501 | `not_supported` | This operation is not supported on this platform |
+| 401 | `auth.missing_header` | `Authorization` header is absent |
+| 401 | `auth.empty_token` | `Authorization: Bearer` with no token value |
+| 401 | `auth.invalid_key` | API key does not match any active key |
+| 401 | `auth.invalid_token` | Bearer JWT or OAuth access token is invalid or expired |
+| 401 | `auth.invalid_secret` | Provided client secret does not match |
+| 401 | `auth.not_authenticated` | Caller is unauthenticated for an endpoint that requires it |
+| 401 | `auth.not_provisioned` | Dashboard user has no `users` row yet; call `POST /v1/users/provision` first |
+| 401 | `auth.user_not_found` | Token resolves to a user that no longer exists |
+| 403 | `auth.dashboard_only` | Endpoint accepts only dashboard JWTs (raw API keys are rejected) |
+| 403 | `auth.requires_dashboard_auth` | Same as above for endpoints behind brand-level UI |
+| 400 | `auth.state_mismatch` | OAuth callback `state` does not match the issued value |
+| 400 | `auth.oauth.invalid_client` | OAuth 2.1 client lookup failed during MCP token exchange |
+| 400 | `auth.oauth.invalid_redirect` | `redirect_uri` is not in the client's whitelist |
+| 400 | `auth.oauth.request_expired` | Authorization request expired before exchange |
+| 400 | `auth.oauth.user_missing` | OAuth grant references a user that does not exist |
 
-## Handling specific cases
+## Accounts
 
-### 401 invalid_token
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 404 | `account.not_found` | The account ID does not belong to your workspace |
+| 409 | `account.already_linked` | This social account is already connected to a workspace |
+| 403 | `account.reconnection_required` | OAuth token is no longer usable; rerun the OAuth flow |
+| 400 | `account.unsupported_platform` | Platform value is not recognized |
+| 404 | `account.no_active_page` | Account has no active Page (Facebook, LinkedIn) selected |
+| 409 | `account.page_inactive` | The requested Page is currently disabled |
+| 501 | `account.pages_not_supported` | Pages do not apply to this platform |
 
-The user's OAuth token expired. Your app should reconnect the account by re-running the [OAuth flow](/guides/oauth).
+## Validation
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.field_required` | A required field is missing from the request |
+| 400 | `validation.field_invalid` | A field has the wrong type, format, or value |
+| 400 | `validation.body_invalid` | Request body could not be parsed as JSON |
+| 400 | `validation.redirect_uri_duplicate` | Redirect URI is already registered for this client |
+
+The `code` always starts with `validation.`. The specific sub-code after the dot identifies the field or rule that failed; `meta.field` in the response points to the offending field name when applicable.
+
+## Resources
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 404 | `resource.not_found` | Generic resource lookup miss; check the `meta.resource` and `meta.id` fields |
+| 409 | `resource.conflict` | Resource is in a state that conflicts with the requested action |
+| 410 | `resource.gone` | Resource existed but was permanently removed |
+| 501 | `resource.not_supported` | Operation does not apply to this platform |
+| 404 | `brand.not_found`, `media.not_found`, `conversation.not_found`, `post.not_found` | Specific lookups failed |
+| 409 | `media.in_use` | Cannot delete media that is still referenced by a post |
+| 410 | `invite.expired` | Brand invite token is past its expiry |
+| 400 | `invite.invalid` | Brand invite token is malformed or already consumed |
+| 409 | `post.state_invalid` | Action does not apply to a post in this state (e.g. retry on a `published` post) |
+| 400 | `post.no_retryable_deliveries` | No failed deliveries on this post to retry |
+
+## Billing and plan limits
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 403 | `billing.brands_limit`, `brand.limit_reached` | Brand count would exceed your plan's allowance |
+| 403 | `billing.post_limit` | Monthly post allowance is exhausted |
+| 413 | `billing.storage_quota` | Media upload would exceed your storage limit |
+| 403 | `billing.platform_not_available` | Platform requires a higher plan tier |
+| 429 | `billing.export_limit` | Daily export allowance is exhausted |
+| 429 | `billing.export_concurrent` | Too many exports running at once for this plan |
+| 429 | `billing.export_cooldown` | Cooldown active between exports |
+
+Limit responses include `meta.plan` and `meta.max` so clients can prompt the user to upgrade.
+
+## Platform errors
+
+When the upstream platform (Meta, TikTok, Google, etc.) rejects a call, the error code has the form `platform.<name>.<reason>`. The HTTP status is forwarded when possible; otherwise it is `502 Bad Gateway`.
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 401 | `platform.<name>.auth` | Platform rejected the stored OAuth token; the account needs to be reconnected |
+| 429 | `platform.<name>.rate_limit` | Upstream platform rate limit hit. This does **not** consume your SocialAPI quota |
+| 502 | `platform.<name>.api_error` | Generic upstream API failure; check the `error` message for detail |
+| 400 | `platform.tiktok.media_required` | TikTok requires media for this post type |
+| 403 | `platform.instagram.permission_denied`, `platform.whatsapp.permission_denied` | OAuth scopes do not include the action |
+| 410 | `platform.instagram.window_closed` | Reply window for this comment or DM has expired |
+| 404 | `platform.facebook.no_pages`, `platform.linkedin.no_pages`, `platform.google.no_locations`, `platform.youtube.no_channels`, `platform.youtube.no_uploads_playlist` | The connected account exposes no usable target |
+
+## BYOK (bring-your-own-key)
+
+For platforms that require a customer-supplied OAuth app (currently Twitter / X).
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 412 | `byok.credentials_missing` | No credentials configured for the user or brand; show the BYOK setup modal |
+| 401 | `byok.credentials_invalid` | Stored credentials were rejected by the platform |
+| 403 | `byok.credentials_forbidden` | Caller does not own the brand they are configuring |
+| 429 | `byok.test_rate_limited` | Too many credential test calls within a minute |
+
+## Publishing delivery
+
+These are emitted by the post delivery workers and surface in the inbox / events stream rather than as direct HTTP responses, but they appear in `event.error_code` for `post.failed` and `post.partial` events.
+
+| Code | Meaning |
+|---|---|
+| `publishing.delivery.account_load_failed` | Could not load the connected account at delivery time |
+| `publishing.delivery.page_resolve_failed` | Could not resolve the target Page (Facebook, LinkedIn) |
+| `publishing.delivery.timeout` | Delivery exceeded the per-platform timeout |
+| `publishing.duplicate_target` | Two deliveries targeting the same destination were queued |
+
+## WhatsApp
+
+WhatsApp Cloud API has a richer error surface than other platforms because of its messaging window, frequency caps, and template state machine.
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 410 | `whatsapp.window_closed` | 24-hour customer service window is closed; send an approved template instead |
+| 429 | `whatsapp.frequency_cap` | Per-user marketing cap reached |
+| 429 | `whatsapp.pair_rate_limit` | Per phone-number-pair rate limit hit |
+| 429 | `whatsapp.throughput_exceeded` | Account-level throughput exhausted |
+| 410 | `whatsapp.user_opted_out` | Recipient has opted out of marketing messages |
+| 410 | `whatsapp.undeliverable` | Message could not be delivered (cold number, region block, etc.) |
+| 404 | `whatsapp.template_not_found` | Referenced template does not exist for this WABA |
+| 409 | `whatsapp.template_paused` | Template is paused due to quality drop |
+| 404 | `whatsapp.no_account`, `whatsapp.no_waba_found`, `whatsapp.no_business_found`, `whatsapp.no_phone_number_found` | Onboarding chain has not produced this resource yet |
+| 500 | `whatsapp.unknown` | Unmapped WhatsApp error; check the message for raw detail |
+
+## System
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 500 | `system.internal` | Unexpected server error. Retry idempotent requests; if persistent, contact support |
+
+## Handling common cases
+
+### Reconnect when a token dies
+
+`account.reconnection_required` and `platform.<name>.auth` both mean the stored OAuth token is no longer usable. Send the user back through `GET /v1/oauth/url`.
 
 ```python
-if error["code"] == "invalid_token":
-    # Trigger reconnect flow for this account_id
+if error["code"] == "account.reconnection_required" or \
+   error["code"].endswith(".auth") and error["code"].startswith("platform."):
     redirect_to_reconnect(account_id)
 ```
 
-### 413 storage_quota_exceeded
+### Storage quota
 
-Your media upload would push storage usage over the plan limit. Free plans are limited to 100 MB. Check your current usage with `GET /v1/media/storage`, delete unused media with `DELETE /v1/media/:id`, or upgrade your plan for unlimited storage.
+`billing.storage_quota` (HTTP 413) means the upload would push you past your plan's storage limit. Check current usage with `GET /v1/media/storage` and delete unused media or upgrade.
 
-```python
-if error["code"] == "storage_quota_exceeded":
-    # Check current usage
-    usage = requests.get(f"{base_url}/v1/media/storage", headers=headers).json()
-    print(f"Storage: {usage['used_bytes']} / {usage['limit_bytes']} bytes")
-    # Consider deleting unused media or upgrading plan
-```
+### Monthly post or interaction limit
 
-### 429 rate_limit_exceeded
+`billing.post_limit` (HTTP 403) means your monthly allowance is exhausted. Limits reset at the start of your next billing period. The free plan uses a rolling 30-day window from your account anniversary.
 
-Your monthly post or interaction allowance is exhausted. Limits reset at the start of your next billing period, or upgrade your plan for unlimited capacity.
+### Platform throttling
 
-### 429 platform_rate_limit
+`platform.<name>.rate_limit` (HTTP 429) is the upstream platform throttling you, not SocialAPI. It does not consume your quota. Wait a few minutes and retry with backoff.
 
-The platform (not SocialAPI) is throttling. This does **not** consume your quota. Wait a few minutes and retry.
+### Validation failures
 
-### 501 not_supported
-
-The operation is not available on this platform. For example, Instagram does not have reviews - calling `GET /accounts/{id}/reviews` on an Instagram account returns 501. Check the [Connectors](/connectors/overview) section for each platform's supported operations.
+Any `validation.*` code includes a `meta.field` pointing to the offending input. Surface the field name to the user.
 
 ## Example error handling
 
@@ -78,22 +200,38 @@ const resp = await fetch(`https://api.social-api.ai/v1/accounts/${accountId}/com
 
 if (!resp.ok) {
   const err = await resp.json();
-  switch (err.code) {
-    case "invalid_token":
-      await reconnectAccount(accountId);
-      break;
-    case "storage_quota_exceeded":
-      throw new Error("Storage full - delete unused media or upgrade plan");
-    case "rate_limit_exceeded":
-      throw new Error("Monthly limit hit - upgrade or wait for reset");
-    case "platform_rate_limit":
-      await sleep(60_000);
-      return retry();
-    case "not_supported":
-      console.warn(`Platform does not support this operation: ${err.error}`);
-      return null;
-    default:
-      throw new Error(`API error: ${err.error} (${err.code})`);
+  const code = err.code as string;
+
+  // Reconnect dead OAuth tokens
+  if (code === "account.reconnection_required" ||
+      (code.startsWith("platform.") && code.endsWith(".auth"))) {
+    await reconnectAccount(accountId);
+    return;
   }
+
+  // Upstream platform throttling: retry with backoff
+  if (code.startsWith("platform.") && code.endsWith(".rate_limit")) {
+    await sleep(60_000);
+    return retry();
+  }
+
+  // Plan limits: prompt to upgrade
+  if (code.startsWith("billing.")) {
+    throw new Error(`Plan limit hit: ${err.error}`);
+  }
+
+  // BYOK setup needed
+  if (code === "byok.credentials_missing") {
+    showByokSetupModal(err.meta.platform);
+    return;
+  }
+
+  // Operation not supported on this platform
+  if (code === "resource.not_supported") {
+    console.warn(`Not supported: ${err.error}`);
+    return null;
+  }
+
+  throw new Error(`API error: ${err.error} (${code})`);
 }
 ```
