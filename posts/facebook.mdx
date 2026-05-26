@@ -5,7 +5,7 @@ description: Full reference for publishing Facebook Page posts via SocialAPI, in
 
 ## 1. Overview
 
-Facebook publishing uses the Meta Graph API directly against your connected Facebook Page. SocialAPI selects the correct Graph API endpoint based on the content type: text and link posts go to `/{page-id}/feed`, photo posts to `/{page-id}/photos`, and video posts to `/{page-id}/videos`.
+Facebook publishing uses the Meta Graph API directly against your connected Facebook Page. SocialAPI selects the correct Graph API endpoint based on the content type: text and link posts go to `/{page-id}/feed`, single-photo posts to `/{page-id}/photos`, single-video posts to `/{page-id}/videos`, and multi-photo albums use a two-step upload-then-feed flow described below.
 
 | Field | Value |
 |---|---|
@@ -17,7 +17,7 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 | Delete post | Yes |
 | Schedule | Yes (deferred publish via `schedule_at`) |
 | First comment | No |
-| Carousel | No |
+| Carousel (multi-photo) | Yes (2 to 10 photos; images only) |
 
 ---
 
@@ -28,13 +28,23 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 | Text only | No `media_ids`; no `link` in `platform_data` | Publishes a plain text status update |
 | Link preview | No `media_ids`; include `link` in `platform_data.facebook` | Facebook generates an Open Graph preview card |
 | Single photo | One image URL in `media_ids` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
-| Single video | One video URL in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos` |
+| Single video | One video URL in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; `platform_data` is ignored |
+| Multi-photo album | 2 to 10 image URLs in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. `platform_data.facebook` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
 
-Route selection is automatic. If `media_ids` is non-empty, SocialAPI inspects the first entry's file extension to choose between the photo and video endpoints. If `media_ids` is empty, the feed endpoint is used and any keys in `platform_data.facebook` are forwarded.
+Route selection is automatic:
+
+- `media_ids` is empty → text or link post on `/{page-id}/feed`
+- `media_ids` has one entry → photo or video endpoint based on the file extension
+- `media_ids` has 2 to 10 entries → multi-photo album
 
 **Caption limit:** Follows Facebook's standard post message limit (approximately 63,206 characters, though shorter posts perform better).
 
-**Multi-media and carousels:** Not supported. Only the first entry in `media_ids` is used.
+**Multi-photo album rules:**
+
+- 2 to 10 photos per post. Passing more than 10 entries returns a validation error.
+- Images only. Mixing images and videos in the same album is rejected with a validation error. Facebook's Graph API does not support mixed-media albums; publish separate posts or use a single Reel with image overlays.
+- Each photo is uploaded as an unpublished photo, which Facebook retains for approximately 24 hours. The follow-up feed call happens immediately, so this expiry only matters if the feed call fails. In that case the uploaded photos are abandoned and you can safely retry the post.
+- For best rendering, use consistent 1,080 by 1,080 px (1:1) images.
 
 ---
 
@@ -82,6 +92,53 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "media_ids": ["https://cdn.example.com/product.jpg"]
   }'
 ```
+
+### Multi-photo album
+
+Provide 2 to 10 image URLs in `media_ids` to publish a multi-photo album. SocialAPI handles the two-step Graph API flow internally: each photo is uploaded with `published=false` to obtain a `media_fbid`, then a single `/{page-id}/feed` call attaches all photo IDs via `attached_media[]` and sets the caption.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Highlights from this week.",
+    "media_ids": [
+      "https://cdn.example.com/photo-1.jpg",
+      "https://cdn.example.com/photo-2.jpg",
+      "https://cdn.example.com/photo-3.jpg"
+    ]
+  }'
+```
+
+Unlike single-photo posts, `platform_data.facebook` IS honored for albums. The `link`, `cta_type` plus `cta_link`, and age targeting fields are forwarded to the feed call:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "text": "Shop the spring collection.",
+    "media_ids": [
+      "https://cdn.example.com/spring-1.jpg",
+      "https://cdn.example.com/spring-2.jpg",
+      "https://cdn.example.com/spring-3.jpg",
+      "https://cdn.example.com/spring-4.jpg"
+    ],
+    "platform_data": {
+      "facebook": {
+        "cta_type": "SHOP_NOW",
+        "cta_link": "https://example.com/spring"
+      }
+    }
+  }'
+```
+
+**Limits:**
+- Minimum 2, maximum 10 photos per album.
+- Images only. Including a video URL (any of `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) in a 2+ item `media_ids` returns a validation error before any upload to Facebook.
 
 ### Video post
 
@@ -202,13 +259,13 @@ Facebook Page tokens derived from long-lived user tokens do not expire. Once an 
 
 When a user completes the Facebook OAuth flow, SocialAPI connects all Facebook Pages that the user manages in a single OAuth exchange. Each page becomes a separate connected account entry. Users do not need to repeat the OAuth flow for additional pages.
 
-### platform_data ignored for media posts
+### platform_data forwarding rules
 
-The `platform_data.facebook` block is only forwarded to the Graph API for text and link posts (the `/{page-id}/feed` endpoint). For photo and video posts, the block is silently ignored. Pass all image or video content exclusively via `media_ids` and `text`.
+The `platform_data.facebook` block is forwarded to the Graph API for text/link posts and for multi-photo albums (both go through the `/{page-id}/feed` endpoint). For single-photo posts and single-video posts, the block is silently ignored because the `/{page-id}/photos` and `/{page-id}/videos` endpoints do not accept those fields. The `alt_text` field is the one exception: it is honored for single-photo posts.
 
-### Only first media_ids entry is used
+### Multi-photo album semantics
 
-Facebook does not support multi-photo albums or carousels via this API path. If you pass more than one URL in `media_ids`, only the first is used. The others are silently dropped.
+Multi-photo albums (2 to 10 image URLs in `media_ids`) use a two-step flow: each photo is uploaded with `published=false`, then attached to a single feed post. The unpublished photos Facebook stores during step one expire after about 24 hours, so if the second step fails the photos are simply abandoned and you can retry the entire post. Mixing images and videos in the same album returns a validation error before any upload happens, and passing more than 10 entries also fails validation.
 
 ### Reviews deprecated
 
