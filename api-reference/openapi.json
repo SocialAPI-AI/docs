@@ -4107,6 +4107,74 @@
                 }
             }
         },
+        "/platforms/whatsapp/phone-numbers/{id}/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns whether a phone number is verified and registered with WhatsApp Business. Used by client UIs to decide which step of the registration flow to show.",
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Get phone number registration status",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (sapi_acc_...)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Verification + registration flags",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/social-api_ai_core_api_connectors_whatsapp.PhoneNumberStatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found or not owned by caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "WhatsApp/Meta upstream error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/whatsapp/phone-numbers/{id}/verify-code": {
             "post": {
                 "security": [
@@ -5685,6 +5753,42 @@
                 }
             }
         },
+        "/webhooks/events": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the catalog of webhook event types you can subscribe to, grouped by category (posts, inbox, accounts).",
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "List available webhook event types",
+                "responses": {
+                    "200": {
+                        "description": "Catalog of webhook event types",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ListWebhookEventsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/webhooks/{id}": {
             "delete": {
                 "security": [
@@ -6255,6 +6359,14 @@
                         "items": {
                             "type": "string",
                             "enum": [
+                                "post.scheduled",
+                                "post.published",
+                                "post.failed",
+                                "post.partial",
+                                "post.updated",
+                                "post.deleted",
+                                "post.unpublished",
+                                "post.retried",
                                 "comment.received",
                                 "dm.received",
                                 "dm.sent",
@@ -6734,6 +6846,20 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.KeyListItem"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.ListWebhookEventsResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.WebhookEventInfo"
                         }
                     }
                 }
@@ -7497,6 +7623,14 @@
                         "items": {
                             "type": "string",
                             "enum": [
+                                "post.scheduled",
+                                "post.published",
+                                "post.failed",
+                                "post.partial",
+                                "post.updated",
+                                "post.deleted",
+                                "post.unpublished",
+                                "post.retried",
                                 "comment.received",
                                 "dm.received",
                                 "dm.sent",
@@ -7714,6 +7848,21 @@
                     "url": {
                         "type": "string",
                         "example": "https://example.com/webhooks/socialapi"
+                    }
+                }
+            },
+            "api_endpoints.WebhookEventInfo": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "description": "\"posts\" | \"inbox\" | \"accounts\"",
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "event": {
+                        "type": "string"
                     }
                 }
             },
@@ -8447,6 +8596,17 @@
                     "url": {
                         "type": "string",
                         "example": "https://cdn.example.com/photo.jpg"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_whatsapp.PhoneNumberStatusResponse": {
+                "type": "object",
+                "properties": {
+                    "registered": {
+                        "type": "boolean"
+                    },
+                    "verified": {
+                        "type": "boolean"
                     }
                 }
             }
