@@ -1,0 +1,70 @@
+---
+title: Custom MCP clients
+description: Connect any MCP client to SocialAPI.AI using an API key, for headless agents, server-side scripts, and CI jobs.
+---
+
+**MCP Server URL:** `https://api.social-api.ai/mcp`
+
+If your MCP client does not implement OAuth 2.1, or you want to run an agent in a non-interactive environment (server, container, CI job, cron), authenticate with an API key on the standard `Authorization: Bearer` header.
+
+## Prerequisites
+
+- A [SocialAPI.AI](https://social-api.ai) account with at least one connected social account
+- An API key created in the [dashboard](https://app.social-api.ai/settings/keys) (format: `sapi_key_...`)
+
+<Warning>
+  API keys are long-lived credentials. Store them in a secret manager or environment variable, never in source control.
+</Warning>
+
+## Config file
+
+Most MCP clients accept a custom `Authorization` header in the server config. Set it to your API key prefixed with `Bearer`:
+
+```json
+{
+  "mcpServers": {
+    "SocialAPI": {
+      "url": "https://api.social-api.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer sapi_key_xxxxxxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+The exact field name varies by client. Some use `headers`, others use `requestInit.headers` or a top-level `auth` block - check your client's MCP documentation.
+
+## Raw HTTP example
+
+For a fully custom integration, the MCP endpoint speaks Streamable HTTP. Send tool calls as JSON-RPC over POST:
+
+```bash
+curl https://api.social-api.ai/mcp \
+  -H "Authorization: Bearer sapi_key_xxxxxxxxxxxxxxxx" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/list"
+  }'
+```
+
+The same `Authorization` header is required on every request. API-key auth skips the OAuth dance entirely, so there is no `/oauth/authorize` redirect and no PKCE exchange.
+
+## Scopes and permissions
+
+API keys grant access to every tool the owning user can call - the same scope as a `/v1` REST request authenticated with that key. Plan tier and per-platform beta gates apply identically. To restrict an agent to a subset of operations, create a dedicated user with a narrower role and issue the key from that account.
+
+## Rotating keys
+
+Rotate by creating a new key, updating the agent config, then revoking the old key in the [dashboard](https://app.social-api.ai/settings/keys). Revocation is immediate; in-flight tool calls with the revoked key return `401`.
+
+## Troubleshooting
+
+**`401 invalid or inactive API key`** - The key is wrong, revoked, or missing the `sapi_key_` prefix. Verify it in the [dashboard](https://app.social-api.ai/settings/keys).
+
+**`401 missing Authorization header`** - Your client is not forwarding the header. Confirm the field name in its MCP config and that the header survives the transport layer.
+
+**Tool not found** - Run `tools/list` first to confirm the tool name. Tool names match the [REST API](/api-reference/introduction) operation IDs.

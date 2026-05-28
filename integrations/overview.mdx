@@ -7,7 +7,16 @@ description: Connect the social media API for AI agents to Claude, ChatGPT, Mist
 
 **MCP Server URL:** `https://api.social-api.ai/mcp`
 
-Authentication is handled automatically via OAuth 2.1 with PKCE - no API key is needed in the configuration.
+## Authentication
+
+The MCP endpoint accepts two credential types on the `Authorization: Bearer` header:
+
+| Method | Best for | How to obtain |
+|---|---|---|
+| **OAuth 2.1 with PKCE** | Claude, ChatGPT, Cursor, VS Code, Le Chat, and other MCP clients with built-in OAuth | Handled automatically by the client on first tool use |
+| **API key** | Custom MCP clients, headless agents, server-side scripts, CI jobs | Create one in the [dashboard](https://app.social-api.ai), prefix `sapi_key_` |
+
+OAuth-capable clients discover the authorization server via `/.well-known/oauth-protected-resource`, so no credentials are needed in their config files. For everything else, see [Custom MCP clients](/integrations/custom).
 
 ## Choose your platform
 
@@ -52,7 +61,7 @@ Your AI assistant has access to **31 tools** covering all [SocialAPI.AI](https:/
 
 **Authorization fails or loops** - Make sure pop-ups are not blocked in your browser when the OAuth window opens. Some browser extensions (ad blockers, privacy tools) can interfere with the redirect.
 
-**Tool calls fail with 401** - Your OAuth session may have expired. Remove the [SocialAPI.AI](https://social-api.ai) connection and re-add it to trigger a fresh authorization.
+**Tool calls fail with 401** - Your OAuth session may have expired. Remove the [SocialAPI.AI](https://social-api.ai) connection and re-add it to trigger a fresh authorization. If you authenticate with an API key, check that the key is still active in the [dashboard](https://app.social-api.ai/settings/keys).
 
 **"MCP server not responding"** - Verify the URL is exactly `https://api.social-api.ai/mcp`. Check [status.social-api.ai](https://status.social-api.ai) for any ongoing incidents.
 
