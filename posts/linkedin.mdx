@@ -3,10 +3,6 @@ title: LinkedIn publishing
 description: Full reference for publishing LinkedIn organization page posts via SocialAPI, including text, image, video, and multi-image carousel posts.
 ---
 
-<Badge>Coming soon</Badge>
-
-**Coming soon.** LinkedIn organization page publishing is in active development. This page documents the planned API shape; calls to create, update, or delete LinkedIn posts will return `501` until the connector launches. See [connectors/linkedin](/connectors/linkedin) for status.
-
 ## 1. Overview
 
 LinkedIn publishing uses the LinkedIn Marketing API REST v202603 against your connected organization page. SocialAPI handles media uploading internally: images and videos are transferred from your S3 media library to LinkedIn's hosted media service before the post is created.
@@ -19,7 +15,7 @@ LinkedIn publishing uses the LinkedIn Marketing API REST v202603 against your co
 | Create post | Yes |
 | Update post | Yes (commentary text only) |
 | Delete post | Yes |
-| Schedule | Yes (deferred publish via `schedule_at`) |
+| Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | No |
 
 ---
@@ -63,7 +59,7 @@ LinkedIn does not support any `platform_data` keys. The connector uses standard 
 |---|---|---|
 | `text` | `commentary` | Post caption or body text |
 | `media_ids` | `content.media` or `content.multiImage` | S3 URLs; uploaded by SocialAPI before posting |
-| `schedule_at` | Deferred publish | ISO 8601 UTC timestamp |
+| `scheduled_at` | Deferred publish | ISO 8601 UTC timestamp |
 
 SocialAPI forwards any additional keys in `platform_data.linkedin` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See [LinkedIn Posts API reference](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api) for the full list of supported parameters.
 
@@ -118,13 +114,13 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Scheduling
 
-Set `schedule_at` to an ISO 8601 timestamp (UTC) to defer publishing:
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
 
 ```json
 {
   "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
   "text": "Our annual report is now available.",
-  "schedule_at": "2026-04-15T09:00:00Z"
+  "scheduled_at": "2026-04-15T09:00:00Z"
 }
 ```
 
@@ -349,8 +345,11 @@ The following LinkedIn OAuth scopes must be approved for your application:
 
 | Scope | Purpose |
 |---|---|
+| `r_liteprofile` | Read the authenticated user's basic profile |
 | `r_organization_social` | Read posts and social data for organization pages |
 | `w_organization_social` | Create, update, and delete posts on organization pages |
+| `r_organization_social_feed` | Read organization social feeds (comments, reactions) |
+| `w_organization_social_feed` | Reply to and moderate organization social feeds |
 | `rw_organization_admin` | List and manage organization page admin roles (required to enumerate connected pages) |
 
-All three scopes are required. If `w_organization_social` is missing, post creation and deletion will fail with a `403 Forbidden` from the LinkedIn API. If `rw_organization_admin` is missing, account connection will fail because SocialAPI cannot enumerate the organization pages the user administers.
+All six scopes are requested. If `w_organization_social` is missing, post creation and deletion fail with a `403 Forbidden` from the LinkedIn API. If `rw_organization_admin` is missing, account connection fails because SocialAPI cannot enumerate the organization pages the user administers.

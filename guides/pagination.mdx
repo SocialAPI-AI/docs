@@ -5,17 +5,17 @@ description: "Page through large result sets using cursors."
 
 ## Cursor-based pagination
 
-All list endpoints return paginated results. To page through them, use the `cursor` returned in the previous response.
+All list endpoints return paginated results. The response includes a `next_cursor` field; pass it as the `cursor` query parameter on the next call to fetch the next page.
 
 ```bash
 # First page
 GET /v1/inbox/comments?limit=25
 
-# Next page (use cursor from previous response)
+# Next page (use next_cursor from previous response)
 GET /v1/inbox/comments?limit=25&cursor=eyJpZCI6IjE3ODQx...
 ```
 
-When there are no more results, the response will not include a `cursor` field.
+When there are no more results, the response omits `next_cursor` (or returns it as an empty string).
 
 This pattern applies to all list endpoints: `/v1/inbox/comments`, `/v1/inbox/conversations`, `/v1/inbox/reviews`, `/v1/posts`, `/v1/media`, and others.
 
@@ -37,5 +37,5 @@ See the [API Reference](/api-reference) for the full set of query parameters on 
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `limit` | integer | 25 | Results per page. Min 1, max 100. |
-| `cursor` | string | - | Opaque pagination cursor from previous response. |
+| `limit` | integer | 20-25 | Results per page. Min 1, max 100. Default varies by endpoint (most endpoints default to 25, the shared validator defaults to 20). |
+| `cursor` | string | - | Opaque pagination cursor from the previous response's `next_cursor` field. |

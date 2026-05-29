@@ -7,12 +7,15 @@ All errors return JSON with a consistent shape:
 
 ```json
 {
-  "error": "human-readable message",
-  "code": "namespace.specific_code"
+  "error": {
+    "code": "namespace.specific_code",
+    "message": "human-readable message",
+    "meta": { "field": "..." }
+  }
 }
 ```
 
-Use `code` for programmatic handling; use `error` for logging and display. Codes are stable and namespaced with dot-separated segments, so you can match on a prefix (for example `platform.*` for any upstream platform failure, or `byok.*` for any bring-your-own-key issue).
+Use `error.code` for programmatic handling; use `error.message` for logging and display. Some errors include an `error.meta` object with structured context (for example `meta.field` for a validation failure, `meta.plan` and `meta.max` for billing limits). Codes are stable and namespaced with dot-separated segments, so you can match on a prefix (for example `platform.*` for any upstream platform failure, or `byok.*` for any bring-your-own-key issue).
 
 ## Code namespaces
 
@@ -73,13 +76,13 @@ The first segment of the code tells you where the failure originated.
 | 400 | `validation.body_invalid` | Request body could not be parsed as JSON |
 | 400 | `validation.redirect_uri_duplicate` | Redirect URI is already registered for this client |
 
-The `code` always starts with `validation.`. The specific sub-code after the dot identifies the field or rule that failed; `meta.field` in the response points to the offending field name when applicable.
+The `code` always starts with `validation.`. The specific sub-code after the dot identifies the field or rule that failed; `error.meta.field` in the response points to the offending field name when applicable.
 
 ## Resources
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 404 | `resource.not_found` | Generic resource lookup miss; check the `meta.resource` and `meta.id` fields |
+| 404 | `resource.not_found` | Generic resource lookup miss; check the `error.meta.resource` and `error.meta.id` fields |
 | 409 | `resource.conflict` | Resource is in a state that conflicts with the requested action |
 | 410 | `resource.gone` | Resource existed but was permanently removed |
 | 501 | `resource.not_supported` | Operation does not apply to this platform |
@@ -95,14 +98,14 @@ The `code` always starts with `validation.`. The specific sub-code after the dot
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 403 | `billing.brands_limit`, `brand.limit_reached` | Brand count would exceed your plan's allowance |
-| 403 | `billing.post_limit` | Monthly post allowance is exhausted |
+| 429 | `billing.post_limit` | Monthly post allowance is exhausted |
 | 413 | `billing.storage_quota` | Media upload would exceed your storage limit |
 | 403 | `billing.platform_not_available` | Platform requires a higher plan tier |
 | 429 | `billing.export_limit` | Daily export allowance is exhausted |
 | 429 | `billing.export_concurrent` | Too many exports running at once for this plan |
 | 429 | `billing.export_cooldown` | Cooldown active between exports |
 
-Limit responses include `meta.plan` and `meta.max` so clients can prompt the user to upgrade.
+Limit responses include `error.meta.plan` and `error.meta.max` so clients can prompt the user to upgrade.
 
 ## Platform errors
 
@@ -170,8 +173,10 @@ WhatsApp Cloud API has a richer error surface than other platforms because of it
 `account.reconnection_required` and `platform.<name>.auth` both mean the stored OAuth token is no longer usable. Send the user back through `GET /v1/oauth/url`.
 
 ```python
-if error["code"] == "account.reconnection_required" or \
-   error["code"].endswith(".auth") and error["code"].startswith("platform."):
+err = response.json()["error"]
+code = err["code"]
+if code == "account.reconnection_required" or \
+   (code.startswith("platform.") and code.endswith(".auth")):
     redirect_to_reconnect(account_id)
 ```
 
@@ -181,7 +186,7 @@ if error["code"] == "account.reconnection_required" or \
 
 ### Monthly post or interaction limit
 
-`billing.post_limit` (HTTP 403) means your monthly allowance is exhausted. Limits reset at the start of your next billing period. The free plan uses a rolling 30-day window from your account anniversary.
+`billing.post_limit` (HTTP 429) means your monthly allowance is exhausted. Limits reset at the start of your next billing period. The free plan uses a rolling 30-day window from your account anniversary.
 
 ### Platform throttling
 
@@ -189,7 +194,7 @@ if error["code"] == "account.reconnection_required" or \
 
 ### Validation failures
 
-Any `validation.*` code includes a `meta.field` pointing to the offending input. Surface the field name to the user.
+Any `validation.*` code includes an `error.meta.field` pointing to the offending input. Surface the field name to the user.
 
 ## Example error handling
 
@@ -199,8 +204,8 @@ const resp = await fetch(`https://api.social-api.ai/v1/accounts/${accountId}/com
 });
 
 if (!resp.ok) {
-  const err = await resp.json();
-  const code = err.code as string;
+  const body = await resp.json();
+  const { code, message, meta } = body.error;
 
   // Reconnect dead OAuth tokens
   if (code === "account.reconnection_required" ||
@@ -217,21 +222,21 @@ if (!resp.ok) {
 
   // Plan limits: prompt to upgrade
   if (code.startsWith("billing.")) {
-    throw new Error(`Plan limit hit: ${err.error}`);
+    throw new Error(`Plan limit hit: ${message}`);
   }
 
   // BYOK setup needed
   if (code === "byok.credentials_missing") {
-    showByokSetupModal(err.meta.platform);
+    showByokSetupModal(meta?.platform);
     return;
   }
 
   // Operation not supported on this platform
   if (code === "resource.not_supported") {
-    console.warn(`Not supported: ${err.error}`);
+    console.warn(`Not supported: ${message}`);
     return null;
   }
 
-  throw new Error(`API error: ${err.error} (${code})`);
+  throw new Error(`API error: ${message} (${code})`);
 }
 ```
