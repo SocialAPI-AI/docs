@@ -97,14 +97,19 @@ curl "https://api.social-api.ai/v1/inbox/comments/POST_ID?limit=5" \
 {
   "data": [
     {
-      "id": "sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
+      "platform_id": "17858893269577012",
       "platform": "instagram",
-      "author": {
-        "id": "17841405793187218",
-        "name": "Jane Smith",
-        "avatar_url": "https://example.com/avatar.jpg"
-      },
       "text": "Love this product!",
+      "author_id": "17841405793187218",
+      "author_name": "Jane Smith",
+      "author_username": "janesmith",
+      "author_picture": "https://example.com/avatar.jpg",
+      "is_owner": false,
+      "like_count": 3,
+      "reply_count": 0,
+      "has_replies": false,
+      "is_hidden": false,
+      "parent_id": null,
       "created_at": "2026-04-15T14:30:00Z",
       "capabilities": {
         "can_reply": true,
@@ -115,9 +120,16 @@ curl "https://api.social-api.ai/v1/inbox/comments/POST_ID?limit=5" \
       }
     }
   ],
-  "count": 1
+  "pagination": {
+    "has_more": false,
+    "next_cursor": ""
+  }
 }
 ```
+
+<Tip>
+  To reply to a specific comment in step 6, use the `platform_id` value above (or pass a `sapi_cmt_...` interaction ID, both are accepted).
+</Tip>
 
 <Tip>
   If `data` is empty, the account has no comments yet, or the post being queried has none. Try a different `account_id`, or post a comment from another account first.
@@ -130,13 +142,13 @@ curl -X POST \
   "https://api.social-api.ai/v1/inbox/comments/POST_ID" \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Thanks so much, Jane!", "parent_id": "sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1"}'
+  -d '{"text": "Thanks so much, Jane!", "comment_id": "17858893269577012", "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
 ```
 
 ```json
 {
-  "id": "sapi_cmt_cmVwbHk6MTIzNDU2Nzg5",
-  "created_at": "2026-04-15T14:35:00Z"
+  "success": true,
+  "comment_id": "sapi_cmt_cmVwbHk6MTIzNDU2Nzg5"
 }
 ```
 
@@ -154,32 +166,33 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Content-Type: application/json" \
   -d '{
     "text": "Hello world from SocialAPI!",
+    "publish_now": true,
     "targets": [
-      {
-        "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-        "platform": "instagram"
-      }
+      { "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }
     ]
   }'
 ```
 
 ```json
 {
-  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "p_01HZ9X3Q4R5M6N7P8V2K0W1J",
   "text": "Hello world from SocialAPI!",
   "status": "publishing",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-04-15T12:00:00Z",
+  "updated_at": "2026-04-15T12:00:00Z",
   "targets": [
     {
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
       "platform": "instagram",
       "status": "publishing"
     }
-  ],
-  "created_at": "2026-04-15T12:00:00Z"
+  ]
 }
 ```
 
-Set `scheduled_at` to schedule the post for later. Omit it to publish immediately.
+The platform for each target is inferred from `account_id`, no `platform` field is required. Set `scheduled_at` instead of `publish_now` to queue the post for later. Omit both to save as a draft.
 
 <Tip>
   If `status` is `failed`, inspect `targets[].error` for the per-platform reason. The most common failure is missing required fields per platform: see [Posts](/posts/overview).
