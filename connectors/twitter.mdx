@@ -47,9 +47,8 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "twitter",
-    "metadata": {
-      "redirect_uri": "https://app.example.com/oauth/callback"
-    }
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
   }'
 ```
 
@@ -62,21 +61,7 @@ Response:
 }
 ```
 
-Redirect your user to `auth_url`. After they authorize, X redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
-
-```bash
-curl -X POST https://api.social-api.ai/v1/oauth/exchange \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "platform": "twitter",
-    "code": "abc123...",
-    "metadata": {
-      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
-      "redirect_uri": "https://app.example.com/oauth/callback"
-    }
-  }'
-```
+Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the code with X and redirects the user to your `redirect_uri` with the connection result. See [OAuth flows](/guides/oauth#step-3-receive-the-result-at-your-redirect_uri) for the redirect parameters.
 
 ## Reading samples
 
