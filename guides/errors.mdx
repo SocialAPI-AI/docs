@@ -11,11 +11,14 @@ All errors return JSON with a consistent shape:
     "code": "namespace.specific_code",
     "message": "human-readable message",
     "meta": { "field": "..." }
-  }
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 
 Use `error.code` for programmatic handling; use `error.message` for logging and display. Some errors include an `error.meta` object with structured context (for example `meta.field` for a validation failure, `meta.plan` and `meta.max` for billing limits). Codes are stable and namespaced with dot-separated segments, so you can match on a prefix (for example `platform.*` for any upstream platform failure, or `byok.*` for any bring-your-own-key issue).
+
+The `request_id` field is present on every error response. The same value appears in the `X-Request-ID` response header. Include it when reporting an issue to support. See [Debugging with request IDs](/guides/debugging) for details on how to supply your own correlation ID.
 
 ## Code namespaces
 
@@ -206,6 +209,7 @@ const resp = await fetch(`https://api.social-api.ai/v1/accounts/${accountId}/com
 if (!resp.ok) {
   const body = await resp.json();
   const { code, message, meta } = body.error;
+  const requestId = body.request_id; // include in support reports
 
   // Reconnect dead OAuth tokens
   if (code === "account.reconnection_required" ||
@@ -237,6 +241,6 @@ if (!resp.ok) {
     return null;
   }
 
-  throw new Error(`API error: ${message} (${code})`);
+  throw new Error(`API error: ${message} (${code}) [request_id: ${requestId}]`);
 }
 ```
