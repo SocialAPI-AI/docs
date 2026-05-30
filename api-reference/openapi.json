@@ -3583,63 +3583,6 @@
                 }
             }
         },
-        "/oauth/exchange": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Exchanges an authorization code (received from the platform callback) for tokens.\nValidates the state token against Redis to prevent CSRF. State is one-time-use.",
-                "tags": [
-                    "Accounts"
-                ],
-                "summary": "Complete OAuth2 account connection",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.ExchangeRequest"
-                            }
-                        }
-                    },
-                    "description": "Platform, code, and metadata (redirect_uri + state)",
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Account connected",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ConnectAccountResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Missing/expired state or unsupported platform",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "State belongs to a different API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/oauth/redirect-uris": {
             "get": {
                 "security": [
@@ -7409,26 +7352,6 @@
                     },
                     "total_previous": {
                         "type": "integer"
-                    }
-                }
-            },
-            "api_endpoints.ExchangeRequest": {
-                "type": "object",
-                "properties": {
-                    "code": {
-                        "description": "Code is the authorization code received from the platform callback.",
-                        "type": "string",
-                        "example": "AQDtbPB9X..."
-                    },
-                    "metadata": {
-                        "description": "Metadata must include redirect_uri and state for CSRF validation.",
-                        "type": "object",
-                        "additionalProperties": {}
-                    },
-                    "platform": {
-                        "description": "Platform identifies the social platform (must match the connect call).",
-                        "type": "string",
-                        "example": "instagram"
                     }
                 }
             },
