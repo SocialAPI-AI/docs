@@ -26,10 +26,10 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 | Content type | How to trigger | Notes |
 |---|---|---|
 | Text only | No `media_ids`; no `link` in `platform_data` | Publishes a plain text status update |
-| Link preview | No `media_ids`; include `link` in `platform_data.facebook` | Facebook generates an Open Graph preview card |
+| Link preview | No `media_ids`; include `link` in the target's `platform_data` | Facebook generates an Open Graph preview card |
 | Single photo | One image URL in `media_ids` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
 | Single video | One video URL in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; `platform_data` is ignored |
-| Multi-photo album | 2 to 10 image URLs in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. `platform_data.facebook` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
+| Multi-photo album | 2 to 10 image URLs in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
 
 Route selection is automatic:
 
@@ -57,26 +57,26 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Exciting news from our team. Read the full announcement on our website.",
-    "platform_data": {
-      "facebook": {
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
         "link": "https://example.com/announcement"
       }
-    }
+    }]
   }'
 ```
 
 ### Platform data fields
 
-Pass these inside `platform_data.facebook`. These fields apply to text and link posts only. Photo and video posts ignore `platform_data` entirely.
+Pass these inside the target's `platform_data` object (keys are read directly, not nested under a `facebook` key). These fields apply to text and link posts only. Photo and video posts ignore `platform_data` entirely.
 
 | Field | Type | Description |
 |---|---|---|
 | `link` | string | URL to attach as a link preview card. Facebook generates the Open Graph preview automatically. |
 | `picture` | string | Image URL to use as the link preview thumbnail. Overrides the Open Graph image from the linked URL. |
 
-SocialAPI forwards any additional keys in `platform_data.facebook` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See [Facebook Pages API reference](https://developers.facebook.com/docs/pages-api/posts) for the full list of supported parameters.
+SocialAPI forwards any additional keys in the target's `platform_data` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See [Facebook Pages API reference](https://developers.facebook.com/docs/pages-api/posts) for the full list of supported parameters.
 
 ### Photo post
 
@@ -112,14 +112,13 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-Unlike single-photo posts, `platform_data.facebook` IS honored for albums. The `link`, `cta_type` plus `cta_link`, and age targeting fields are forwarded to the feed call:
+Unlike single-photo posts, the target's `platform_data` IS honored for albums. The `link`, `cta_type` plus `cta_link`, and age targeting fields are forwarded to the feed call:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Shop the spring collection.",
     "media_ids": [
       "https://cdn.example.com/spring-1.jpg",
@@ -127,12 +126,13 @@ curl -X POST https://api.social-api.ai/v1/posts \
       "https://cdn.example.com/spring-3.jpg",
       "https://cdn.example.com/spring-4.jpg"
     ],
-    "platform_data": {
-      "facebook": {
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
         "cta_type": "SHOP_NOW",
         "cta_link": "https://example.com/spring"
       }
-    }
+    }]
   }'
 ```
 
@@ -261,7 +261,7 @@ When a user completes the Facebook OAuth flow, SocialAPI connects all Facebook P
 
 ### platform_data forwarding rules
 
-The `platform_data.facebook` block is forwarded to the Graph API for text/link posts and for multi-photo albums (both go through the `/{page-id}/feed` endpoint). For single-photo posts and single-video posts, the block is silently ignored because the `/{page-id}/photos` and `/{page-id}/videos` endpoints do not accept those fields. The `alt_text` field is the one exception: it is honored for single-photo posts.
+The target's `platform_data` block is forwarded to the Graph API for text/link posts and for multi-photo albums (both go through the `/{page-id}/feed` endpoint). For single-photo posts and single-video posts, the block is silently ignored because the `/{page-id}/photos` and `/{page-id}/videos` endpoints do not accept those fields. The `alt_text` field is the one exception: it is honored for single-photo posts.
 
 ### Multi-photo album semantics
 
@@ -313,14 +313,14 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "We just launched our spring collection. Shop now and get 20% off your first order.",
-    "platform_data": {
-      "facebook": {
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
         "link": "https://example.com/spring-collection",
         "picture": "https://cdn.example.com/spring-og.jpg"
       }
-    }
+    }]
   }'
 ```
 
