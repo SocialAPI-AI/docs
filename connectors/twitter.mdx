@@ -29,14 +29,14 @@ Before you can connect any Twitter account, register a Twitter Developer app and
 | Reply to comment | Yes | |
 | Comment replies (thread) | Yes | |
 | Moderate comment (hide/delete) | Yes | Hide a reply, or delete your own reply |
-| Like comment | Yes | Like/unlike a tweet or reply |
+| Like comment | No | X removed like/unlike writes from self-serve tiers (Enterprise only) |
 | Private reply | No | Not applicable |
 | DMs | Yes | Direct Messages via X API v2 |
 | Send DM | Yes | |
 | Reviews | No | Not applicable |
 | Mentions | Yes | Tweets mentioning the authenticated user |
-| Create post | Yes | Text tweets, with optional media |
-| Update post | No | X does not expose a public edit endpoint |
+| Create post | Yes | Text tweets only (no media upload today) |
+| Update post | No | Edits are gated to Enterprise; not available to self-serve apps |
 | Delete post | Yes | |
 
 ## Connecting
@@ -56,7 +56,7 @@ Response:
 
 ```json
 {
-  "auth_url": "https://twitter.com/i/oauth2/authorize?client_id=...&state=...",
+  "auth_url": "https://x.com/i/oauth2/authorize?client_id=...&state=...",
   "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
 }
 ```
@@ -120,14 +120,13 @@ PlatformData fields. Pass these inside the target's `platform_data` when creatin
 |---|---|---|---|
 | `reply_settings` | string | `"everyone"` | Who can reply to this tweet. Options: `"everyone"`, `"following"` (only people you follow), `"verified"` (only verified accounts). |
 
-See [Twitter posts reference](/posts/twitter) for full publishing details.
-
 ## Limitations and gotchas
 
-- **No post editing.** X does not expose a public edit API. `UpdatePost` returns `501`. Delete and re-create if needed.
+- **Text-only posts.** `CreatePost` publishes the tweet text (and optional `reply_settings`). Media upload is not implemented yet, so attachments are ignored.
+- **No post editing.** X's edit capability (`edit_options.previous_post_id`) is gated to Enterprise on the pay-per-use tier, so it is not available to self-serve BYOK apps. `UpdatePost` returns `501`. Delete and re-create if needed.
 - **No webhook handler.** X does not push real-time events via this integration. Posts and comments are fetched on demand.
-- **Comment moderation.** Hide toggles reply visibility. Delete removes your own replies. Like/unlike is supported.
-- **Token refresh.** X OAuth 2.0 tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
+- **Comment moderation.** Hide toggles reply visibility. Delete removes your own replies. Liking is not available: X removed like/unlike writes from all self-serve tiers (April 2026), so `can_like` is `false`.
+- **Token refresh.** X OAuth 2.0 tokens expire after two hours. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
 - **Required scopes.** Your X Developer App must have the appropriate OAuth 2.0 scopes for reading tweets, posting, DMs, and user lookup.
 
 ## Permissions
