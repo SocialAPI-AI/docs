@@ -27,9 +27,9 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 |---|---|---|
 | Text only | No `media_ids`; no `link` in `platform_data` | Publishes a plain text status update |
 | Link preview | No `media_ids`; include `link` in the target's `platform_data` | Facebook generates an Open Graph preview card |
-| Single photo | One image URL in `media_ids` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
-| Single video | One video URL in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; `platform_data` is ignored |
-| Multi-photo album | 2 to 10 image URLs in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
+| Single photo | One image entry in `media_ids` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
+| Single video | One video entry in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; `platform_data` is ignored |
+| Multi-photo album | 2 to 10 image entries in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
 
 Route selection is automatic:
 
@@ -80,7 +80,7 @@ SocialAPI forwards any additional keys in the target's `platform_data` directly 
 
 ### Photo post
 
-Provide a single image URL in `media_ids`. The `platform_data` block is ignored for photo posts.
+Provide a single image entry in `media_ids`. The `platform_data` block is ignored for photo posts.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -89,13 +89,13 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Our new product is here.",
-    "media_ids": ["https://cdn.example.com/product.jpg"]
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
   }'
 ```
 
 ### Multi-photo album
 
-Provide 2 to 10 image URLs in `media_ids` to publish a multi-photo album. SocialAPI handles the two-step Graph API flow internally: each photo is uploaded with `published=false` to obtain a `media_fbid`, then a single `/{page-id}/feed` call attaches all photo IDs via `attached_media[]` and sets the caption.
+Provide 2 to 10 image entries in `media_ids` to publish a multi-photo album. SocialAPI handles the two-step Graph API flow internally: each photo is uploaded with `published=false` to obtain a `media_fbid`, then a single `/{page-id}/feed` call attaches all photo IDs via `attached_media[]` and sets the caption.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -105,9 +105,9 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Highlights from this week.",
     "media_ids": [
-      "https://cdn.example.com/photo-1.jpg",
-      "https://cdn.example.com/photo-2.jpg",
-      "https://cdn.example.com/photo-3.jpg"
+      "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b",
+      "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17"
     ]
   }'
 ```
@@ -121,10 +121,10 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "text": "Shop the spring collection.",
     "media_ids": [
-      "https://cdn.example.com/spring-1.jpg",
-      "https://cdn.example.com/spring-2.jpg",
-      "https://cdn.example.com/spring-3.jpg",
-      "https://cdn.example.com/spring-4.jpg"
+      "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b",
+      "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17",
+      "5e2c8a14-7b9d-4f03-a6c1-9d8e0b3f4a26"
     ],
     "targets": [{
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
@@ -138,11 +138,11 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 **Limits:**
 - Minimum 2, maximum 10 photos per album.
-- Images only. Including a video URL (any of `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) in a 2+ item `media_ids` returns a validation error before any upload to Facebook.
+- Images only. Including a video entry (any of `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) in a 2+ item `media_ids` returns a validation error before any upload to Facebook.
 
 ### Video post
 
-Provide a single video URL in `media_ids`. SocialAPI detects the video extension and routes to `/{page-id}/videos`.
+Provide a single video entry in `media_ids`. SocialAPI detects the video extension and routes to `/{page-id}/videos`.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -151,7 +151,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Watch our latest brand film.",
-    "media_ids": ["https://cdn.example.com/brand-film.mp4"]
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
   }'
 ```
 
@@ -265,7 +265,7 @@ The target's `platform_data` block is forwarded to the Graph API for text/link p
 
 ### Multi-photo album semantics
 
-Multi-photo albums (2 to 10 image URLs in `media_ids`) use a two-step flow: each photo is uploaded with `published=false`, then attached to a single feed post. The unpublished photos Facebook stores during step one expire after about 24 hours, so if the second step fails the photos are simply abandoned and you can retry the entire post. Mixing images and videos in the same album returns a validation error before any upload happens, and passing more than 10 entries also fails validation.
+Multi-photo albums (2 to 10 image entries in `media_ids`) use a two-step flow: each photo is uploaded with `published=false`, then attached to a single feed post. The unpublished photos Facebook stores during step one expire after about 24 hours, so if the second step fails the photos are simply abandoned and you can retry the entire post. Mixing images and videos in the same album returns a validation error before any upload happens, and passing more than 10 entries also fails validation.
 
 ### Reviews deprecated
 

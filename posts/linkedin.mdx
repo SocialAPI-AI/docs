@@ -16,20 +16,25 @@ Publishing as the individual member is live. Posting to Organization (company) P
 | Content type | Supported | Notes |
 | ------------ | --------- | ----- |
 | Text only | Yes | `text` is the post commentary |
-| Single image | Yes | one entry in `media_urls` |
-| Single video | Yes | one video entry in `media_urls` |
-| Multi-image (carousel) | Yes | multiple image entries in `media_urls` |
+| Single image | Yes | one entry in `media_ids` |
+| Single video | Yes | one video entry in `media_ids` |
+| Multi-image (carousel) | Yes | multiple image entries in `media_ids` |
 | Mixed image + video | No | LinkedIn does not support mixed carousels |
 | Article / link | Yes | provide your own thumbnail, title, description |
 
 ## Post fields
 
+LinkedIn uses the standard `POST /v1/posts` body. The target account is specified inside `targets`, not at the top level.
+
 | Field | Type | Required | Description |
 | ----- | ---- | -------- | ----------- |
-| `account_id` | string | Yes | The connected LinkedIn member account |
 | `text` | string | Yes | Post commentary |
-| `media_urls` | array | No | Image or video URLs to attach |
-| `visibility` | string | No | `PUBLIC` (default) or `CONNECTIONS` |
+| `targets` | array | Yes | One entry per account; each requires `account_id`. The platform is inferred from the account, no `platform` field is sent |
+| `media_ids` | array | No | IDs of media uploaded via the [media upload flow](/posts/instagram#1-upload-media); attach images or a video |
+
+<Note>
+LinkedIn member posts are always published with `PUBLIC` visibility. The post-level `visibility` field is accepted by the API but ignored for LinkedIn targets.
+</Note>
 
 ## Creating a post
 
@@ -40,15 +45,15 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCIALAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_id": "acc_...",
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Big news from our team!",
-    "media_urls": ["https://yourcdn.com/photo.jpg"]
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
   }'
 ```
 
 </CodeGroup>
 
-The post publishes to the member's feed. The author is the authenticated person.
+The post publishes to the member's feed. The author is the authenticated person. To attach media, upload it first (see the [Instagram media upload steps](/posts/instagram#1-upload-media)) and pass the returned `media_id` values in `media_ids`.
 
 ## Updating a post
 
