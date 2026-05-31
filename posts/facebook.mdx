@@ -29,6 +29,7 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 | Link preview | No `media_ids`; include `link` in the target's `platform_data` | Facebook generates an Open Graph preview card |
 | Single photo | One image URL in `media_ids` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
 | Single video | One video URL in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; `platform_data` is ignored |
+| Reel | One vertical video URL in `media_ids` plus `content_type: "reel"` in the target's `platform_data` | Routes to the Reels API (`/{page-id}/video_reels`). Unlike standard videos, `platform_data` IS honored (`content_type`, `share_to_feed`). |
 | Multi-photo album | 2 to 10 image URLs in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
 
 Route selection is automatic:
@@ -154,6 +155,38 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "media_ids": ["https://cdn.example.com/brand-film.mp4"]
   }'
 ```
+
+### Reel
+
+Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video URL in `media_ids`. SocialAPI runs Facebook's Reels publishing flow (upload, processing, publish) and returns once the Reel is accepted for processing.
+
+The `platform_data` object lives on the target (inside the `targets` array), and its keys are read directly (do not nest them under a `facebook` key).
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Behind the scenes #reels",
+    "media_ids": ["https://cdn.example.com/vertical-clip.mp4"],
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "content_type": "reel",
+        "share_to_feed": true
+      }
+    }]
+  }'
+```
+
+Reel fields (inside the target's `platform_data`):
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `content_type` | string | `"feed"` | Set to `"reel"` to publish a Reel. Any other value (or omitting it) publishes a standard post or feed video. |
+| `share_to_feed` | boolean | `true` | When `true`, the Reel also appears in the Page feed, not just the Reels tab. |
+
+Requirements: exactly one video, vertical orientation (9:16), and a duration of 3 to 90 seconds. SocialAPI warns when the duration is outside that range; Facebook enforces the aspect ratio at publish time and rejects videos that do not comply.
 
 ### Scheduling
 
