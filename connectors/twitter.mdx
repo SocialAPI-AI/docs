@@ -95,7 +95,7 @@ curl "https://api.social-api.ai/v1/accounts/{id}/mentions?limit=10" \
 
 ## Publishing
 
-Create a tweet with optional reply settings:
+Create a tweet with optional X-specific settings:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -107,22 +107,61 @@ curl -X POST https://api.social-api.ai/v1/posts \
       {
         "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
         "platform_data": {
-          "reply_settings": "everyone"
+          "reply_settings": "following"
         }
       }
     ]
   }'
 ```
 
-PlatformData fields. Pass these inside the target's `platform_data` when creating a post.
+### Platform data fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `reply_settings` | string | `"everyone"` | Who can reply to this tweet. Options: `"everyone"`, `"following"` (only people you follow), `"verified"` (only verified accounts). |
+Pass these inside the target's `platform_data` when creating a post. All fields are optional.
+
+| Field | Type | Description |
+|---|---|---|
+| `reply_settings` | string | Who can reply to this tweet. One of `"following"`, `"mentionedUsers"`, `"subscribers"`, `"verified"`. |
+| `geo_place_id` | string | Attach a location by X place ID. |
+| `community_id` | string | Post into an X Community. |
+| `for_super_followers_only` | boolean | Restrict the post to Super Followers. |
+| `nullcast` | boolean | Promoted-only post (does not appear in the timeline). |
+| `made_with_ai` | boolean | Flag the post as AI-generated content. |
+| `paid_partnership` | boolean | Disclose branded content. |
+| `in_reply_to_tweet_id` | string | Publish the post as a reply to an existing tweet. |
+| `auto_populate_reply_metadata` | boolean | Auto-include @mentions from the tweet being replied to. Only meaningful with `in_reply_to_tweet_id`. |
+| `exclude_reply_user_ids` | array of string | User IDs to exclude from auto-populated @mentions. Only meaningful with `in_reply_to_tweet_id`. |
+| `thread` | array of string | Continuation tweets chained after the root, posted in order. See [Threads](#threads). |
+
+Invalid values (a bad `reply_settings` enum, a wrong field type, an empty or over-length thread entry) are rejected by `POST /v1/posts/validate` and by create with a validation error, before any tweet is published. Unrecognized `platform_data` keys are ignored with a warning.
+
+### Threads
+
+Set `thread` to an array of strings to publish a chained thread. The target's `text` is the root tweet (tweet 1) and each `thread` entry is posted as a reply to the one before it. Continuation tweets are text-only: the `platform_data` settings above apply to the root tweet only.
+
+```json
+{
+  "text": "1/ A thread about our launch.",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "thread": [
+          "2/ First, the backstory.",
+          "3/ And here is what is next."
+        ]
+      }
+    }
+  ]
+}
+```
+
+The published post's ID is the root tweet's ID. Continuation tweet IDs are returned in the post metadata under `thread_post_ids`. If a continuation tweet fails partway through, publishing stops: the tweets posted so far stay live (X has no batch rollback), the metadata records `thread_failed_at_index`, and the request returns an error.
+
+Each tweet in a thread is a separate billable X write. Posts containing a URL cost significantly more per X's pay-per-use pricing, so keep links minimal.
 
 ## Limitations and gotchas
 
-- **Text-only posts.** `CreatePost` publishes the tweet text (and optional `reply_settings`). Media upload is not implemented yet, so attachments are ignored.
+- **Text-only posts.** Posts carry text plus the `platform_data` settings above, and can be chained into threads. Media upload is not implemented yet, so image and video attachments are ignored. Polls and quote tweets are also unsupported.
 - **No post editing.** X's edit capability (`edit_options.previous_post_id`) is gated to Enterprise on the pay-per-use tier, so it is not available to self-serve BYOK apps. `UpdatePost` returns `501`. Delete and re-create if needed.
 - **No webhook handler.** X does not push real-time events via this integration. Posts and comments are fetched on demand.
 - **Comment moderation.** Hide toggles reply visibility. Delete removes your own replies. Liking is not available: X removed like/unlike writes from all self-serve tiers (April 2026), so `can_like` is `false`.
