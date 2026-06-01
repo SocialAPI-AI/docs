@@ -95,6 +95,18 @@ Read conversations and send messages across platforms that support DMs.
 | Threads | No | Not available via API |
 | YouTube | No | Not available via API |
 
+### Sending text and attachments
+
+A message can carry text, an attachment, or both. Provide `text`, `attachment_url`, or both: at least one is required.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `account_id` | Yes | Connected account that owns the conversation |
+| `text` | Conditional | Message body. Required unless `attachment_url` is set |
+| `attachment_url` | Conditional | Publicly reachable URL of a media file to attach. Required unless `text` is set |
+
+On Facebook and Instagram, `attachment_url` is delivered as a Messenger attachment. The attachment type (image, video, audio, or file) is inferred from the URL file extension, so use a direct media link with the correct extension (for example `.jpg`, `.mp4`, `.mp3`). URLs without a recognized media extension are sent as a generic file. The media must be hosted on a publicly reachable URL (max 25 MB); the platform fetches it directly.
+
 ### Example: list conversations and send a message
 
 ```bash
@@ -102,11 +114,17 @@ Read conversations and send messages across platforms that support DMs.
 curl https://api.social-api.ai/v1/inbox/conversations \
   -H "Authorization: Bearer $SOCAPI_KEY"
 
-# Send a message in a conversation
+# Send a text message in a conversation
 curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "text": "Your order has shipped!" }'
+  -d '{ "account_id": "acc_abc123", "text": "Your order has shipped!" }'
+
+# Send an image attachment (text optional)
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_abc123", "text": "Here is your receipt", "attachment_url": "https://cdn.example.com/receipt.jpg" }'
 ```
 
 ## Reviews
