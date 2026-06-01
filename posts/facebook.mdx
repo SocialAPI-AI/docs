@@ -30,7 +30,7 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 | Single photo | One image entry in `media_ids` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
 | Single video | One video entry in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; `platform_data` is ignored |
 | Reel | One vertical video entry in `media_ids` plus `content_type: "reel"` in the target's `platform_data` | Routes to the Reels API (`/{page-id}/video_reels`). Unlike standard videos, `platform_data` IS honored (`content_type`, `share_to_feed`). |
-| Multi-photo album | 2 to 10 image URLs in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
+| Multi-photo album | 2 to 10 image entries in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
 
 Route selection is automatic:
 
@@ -158,7 +158,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Reel
 
-Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video URL in `media_ids`. SocialAPI runs Facebook's Reels publishing flow (upload, processing, publish) and returns once the Reel is accepted for processing.
+Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media_ids`. SocialAPI runs Facebook's Reels publishing flow (upload, processing, publish) and returns once the Reel is accepted for processing.
 
 The `platform_data` object lives on the target (inside the `targets` array), and its keys are read directly (do not nest them under a `facebook` key).
 
@@ -168,7 +168,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Content-Type: application/json" \
   -d '{
     "text": "Behind the scenes #reels",
-    "media_ids": ["https://cdn.example.com/vertical-clip.mp4"],
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
     "targets": [{
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
       "platform_data": {
