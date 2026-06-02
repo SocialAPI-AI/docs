@@ -10,11 +10,13 @@ SocialAPI uses OAuth in two distinct contexts:
 
 ## Connecting platform accounts
 
-Most social platforms use OAuth 2.0. Connecting a platform account takes three steps.
+SocialAPI manages platform OAuth on your behalf. Your application kicks off the connection, sends the user to the platform's consent screen, and receives a redirect back to a URL of your choice with the result. You never see or store platform access tokens — SocialAPI persists them encrypted and proxies all subsequent calls.
 
-### Step 1: Initiate the flow
+This is a managed connection pattern, not an OAuth flow you implement against SocialAPI. For OAuth 2.1 (used by MCP and third-party API clients calling SocialAPI), see the section below.
 
-Call `POST /v1/accounts/connect` with the platform and a `redirect_uri`:
+### Step 1: Initiate the connection
+
+Call `POST /v1/accounts/connect` with the platform slug, your post-connection `redirect_uri`, and an optional `state` value for correlation:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
@@ -22,64 +24,82 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "instagram",
-    "redirect_uri": "https://app.example.com/oauth/callback"
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
   }'
 ```
+
+Fields:
+
+| Field | Location | Required | Notes |
+|---|---|---|---|
+| `platform` | top-level | yes | Platform slug (`instagram`, `facebook`, `threads`, `tiktok`, `linkedin`, `twitter`, `youtube`, `google`). |
+| `redirect_uri` | top-level | recommended | Your post-connection callback. Must be pre-registered (see [Whitelisting redirect URIs](#whitelisting-redirect-uris)). If omitted, the user sees a built-in HTML success page instead of being redirected. |
+| `state` | top-level | optional | Opaque correlation value, max 512 chars, echoed back verbatim in the final redirect. Use it to tie the result to a session on your side. |
+| `brand_id` | top-level | optional | Attach the account to an existing brand. If omitted, a new brand is auto-created. |
+| `metadata` | top-level | optional | Platform-specific connection data only (for example, TikTok BYOK uses this for `apikey`). For standard managed OAuth this is empty or omitted. |
 
 Response (HTTP 202):
 
 ```json
 {
   "auth_url": "https://www.instagram.com/oauth/authorize?client_id=...&state=...",
-  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Redirect the user to auth_url"
 }
 ```
 
-### Step 2: Redirect the user
+The `state` in the response is SocialAPI's internal CSRF token used between our connect call and our platform callback. Your application does not need to read or store it; just send the user to `auth_url`.
 
-Send your user to `auth_url`. They log in and grant permissions. The platform redirects back to your `redirect_uri` with `?code=...&state=...` query parameters.
+### Step 2: User authorizes on the platform
 
-Store the `state` value from Step 1. You need it in Step 3.
+Redirect your user to the `auth_url`. They log in to the platform and grant permissions. The platform redirects back to **SocialAPI's** callback (not yours). SocialAPI exchanges the code for an access token, persists it encrypted, and then 302-redirects the user to **your** `redirect_uri`.
 
-### Step 3: Exchange the code
+### Step 3: Receive the result at your `redirect_uri`
 
-```bash
-curl -X POST https://api.social-api.ai/v1/oauth/exchange \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "platform": "instagram",
-    "code": "AQDtbPB9X...",
-    "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
-    "redirect_uri": "https://app.example.com/oauth/callback"
-  }'
+**Success:**
+
+```
+https://app.example.com/oauth/callback
+  ?status=success
+  &platform=instagram
+  &state=session_abc123
+  &account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J
 ```
 
-Response (HTTP 201):
+One connection produces exactly one `account_id`. Facebook accounts that manage multiple Pages still resolve to a single account in the connection result; Page details are exposed separately under `/v1/accounts/{id}/pages` and are not part of this flow.
 
-```json
-{
-  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-  "platform": "instagram",
-  "username": "acmecorp"
-}
+**Error** (the user denied consent, the platform returned an error, or the link expired):
+
+```
+https://app.example.com/oauth/callback
+  ?status=error
+  &error=access_denied
+  &error_description=The+user+denied+the+request
+  &platform=instagram
+  &state=session_abc123
 ```
 
-The `account_id` is now ready to use in all account endpoints.
+Always check `status` first. On `success`, persist the `account_id` against your user record and call `/v1/accounts/{id}` for full account details. On `error`, surface a retry path in your UI — the customer can restart from Step 1.
 
-<Warning>
-  The `state` token is one-time-use and expires after 10 minutes. If the exchange fails with `invalid or expired state`, restart from Step 1.
-</Warning>
+### Fallback when `redirect_uri` is omitted
 
-### State token security
+If your connect call did not include `redirect_uri`, SocialAPI renders a built-in HTML success or error page in place of the redirect. This is intended for ad-hoc connections (for example, the SocialAPI dashboard itself); production integrations should always supply `redirect_uri`.
 
-The `state` value is a CSRF token. It:
-1. Is generated server-side as 16 random bytes (not guessable)
-2. Is stored in Redis with a 10-minute TTL
-3. Is deleted immediately on exchange (prevents replay attacks)
-4. Is tied to your API key. Another key cannot use your state.
+### Whitelisting redirect URIs
 
-If your `/oauth/exchange` call returns `403 state does not belong to this API key`, the key used in Step 3 is different from the one used in Step 1.
+Every `redirect_uri` you use must be pre-registered. Register URIs from the SocialAPI dashboard under **Settings → OAuth redirect URIs**. The management API exists at `/v1/oauth/redirect-uris` but is dashboard-only (requires the dashboard JWT, not an API key).
+
+A connect call with a `redirect_uri` that is not on the whitelist returns `400` with an error.
+
+### Correlation `state` (customer-controlled)
+
+The top-level `state` field on `POST /v1/accounts/connect` is **your** correlation token, not a security primitive enforced by SocialAPI. It is echoed back unchanged in the final redirect. Common uses:
+
+- Tie the redirect to the originating session (set `state` to a server-side session ID).
+- CSRF defense for your own application — generate a random value, store it in the user's session, and verify it matches when the redirect lands.
+
+SocialAPI does not validate `state`. If you do not pass one, the final redirect will include `state=` with an empty value.
 
 ### Listing connected accounts
 
@@ -90,7 +110,7 @@ curl https://api.social-api.ai/v1/accounts \
 
 ### Reconnecting an account
 
-If you call `POST /v1/accounts/connect` for an account that is already connected, the upsert updates the stored token. This is safe to call when tokens expire.
+If you call `POST /v1/accounts/connect` for an account that is already connected, the flow runs again and the stored token is upserted. This is safe to call when tokens expire and is the supported path for token refresh on platforms that lack long-lived tokens.
 
 ---
 

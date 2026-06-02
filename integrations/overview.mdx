@@ -7,7 +7,16 @@ description: Connect the social media API for AI agents to Claude, ChatGPT, Mist
 
 **MCP Server URL:** `https://api.social-api.ai/mcp`
 
-Authentication is handled automatically via OAuth 2.1 with PKCE - no API key is needed in the configuration.
+## Authentication
+
+The MCP endpoint accepts two credential types on the `Authorization: Bearer` header:
+
+| Method | Best for | How to obtain |
+|---|---|---|
+| **OAuth 2.1 with PKCE** | Claude, ChatGPT, Cursor, VS Code, Le Chat, and other MCP clients with built-in OAuth | Handled automatically by the client on first tool use |
+| **API key** | Custom MCP clients, headless agents, server-side scripts, CI jobs | Create one in the [dashboard](https://app.social-api.ai), prefix `sapi_key_` |
+
+OAuth-capable clients discover the authorization server via `/.well-known/oauth-protected-resource`, so no credentials are needed in their config files. For everything else, see [Custom MCP clients](/integrations/custom).
 
 ## Choose your platform
 
@@ -31,28 +40,33 @@ Authentication is handled automatically via OAuth 2.1 with PKCE - no API key is 
 
 ## Available tools
 
-Your AI assistant has access to **31 tools** covering all [SocialAPI.AI](https://social-api.ai) functionality:
+Your AI assistant has access to **75 tools** covering all [SocialAPI.AI](https://social-api.ai) functionality:
 
 | Category | What the assistant can do |
 |---|---|
-| **Accounts** | List connected accounts, connect new accounts, view platform metadata |
-| **Posts** | List posts, create, update, delete, retry failed posts |
-| **Publishing** | Upload media, get upload URLs, verify uploads |
-| **Comments** | Fetch comments, reply, moderate (hide/unhide/delete), toggle comments on/off |
-| **DMs** | List conversations, read threads, send messages |
-| **Reviews** | Fetch reviews, reply to reviews |
-| **Mentions** | Fetch mentions across platforms |
-| **Usage** | Check resource usage (accounts, posts, interactions, storage) and platform limits |
-| **Keys** | List, create, and revoke API keys |
-| **Webhooks** | List, create, update, and delete webhook endpoints |
-| **Users** | View and update profile, delete account |
+| **Accounts** | List connected accounts, connect new accounts, disconnect, complete OAuth exchange, list account pages, fetch creator info, get per-account limits |
+| **Brands** | List, create, update, delete brands |
+| **Posts** | List, create, get, update, delete, retry, unpublish posts; fetch metrics; validate; import |
+| **Media** | List, delete media; get upload URLs; upload; verify; check storage usage |
+| **Comments** | List commented posts, list comments on a post, list reply threads, reply, hide/unhide, like/unlike, delete, send private reply, moderate |
+| **DMs** | List conversations, get conversation, list and send messages, mark as read |
+| **Reviews** | List reviews, reply to a review, update or delete a review reply |
+| **Mentions** | Fetch mentions for an account |
+| **Inbox posts** | List inbox posts |
+| **Usage** | Check workspace usage, per-account limits, storage usage, account constraints, publishing constraints |
+| **Keys** | List, create, revoke API keys |
+| **Webhooks** | List, create, get, update, delete webhooks; list deliveries; retry deliveries; test webhooks; list event catalog |
+| **Exports** | Create exports, get an export, list exports, fetch export videos |
+| **Events** | List events, fetch events summary |
+| **Invites** | List, create, revoke brand invites |
+| **Users** | Get/update profile, delete account |
 | **Feedback** | Send feedback to the [SocialAPI.AI](https://social-api.ai) team |
 
 ## Troubleshooting
 
 **Authorization fails or loops** - Make sure pop-ups are not blocked in your browser when the OAuth window opens. Some browser extensions (ad blockers, privacy tools) can interfere with the redirect.
 
-**Tool calls fail with 401** - Your OAuth session may have expired. Remove the [SocialAPI.AI](https://social-api.ai) connection and re-add it to trigger a fresh authorization.
+**Tool calls fail with 401** - Your OAuth session may have expired. Remove the [SocialAPI.AI](https://social-api.ai) connection and re-add it to trigger a fresh authorization. If you authenticate with an API key, check that the key is still active in the [dashboard](https://app.social-api.ai/settings/keys).
 
 **"MCP server not responding"** - Verify the URL is exactly `https://api.social-api.ai/mcp`. Check [status.social-api.ai](https://status.social-api.ai) for any ongoing incidents.
 

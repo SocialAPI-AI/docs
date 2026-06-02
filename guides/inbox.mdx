@@ -15,36 +15,60 @@ List comments across all connected accounts, reply, and moderate.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/v1/inbox/comments` | List comments across all accounts |
-| `POST` | `/v1/inbox/comments/:id` | Reply to a comment |
-| `POST` | `/v1/inbox/comments/:id/moderate` | Hide, delete, or like a comment |
+| `GET` | `/v1/inbox/comments` | List posts that received comments across accounts |
+| `GET` | `/v1/inbox/comments/:postId` | List comments on a specific post |
+| `GET` | `/v1/inbox/comments/:postId/:commentId/replies` | List replies to a specific comment |
+| `POST` | `/v1/inbox/comments/:postId` | Reply to a comment on a post |
+| `DELETE` | `/v1/inbox/comments/:postId/:commentId` | Delete a comment |
+| `POST` | `/v1/inbox/comments/:postId/:commentId/hide` | Hide a comment |
+| `DELETE` | `/v1/inbox/comments/:postId/:commentId/hide` | Unhide a comment |
+| `POST` | `/v1/inbox/comments/:postId/:commentId/like` | Like a comment |
+| `DELETE` | `/v1/inbox/comments/:postId/:commentId/like` | Unlike a comment |
+| `POST` | `/v1/inbox/comments/:postId/:commentId/private-reply` | Send a private DM in reply to a comment |
+
+`:postId` and `:commentId` accept SocialAPI interaction IDs (`sapi_cmt_...`). See [Interaction IDs](/guides/interaction-ids) for the encoding.
 
 ### Platform capabilities
 
 | Platform | Reply | Hide | Like | Delete | Private reply |
 |----------|-------|------|------|--------|---------------|
-| Instagram | Yes | Yes | Yes | Yes | Yes |
+| Instagram | Yes | Yes | No | Yes | Yes |
 | Facebook | Yes | Yes | Yes | Yes | Yes |
-| Threads | Yes | Yes | No | No | No |
+| Threads | Yes | Conditional | No | Conditional | No |
 | Google | Yes | No | No | No | No |
-| LinkedIn | Yes | No | No | Yes | No |
+| LinkedIn | Soon | No | Soon | Soon | No |
 | YouTube | Yes | Yes | No | Yes | No |
+| X / Twitter | Yes | Yes | No | Conditional | No |
 | TikTok | No | No | No | No | No |
 
-Each comment includes a `capabilities` object so your code can check what actions are available before attempting them.
+For Threads, Hide is available on comments not owned by the user; Delete is available on own replies. For X / Twitter, Delete is available on own posts. Each comment in the response includes a `capabilities` object so your code can check what is actually allowed for that specific item.
 
 ### Example: list and reply
 
 ```bash
-# List comments
+# List posts that have comments
 curl https://api.social-api.ai/v1/inbox/comments \
   -H "Authorization: Bearer $SOCAPI_KEY"
 
-# Reply to a comment
-curl -X POST https://api.social-api.ai/v1/inbox/comments/sapi_cmt_aW5zdGF.../reply \
+# List comments on one post
+curl "https://api.social-api.ai/v1/inbox/comments/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+
+# Reply to a comment on that post
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U" \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "text": "Thanks for the feedback!" }'
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "comment_id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U",
+    "text": "Thanks for the feedback!"
+  }'
+
+# Hide a comment
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/{postId}/{commentId}/hide" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
 ```
 
 ## Direct messages
@@ -71,6 +95,18 @@ Read conversations and send messages across platforms that support DMs.
 | Threads | No | Not available via API |
 | YouTube | No | Not available via API |
 
+### Sending text and attachments
+
+A message can carry text, an attachment, or both. Provide `text`, `attachment_url`, or both: at least one is required.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `account_id` | Yes | Connected account that owns the conversation |
+| `text` | Conditional | Message body. Required unless `attachment_url` is set |
+| `attachment_url` | Conditional | Publicly reachable URL of a media file to attach. Required unless `text` is set |
+
+On Facebook and Instagram, `attachment_url` is delivered as a Messenger attachment. The attachment type (image, video, audio, or file) is inferred from the URL file extension, so use a direct media link with the correct extension (for example `.jpg`, `.mp4`, `.mp3`). URLs without a recognized media extension are sent as a generic file. The media must be hosted on a publicly reachable URL (max 25 MB); the platform fetches it directly.
+
 ### Example: list conversations and send a message
 
 ```bash
@@ -78,11 +114,17 @@ Read conversations and send messages across platforms that support DMs.
 curl https://api.social-api.ai/v1/inbox/conversations \
   -H "Authorization: Bearer $SOCAPI_KEY"
 
-# Send a message in a conversation
-curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_bWV0YS4.../messages \
+# Send a text message in a conversation
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "text": "Your order has shipped!" }'
+  -d '{ "account_id": "acc_abc123", "text": "Your order has shipped!" }'
+
+# Send an image attachment (text optional)
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_abc123", "text": "Here is your receipt", "attachment_url": "https://cdn.example.com/receipt.jpg" }'
 ```
 
 ## Reviews
@@ -94,7 +136,7 @@ Read and reply to reviews on platforms that support them.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/v1/inbox/reviews` | List reviews |
-| `POST` | `/v1/inbox/reviews/:id` | Reply to a review |
+| `POST` | `/v1/inbox/reviews/:id/reply` | Reply to a review |
 
 ### Platform support
 
@@ -111,7 +153,7 @@ curl https://api.social-api.ai/v1/inbox/reviews \
   -H "Authorization: Bearer $SOCAPI_KEY"
 
 # Reply to a review
-curl -X POST https://api.social-api.ai/v1/inbox/reviews/sapi_rev_Z29vZ2xl.../reply \
+curl -X POST https://api.social-api.ai/v1/inbox/reviews/sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/reply \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "text": "Thank you for the review!" }'
@@ -119,13 +161,15 @@ curl -X POST https://api.social-api.ai/v1/inbox/reviews/sapi_rev_Z29vZ2xl.../rep
 
 ## Mentions
 
-Read mentions of your accounts across platforms.
+Read mentions of a connected account.
 
 ### Endpoint
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/v1/inbox/mentions` | List mentions |
+| `GET` | `/v1/accounts/:id/mentions` | List mentions for a connected account |
+
+Mentions are scoped to a single connected account, not the workspace.
 
 ### Platform support
 
@@ -133,12 +177,13 @@ Read mentions of your accounts across platforms.
 |----------|----------|
 | Instagram | Yes |
 | Facebook | Yes |
+| X / Twitter | Yes |
 | All others | No |
 
 ### Example
 
 ```bash
-curl https://api.social-api.ai/v1/inbox/mentions \
+curl "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 

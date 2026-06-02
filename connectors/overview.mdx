@@ -3,7 +3,7 @@ title: Connectors Overview
 description: Platform capabilities and feature matrix.
 ---
 
-[SocialAPI.AI](https://social-api.ai) uses a connector pattern - each platform implements the same interface. If a platform doesn't support a feature, the API returns `501` with `code: "not_supported"`. Your code doesn't need to branch per platform; just handle the 501.
+[SocialAPI.AI](https://social-api.ai) uses a connector pattern - each platform implements the same interface. If a platform doesn't support a feature, the API returns `501` with `error.code: "resource.not_supported"`. Your code doesn't need to branch per platform; just handle the 501.
 
 ## Feature matrix
 
@@ -18,12 +18,13 @@ Every connector except Twitter uses SocialAPI's managed platform app. You don't 
 | Instagram | SocialAPI |
 | Facebook | SocialAPI |
 | Threads | SocialAPI |
-| Google | SocialAPI |
 | TikTok | SocialAPI |
 | LinkedIn | SocialAPI |
 | YouTube | SocialAPI |
+| WhatsApp | SocialAPI |
 | X / Twitter | **You (BYOK)** - see [setup guide](/connectors/twitter-byok) |
-| Trustpilot | API key (no OAuth) |
+| Google | SocialAPI (Coming soon) |
+| Trustpilot | API key (Coming soon) |
 
 See [Platform credentials](/guides/platform-credentials) for the full story, including consent-screen branding and FAQs.
 
@@ -66,8 +67,10 @@ When a platform doesn't support a feature (e.g. Instagram has no reviews), calli
 
 ```json
 {
-  "error": "operation not supported for this platform",
-  "code": "not_supported"
+  "error": {
+    "code": "resource.not_supported",
+    "message": "operation not supported for this platform"
+  }
 }
 ```
 
@@ -77,7 +80,7 @@ This is expected behavior, not a bug. Design your app to handle `501` gracefully
 
 | Type | How it works |
 |---|---|
-| `oauth2` | `POST /accounts/connect` returns an `auth_url` to redirect your user to. After authorization, call `POST /oauth/exchange` with the code. |
+| `oauth2` | `POST /accounts/connect` with a top-level `redirect_uri` returns an `auth_url`. Send the user there; SocialAPI handles the platform callback and redirects the user to your `redirect_uri` with the result. See [OAuth flows](/guides/oauth). |
 | `apikey` | Pass the platform API key in `metadata` in `POST /accounts/connect`. Returns account ID immediately. |
 
 ## Private replies

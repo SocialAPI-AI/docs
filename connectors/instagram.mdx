@@ -25,10 +25,12 @@ description: Connect and interact with Instagram accounts via the Meta Graph API
 | Reply to comment | Yes | |
 | Private reply | Yes | Sends a DM to the commenter |
 | Comment replies (thread) | Yes | |
+| Like comment | No | Instagram Graph API does not expose comment likes |
 | Moderate comment (hide/unhide/delete) | Yes | |
 | Toggle post comments | Yes | |
 | DMs | Yes | |
-| Send DM | Yes | |
+| Send DM | Yes | Text and/or media attachment (`attachment_url`) |
+| Send DM attachment | Yes | Image, video, audio, or file via `attachment_url` (type inferred from URL extension, max 25 MB) |
 | Get DM thread by user | Yes | |
 | Reviews | No | Instagram has no review feature |
 | Mentions | Yes | |
@@ -43,9 +45,8 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "instagram",
-    "metadata": {
-      "redirect_uri": "https://app.example.com/oauth/callback"
-    }
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
   }'
 ```
 
@@ -58,21 +59,7 @@ Response:
 }
 ```
 
-Redirect your user to `auth_url`. After they authorize, Instagram redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
-
-```bash
-curl -X POST https://api.social-api.ai/v1/oauth/exchange \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "platform": "instagram",
-    "code": "AQDtbPB9X...",
-    "metadata": {
-      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
-      "redirect_uri": "https://app.example.com/oauth/callback"
-    }
-  }'
-```
+Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the code with Instagram and redirects the user to your `redirect_uri` with the connection result. See [OAuth flows](/guides/oauth#step-3-receive-the-result-at-your-redirect_uri) for the redirect parameters.
 
 ## Reading samples
 
@@ -190,15 +177,17 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
     "text": "Hello world #socapi",
-    "media_ids": ["https://cdn.example.com/photo.jpg"],
-    "platform_data": {
-      "instagram": {
-        "alt_text": "A product photo showing our new widget",
-        "share_to_feed": true
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "targets": [
+      {
+        "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+        "platform_data": {
+          "alt_text": "A product photo showing our new widget",
+          "share_to_feed": true
+        }
       }
-    }
+    ]
   }'
 ```
 

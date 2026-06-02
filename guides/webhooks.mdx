@@ -3,7 +3,7 @@ title: Webhooks
 description: Receive real-time notifications when interactions arrive on your connected accounts.
 ---
 
-Instead of polling the API, register a webhook endpoint and SocialAPI will POST a signed payload to your server whenever a new comment, DM, review, or mention arrives.
+Instead of polling the API, register a webhook endpoint and SocialAPI will POST a signed payload to your server whenever a new comment, DM, review, or mention arrives, or whenever one of your posts changes lifecycle state (scheduled, published, deleted, etc.).
 
 ## Register an endpoint
 
@@ -43,27 +43,126 @@ The `secret` is returned **once**. Store it immediately in your environment. It 
 
 ## Event types
 
-| Event | When it fires |
-|---|---|
-| `comment.received` | A new comment arrives on any connected account |
-| `dm.received` | A new direct message arrives (may include `metadata.referral` if the DM originated from an ad) |
-| `dm.sent` | Your account sent a direct message (echo confirmation from Meta). |
-| `dm.referral` | A user clicked an ad or referral link without sending a message. The interaction has empty content and includes `metadata.referral`. |
-| `review.received` | A new review arrives (Google Business Profile) |
-| `mention.received` | Your account is mentioned on a supported platform |
+Events are grouped into three categories: **inbox** (incoming interactions), **posts** (post lifecycle transitions), and **accounts** (connection state).
 
-You can subscribe to any combination. Pass all six to receive everything:
+| Event | Category | When it fires |
+|---|---|---|
+| `comment.received` | inbox | A new comment arrives on any connected account |
+| `dm.received` | inbox | A new direct message arrives (may include `metadata.referral` if the DM originated from an ad) |
+| `dm.sent` | inbox | Your account sent a direct message (echo confirmation from Meta) |
+| `dm.referral` | inbox | A user clicked an ad or referral link without sending a message. The interaction has empty content and includes `metadata.referral` |
+| `review.received` | inbox | A new review arrives (Google Business Profile) |
+| `mention.received` | inbox | Your account is mentioned on a supported platform |
+| `dm.status.sent` | inbox | A direct message you sent was accepted by the platform |
+| `dm.status.delivered` | inbox | A direct message you sent was delivered to the recipient |
+| `dm.status.read` | inbox | A direct message you sent was read by the recipient |
+| `dm.status.failed` | inbox | A direct message you sent failed to deliver |
+| `post.scheduled` | posts | A post was created with a future `scheduled_at` and entered the `scheduled` state |
+| `post.published` | posts | A post finished publishing successfully on all targets |
+| `post.partial` | posts | A post published on some targets but failed on others |
+| `post.failed` | posts | A post failed to publish on all targets |
+| `post.updated` | posts | A draft, scheduled, or failed post was edited |
+| `post.deleted` | posts | A post was deleted. The payload includes `was_status` so you know what state the post was in before removal |
+| `post.unpublished` | posts | A published post was removed from one or more platforms (the post row stays unless every target is unpublished) |
+| `post.retried` | posts | A failed or partial post is being retried. A subsequent `post.published`, `post.partial`, or `post.failed` event fires once the retry completes |
+| `account.connected` | accounts | A social account finished connecting. Payload includes username, display name, profile picture, bio, and a public profile link |
+| `account.disconnected` | accounts | A connected account was revoked by the user on the platform side (Meta deauthorize webhook, TikTok deauthorize webhook) |
+
+You can subscribe to any combination. Fetch the authoritative list with `GET /v1/webhooks/events` and subscribe to everything by passing the full set.
+
+<Tip>
+  The authoritative list of event types is available at `GET /v1/webhooks/events`. It returns each event's description and category, so dashboard UIs and integrations can render the catalog without hard-coding it.
+</Tip>
+
+### Post lifecycle payloads
+
+Each post lifecycle event carries a small payload with the `post_id` and event-specific fields.
 
 ```json
-[
-  "comment.received",
-  "dm.received",
-  "dm.sent",
-  "dm.referral",
-  "review.received",
-  "mention.received"
-]
+{
+  "event": "post.scheduled",
+  "data": {
+    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "status": "scheduled",
+    "scheduled_at": "2026-06-01T14:00:00Z",
+    "targets": [
+      { "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "platform": "instagram" },
+      { "account_id": "acc_02HZ9X3Q4R5M6N7P8V2K0W1J", "platform": "facebook" }
+    ]
+  }
+}
 ```
+
+```json
+{
+  "event": "post.updated",
+  "data": {
+    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "status": "scheduled",
+    "changed_fields": ["text", "scheduled_at"]
+  }
+}
+```
+
+```json
+{
+  "event": "post.deleted",
+  "data": {
+    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "was_status": "published"
+  }
+}
+```
+
+```json
+{
+  "event": "post.unpublished",
+  "data": {
+    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "unpublished_count": 1
+  }
+}
+```
+
+When `account_id` is `null` on a `post.unpublished` event, the post was unpublished from every target.
+
+```json
+{
+  "event": "post.retried",
+  "data": {
+    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "retried_count": 2
+  }
+}
+```
+
+`post.published`, `post.partial`, and `post.failed` share a `{ post_id, status, results }` payload, where `results` is the same per-target outcome array returned by `POST /v1/posts`.
+
+### `account.connected` payload
+
+Fires once per connected account after a successful OAuth exchange or direct connection. Use this to render the connected profile in your UI or kick off post-connect work.
+
+```json
+{
+  "event": "account.connected",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "br_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform": "instagram",
+    "platform_user_id": "17841405793187218",
+    "username": "acmecorp",
+    "display_name": "ACME Corp",
+    "profile_picture_url": "https://scontent.cdninstagram.com/...",
+    "bio": "Official ACME account",
+    "profile_url": "https://www.instagram.com/acmecorp/",
+    "user_email": "owner@acme.com",
+    "connected_at": "2026-05-25T14:30:00Z"
+  }
+}
+```
+
+`profile_url` is built per platform from `username` (Instagram, Threads, TikTok, X) or `platform_user_id` (Facebook, LinkedIn, YouTube, Google Business Profile). It is empty when neither is available.
 
 ## Payload format
 

@@ -1,0 +1,56 @@
+---
+title: Debugging with request IDs
+description: Use X-Request-ID to correlate API calls with server-side logs.
+---
+
+Every API response includes an `X-Request-ID` header. The same value appears in every error response body as `request_id`. Include this ID when reporting an issue to support and we can find the full server-side trace for your call in seconds.
+
+## Supplying your own ID
+
+If your application already generates correlation IDs (for tracing across your own services), send them on the `X-Request-ID` request header. The server uses your ID when it matches `^[a-zA-Z0-9_-]{1,64}$` and falls back to generating an 8-char hex ID otherwise.
+
+## Example
+
+```bash
+curl -i -H "X-Request-ID: my-trace-abc-123" https://api.social-api.ai/v1/accounts
+```
+
+The response includes `X-Request-ID: my-trace-abc-123` on success and on error.
+
+## Error response shape
+
+```json
+{
+  "error": {
+    "code": "auth.invalid_token",
+    "message": "Bearer token is invalid"
+  },
+  "request_id": "my-trace-abc-123"
+}
+```
+
+When something goes wrong, copy the `request_id` from the response body (or the `X-Request-ID` response header) and include it in your support email or message. That lets us pull the full log trace for the failing request without you having to re-run anything.
+
+## Logging request IDs in your application
+
+It is good practice to log the `X-Request-ID` from every response alongside your own trace context. Here is a minimal example in TypeScript:
+
+```typescript
+const resp = await fetch("https://api.social-api.ai/v1/accounts", {
+  headers: {
+    Authorization: `Bearer ${apiKey}`,
+    "X-Request-ID": myCorrelationId, // your own trace ID
+  },
+});
+
+const requestId = resp.headers.get("X-Request-ID");
+
+if (!resp.ok) {
+  const body = await resp.json();
+  console.error("API error", {
+    code: body.error.code,
+    message: body.error.message,
+    request_id: requestId, // same as body.request_id
+  });
+}
+```

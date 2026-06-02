@@ -1,112 +1,110 @@
 ---
-title: LinkedIn
-description: Connect and interact with LinkedIn profiles and pages via the LinkedIn API.
+title: "LinkedIn"
+description: "Connect a LinkedIn member account to publish posts as the individual."
 ---
 
-<Badge>Coming soon</Badge>
+## Overview
 
-**Coming soon.** LinkedIn Organization Page comment management and publishing is in active development via the LinkedIn Marketing Developer Platform. When it launches, [SocialAPI](https://social-api.ai) will handle the LinkedIn App and platform app review for you. No customer-side LinkedIn Developer registration will be required. See [Platform credentials](/guides/platform-credentials).
+The LinkedIn connector lets you publish posts as the **authenticated individual member** (your personal LinkedIn profile). It authenticates through LinkedIn's OAuth 2.0 flow with OpenID Connect and uses the "Share on LinkedIn" REST API.
 
-## At a glance
-
-| Field | Value |
-|---|---|
-| Platform slug | `linkedin` |
-| Auth type | OAuth 2.0 (LinkedIn) |
-| API | LinkedIn Marketing Developer Platform |
-| Best for | B2B reach: company-page posts and comment moderation on LinkedIn. |
+<Note>
+LinkedIn connects as the **individual member**, posting to that person's feed. Posting to LinkedIn organization (company) pages is not available yet.
+</Note>
 
 ## Capabilities
 
-| Feature | Supported | Notes |
-|---|---|---|
-| List posts | Coming soon | Profile and page posts |
-| Comments | Coming soon | Scoped to a specific post |
-| Reply to comment | Coming soon | |
-| Comment replies (thread) | Coming soon | |
-| Moderate comment | Coming soon | Delete only at launch; hide/unhide not supported by LinkedIn API |
-| Toggle post comments | Coming soon | |
-| DMs | No | Not supported by LinkedIn API |
-| Reviews | No | Not applicable |
-| Mentions | No | Not supported via LinkedIn API |
-| Create post | Coming soon | Text, images, articles |
-| Update post | Coming soon | Text only, media cannot be updated |
-| Delete post | Coming soon | |
+| Capability | Supported |
+| ---------- | --------- |
+| Publish posts (text, image, video, multi-image) | Yes |
+| Update post text | Yes |
+| Delete posts | Yes |
+| Read posts | No |
+| Comments | No |
+| Direct messages | No |
+| Reviews | No |
+| Mentions | No |
 
-## Connecting
+Posts only. Reading existing posts from the platform, comments, DMs, reviews, and mentions are not available for member accounts.
 
-```bash
+<Note>
+Comment management (read, reply, like, delete) and reading posts are coming soon for LinkedIn organization (company) pages, pending LinkedIn's Community Management API approval. Direct messages, reviews, and mentions are not offered by LinkedIn's API and will remain unavailable.
+</Note>
+
+## Authentication
+
+LinkedIn uses OAuth 2.0. Connect an account through the standard connect flow:
+
+1. Call the connect endpoint with `platform=linkedin`.
+2. Redirect the user to the returned `auth_url`.
+3. LinkedIn redirects back to your `redirect_uri` with a `code`.
+4. The code is exchanged for an access token automatically.
+
+### Scopes
+
+The connector requests these scopes:
+
+- `openid`, `profile` — identify the member (used to read the person's name, picture, and ID)
+- `w_member_social` — publish posts as the member
+
+### Token lifetime
+
+LinkedIn member access tokens last about 60 days and cannot be refreshed programmatically. When a token expires, the member reconnects the account to continue publishing.
+
+### Required header
+
+All API calls send `LinkedIn-Version` (currently `202605`) and use the Rest.li protocol.
+
+## Connecting an account
+
+<CodeGroup>
+
+```bash cURL
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"platform": "linkedin", "redirect_uri": "https://yourapp.com/callback"}'
+```
+
+</CodeGroup>
+
+After connecting, the response contains a single connected account: the authenticated member. That account is what you publish to.
+
+## Publishing a post
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "platform": "linkedin",
-    "metadata": {
-      "redirect_uri": "https://app.example.com/oauth/callback"
-    }
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "Hello from SocialAPI!",
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
   }'
 ```
 
-Response:
+</CodeGroup>
 
-```json
-{
-  "auth_url": "https://www.linkedin.com/oauth/v2/authorization?client_id=...&state=...",
-  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
-}
-```
+Posts publish to the member's feed. You can attach a single image, a single video, or multiple images (a carousel). Mixed image and video carousels are not supported.
 
-Redirect your user to `auth_url`. After they authorize, LinkedIn redirects to your `redirect_uri` with `?code=...&state=...`. Then call:
+## Quirks and limitations
 
-```bash
-curl -X POST https://api.social-api.ai/v1/oauth/exchange \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "platform": "linkedin",
-    "code": "AQR1234...",
-    "metadata": {
-      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
-      "redirect_uri": "https://app.example.com/oauth/callback"
-    }
-  }'
-```
+- LinkedIn connects as the individual member, not an organization page. Organization page posting is not available yet.
+- Reading a member's own posts from the platform requires elevated permissions and is not available, so listing posts returns the posts SocialAPI has stored, not a live read from LinkedIn.
+- Comments, direct messages, reviews, and mentions are not available for member accounts.
+- LinkedIn does not scrape link previews; provide your own thumbnail, title, and description for article posts.
+- The post URN is returned in a response header, not the body.
+- Member access tokens last about 60 days with no programmatic refresh; the member reconnects when the token expires.
+- LinkedIn does not provide a token revocation API; disconnecting removes the stored token on our side only.
 
-## Reading samples
+## Next steps
 
-### List posts
-
-```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-### List comments on a post
-
-```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/posts/{post_id}/comments?limit=10" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-## Publishing
-
-For the full field reference, media constraints, and error recovery, see [Publishing to LinkedIn](/posts/linkedin).
-
-## Limitations and gotchas
-
-- **Moderation**: LinkedIn only supports deleting comments. Hide and unhide actions return `501`.
-- **Post updates**: Only the text content of a post can be updated. Media attachments cannot be changed after publishing.
-- **Toggle comments**: You can enable or disable comments on posts you own.
-- **Token refresh**: LinkedIn OAuth tokens expire after 60 days. [SocialAPI](https://social-api.ai) handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
-
-## Permissions
-
-[SocialAPI](https://social-api.ai)'s managed LinkedIn Developer app already requests these scopes on your behalf: `r_liteprofile`, `rw_organization_admin`, `r_organization_social`, `w_organization_social`. You don't need to register with LinkedIn Developers. See [Platform credentials](/guides/platform-credentials).
-
-## Related
-
-- [Platform credentials](/guides/platform-credentials)
-- [OAuth flows](/guides/oauth)
-- [Publishing to LinkedIn](/posts/linkedin)
-- [Errors](/guides/errors)
-- [Interaction IDs](/guides/interaction-ids)
+<CardGroup cols={2}>
+  <Card title="Publishing posts" icon="paper-plane" href="/posts/linkedin">
+    Full reference for the LinkedIn post payload.
+  </Card>
+  <Card title="Publishing overview" icon="paper-plane" href="/posts/overview">
+    How publishing works across platforms.
+  </Card>
+</CardGroup>

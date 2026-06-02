@@ -70,19 +70,23 @@ When you exceed your monthly post or interaction allowance, the API returns HTTP
 
 ```json
 {
-  "error": "monthly post limit exceeded for your plan",
-  "code": "rate_limit_exceeded"
+  "error": {
+    "code": "billing.post_limit",
+    "message": "not enough post credits: need 1, have 0 remaining"
+  }
 }
 ```
 
-Your counters reset at the start of your next billing period. To get more capacity immediately, upgrade your plan.
+The interaction-limit response uses the same shape with `error.code` set to `billing.interaction_limit`. Your counters reset at the start of your next billing period. To get more capacity immediately, upgrade your plan.
 
 When you exceed your storage quota, the API returns HTTP `413`:
 
 ```json
 {
-  "error": "Storage quota exceeded. Free plan is limited to 100MB. Upgrade your plan for more storage.",
-  "code": "storage_quota_exceeded"
+  "error": {
+    "code": "billing.storage_quota",
+    "message": "Storage quota exceeded. Free plan is limited to 100MB. Upgrade your plan for more storage."
+  }
 }
 ```
 
@@ -148,10 +152,14 @@ Platforms (Instagram, Facebook, etc.) have their own rate limits independent of 
 
 ```json
 {
-  "error": "platform rate limit exceeded",
-  "code": "platform_rate_limit"
+  "error": {
+    "code": "platform.instagram.rate_limit",
+    "message": "platform rate limit exceeded"
+  }
 }
 ```
+
+The `instagram` segment is replaced with the actual platform name (`facebook`, `tiktok`, etc.). Match on the `platform.*.rate_limit` shape to handle all platforms.
 
 This does **not** consume your post or interaction quota. Retry after a short wait (typically a few minutes).
 

@@ -30,7 +30,7 @@ Google Business Profile (GBP) publishing uses the Google My Business API (v4) ag
 | Content type | How to trigger | Notes |
 |---|---|---|
 | Text only | No `media_ids` | Publishes a plain text local post |
-| Single image | One image URL in `media_ids` | GBP supports one image per post; additional entries are ignored |
+| Single image | One image entry in `media_ids` | GBP supports one image per post; additional entries are ignored |
 
 **Video:** Not supported. The Google My Business API does not accept video uploads for local posts.
 
@@ -42,14 +42,14 @@ Google Business Profile (GBP) publishing uses the Google My Business API (v4) ag
 
 ## 3. Create post
 
-Use `POST /v1/posts` with `account_ids` targeting a connected GBP location. The `text` field maps to the `summary` field in the GBP API.
+Use `POST /v1/posts` with `targets` targeting a connected GBP location. The `text` field maps to the `summary` field in the GBP API.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Join us this Saturday for our grand reopening. Free coffee for the first 100 visitors.",
     "platform_data": {
       "google": {
@@ -82,7 +82,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Come celebrate our 10th anniversary with us.",
     "platform_data": {
       "google": {
@@ -106,9 +106,9 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Our spring menu is now available.",
-    "media_ids": ["https://cdn.example.com/spring-menu.jpg"],
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
     "platform_data": {
       "google": {
         "topicType": "STANDARD"
@@ -227,7 +227,7 @@ The Google My Business API does not expose per-post engagement metrics (likes, c
 
 ### No scheduling
 
-The GBP local posts API publishes immediately on create. There is no scheduled or draft publish capability. If you set `schedule_at` on a post targeting a Google account, SocialAPI will create the post at the scheduled time but Google will publish it immediately at that point, not at a future time of your choosing within GBP's own UI.
+The GBP local posts API publishes immediately on create. There is no scheduled or draft publish capability. If you set `scheduled_at` on a post targeting a Google account, SocialAPI will create the post at the scheduled time but Google will publish it immediately at that point, not at a future time of your choosing within GBP's own UI.
 
 ### topicType must be set for non-standard posts
 
@@ -247,7 +247,7 @@ Google OAuth 2.0 access tokens expire after one hour. SocialAPI automatically re
 
 ### Rate limits
 
-The GBP API enforces a 300 QPM (queries per minute) quota per Google Cloud project, shared across all locations. SocialAPI applies an internal throttle at 240 QPM (80% of the limit) to leave headroom for bursts. When the throttle is active, requests return `429 Too Many Requests`. Retry after a short delay.
+The GBP API enforces a 300 QPM (queries per minute) quota on SocialAPI's managed Google Cloud project, shared across all locations. SocialAPI applies an internal throttle at 240 QPM (80% of the limit) to leave headroom for bursts. When the throttle is active, requests return `429 Too Many Requests`. Retry after a short delay.
 
 ### Error shapes
 
@@ -286,7 +286,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Get 20% off all services this week only. Use code SPRING20 at checkout.",
     "platform_data": {
       "google": {
@@ -372,12 +372,10 @@ curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
 
 ## 9. Required OAuth scopes
 
-The following Google OAuth 2.0 scope must be granted during the authorization flow:
+SocialAPI's managed Google Cloud OAuth app requests the following scope on your behalf during the authorization flow. This is informational — you do not need to configure anything.
 
 | Scope | Purpose |
 |---|---|
 | `https://www.googleapis.com/auth/business.manage` | Read and write access to all Google Business Profile locations, posts, reviews, and Q&A for the authenticated user |
 
-This single scope covers all GBP API operations (listing locations, creating and managing local posts, reading and replying to reviews, and answering Q&A questions). Google requires this scope to be enabled in your Google Cloud project's OAuth consent screen before users can complete the authorization flow.
-
-If the GBP API is not enabled in your Google Cloud project, the connector returns an `auth` error with the message `ACCESS_NOT_CONFIGURED`. Enable the "My Business API" and "Business Profile APIs" in the Google Cloud Console under APIs and Services.
+This single scope covers all GBP API operations (listing locations, creating and managing local posts, reading and replying to reviews, and answering Q&A questions).

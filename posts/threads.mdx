@@ -15,7 +15,7 @@ Threads publishing uses the Threads Graph API two-step flow: SocialAPI creates a
 | Create post | Yes |
 | Update post | No (not supported by platform) |
 | Delete post | Yes |
-| Schedule | Yes (deferred publish via `schedule_at`) |
+| Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | No |
 
 ---
@@ -39,16 +39,16 @@ SocialAPI auto-detects the media type from the URL file extension. Video detecti
 
 ## 3. Create post
 
-Use `POST /v1/posts` with `account_ids` targeting a Threads account. The `text` field becomes the post body.
+Use `POST /v1/posts` with `targets` targeting a Threads account. The `text` field becomes the post body.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Shipping updates for April. Full details on our site.",
-    "media_ids": ["https://cdn.example.com/banner.jpg"],
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
     "platform_data": {
       "threads": {
         "reply_control": "accounts_you_follow"
@@ -70,13 +70,13 @@ SocialAPI forwards any additional keys in `platform_data.threads` directly to th
 
 ### Scheduling
 
-Set `schedule_at` to an ISO 8601 timestamp (UTC) to defer publishing:
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
 
 ```json
 {
-  "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
   "text": "Big announcement coming tomorrow.",
-  "schedule_at": "2026-04-15T10:00:00Z"
+  "scheduled_at": "2026-04-15T10:00:00Z"
 }
 ```
 
@@ -216,7 +216,7 @@ Response:
 ```json
 {
   "upload_url": "https://r2.example.com/media/clip.mp4?X-Amz-Signature=...",
-  "media_id": "med_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "public_url": "https://cdn.example.com/media/clip.mp4"
 }
 ```
@@ -224,7 +224,7 @@ Response:
 Upload the file directly to the presigned URL, then verify:
 
 ```bash
-curl -X POST https://api.social-api.ai/v1/media/med_01HZ9X3Q4R5M6N7P8V2K0W1J/verify \
+curl -X POST https://api.social-api.ai/v1/media/f47ac10b-58cc-4372-a567-0e02b2c3d479/verify \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
@@ -235,9 +235,9 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Our April product update is live. Check the link in bio for full details.",
-    "media_ids": ["https://cdn.example.com/media/clip.mp4"],
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
     "platform_data": {
       "threads": {
         "reply_control": "accounts_you_follow",
@@ -301,16 +301,13 @@ Response once published:
 
 ## 9. Required OAuth scopes
 
-The following Threads app scopes must be approved for your application before publishing will work:
+SocialAPI's managed Meta Threads App requests the following scopes on your behalf during the OAuth flow. This is informational — you do not need to configure anything.
 
 | Scope | Purpose |
 |---|---|
 | `threads_basic` | Read basic account info and profile |
 | `threads_content_publish` | Create and publish media containers |
 | `threads_read_replies` | Read replies on posts |
-| `threads_manage_replies` | Hide, unhide, and delete replies |
 | `threads_delete` | Delete published posts |
 
-All five scopes are requested during the OAuth flow. If any scope is missing or not approved in your Meta App Dashboard, the corresponding API calls will return a `400` or `403` from the Threads Graph API.
-
-To verify which scopes your connected account has, call `GET /v1/accounts/:id/limits`.
+To verify which scopes your connected account has granted, call `GET /v1/accounts/:id/limits`.

@@ -8,8 +8,10 @@ Every comment, DM, review, and mention returned by the API has a stable, opaque 
 ## Format
 
 ```
-sapi_{type}_{base64url(platform:platformID)}
+sapi_{type}_{32 character payload}
 ```
+
+The 32-character payload encodes `platform:platformID` using a SocialAPI custom base-35 alphabet. It is reversible: given the ID, the API recovers the original platform and the platform's native ID without a database lookup.
 
 The prefix tells you the interaction type:
 
@@ -21,49 +23,68 @@ The prefix tells you the interaction type:
 | `sapi_mnt_` | Mention |
 
 Examples:
-- `sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1` - an Instagram comment
-- `sapi_rev_Z29vZ2xlOmNoSUpBYnVu` - a Google Review
-- `sapi_dm_aW5zdGFncmFtOnQxNzg0MQ` - an Instagram DM
+
+- `sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U` — a comment
+- `sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U` — a review
+- `sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U` — a DM
+
+The payload alphabet uses `A-Z` and `1-9` (no `0`) in a shuffled, non-standard order, so do not assume the payload is base64url or hex.
 
 ## Why this matters
 
-The type prefix lets the API dispatch correctly without a database lookup:
+The prefix lets handlers route requests without a lookup. Each inbox endpoint accepts the appropriate prefix in its path parameter:
 
-- `POST /interactions/{iid}/reply` → checks prefix: if `sapi_cmt_`, calls `ReplyToComment`; if `sapi_rev_`, calls `ReplyToReview`
-- `POST /interactions/{iid}/moderate` → only valid for `sapi_cmt_` IDs; returns 400 for others
-- `GET /interactions/{iid}/replies` → only valid for `sapi_cmt_` IDs
+- Comment routes (`POST /v1/inbox/comments/:postId`, `POST /v1/inbox/comments/:postId/:commentId/hide`, etc.) accept `sapi_cmt_` IDs in `:postId` and `:commentId`.
+- Review routes (`POST /v1/inbox/reviews/:id/reply`) accept `sapi_rev_` IDs in `:id`.
+- Conversation routes (`POST /v1/inbox/conversations/:id/messages`) accept `sapi_dm_` thread IDs in `:id`.
 
-If you pass a `sapi_rev_` ID to an endpoint that only accepts comments, you'll get a `400` error.
+If you pass an ID with the wrong prefix to a route, the call returns `400 validation.field_invalid`.
 
 ## Stability
 
-IDs are deterministic - the same platform interaction always produces the same SocialAPI ID. You can safely store IDs in your database and compare them across calls.
+IDs are deterministic. The same `(type, platform, platform_id)` tuple always produces the same SocialAPI ID, so you can safely store IDs in your own database and join against them across calls.
 
 ## Using IDs
 
-Fetch comments:
+List comments on a connected account, then reply to one using the comment's `id`:
 
 ```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/comments" \
+# 1. List commented posts for the account
+curl "https://api.social-api.ai/v1/inbox/comments" \
   -H "Authorization: Bearer $SOCAPI_KEY"
+
+# 2. Reply to a comment on a given post
+curl -X POST \
+  "https://api.social-api.ai/v1/inbox/comments/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "comment_id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U",
+    "text": "Thank you!"
+  }'
 ```
 
-Reply using the returned `id`:
+Hide a comment:
 
 ```bash
 curl -X POST \
-  "https://api.social-api.ai/v1/accounts/{id}/interactions/sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1/reply" \
+  "https://api.social-api.ai/v1/inbox/comments/{postId}/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/hide" \
   -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Thank you!"}'
+  -d '{"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
 ```
 
-Moderate using the same `id`:
+Reply to a review:
 
 ```bash
 curl -X POST \
-  "https://api.social-api.ai/v1/accounts/{id}/interactions/sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1/moderate" \
+  "https://api.social-api.ai/v1/inbox/reviews/sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/reply" \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"action": "hide"}'
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Thanks for the feedback!"
+  }'
 ```
+
+See the [Inbox guide](/guides/inbox) for the full list of routes that take interaction IDs.

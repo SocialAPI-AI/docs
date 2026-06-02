@@ -27,7 +27,7 @@ TikTok publishing uses the TikTok Content Posting API v2 (PULL\_FROM\_URL flow).
 | Single video | `platform_data.tiktok.media_type: "video"` or omit (default) | One `media_ids` entry required; MP4 recommended |
 | Photo carousel | `platform_data.tiktok.media_type: "photo"` | 2 to 35 images required; `disable_duet` and `disable_stitch` are ignored |
 
-Single images are not supported. Mixed media (video plus images) is not supported. The `media_ids` field should contain publicly accessible HTTPS URLs that TikTok will pull directly.
+Single images are not supported. Mixed media (video plus images) is not supported. The `media_ids` field takes IDs of media you upload first via the [media upload flow](/posts/instagram#1-upload-media). SocialAPI resolves each ID to a presigned HTTPS URL that TikTok pulls directly, so the underlying files must remain accessible while the post is being published.
 
 **Video duration:** The maximum video duration is per-creator and returned by the TikTok creator info endpoint. SocialAPI validates duration during `POST /v1/posts/validate` when the media item includes a `duration_seconds` field.
 
@@ -37,7 +37,7 @@ Single images are not supported. Mixed media (video plus images) is not supporte
 
 ## 3. Create post
 
-Use `POST /v1/posts` with `account_ids` targeting a TikTok account. The `text` field becomes the post title or description. `privacy_level` in `platform_data.tiktok` is optional: if omitted, SocialAPI picks a compliance-safe default from the creator's allowed options (`SELF_ONLY` when available, otherwise the first allowed option). You should still set it explicitly for production use so the audience is predictable.
+Use `POST /v1/posts` with `targets` targeting a TikTok account. The `text` field becomes the post title or description. `privacy_level` in `platform_data.tiktok` is optional: if omitted, SocialAPI picks a compliance-safe default from the creator's allowed options (`SELF_ONLY` when available, otherwise the first allowed option). You should still set it explicitly for production use so the audience is predictable.
 
 Before publishing, SocialAPI calls the TikTok creator info endpoint to validate the privacy level, check posting availability, and inherit creator-level defaults for comment, duet, and stitch settings.
 
@@ -48,9 +48,9 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "My latest video #fyp",
-    "media_ids": ["https://cdn.example.com/video.mp4"],
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
     "platform_data": {
       "tiktok": {
         "privacy_level": "PUBLIC_TO_EVERYONE",
@@ -70,12 +70,12 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Swipe through the highlights",
     "media_ids": [
-      "https://cdn.example.com/photo1.jpg",
-      "https://cdn.example.com/photo2.jpg",
-      "https://cdn.example.com/photo3.jpg"
+      "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b",
+      "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17"
     ],
     "platform_data": {
       "tiktok": {
@@ -110,9 +110,9 @@ curl -X POST https://api.social-api.ai/v1/posts/validate \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "My post caption",
-    "media_ids": ["https://cdn.example.com/video.mp4"],
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
     "platform_data": {
       "tiktok": {
         "privacy_level": "PUBLIC_TO_EVERYONE"
@@ -219,9 +219,9 @@ curl -X POST https://api.social-api.ai/v1/posts/validate \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Behind the scenes of our product shoot #bts #brand",
-    "media_ids": ["https://cdn.example.com/bts-video.mp4"],
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
     "platform_data": {
       "tiktok": {
         "privacy_level": "PUBLIC_TO_EVERYONE",
@@ -252,9 +252,9 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Behind the scenes of our product shoot #bts #brand",
-    "media_ids": ["https://cdn.example.com/bts-video.mp4"],
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
     "platform_data": {
       "tiktok": {
         "privacy_level": "PUBLIC_TO_EVERYONE",
@@ -303,6 +303,7 @@ curl -X POST https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J/re
 | Scope | Purpose |
 |---|---|
 | `user.info.basic` | Read account profile (open ID, username, display name, avatar) |
+| `user.info.profile` | Read additional profile fields (e.g. bio, follower counts) |
 | `video.publish` | Publish videos and photo carousels via PULL\_FROM\_URL |
 | `video.upload` | Upload video files directly (used for file-based publish flows) |
 
