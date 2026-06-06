@@ -1161,6 +1161,63 @@
                 }
             }
         },
+        "/feedback": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submit feedback (bug report, feature request, or general comment). Stored for the team and forwarded to their notification channel.",
+                "tags": [
+                    "Feedback"
+                ],
+                "summary": "Send feedback",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.SendFeedbackRequest"
+                            }
+                        }
+                    },
+                    "description": "Feedback type and message",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Feedback received",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.OKResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid type or empty message",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/inbox/comments": {
             "get": {
                 "security": [
@@ -8177,6 +8234,21 @@
                     },
                     "meta": {
                         "$ref": "#/components/schemas/social-api_ai_core_api_service.FanOutMeta"
+                    }
+                }
+            },
+            "api_endpoints.SendFeedbackRequest": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "description": "Message is the feedback content.",
+                        "type": "string",
+                        "example": "It would be great to have a dark mode."
+                    },
+                    "type": {
+                        "description": "Type is one of: bug, feature_request, general.",
+                        "type": "string",
+                        "example": "feature_request"
                     }
                 }
             },
