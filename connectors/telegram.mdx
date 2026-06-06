@@ -1,0 +1,107 @@
+---
+title: Telegram
+description: Connect a Telegram bot to read and reply to direct messages through SocialAPI.
+---
+
+<Badge>Available</Badge>
+
+**Messaging connector.** Telegram is a DM-only connector: you connect a bot with a static token from @BotFather and use SocialAPI's unified inbox to read and reply to the direct messages the bot receives. There is no OAuth, no posts, and no comments.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `telegram` |
+| Auth type | Static bot token (from @BotFather) |
+| API | Telegram Bot API |
+| Best for | A unified inbox for your Telegram bot's direct messages. |
+
+## Capabilities
+
+| Feature | Supported | Notes |
+|---|---|---|
+| DMs | Yes | Read direct messages your bot receives and reply to them |
+| Send DM | Yes | Send text, a photo (by URL), or a document (by URL) |
+| Comments | No | Telegram bots have no post-comment model |
+| Reviews | No | Not applicable |
+| Mentions | No | Not tracked for Telegram |
+| Publishing | No | Telegram is a messaging connector here; it does not publish posts |
+| Webhooks | Yes | Inbound messages arrive in real time via Telegram webhooks |
+
+## Connecting
+
+Telegram does not use OAuth. There is no authorization URL, no `code` exchange, no refresh token, and no token expiry. You create a bot with @BotFather, copy its token, and pass it in `metadata.bot_token`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "telegram",
+    "metadata": { "bot_token": "123456789:ABCdefGhIjKlMnOpQrStUvWxYz-1234" }
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "telegram",
+  "username": "mysocialinboxbot",
+  "display_name": "My Social Inbox Bot"
+}
+```
+
+SocialAPI validates the token, registers a Telegram webhook for your bot automatically, and stores the account. No redirect, no second call.
+
+### Getting a bot token
+
+1. Open Telegram and message [@BotFather](https://t.me/BotFather).
+2. Send `/newbot` and follow the prompts (choose a name and a username ending in `bot`).
+3. BotFather replies with a token of the form `<bot_id>:<secret>`.
+4. Paste that token as `metadata.bot_token`.
+
+The whole process takes about two minutes. There is no developer account, business verification, or app review.
+
+## Reading and sending DMs
+
+Telegram has no message-history API: a bot only sees messages that arrive after it is connected. SocialAPI builds the inbox from inbound webhook events from connect time onward.
+
+### List DM conversations
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id={id}" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+### Send a DM
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "text": "Thanks for reaching out!" }'
+```
+
+## Limitations and gotchas
+
+- **The bot cannot start a conversation.** Telegram forbids a bot from messaging a user who has never messaged it. Sending to such a user returns `telegram.cannot_message` (HTTP 403). The user must send `/start` or any message to the bot first. There is no 24-hour window once started.
+- **No message history backfill.** There is no list or history endpoint in the Bot API. The inbox is populated only by webhooks received after you connect.
+- **DM-only.** Posts, channels, and comments are not supported through this connector.
+- **No token expiry.** A bot token never expires. It is revoked only via @BotFather (`/revoke`). If a token is revoked, reconnect with a fresh token.
+
+## Errors
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 403 | `telegram.cannot_message` | The bot cannot message this chat: the user has not started the bot, or blocked or removed it |
+
+See [Errors](/guides/errors) for the full catalog.
+
+## Related
+
+- [Platform support](/guides/platforms)
+- [Platform credentials](/guides/platform-credentials)
+- [Inbox](/guides/inbox)
+- [Errors](/guides/errors)
