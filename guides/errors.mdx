@@ -36,6 +36,7 @@ The first segment of the code tells you where the failure originated.
 | `byok.*` | Bring-your-own-key credentials (Twitter app, etc.) |
 | `publishing.delivery.*` | A platform delivery worker failed mid-publish |
 | `whatsapp.*` | WhatsApp Cloud API specific failures (window, frequency, template state) |
+| `telegram.*` | Telegram Bot API specific failures (e.g. the bot cannot message a user who has not started it) |
 | `system.internal` | Unexpected server error; safe to retry idempotent requests |
 
 ## Authentication
@@ -162,6 +163,12 @@ WhatsApp Cloud API has a richer error surface than other platforms because of it
 | 409 | `whatsapp.template_paused` | Template is paused due to quality drop |
 | 404 | `whatsapp.no_account`, `whatsapp.no_waba_found`, `whatsapp.no_business_found`, `whatsapp.no_phone_number_found` | Onboarding chain has not produced this resource yet |
 | 500 | `whatsapp.unknown` | Unmapped WhatsApp error; check the message for raw detail |
+
+## Telegram
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 403 | `telegram.cannot_message` | The bot cannot message this chat. The user must start the bot first, or the bot was blocked or removed. There is no 24-hour window once started. |
 
 ## System
 
