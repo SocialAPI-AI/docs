@@ -176,6 +176,63 @@
                 }
             }
         },
+        "/accounts/{id}/boards": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the boards for a connected Pinterest account, for choosing a publish destination.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "List Pinterest boards",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PinterestBoardsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/accounts/{id}/creator-info": {
             "get": {
                 "security": [
@@ -1645,7 +1702,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, and Threads. Check the can_hide capability flag.",
+                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, Threads, and YouTube. Check the can_hide capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -1747,7 +1804,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, and Threads.",
+                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, Threads, and YouTube.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -6061,6 +6118,301 @@
                 }
             }
         },
+        "/v1/platforms/youtube/accounts/{id}/summary": {
+            "get": {
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Get YouTube channel summary",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.YouTubeChannelSummaryResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platforms/youtube/accounts/{id}/sync": {
+            "post": {
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Re-sync a YouTube account's videos",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platforms/youtube/accounts/{id}/videos/{videoId}": {
+            "patch": {
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Edit a published YouTube video",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YouTube video ID",
+                        "name": "videoId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.UpdateYouTubeVideoRequest"
+                            }
+                        }
+                    },
+                    "description": "Editable fields",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platforms/youtube/comments/{commentId}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Edits the text of one of the connected account's own YouTube comments via comments.update. Only the comment author (the connected account) can edit. YouTube only.",
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Edit a YouTube comment",
+                "parameters": [
+                    {
+                        "description": "YouTube comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.EditYouTubeCommentRequest"
+                            }
+                        }
+                    },
+                    "description": "New comment text (post_id is required and is also used to keep the local inbox cache in sync)",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Comment edited",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Account is not a YouTube account, or the connector does not support editing comments",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platforms/youtube/comments/{commentId}/moderate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets the moderation status of a YouTube comment (published, held_for_review, or rejected), optionally banning the author. ban_author is only valid with status=rejected. YouTube only.",
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Moderate a YouTube comment",
+                "parameters": [
+                    {
+                        "description": "YouTube comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.ModerateYouTubeCommentRequest"
+                            }
+                        }
+                    },
+                    "description": "Moderation action (post_id is required and is also used to keep the local inbox cache in sync)",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Comment moderated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Account is not a YouTube account, or the connector does not support comment moderation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/webhooks": {
             "get": {
                 "security": [
@@ -7314,6 +7666,20 @@
                     }
                 }
             },
+            "api_endpoints.EditYouTubeCommentRequest": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    },
+                    "post_id": {
+                        "type": "string"
+                    },
+                    "text": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.ErrorBody": {
                 "type": "object",
                 "properties": {
@@ -7882,6 +8248,23 @@
                     }
                 }
             },
+            "api_endpoints.ModerateYouTubeCommentRequest": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    },
+                    "ban_author": {
+                        "type": "boolean"
+                    },
+                    "post_id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.OKResponse": {
                 "type": "object",
                 "properties": {
@@ -7931,6 +8314,31 @@
                     "use_case": {
                         "type": "string",
                         "example": "Managing my own brand's social accounts"
+                    }
+                }
+            },
+            "api_endpoints.PinterestBoardItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "privacy": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.PinterestBoardsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PinterestBoardItem"
+                        }
                     }
                 }
             },
@@ -8101,6 +8509,10 @@
                     "metrics_synced_at": {
                         "type": "string",
                         "example": "2026-04-01T12:00:00Z"
+                    },
+                    "page_id": {
+                        "type": "string",
+                        "example": "sapi_page_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "permalink": {
                         "type": "string",
@@ -8618,6 +9030,21 @@
                         "description": "URL changes the webhook delivery endpoint. Must be HTTPS.",
                         "type": "string",
                         "example": "https://example.com/webhooks/socialapi"
+                    }
+                }
+            },
+            "api_endpoints.UpdateYouTubeVideoRequest": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "visibility": {
+                        "description": "public | unlisted | private",
+                        "type": "string"
                     }
                 }
             },
@@ -9379,6 +9806,29 @@
                         "description": "Code is the 6-digit verification code received via SMS or voice.",
                         "type": "string",
                         "example": "123456"
+                    }
+                }
+            },
+            "api_endpoints.YouTubeChannelSummaryResponse": {
+                "type": "object",
+                "properties": {
+                    "handle": {
+                        "type": "string"
+                    },
+                    "subscriber_count": {
+                        "type": "integer"
+                    },
+                    "thumbnail_url": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "video_count": {
+                        "type": "integer"
+                    },
+                    "view_count": {
+                        "type": "integer"
                     }
                 }
             },
