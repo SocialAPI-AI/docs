@@ -106,8 +106,26 @@ A message can carry text, an attachment, or both. Provide `text`, `attachment_ur
 | `account_id` | Yes | Connected account that owns the conversation |
 | `text` | Conditional | Message body. Required unless `attachment_url` is set |
 | `attachment_url` | Conditional | Publicly reachable URL of a media file to attach. Required unless `text` is set |
+| `message_tag` | No | Meta message tag to send outside the standard 24-hour window. Instagram and Facebook only. See below |
 
 On Facebook and Instagram, `attachment_url` is delivered as a Messenger attachment. The attachment type (image, video, audio, or file) is inferred from the URL file extension, so use a direct media link with the correct extension (for example `.jpg`, `.mp4`, `.mp3`). URLs without a recognized media extension are sent as a generic file. The media must be hosted on a publicly reachable URL (max 25 MB); the platform fetches it directly.
+
+### Messaging window and message tags
+
+By default, Instagram and Facebook only let you send a DM within 24 hours of the user's last message. To reply later, set `message_tag` so the message is sent with a Meta message tag instead of a standard response.
+
+- Instagram accepts only `HUMAN_AGENT`, which extends the window to 7 days.
+- Facebook accepts `HUMAN_AGENT`, `ACCOUNT_UPDATE`, `CONFIRMED_EVENT_UPDATE`, `CUSTOMER_FEEDBACK`, and `POST_PURCHASE_UPDATE`.
+
+Sending `HUMAN_AGENT` requires your Meta app to hold the "Human Agent" advanced access, and asserts that a human (not a bot) is replying. An unsupported value returns `400 validation.invalid_message_tag`. The field is ignored on non-Meta platforms.
+
+```bash
+# Reply with the HUMAN_AGENT tag (up to 7 days after the user's last message)
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_abc123", "text": "Following up on your question", "message_tag": "HUMAN_AGENT" }'
+```
 
 ### Example: list conversations and send a message
 
