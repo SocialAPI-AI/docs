@@ -1282,7 +1282,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns inbox posts that have comments, ordered by most-recently-commented. Supports filtering by account, platform, minimum comment count, and date range. Uses cursor-based pagination.",
+                "description": "Returns inbox posts that have comments, ordered by most-recently-commented. Supports filtering by account, platform, minimum comment count, and date range. Uses cursor-based pagination. YouTube has no webhooks, so YouTube commented posts are served live from the platform and only appear when the request is scoped with account_id (they are absent from the unfiltered aggregate); the live YouTube list returns a single page (no cursor).",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -1401,7 +1401,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns comments for a specific inbox post, including per-platform capability flags (can_reply, can_delete, can_hide, can_like, can_private_reply). Uses cursor-based pagination.",
+                "description": "Returns comments for a specific inbox post, including per-platform capability flags (can_reply, can_delete, can_hide, can_like, can_private_reply). Comments are fetched live from the platform on every request. Uses cursor-based pagination.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -1439,6 +1439,33 @@
                     {
                         "description": "Pagination cursor from previous response",
                         "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "held_for_review",
+                        "description": "Filter by moderation status: published (default), held_for_review, likely_spam. YouTube only; ignored by other platforms.",
+                        "name": "moderation_status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "relevance",
+                        "description": "Order: recent (default) or relevance. YouTube only; ignored by other platforms.",
+                        "name": "order",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "great video",
+                        "description": "Keyword search across comment text (max 256 chars). YouTube only; ignored by other platforms.",
+                        "name": "q",
                         "in": "query",
                         "schema": {
                             "type": "string"
@@ -6268,7 +6295,7 @@
                             }
                         }
                     },
-                    "description": "New comment text (post_id is required and is also used to keep the local inbox cache in sync)",
+                    "description": "New comment text (post_id is required to resolve the channel that owns the comment)",
                     "required": true
                 },
                 "responses": {
@@ -6356,7 +6383,7 @@
                             }
                         }
                     },
-                    "description": "Moderation action (post_id is required and is also used to keep the local inbox cache in sync)",
+                    "description": "Moderation action (post_id is required to resolve the channel that owns the comment)",
                     "required": true
                 },
                 "responses": {
@@ -7190,6 +7217,10 @@
                     },
                     "like_count": {
                         "type": "integer"
+                    },
+                    "moderation_status": {
+                        "description": "ModerationStatus is the platform's moderation state for this comment, when\nexposed: \"published\", \"held_for_review\", \"likely_spam\", or \"rejected\".\nEmpty when unknown or not applicable. [platform: youtube]",
+                        "type": "string"
                     },
                     "parent_id": {
                         "type": "string"
