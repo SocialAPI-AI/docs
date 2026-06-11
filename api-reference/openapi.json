@@ -7329,7 +7329,7 @@
                         "example": "instagram"
                     },
                     "redirect_uri": {
-                        "description": "RedirectURI is the customer's URL to redirect the user to after OAuth completes.\nMust be pre-registered in the dashboard whitelist. If omitted, the default HTML success page is shown.",
+                        "description": "RedirectURI is the customer's URL to redirect the user to after OAuth completes.\nIf you have registered redirect URIs in the dashboard, the value must match one of them.\nIf you have none registered, any valid https URI is accepted. If omitted, the default HTML success page is shown.",
                         "type": "string",
                         "example": "https://app.acme.com/oauth/done"
                     },
@@ -7453,6 +7453,13 @@
                         "description": "ScheduledAt queues the post for future publication. Omit to publish immediately or create a draft.",
                         "type": "string",
                         "example": "2026-04-01T10:00:00Z"
+                    },
+                    "segments": {
+                        "description": "Segments are continuation posts that publish as a native thread on X and Threads.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
+                        }
                     },
                     "skip_duplicate_check": {
                         "description": "SkipDuplicateCheck bypasses the duplicate content detection.",
@@ -8680,6 +8687,23 @@
                     }
                 }
             },
+            "api_endpoints.SegmentRequest": {
+                "type": "object",
+                "properties": {
+                    "media_ids": {
+                        "description": "MediaIDs attach media to this segment (Threads only; ignored by X).",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "text": {
+                        "description": "Text is the post body for this segment. Required.",
+                        "type": "string",
+                        "example": "And here's the second post in the thread."
+                    }
+                }
+            },
             "api_endpoints.SendFeedbackRequest": {
                 "type": "object",
                 "properties": {
@@ -8708,6 +8732,11 @@
                     "attachment_url": {
                         "type": "string",
                         "example": "https://cdn.example.com/photo.jpg"
+                    },
+                    "message_tag": {
+                        "description": "MessageTag attaches a Meta message tag so the DM can be sent outside the\nstandard 24-hour window. Instagram/Facebook only. Instagram accepts only\nHUMAN_AGENT; Facebook also accepts ACCOUNT_UPDATE, CONFIRMED_EVENT_UPDATE,\nCUSTOMER_FEEDBACK, POST_PURCHASE_UPDATE. Requires Meta \"Human Agent\"\nadvanced access for HUMAN_AGENT. Ignored by non-Meta platforms.",
+                        "type": "string",
+                        "example": "HUMAN_AGENT"
                     },
                     "text": {
                         "type": "string",
@@ -8991,6 +9020,13 @@
                         "type": "string",
                         "example": "2026-04-02T14:00:00Z"
                     },
+                    "segments": {
+                        "description": "Segments are continuation posts that publish as a native thread on X and Threads.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
+                        }
+                    },
                     "targets": {
                         "description": "Targets replaces or updates per-platform target configuration.",
                         "type": "array",
@@ -9190,6 +9226,13 @@
                         "type": "string",
                         "example": "2026-04-01T10:00:00Z"
                     },
+                    "segments": {
+                        "description": "Segments are continuation posts that publish as a native thread on X and Threads.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
+                        }
+                    },
                     "targets": {
                         "description": "Targets validates per-target overrides if provided.",
                         "type": "array",
@@ -9238,6 +9281,11 @@
                     "platform": {
                         "type": "string",
                         "example": "instagram"
+                    },
+                    "segment_index": {
+                        "description": "SegmentIndex pins the issue to a continuation segment (0-based); nil for the main post.",
+                        "type": "integer",
+                        "example": 0
                     },
                     "target": {
                         "type": "string",
