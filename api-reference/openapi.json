@@ -5338,7 +5338,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Publishes to one or more connected accounts. If scheduled_at is omitted the post is\npublished immediately (synchronous - blocks until all accounts respond). If scheduled_at\nis set the post is queued for future publication (asynchronous). Omit account_ids and\nscheduled_at to create a draft. Consumes 1 post credit.",
+                "description": "Creates a post for one or more connected accounts. Set `publish_now: true` to publish\nimmediately (synchronous - blocks until all accounts respond). Set `scheduled_at` to queue\nthe post for future publication (asynchronous). With neither flag the post is saved as a\ndraft (this is the default, even when targets are provided); publish it later with\nPOST /posts/{pid}/publish. Consumes 1 post credit when the post is published or\nscheduled; saving a draft is free.",
                 "tags": [
                     "Posts"
                 ],
@@ -5820,6 +5820,103 @@
                 }
             }
         },
+        "/posts/{pid}/publish": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Publishes a post in `draft` or `scheduled` status immediately and synchronously\n(blocks until all accounts respond). Use this to publish a post that was saved as a\ndraft, or to publish a scheduled post ahead of its time. Consumes 1 post credit.",
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Publish a draft post now",
+                "parameters": [
+                    {
+                        "description": "Post ID",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "All accounts published",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "207": {
+                        "description": "Some accounts published, some failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Post is not in a publishable state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "publishing.delivery.all_failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Monthly post limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/posts/{pid}/retry": {
             "post": {
                 "security": [
@@ -6138,6 +6235,37 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platforms/linkedin/insights": {
+            "get": {
+                "tags": [
+                    "LinkedIn"
+                ],
+                "summary": "Get LinkedIn page insights",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.LinkedInInsightsResponse"
                                 }
                             }
                         }
@@ -7188,6 +7316,9 @@
             "api_endpoints.CommentWithCapabilities": {
                 "type": "object",
                 "properties": {
+                    "author_headline": {
+                        "type": "string"
+                    },
                     "author_id": {
                         "type": "string"
                     },
@@ -7195,6 +7326,9 @@
                         "type": "string"
                     },
                     "author_picture": {
+                        "type": "string"
+                    },
+                    "author_profile_url": {
                         "type": "string"
                     },
                     "author_username": {
@@ -7329,7 +7463,7 @@
                         "example": "instagram"
                     },
                     "redirect_uri": {
-                        "description": "RedirectURI is the customer's URL to redirect the user to after OAuth completes.\nMust be pre-registered in the dashboard whitelist. If omitted, the default HTML success page is shown.",
+                        "description": "RedirectURI is the customer's URL to redirect the user to after OAuth completes.\nIf you have registered redirect URIs in the dashboard, the value must match one of them.\nIf you have none registered, any valid https URI is accepted. If omitted, the default HTML success page is shown.",
                         "type": "string",
                         "example": "https://app.acme.com/oauth/done"
                     },
@@ -7445,17 +7579,29 @@
                         }
                     },
                     "publish_now": {
-                        "description": "PublishNow immediately publishes if targets are provided (ignores scheduled_at).",
+                        "description": "PublishNow publishes immediately when targets are provided (ignores scheduled_at). Without this flag (and without scheduled_at) the post is saved as a draft; publish it later with POST /posts/{pid}/publish.",
                         "type": "boolean",
                         "example": false
                     },
                     "scheduled_at": {
-                        "description": "ScheduledAt queues the post for future publication. Omit to publish immediately or create a draft.",
+                        "description": "ScheduledAt queues the post for future publication (RFC3339). When set, the post is scheduled rather than drafted.",
                         "type": "string",
                         "example": "2026-04-01T10:00:00Z"
                     },
+                    "segments": {
+                        "description": "Segments are continuation posts that publish as a native thread on X and Threads.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
+                        }
+                    },
                     "skip_duplicate_check": {
                         "description": "SkipDuplicateCheck bypasses the duplicate content detection.",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "skip_validation": {
+                        "description": "SkipValidation bypasses pre-publish validation. The post is scheduled/published as-is and may fail at the platform.",
                         "type": "boolean",
                         "example": false
                     },
@@ -7531,7 +7677,8 @@
                                 "review.received",
                                 "mention.received",
                                 "account.connected",
-                                "account.disconnected"
+                                "account.disconnected",
+                                "page.removed"
                             ]
                         },
                         "example": [
@@ -8138,6 +8285,14 @@
                     }
                 }
             },
+            "api_endpoints.LinkedInInsightsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PageInsights"
+                    }
+                }
+            },
             "api_endpoints.ListWebhookEventsResponse": {
                 "type": "object",
                 "properties": {
@@ -8680,6 +8835,23 @@
                     }
                 }
             },
+            "api_endpoints.SegmentRequest": {
+                "type": "object",
+                "properties": {
+                    "media_ids": {
+                        "description": "MediaIDs attach media to this segment (Threads only; ignored by X).",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "text": {
+                        "description": "Text is the post body for this segment. Required.",
+                        "type": "string",
+                        "example": "And here's the second post in the thread."
+                    }
+                }
+            },
             "api_endpoints.SendFeedbackRequest": {
                 "type": "object",
                 "properties": {
@@ -8996,6 +9168,18 @@
                         "type": "string",
                         "example": "2026-04-02T14:00:00Z"
                     },
+                    "segments": {
+                        "description": "Segments are continuation posts that publish as a native thread on X and Threads.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
+                        }
+                    },
+                    "skip_validation": {
+                        "description": "SkipValidation bypasses pre-publish validation. The post is scheduled/published as-is and may fail at the platform.",
+                        "type": "boolean",
+                        "example": false
+                    },
                     "targets": {
                         "description": "Targets replaces or updates per-platform target configuration.",
                         "type": "array",
@@ -9053,7 +9237,8 @@
                                 "review.received",
                                 "mention.received",
                                 "account.connected",
-                                "account.disconnected"
+                                "account.disconnected",
+                                "page.removed"
                             ]
                         }
                     },
@@ -9195,6 +9380,13 @@
                         "type": "string",
                         "example": "2026-04-01T10:00:00Z"
                     },
+                    "segments": {
+                        "description": "Segments are continuation posts that publish as a native thread on X and Threads.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
+                        }
+                    },
                     "targets": {
                         "description": "Targets validates per-target overrides if provided.",
                         "type": "array",
@@ -9243,6 +9435,11 @@
                     "platform": {
                         "type": "string",
                         "example": "instagram"
+                    },
+                    "segment_index": {
+                        "description": "SegmentIndex pins the issue to a continuation segment (0-based); nil for the main post.",
+                        "type": "integer",
+                        "example": 0
                     },
                     "target": {
                         "type": "string",
@@ -10059,6 +10256,49 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.PageInsights": {
+                "type": "object",
+                "properties": {
+                    "follower_count": {
+                        "type": "integer"
+                    },
+                    "posts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostInsight"
+                        }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.PostInsight": {
+                "type": "object",
+                "properties": {
+                    "clicks": {
+                        "type": "integer"
+                    },
+                    "comments": {
+                        "type": "integer"
+                    },
+                    "engagement_rate": {
+                        "type": "number"
+                    },
+                    "impressions": {
+                        "type": "integer"
+                    },
+                    "likes": {
+                        "type": "integer"
+                    },
+                    "post_id": {
+                        "type": "string"
+                    },
+                    "shares": {
+                        "type": "integer"
+                    },
+                    "unique_views": {
+                        "type": "integer"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_whatsapp.PhoneNumberStatusResponse": {
                 "type": "object",
                 "properties": {
@@ -10448,6 +10688,10 @@
                     },
                     "max_mentions": {
                         "description": "0 = no limit",
+                        "type": "integer"
+                    },
+                    "photo_max_length": {
+                        "description": "platform-specific stricter cap for photo-mode captions (e.g. TikTok); 0 = use MaxLength",
                         "type": "integer"
                     }
                 }
