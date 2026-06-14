@@ -68,7 +68,8 @@ Events are grouped into three categories: **inbox** (incoming interactions), **p
 | `post.unpublished` | posts | A published post was removed from one or more platforms (the post row stays unless every target is unpublished) |
 | `post.retried` | posts | A failed or partial post is being retried. A subsequent `post.published`, `post.partial`, or `post.failed` event fires once the retry completes |
 | `account.connected` | accounts | A social account finished connecting. Payload includes username, display name, profile picture, bio, and a public profile link |
-| `account.disconnected` | accounts | A connected account was revoked by the user on the platform side (Meta deauthorize webhook, TikTok deauthorize webhook) |
+| `account.disconnected` | accounts | A connected account was revoked by the user on the platform side (Meta deauthorize webhook, TikTok deauthorize webhook), or flagged for reconnection because all of its pages were removed or its access was revoked. When the payload includes `reconnect_required: true`, the account still exists but needs to be reconnected |
+| `page.removed` | accounts | A page on a multi-page account (for example a Facebook Page) was detected as removed during a periodic refresh and was deactivated. Other pages on the same account are unaffected |
 
 You can subscribe to any combination. Fetch the authoritative list with `GET /v1/webhooks/events` and subscribe to everything by passing the full set.
 
@@ -165,6 +166,39 @@ Fires once per connected account after a successful OAuth exchange or direct con
 ```
 
 `profile_url` is built per platform from `username` (Instagram, Threads, TikTok, X) or `platform_user_id` (Facebook, LinkedIn, YouTube, Google Business Profile). It is empty when neither is available.
+
+### `page.removed` payload
+
+Fires when a single page on a multi-page account (for example a Facebook Page) is detected as removed during a periodic refresh. The page is deactivated and stops appearing in page listings. Other pages on the same account stay active.
+
+```json
+{
+  "event": "page.removed",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform_page_id": "102938475610293",
+    "name": "ACME Storefront",
+    "platform": "facebook",
+    "reason": "page_not_found"
+  }
+}
+```
+
+### `account.disconnected` payload
+
+Fires in two cases. A platform-side revocation (the user removes the app) carries no `reconnect_required` flag and the account is deleted. A reconnection prompt carries `reconnect_required: true`: the account row still exists but its status is set so that calls signal it needs reconnecting. The `reason` is `all_pages_removed` (the last remaining page was removed) or `access_revoked` (the account token or permissions were revoked, which fails every page at once).
+
+```json
+{
+  "event": "account.disconnected",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform": "facebook",
+    "reason": "all_pages_removed",
+    "reconnect_required": true
+  }
+}
+```
 
 ## Payload format
 
