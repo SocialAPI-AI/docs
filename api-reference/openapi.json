@@ -7883,16 +7883,23 @@
             "api_endpoints.DMAttachmentInput": {
                 "type": "object",
                 "properties": {
-                    "attachment_id": {
-                        "type": "string",
-                        "example": "1234567890"
-                    },
-                    "media_id": {
-                        "description": "MediaID references a file in your SocialAPI media library (GET /v1/media).\nThe server resolves it to a presigned S3 URL before sending, so you can\nattach stored media without exposing a public URL yourself.",
+                    "source": {
+                        "description": "Source is the attachment reference; its meaning is given by source_type.",
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
+                    "source_type": {
+                        "description": "SourceType selects how Source is interpreted:\n  - \"url\": Source is a publicly reachable media URL the platform fetches directly.\n  - \"media_id\": Source is a file id in your SocialAPI media library\n    (GET /v1/media); the server resolves it to a temporary URL before sending.\n  - \"platform_attachment_id\": Source is an id of media already uploaded to the\n    target platform (for example a Meta attachment_id) to reuse without re-upload.",
+                        "type": "string",
+                        "enum": [
+                            "url",
+                            "media_id",
+                            "platform_attachment_id"
+                        ],
+                        "example": "media_id"
+                    },
                     "type": {
+                        "description": "Type is the media kind. Optional for url and media_id sources (inferred from\nthe file), required for platform_attachment_id (the platform exposes no URL\nto infer from).",
                         "type": "string",
                         "enum": [
                             "image",
@@ -7901,10 +7908,6 @@
                             "file"
                         ],
                         "example": "image"
-                    },
-                    "url": {
-                        "type": "string",
-                        "example": "https://cdn.example.com/photo.jpg"
                     }
                 }
             },
