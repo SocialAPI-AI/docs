@@ -5338,7 +5338,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a post for one or more connected accounts. Set `publish_now: true` to publish\nimmediately (synchronous - blocks until all accounts respond). Set `scheduled_at` to queue\nthe post for future publication (asynchronous). With neither flag the post is saved as a\ndraft (this is the default, even when targets are provided); publish it later with\nPOST /posts/{pid}/publish. Consumes 1 post credit when the post is published or\nscheduled; saving a draft is free.",
+                "description": "Publishes to one or more connected accounts. If scheduled_at is omitted the post is\npublished immediately (synchronous - blocks until all accounts respond). If scheduled_at\nis set the post is queued for future publication (asynchronous). Omit account_ids and\nscheduled_at to create a draft. Consumes 1 post credit.",
                 "tags": [
                     "Posts"
                 ],
@@ -5820,103 +5820,6 @@
                 }
             }
         },
-        "/posts/{pid}/publish": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Publishes a post in `draft` or `scheduled` status immediately and synchronously\n(blocks until all accounts respond). Use this to publish a post that was saved as a\ndraft, or to publish a scheduled post ahead of its time. Consumes 1 post credit.",
-                "tags": [
-                    "Posts"
-                ],
-                "summary": "Publish a draft post now",
-                "parameters": [
-                    {
-                        "description": "Post ID",
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "All accounts published",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
-                                }
-                            }
-                        }
-                    },
-                    "207": {
-                        "description": "Some accounts published, some failed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Post is not in a publishable state",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Post not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "publishing.delivery.all_failed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.PostResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Monthly post limit exceeded",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/posts/{pid}/retry": {
             "post": {
                 "security": [
@@ -6235,37 +6138,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platforms/linkedin/insights": {
-            "get": {
-                "tags": [
-                    "LinkedIn"
-                ],
-                "summary": "Get LinkedIn page insights",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "account_id",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.LinkedInInsightsResponse"
                                 }
                             }
                         }
@@ -7316,9 +7188,6 @@
             "api_endpoints.CommentWithCapabilities": {
                 "type": "object",
                 "properties": {
-                    "author_headline": {
-                        "type": "string"
-                    },
                     "author_id": {
                         "type": "string"
                     },
@@ -7326,9 +7195,6 @@
                         "type": "string"
                     },
                     "author_picture": {
-                        "type": "string"
-                    },
-                    "author_profile_url": {
                         "type": "string"
                     },
                     "author_username": {
@@ -7579,12 +7445,12 @@
                         }
                     },
                     "publish_now": {
-                        "description": "PublishNow publishes immediately when targets are provided (ignores scheduled_at). Without this flag (and without scheduled_at) the post is saved as a draft; publish it later with POST /posts/{pid}/publish.",
+                        "description": "PublishNow immediately publishes if targets are provided (ignores scheduled_at).",
                         "type": "boolean",
                         "example": false
                     },
                     "scheduled_at": {
-                        "description": "ScheduledAt queues the post for future publication (RFC3339). When set, the post is scheduled rather than drafted.",
+                        "description": "ScheduledAt queues the post for future publication. Omit to publish immediately or create a draft.",
                         "type": "string",
                         "example": "2026-04-01T10:00:00Z"
                     },
@@ -7597,11 +7463,6 @@
                     },
                     "skip_duplicate_check": {
                         "description": "SkipDuplicateCheck bypasses the duplicate content detection.",
-                        "type": "boolean",
-                        "example": false
-                    },
-                    "skip_validation": {
-                        "description": "SkipValidation bypasses pre-publish validation. The post is scheduled/published as-is and may fail at the platform.",
                         "type": "boolean",
                         "example": false
                     },
@@ -8282,14 +8143,6 @@
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.KeyListItem"
                         }
-                    }
-                }
-            },
-            "api_endpoints.LinkedInInsightsResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PageInsights"
                     }
                 }
             },
@@ -9174,11 +9027,6 @@
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
                         }
-                    },
-                    "skip_validation": {
-                        "description": "SkipValidation bypasses pre-publish validation. The post is scheduled/published as-is and may fail at the platform.",
-                        "type": "boolean",
-                        "example": false
                     },
                     "targets": {
                         "description": "Targets replaces or updates per-platform target configuration.",
@@ -10253,58 +10101,6 @@
                     "url": {
                         "type": "string",
                         "example": "https://cdn.example.com/photo.jpg"
-                    }
-                }
-            },
-            "social-api_ai_core_api_connectors_base.PageInsights": {
-                "type": "object",
-                "properties": {
-                    "follower_count": {
-                        "type": "integer"
-                    },
-                    "posts": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostInsight"
-                        }
-                    }
-                }
-            },
-            "social-api_ai_core_api_connectors_base.PostInsight": {
-                "type": "object",
-                "properties": {
-                    "clicks": {
-                        "type": "integer"
-                    },
-                    "comments": {
-                        "type": "integer"
-                    },
-                    "created_at": {
-                        "type": "string"
-                    },
-                    "engagement_rate": {
-                        "type": "number"
-                    },
-                    "impressions": {
-                        "type": "integer"
-                    },
-                    "likes": {
-                        "type": "integer"
-                    },
-                    "permalink": {
-                        "type": "string"
-                    },
-                    "post_id": {
-                        "type": "string"
-                    },
-                    "shares": {
-                        "type": "integer"
-                    },
-                    "text": {
-                        "type": "string"
-                    },
-                    "unique_views": {
-                        "type": "integer"
                     }
                 }
             },

@@ -34,7 +34,7 @@ Fields:
 | Field | Location | Required | Notes |
 |---|---|---|---|
 | `platform` | top-level | yes | Platform slug (`instagram`, `facebook`, `threads`, `tiktok`, `linkedin`, `twitter`, `youtube`, `google`). |
-| `redirect_uri` | top-level | recommended | Your post-connection callback. Must be pre-registered (see [Whitelisting redirect URIs](#whitelisting-redirect-uris)). If omitted, the user sees a built-in HTML success page instead of being redirected. |
+| `redirect_uri` | top-level | recommended | Your post-connection callback. If you have registered any redirect URIs, this must match one of them (see [Whitelisting redirect URIs](#whitelisting-redirect-uris)). If omitted, the user sees a built-in HTML success page instead of being redirected. |
 | `state` | top-level | optional | Opaque correlation value, max 512 chars, echoed back verbatim in the final redirect. Use it to tie the result to a session on your side. |
 | `brand_id` | top-level | optional | Attach the account to an existing brand. If omitted, a new brand is auto-created. |
 | `metadata` | top-level | optional | Platform-specific connection data only (for example, TikTok BYOK uses this for `apikey`). For standard managed OAuth this is empty or omitted. |
@@ -88,9 +88,11 @@ If your connect call did not include `redirect_uri`, SocialAPI renders a built-i
 
 ### Whitelisting redirect URIs
 
-Every `redirect_uri` you use must be pre-registered. Register URIs from the SocialAPI dashboard under **Settings → OAuth redirect URIs**. The management API exists at `/v1/oauth/redirect-uris` but is dashboard-only (requires the dashboard JWT, not an API key).
+Redirect URI enforcement is optional until you register your first URI. If your workspace has no redirect URIs registered, any valid `redirect_uri` (https, or http for localhost) is accepted when starting a connect flow. As soon as you register one or more URIs, every `redirect_uri` must match an entry in your list, and unmatched values are rejected with a `400` error. Deleting all registered URIs returns your workspace to open mode.
 
-A connect call with a `redirect_uri` that is not on the whitelist returns `400` with an error.
+Register URIs from the SocialAPI dashboard under **Settings → OAuth redirect URIs**. The management API exists at `/v1/oauth/redirect-uris` but is dashboard-only (requires the dashboard JWT, not an API key).
+
+We recommend registering your production redirect URIs to lock down where users can be sent after OAuth.
 
 ### Correlation `state` (customer-controlled)
 
