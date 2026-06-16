@@ -3915,6 +3915,121 @@
                 }
             }
         },
+        "/platforms/instagram/accounts/{id}/stories": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the currently-active stories for a connected Instagram account. Stories are ephemeral and expire about 24 hours after posting; each item carries is_story and a computed expires_at in metadata. Returns 501 for non-Instagram accounts.",
+                "tags": [
+                    "Instagram"
+                ],
+                "summary": "List active Instagram stories",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": 20,
+                        "description": "Maximum number of results to return (1-100, default 20)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor returned by the previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of active stories",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InstagramStoriesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Platform access not permitted for your plan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support stories",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/twitter/credentials": {
             "get": {
                 "security": [
@@ -7670,6 +7785,7 @@
                                 "dm.received",
                                 "dm.sent",
                                 "dm.referral",
+                                "dm.postback",
                                 "dm.status.sent",
                                 "dm.status.delivered",
                                 "dm.status.read",
@@ -8200,6 +8316,23 @@
                     }
                 }
             },
+            "api_endpoints.InstagramStoriesResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Post"
+                        }
+                    },
+                    "next_cursor": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.InviteListItem": {
                 "type": "object",
                 "properties": {
@@ -8423,6 +8556,67 @@
                     },
                     "next_cursor": {
                         "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.MessageButton": {
+                "type": "object",
+                "properties": {
+                    "payload": {
+                        "type": "string",
+                        "example": "VIEW_ORDER"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "View order"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "url",
+                            "postback"
+                        ],
+                        "example": "url"
+                    },
+                    "url": {
+                        "type": "string",
+                        "example": "https://shop.example.com/orders/1"
+                    }
+                }
+            },
+            "api_endpoints.MessageCard": {
+                "type": "object",
+                "properties": {
+                    "buttons": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MessageButton"
+                        }
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "example": "https://cdn.example.com/p.jpg"
+                    },
+                    "subtitle": {
+                        "type": "string",
+                        "example": "Short description"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Product name"
+                    }
+                }
+            },
+            "api_endpoints.MessageQuickReply": {
+                "type": "object",
+                "properties": {
+                    "payload": {
+                        "type": "string",
+                        "example": "TRACK_ORDER"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Track my order"
                     }
                 }
             },
@@ -8917,10 +9111,31 @@
                             "$ref": "#/components/schemas/api_endpoints.DMAttachmentInput"
                         }
                     },
+                    "buttons": {
+                        "description": "Buttons renders a button template (1-3 buttons); uses text as the bubble body.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MessageButton"
+                        }
+                    },
+                    "cards": {
+                        "description": "Cards renders a generic/carousel template (up to 10 cards).",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MessageCard"
+                        }
+                    },
                     "message_tag": {
                         "description": "MessageTag attaches a Meta message tag so the DM can be sent outside the\nstandard 24-hour window. Instagram/Facebook only. Instagram accepts only\nHUMAN_AGENT; Facebook also accepts ACCOUNT_UPDATE, CONFIRMED_EVENT_UPDATE,\nCUSTOMER_FEEDBACK, POST_PURCHASE_UPDATE. Requires Meta \"Human Agent\"\nadvanced access for HUMAN_AGENT. Ignored by non-Meta platforms.",
                         "type": "string",
                         "example": "HUMAN_AGENT"
+                    },
+                    "quick_replies": {
+                        "description": "QuickReplies renders up to 13 tappable chips above the keyboard; requires text.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MessageQuickReply"
+                        }
                     },
                     "reply_to_message_id": {
                         "description": "ReplyToMessageID makes the first sent bubble a reply to a specific prior\nmessage (Meta message.reply_to.mid). Instagram/Facebook only.",
@@ -9282,6 +9497,7 @@
                                 "dm.received",
                                 "dm.sent",
                                 "dm.referral",
+                                "dm.postback",
                                 "dm.status.sent",
                                 "dm.status.delivered",
                                 "dm.status.read",
@@ -10319,6 +10535,64 @@
                         "items": {
                             "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostInsight"
                         }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.Post": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "description": "[always]",
+                        "type": "string"
+                    },
+                    "caption": {
+                        "description": "[always] Post text body; may be empty for media-only posts",
+                        "type": "string"
+                    },
+                    "comments_count": {
+                        "description": "[platform: instagram, facebook, tiktok] Zero on other platforms",
+                        "type": "integer"
+                    },
+                    "id": {
+                        "description": "[always] Platform-native post/video/media ID",
+                        "type": "string"
+                    },
+                    "like_count": {
+                        "description": "[platform: instagram, facebook, tiktok] Zero on other platforms",
+                        "type": "integer"
+                    },
+                    "media_type": {
+                        "description": "[platform: instagram, facebook, threads, tiktok, youtube] Empty on linkedin and google",
+                        "type": "string"
+                    },
+                    "media_url": {
+                        "description": "[platform: instagram, tiktok, youtube] Cover image or media URL; empty on facebook, threads, linkedin, google",
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "description": "[optional] Platform-specific keys; facebook sets \"page_id\" and \"page_name\"",
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "permalink": {
+                        "description": "[platform: instagram, facebook, threads, tiktok, youtube, google] Empty on linkedin",
+                        "type": "string"
+                    },
+                    "platform": {
+                        "description": "[always]",
+                        "type": "string"
+                    },
+                    "shares_count": {
+                        "description": "[platform: facebook] Zero on other platforms",
+                        "type": "integer"
+                    },
+                    "timestamp": {
+                        "description": "[always]",
+                        "type": "string"
+                    },
+                    "view_count": {
+                        "description": "[platform: youtube, tiktok] Zero on other platforms",
+                        "type": "integer"
                     }
                 }
             },
