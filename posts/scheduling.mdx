@@ -37,7 +37,7 @@ Response:
 }
 ```
 
-Omit `scheduled_at` (or set it to `null`) to publish immediately.
+To publish immediately instead of scheduling, pass `"publish_now": true`. Passing neither `scheduled_at` nor `publish_now` saves the post as a **draft** (even when targets are provided), it is not published.
 
 ## Managing scheduled posts
 
@@ -61,6 +61,17 @@ curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
   -d '{ "scheduled_at": "2026-06-02T14:00:00Z" }'
 ```
 
+### Publish a draft or scheduled post now
+
+To publish a post that is currently in `draft` or `scheduled` status, call the publish endpoint. This sends it to all targets immediately and synchronously (the response reflects the final delivery result):
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J/publish \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+This is the only way to publish an existing draft. `PATCH` only edits a post's content, it does not trigger publishing. Consumes 1 post credit.
+
 ### Cancel a scheduled post
 
 Delete it before it publishes:
@@ -77,10 +88,13 @@ Only posts in `scheduled` or `draft` status can be cancelled. Once a post enters
 Every post moves through this state machine:
 
 ```
-draft --> scheduled --> publishing --> published
-                                  \-> partial
-                                  \-> failed
+draft ------> scheduled --> publishing --> published
+   \                   /                \-> partial
+    \-----------------/                  \-> failed
+   (publish_now / POST /posts/{pid}/publish)
 ```
+
+A `draft` reaches `publishing` either by being created with `publish_now: true`, or later via `POST /v1/posts/{pid}/publish`.
 
 | Status | Meaning |
 |--------|---------|
