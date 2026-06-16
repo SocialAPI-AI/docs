@@ -20,7 +20,7 @@ Publishing as the individual member is live. Posting to Organization (company) P
 | Single video | Yes | one video entry in `media_ids` |
 | Multi-image (carousel) | Yes | multiple image entries in `media_ids` |
 | Mixed image + video | No | LinkedIn does not support mixed carousels |
-| Article / link | Yes | provide your own thumbnail, title, description |
+| Article / link | Yes | set `article_url` in `platform_data`; the first attached image becomes the thumbnail |
 
 ## Post fields
 
@@ -31,10 +31,33 @@ LinkedIn uses the standard `POST /v1/posts` body. The target account is specifie
 | `text` | string | Yes | Post commentary |
 | `targets` | array | Yes | One entry per account; each requires `account_id`. The platform is inferred from the account, no `platform` field is sent |
 | `media_ids` | array | No | IDs of media uploaded via the [media upload flow](/posts/instagram#1-upload-media); attach images or a video |
+| `visibility` | string | No | `public` (default), `connections_only`, or `logged_in` (logged-in LinkedIn members). Set on the target |
 
-<Note>
-LinkedIn member posts are always published with `PUBLIC` visibility. The post-level `visibility` field is accepted by the API but ignored for LinkedIn targets.
-</Note>
+## Visibility
+
+LinkedIn honors the `visibility` field on the target:
+
+| Value | LinkedIn audience |
+| ----- | ----------------- |
+| `public` (default) | Anyone on or off LinkedIn |
+| `connections_only` | The member's connections only |
+| `logged_in` | Any logged-in LinkedIn member |
+
+## Platform options
+
+Pass these keys inside `platform_data` on a target for LinkedIn-specific options:
+
+| Key | Type | Description |
+| --- | ---- | ----------- |
+| `article_url` | string | Publishes a link post. The post links to this URL; the first attached image (if any) is uploaded as the thumbnail |
+| `article_title` | string | Title shown on the link card |
+| `article_description` | string | Description shown on the link card |
+| `cta_label` | string | Call-to-action button on a link post. One of `LEARN_MORE`, `SIGN_UP`, `DOWNLOAD`, `REGISTER`, `SUBSCRIBE`, `APPLY`, `REQUEST_DEMO`, `JOIN`, `ATTEND`. Requires `article_url` |
+| `cta_url` | string | Destination for the call-to-action button. Requires `article_url` |
+| `alt_text` | string | Accessibility alt text for a single-image post |
+| `alt_texts` | array | Per-image alt text for a carousel, matched by position to `media_ids` |
+| `media_title` | string | Caption or title for an attached image or video |
+| `disable_reshare` | boolean | When true, others cannot reshare the post |
 
 ## Creating a post
 
@@ -54,6 +77,34 @@ curl -X POST https://api.social-api.ai/v1/posts \
 </CodeGroup>
 
 The post publishes to the member's feed. The author is the authenticated person. To attach media, upload it first (see the [Instagram media upload steps](/posts/instagram#1-upload-media)) and pass the returned `media_id` values in `media_ids`.
+
+### Link post with a call to action
+
+Set `article_url` in `platform_data` to publish a link post. Add `cta_label` and `cta_url` for a call-to-action button. If you attach an image, it becomes the link thumbnail.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Read our latest product update.",
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "visibility": "public",
+      "platform_data": {
+        "article_url": "https://example.com/update",
+        "article_title": "Product update",
+        "article_description": "What shipped this month",
+        "cta_label": "LEARN_MORE",
+        "cta_url": "https://example.com/update"
+      }
+    }]
+  }'
+```
+
+</CodeGroup>
 
 ## Updating a post
 
