@@ -21,6 +21,7 @@ description: Connect and interact with Instagram accounts via the Meta Graph API
 | Feature | Supported | Notes |
 |---|---|---|
 | List posts | Yes | Returns posts, reels, carousels |
+| List stories | Yes | Active stories only (expire about 24 hours after posting) |
 | Comments | Yes | Scoped to a specific post |
 | Reply to comment | Yes | |
 | Private reply | Yes | Sends a DM to the commenter |
@@ -86,6 +87,41 @@ Sample response:
       "like_count": 42,
       "comments_count": 5,
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+    }
+  ],
+  "count": 1
+}
+```
+
+### List active stories
+
+Returns the account's currently-active stories. Stories are ephemeral: they expire about 24 hours after posting, so this endpoint only ever returns what is live right now. Instagram only.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/instagram/accounts/{id}/stories?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each item uses the same shape as a post. Two story-specific values are surfaced in `metadata`: `is_story` is always `true`, and `expires_at` is the computed expiry (posting `timestamp` plus 24 hours; Instagram does not return an expiry field). For video stories without a `media_url`, the cover image is returned as `media_url`.
+
+Sample response:
+
+```json
+{
+  "data": [
+    {
+      "id": "17895695668004550",
+      "platform": "instagram",
+      "caption": "",
+      "media_type": "VIDEO",
+      "media_url": "https://scontent-...",
+      "permalink": "https://www.instagram.com/stories/acmecorp/17895695668004550/",
+      "timestamp": "2026-06-16T12:00:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "metadata": {
+        "is_story": true,
+        "expires_at": "2026-06-17T12:00:00Z"
+      }
     }
   ],
   "count": 1
