@@ -106,25 +106,32 @@ Access is beta-gated: your account must have `linkedin_page` in its `allowed_pla
 
 ### Connecting an organization page
 
+Pass `"connection_type": "organization"` inside the `"metadata"` field to anchor the credential on the first administered company page (the default behavior). The returned account includes all administered organization pages.
+
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
   -H "Authorization: Bearer $SOCIALAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "linkedin_page",
-    "redirect_uri": "https://yourapp.com/callback"
+    "redirect_uri": "https://yourapp.com/callback",
+    "metadata": { "connection_type": "organization" }
   }'
 ```
 
-Pass `"connection_type": "organization"` in the `metadata` field to anchor the credential on the first administered company page (the default behavior). The returned account includes all administered organization pages.
-
 ### Scopes
 
-The `linkedin_page` connector requests:
+The `linkedin_page` organization flow (default) requests these 7 scopes:
 
-- `openid`, `profile` — identify the authenticating member
-- `w_organization_social` — publish and manage posts as an organization page
-- `r_basicprofile` — read commenter profile information (name, headline, photo)
+- `r_organization_followers`: read the company page's follower statistics
+- `r_organization_social`: read the page's posts and comments
+- `rw_organization_admin`: read and write page administrative data (manage the page)
+- `r_organization_social_feed`: read the page's social feed
+- `w_organization_social`: publish posts as the page
+- `w_organization_social_feed`: create comments and replies on the page's feed
+- `r_basicprofile`: resolve the connecting admin's identity via /v2/me
+
+The optional `"connection_type": "personal"` variant uses a different scope set (`w_member_social`, `w_member_social_feed`, `r_member_postAnalytics`, `r_member_profileAnalytics`, `r_basicprofile`, `r_1st_connections_size`) and anchors the credential on the connecting member rather than a company page.
 
 ### Organization URN requirement
 
