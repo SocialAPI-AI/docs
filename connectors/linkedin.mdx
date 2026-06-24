@@ -1,17 +1,17 @@
 ---
 title: "LinkedIn"
-description: "Connect a LinkedIn member account to publish posts as the individual."
+description: "Connect a LinkedIn member account to publish posts as the individual, or connect a LinkedIn organization page (beta)."
 ---
 
 ## Overview
 
 The LinkedIn connector lets you publish posts as the **authenticated individual member** (your personal LinkedIn profile). It authenticates through LinkedIn's OAuth 2.0 flow with OpenID Connect and uses the "Share on LinkedIn" REST API.
 
-<Note>
-LinkedIn connects as the **individual member**, posting to that person's feed. Posting to LinkedIn organization (company) pages is not available yet.
-</Note>
+Organization (company) page support is available in beta via the separate `linkedin_page` platform identifier. See [LinkedIn organization pages](#linkedin-organization-pages-beta) below.
 
 ## Capabilities
+
+### LinkedIn member (`linkedin`)
 
 | Capability | Supported |
 | ---------- | --------- |
@@ -24,11 +24,21 @@ LinkedIn connects as the **individual member**, posting to that person's feed. P
 | Reviews | No |
 | Mentions | No |
 
-Posts only. Reading existing posts from the platform, comments, DMs, reviews, and mentions are not available for member accounts.
+Posts only. Reading existing posts from the platform, comments, DMs, reviews, and mentions are not available for member accounts. Direct messages, reviews, and mentions are not offered by LinkedIn's API and will remain unavailable.
 
-<Note>
-Comment management (read, reply, like, delete) and reading posts are coming soon for LinkedIn organization (company) pages, pending LinkedIn's Community Management API approval. Direct messages, reviews, and mentions are not offered by LinkedIn's API and will remain unavailable.
-</Note>
+### LinkedIn organization page (`linkedin_page`, beta)
+
+| Capability | Supported |
+| ---------- | --------- |
+| Publish posts (text, image, video, multi-image) | Yes (beta) |
+| Update post text | Yes (beta) |
+| Delete posts | Yes (beta) |
+| Read posts | Yes (beta) |
+| Comments (read, reply, like, delete) | Yes (beta) |
+| Page insights | Yes (beta) |
+| Direct messages | No |
+| Reviews | No |
+| Mentions | No |
 
 ## Authentication
 
@@ -88,11 +98,47 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 Posts publish to the member's feed. You can attach a single image, a single video, or multiple images (a carousel). Mixed image and video carousels are not supported.
 
+## LinkedIn organization pages (beta)
+
+LinkedIn organization (company) page support is live in beta via the `linkedin_page` platform identifier. It uses the `w_organization_social` scope and the LinkedIn Community Management API.
+
+Access is beta-gated: your account must have `linkedin_page` in its `allowed_platforms` list. Contact support to request access.
+
+### Connecting an organization page
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "linkedin_page",
+    "redirect_uri": "https://yourapp.com/callback"
+  }'
+```
+
+Pass `"connection_type": "organization"` in the `metadata` field to anchor the credential on the first administered company page (the default behavior). The returned account includes all administered organization pages.
+
+### Scopes
+
+The `linkedin_page` connector requests:
+
+- `openid`, `profile` — identify the authenticating member
+- `w_organization_social` — publish and manage posts as an organization page
+- `r_basicprofile` — read commenter profile information (name, headline, photo)
+
+### Organization URN requirement
+
+All org-page operations require the LinkedIn organization URN (for example, `urn:li:organization:12345678`). This URN is returned as the account's `platform_account_id` when the account is connected.
+
+### Capabilities
+
+The `linkedin_page` connector supports publishing posts (text, image, video, multi-image), reading posts, managing comments (read, reply, like, delete, hide), and retrieving page-level analytics via `GetPageInsights`. DMs, reviews, and mentions are not available through LinkedIn's API.
+
 ## Quirks and limitations
 
-- LinkedIn connects as the individual member, not an organization page. Organization page posting is not available yet.
+- LinkedIn member (`linkedin`) connects as the individual member. Use `linkedin_page` for organization pages.
 - Reading a member's own posts from the platform requires elevated permissions and is not available, so listing posts returns the posts SocialAPI has stored, not a live read from LinkedIn.
-- Comments, direct messages, reviews, and mentions are not available for member accounts.
+- Comments, direct messages, reviews, and mentions are not available for member accounts. Use the `linkedin_page` connector for organization page comment management.
 - LinkedIn does not scrape link previews; provide your own thumbnail, title, and description for article posts.
 - The post URN is returned in a response header, not the body.
 - Member access tokens last about 60 days with no programmatic refresh; the member reconnects when the token expires.
