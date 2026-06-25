@@ -33,6 +33,7 @@ description: Connect and interact with YouTube channels via the YouTube Data API
 | Create post | Yes | Upload and publish videos |
 | Update post | Yes | Update title, description, tags, privacy, and other metadata |
 | Delete post | Yes | |
+| Edit own comment | Yes | PATCH /v1/platforms/youtube/comments/{commentId} |
 
 ## Connecting
 
@@ -134,7 +135,12 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### PlatformData fields
 
-Pass these inside `platform_data.youtube` when creating or updating a post.
+YouTube platform data can be supplied in two forms, which are merged before delivery (per-target values override top-level values on conflict):
+
+- **Top-level:** `platform_data.youtube.<key>` applies to all YouTube targets in the request.
+- **Per-target:** `targets[].platform_data.<key>` (flat keys, no nesting) overrides the top-level value for that target only. The example above uses this form.
+
+Fields supported in either form:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -151,12 +157,60 @@ Pass these inside `platform_data.youtube` when creating or updating a post.
 | `notify_subscribers` | bool | `true` | Whether to send a notification to channel subscribers. |
 | `playlist_id` | string | none | YouTube playlist ID. The video is added to this playlist after publishing. |
 
+## Channel summary
+
+Retrieve aggregate stats for a connected YouTube channel.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/youtube/accounts/{id}/summary" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "title": "Acme Corp",
+  "handle": "@acmecorp",
+  "thumbnail_url": "https://yt3.ggpht.com/...",
+  "subscriber_count": 12400,
+  "view_count": 980000,
+  "video_count": 47
+}
+```
+
+## Force sync
+
+Force an immediate re-sync of uploaded videos for an account.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/platforms/youtube/accounts/{id}/sync" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Returns `{"success": true}` on success.
+
+## Edit own comment
+
+To edit a comment you own, use the YouTube-specific PATCH endpoint. All three body fields are required.
+
+```bash
+curl -X PATCH "https://api.social-api.ai/v1/platforms/youtube/comments/{commentId}" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "post_id": "dQw4w9WgXcQ",
+    "text": "Updated comment text"
+  }'
+```
+
 ## Limitations and gotchas
 
 - **No DMs or mentions.** YouTube does not expose a messaging or mention API. These endpoints return `501`.
 - **No webhook handler.** YouTube does not push real-time events. Posts and comments are fetched on demand.
-- **Comment moderation.** Hide sets the comment's moderation status (held for review). Delete removes it permanently. Like is not supported.
-- **Token refresh.** Google OAuth tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
+- **Comment moderation.** Hide sets the comment moderation status to rejected (removes it from public view). Delete removes it permanently. Like is not supported.
+- **Token refresh.** Google OAuth tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "platform.youtube.auth"`, reconnect the account.
 
 ## Permissions
 
