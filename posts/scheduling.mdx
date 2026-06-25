@@ -27,7 +27,7 @@ Response:
 
 ```json
 {
-  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "p_01HZ9X3Q4R5M6N7P8V2K0W1J",
   "status": "scheduled",
   "scheduled_at": "2026-06-01T09:00:00Z",
   "targets": [
@@ -50,12 +50,12 @@ curl "https://api.social-api.ai/v1/posts?status=scheduled" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-### Reschedule a post
+### Edit or reschedule a post
 
-Update the scheduled time with `PATCH`:
+Use `PATCH /v1/posts/:pid` to update the text, media, or schedule time of a post in `draft`, `scheduled`, or `failed` status. Editing a failed post lets you correct content issues before calling `POST /v1/posts/:pid/retry`. Update the scheduled time with:
 
 ```bash
-curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+curl -X PATCH https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "scheduled_at": "2026-06-02T14:00:00Z" }'
@@ -66,7 +66,7 @@ curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
 To publish a post that is currently in `draft` or `scheduled` status, call the publish endpoint. This sends it to all targets immediately and synchronously (the response reflects the final delivery result):
 
 ```bash
-curl -X POST https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J/publish \
+curl -X POST https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J/publish \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
@@ -77,11 +77,11 @@ This is the only way to publish an existing draft. `PATCH` only edits a post's c
 Delete it before it publishes:
 
 ```bash
-curl -X DELETE https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+curl -X DELETE https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Only posts in `scheduled` or `draft` status can be cancelled. Once a post enters `publishing`, it cannot be stopped.
+Only posts in `scheduled`, `draft`, or `failed` status can be deleted. Once a post enters `publishing`, it cannot be stopped.
 
 ## Status lifecycle
 
@@ -105,7 +105,7 @@ A `draft` reaches `publishing` either by being created with `publish_now: true`,
 | `partial` | Some targets succeeded, some failed (check per-target status) |
 | `failed` | All targets failed |
 
-A post can also be set to `cancelled` by deleting it while it is in `draft` or `scheduled` status.
+Deleting a post permanently removes it (the post returns `404` on subsequent fetch). For scheduled posts, any pending platform deliveries are marked `cancelled` before the post row is removed.
 
 ## Platform scheduling support
 
@@ -113,10 +113,10 @@ Not all platforms support deferred publishing through their APIs. For platforms 
 
 | Platform | Native scheduling | Media types | Notes |
 |----------|-------------------|-------------|-------|
-| Instagram | Yes | Image, Video (Reel), Carousel (2-10) | Min 10 min in future, max 75 days |
-| Facebook | Yes | Image, Video | Min 10 min in future |
-| Threads | Yes | Image, Video, Carousel | Min 10 min in future |
-| LinkedIn | Yes | Image, Video, Carousel | Min 10 min in future |
+| Instagram | No (server-side) | Image, Video (Reel), Carousel (2-10) | SocialAPI holds and publishes at scheduled time |
+| Facebook | No (server-side) | Image, Video | SocialAPI holds and publishes at scheduled time |
+| Threads | No (server-side) | Image, Video, Carousel | SocialAPI holds and publishes at scheduled time |
+| LinkedIn | No (server-side) | Image, Video, Carousel | SocialAPI holds and publishes at scheduled time |
 | Google | No (server-side) | Image | SocialAPI holds and publishes at scheduled time |
 | TikTok | No (server-side) | Video, Photo carousel (2-35) | SocialAPI holds and publishes at scheduled time |
 | YouTube | Coming soon | Video | Not yet available |
