@@ -38,6 +38,7 @@ The first segment of the code tells you where the failure originated.
 | `whatsapp.*` | WhatsApp Cloud API specific failures (window, frequency, template state) |
 | `telegram.*` | Telegram Bot API specific failures (e.g. the bot cannot message a user who has not started it) |
 | `system.internal` | Unexpected server error; safe to retry idempotent requests |
+| `http.<status>` | Fiber framework HTTP error (for example, `http.404` for an unknown route). Not returned by application logic. |
 
 ## Authentication
 
@@ -47,17 +48,17 @@ The first segment of the code tells you where the failure originated.
 | 401 | `auth.empty_token` | `Authorization: Bearer` with no token value |
 | 401 | `auth.invalid_key` | API key does not match any active key |
 | 401 | `auth.invalid_token` | Bearer JWT or OAuth access token is invalid or expired |
-| 401 | `auth.invalid_secret` | Provided client secret does not match |
+| 403 | `auth.invalid_secret` | Provided client secret does not match |
 | 401 | `auth.not_authenticated` | Caller is unauthenticated for an endpoint that requires it |
 | 401 | `auth.not_provisioned` | Dashboard user has no `users` row yet; call `POST /v1/users/provision` first |
 | 401 | `auth.user_not_found` | Token resolves to a user that no longer exists |
 | 403 | `auth.dashboard_only` | Endpoint accepts only dashboard JWTs (raw API keys are rejected) |
 | 403 | `auth.requires_dashboard_auth` | Same as above for endpoints behind brand-level UI |
-| 400 | `auth.state_mismatch` | OAuth callback `state` does not match the issued value |
+| 403 | `auth.state_mismatch` | OAuth callback `state` does not match the issued value |
 | 400 | `auth.oauth.invalid_client` | OAuth 2.1 client lookup failed during MCP token exchange |
 | 400 | `auth.oauth.invalid_redirect` | `redirect_uri` is not in the client's whitelist |
 | 400 | `auth.oauth.request_expired` | Authorization request expired before exchange |
-| 400 | `auth.oauth.user_missing` | OAuth grant references a user that does not exist |
+| 401 | `auth.oauth.user_missing` | OAuth grant references a user that does not exist |
 
 ## Accounts
 
@@ -67,9 +68,9 @@ The first segment of the code tells you where the failure originated.
 | 409 | `account.already_linked` | This social account is already connected to a workspace |
 | 403 | `account.reconnection_required` | OAuth token is no longer usable; rerun the OAuth flow |
 | 400 | `account.unsupported_platform` | Platform value is not recognized |
-| 404 | `account.no_active_page` | Account has no active Page (Facebook, LinkedIn) selected |
-| 409 | `account.page_inactive` | The requested Page is currently disabled |
-| 501 | `account.pages_not_supported` | Pages do not apply to this platform |
+| 400 | `account.no_active_page` | Account has no active Page (Facebook, LinkedIn) selected |
+| 400 | `account.page_inactive` | The requested Page is currently disabled |
+| 400 | `account.pages_not_supported` | Pages do not apply to this platform |
 
 ## Validation
 

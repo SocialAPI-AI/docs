@@ -72,13 +72,18 @@ When you exceed your monthly post or interaction allowance, the API returns HTTP
 ```json
 {
   "error": {
-    "code": "billing.post_limit",
-    "message": "not enough post credits: need 1, have 0 remaining"
-  }
+    "code": "validation.post_limit_exhausted",
+    "message": "Monthly post limit exhausted"
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 
-The interaction-limit response uses the same shape with `error.code` set to `billing.interaction_limit`. Your counters reset at the start of your next billing period. To get more capacity immediately, upgrade your plan.
+The interaction-limit response uses the same shape with `error.code` set to `validation.interaction_limit_exhausted`. Your counters reset at the start of your next billing period. To get more capacity immediately, upgrade your plan.
+
+<Note>
+  The bulk-import pre-check path uses a different code: `billing.post_limit`. This is only relevant if you use the import endpoint to pre-validate a batch of posts before committing them.
+</Note>
 
 When you exceed your storage quota, the API returns HTTP `413`:
 
@@ -87,7 +92,8 @@ When you exceed your storage quota, the API returns HTTP `413`:
   "error": {
     "code": "billing.storage_quota",
     "message": "Storage quota exceeded. Free plan is limited to 100MB. Upgrade your plan for more storage."
-  }
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 
@@ -156,7 +162,8 @@ Platforms (Instagram, Facebook, etc.) have their own rate limits independent of 
   "error": {
     "code": "platform.instagram.rate_limit",
     "message": "platform rate limit exceeded"
-  }
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 

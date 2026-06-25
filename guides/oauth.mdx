@@ -170,6 +170,8 @@ Response (HTTP 201):
 {
   "client_id": "a1b2c3d4e5f6...",
   "client_secret": "s3cr3t...",
+  "client_id_issued_at": 1719000000,
+  "client_secret_expires_at": 0,
   "client_name": "My MCP Client",
   "redirect_uris": ["https://app.example.com/callback"],
   "grant_types": ["authorization_code", "refresh_token"],
@@ -232,6 +234,10 @@ Response:
 
 The access token is an EdDSA/Ed25519 signed JWT valid for **1 hour**. Use it as a Bearer token for all `/v1` endpoints.
 
+<Note>
+  Per RFC 6749 section 2.3.1, the token endpoint also accepts client credentials via HTTP Basic authentication. Send `Authorization: Basic base64(client_id:client_secret)` instead of including `client_id` and `client_secret` in the request body. Body parameters take precedence if both are present.
+</Note>
+
 ### Step 4: Refresh the access token
 
 When the access token expires, use the refresh token to get a new pair:
@@ -266,6 +272,7 @@ Per RFC 7009, this endpoint always returns `200`, even if the token is already i
 | `/.well-known/oauth-authorization-server` | GET | RFC 8414 metadata discovery |
 | `/oauth/register` | POST | RFC 7591 dynamic client registration |
 | `/oauth/authorize` | GET | Authorization with PKCE |
+| `/oauth/authorize/request` | GET | Fetch a pending authorization request by `request_id` (used by the consent UI) |
 | `/oauth/token` | POST | Code exchange and refresh token rotation |
 | `/oauth/revoke` | POST | RFC 7009 token revocation |
 
