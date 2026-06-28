@@ -17,7 +17,7 @@ Use `POST /v1/posts/validate` to check constraints before publishing, and `GET /
 | Update post | No | Yes (text only) | Yes (text only) | No | No | Yes | No | Coming soon |
 | Delete post | Yes | Yes | Yes | Yes | No | Yes | Yes | Coming soon |
 | Schedule | Yes | Yes | Yes | Yes | No | No | No | Coming soon |
-| First comment | Yes (best-effort) | No | No | No | No | No | No | No |
+| First comment | Yes (best-effort) | Yes (best-effort) | No | No | No | Yes (best-effort) | No | No |
 | Image | Yes | Yes | Yes | Yes | Yes (1-35) | Thumbnail | No | Coming soon |
 | Video | Yes (as Reel) | Yes | Yes | Yes | Yes | Yes | No | No |
 | Carousel | Yes (2-10) | Yes (2-10) | Yes (2-20) | Yes (2-20) | Photo carousel only | No | No | No |
@@ -55,7 +55,7 @@ How each platform interprets the shared `PostDraft` fields:
 |---|---|---|---|---|---|---|---|---|
 | `text` | Caption (max 2200 chars) | Post message | Commentary | Post text (max 500 chars) | Video description | Video description | Tweet text (max 280) | Summary |
 | `media_ids` | Presigned URLs; determines image/video/carousel | First URL only; photo or video | Presigned URLs; image or video | Presigned URLs | Presigned URLs; video or photo carousel | Single video URL | Not supported (text only) | Single image URL |
-| `first_comment` | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported |
+| `first_comment` | Posted as a comment after publish (best-effort, non-blocking) | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported | Not supported | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported |
 | `scheduled_at` | Deferred publish | Deferred publish | Deferred publish | Deferred publish | Not supported | Not supported | Not supported | Not supported |
 
 ## Platform-specific `platform_data` summary
@@ -67,12 +67,12 @@ Pass these inside each target's `platform_data` object (per-target overrides sup
 | Platform | Required fields | Notable optional fields |
 |---|---|---|
 | [Instagram](/posts/instagram) | None | `alt_text`, `location_id`, `share_to_feed`, `cover_url` |
-| [Facebook](/posts/facebook) | None | `link`, `picture` (text posts only; photo posts ignore platform_data) |
-| [LinkedIn](/posts/linkedin) | None | No platform_data keys supported |
+| [Facebook](/posts/facebook) | None | `link`, `cta_type`, `cta_link`, `min_age`, `max_age` (text, link, album posts); `alt_text` (single-photo); `title` (single-video) |
+| [LinkedIn](/posts/linkedin) | None | `disable_reshare`, `cta_label`, `cta_url`, `article_url`, `article_title`, `article_description`, `media_title`, `alt_text`, `alt_texts` |
 | [Threads](/posts/threads) | None | `reply_control`, `link_attachment` |
 | [TikTok](/posts/tiktok) | `privacy_level` | `media_type`, `brand_content_toggle`, `disable_duet`, `disable_stitch`, `disable_comment`, `is_aigc`, `video_cover_timestamp_ms` |
 | [YouTube](/connectors/youtube) | None | `category_id`, `tags`, `made_for_kids`, `embeddable`, `notify_subscribers` |
-| [X / Twitter](/connectors/twitter) | None | `reply_settings` (`everyone`, `following`, `verified`) |
+| [X / Twitter](/connectors/twitter) | None | `reply_settings` (`following`, `mentionedUsers`, `subscribers`, `verified`) |
 | [Google](/posts/google) | None (defaults to STANDARD) | `topicType` (STANDARD, EVENT, OFFER, ALERT), `updateMask` |
 
 ## Required OAuth scopes

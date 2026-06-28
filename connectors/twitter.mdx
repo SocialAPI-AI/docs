@@ -165,7 +165,7 @@ Each tweet in a thread is a separate billable X write. Posts containing a URL co
 - **No post editing.** X's edit capability (`edit_options.previous_post_id`) is gated to Enterprise on the pay-per-use tier, so it is not available to self-serve BYOK apps. `UpdatePost` returns `501`. Delete and re-create if needed.
 - **No webhook handler.** X does not push real-time events via this integration. Posts and comments are fetched on demand.
 - **Comment moderation.** Hide toggles reply visibility. Delete removes your own replies. Liking is not available: X removed like/unlike writes from all self-serve tiers (April 2026), so `can_like` is `false`.
-- **Token refresh.** X OAuth 2.0 tokens expire after two hours. SocialAPI handles refresh automatically. If you receive `401` with `code: "invalid_token"`, reconnect the account.
+- **Token refresh.** X OAuth 2.0 tokens expire after two hours. SocialAPI proactively refreshes the access token when fewer than 5 minutes remain on the current token, so most requests complete without interruption. If you receive `401` with `code: "invalid_token"`, the refresh itself failed (for example, the refresh token was revoked): reconnect the account.
 - **Required scopes.** Your X Developer App must have the appropriate OAuth 2.0 scopes for reading tweets, posting, DMs, and user lookup.
 
 ## Permissions

@@ -25,6 +25,16 @@
                     "Accounts"
                 ],
                 "summary": "List connected accounts",
+                "parameters": [
+                    {
+                        "description": "Filter accounts by brand ID",
+                        "name": "brand_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "List of connected accounts",
@@ -115,6 +125,16 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Plan limit reached (billing.platform_not_available or billing.brands_limit)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -374,6 +394,16 @@
                                 }
                             }
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -423,8 +453,8 @@
                             }
                         }
                     },
-                    "404": {
-                        "description": "Account not found",
+                    "403": {
+                        "description": "Account requires reconnection",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -433,8 +463,8 @@
                             }
                         }
                     },
-                    "429": {
-                        "description": "Rate limit exceeded",
+                    "404": {
+                        "description": "Account not found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -912,7 +942,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes a brand and disconnects all its connected accounts.",
+                "description": "Deletes a brand and deactivates all its connected accounts (sets is_active=false).",
                 "tags": [
                     "Brands"
                 ],
@@ -1245,6 +1275,16 @@
                                 }
                             }
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1292,6 +1332,16 @@
                                 }
                             }
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1303,8 +1353,9 @@
                         "BearerAuth": []
                     }
                 ],
+                "description": "Returns the cached video data for a completed export, including metrics and optional AI-enriched fields (transcript, vision summary).",
                 "tags": [
-                    "exports"
+                    "Exports"
                 ],
                 "summary": "Get export videos",
                 "parameters": [
@@ -1320,10 +1371,34 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ExportVideosResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
                     },
                     "404": {
-                        "description": "Not Found"
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2466,6 +2541,14 @@
                         }
                     },
                     {
+                        "description": "Filter by Facebook/Instagram page ID (for multi-page accounts)",
+                        "name": "page_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "description": "Filter by platform (instagram, facebook, …)",
                         "name": "platform",
                         "in": "query",
@@ -2796,7 +2879,7 @@
                         }
                     },
                     "403": {
-                        "description": "Platform rejected the request (e.g. platform.instagram.permission_denied)",
+                        "description": "Platform rejected the request (e.g. platform.instagram.permission_denied), or account requires reconnection (account.reconnection_required)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2937,7 +3020,7 @@
                     },
                     {
                         "example": 25,
-                        "description": "Maximum number of results (1-100, default 50)",
+                        "description": "Maximum number of results (1-100, default 20)",
                         "name": "limit",
                         "in": "query",
                         "schema": {
@@ -3015,15 +3098,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "account_id": {
-                                        "type": "string"
-                                    },
-                                    "text": {
-                                        "type": "string"
-                                    }
-                                }
+                                "$ref": "#/components/schemas/api_endpoints.ReplyReviewRequest"
                             }
                         }
                     },
@@ -3053,6 +3128,16 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Account requires reconnection (account.reconnection_required)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3343,16 +3428,6 @@
                                 }
                             }
                         }
-                    },
-                    "429": {
-                        "description": "Daily rate limit exceeded",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
                     }
                 }
             },
@@ -3401,16 +3476,6 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Daily rate limit exceeded",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3475,16 +3540,6 @@
                                 }
                             }
                         }
-                    },
-                    "429": {
-                        "description": "Daily rate limit exceeded",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -3539,6 +3594,16 @@
                                 }
                             }
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -3582,6 +3647,16 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3773,8 +3848,28 @@
                     "204": {
                         "description": "No Content"
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3844,86 +3939,42 @@
                 }
             }
         },
-        "/oauth/redirect-uris": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns all whitelisted OAuth redirect URIs for the authenticated user.\nThese URIs can be used as the redirect_uri parameter in POST /v1/accounts/connect.",
-                "tags": [
-                    "OAuth"
-                ],
-                "summary": "List allowed redirect URIs",
-                "responses": {
-                    "200": {
-                        "description": "List of redirect URIs",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.RedirectURIListResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing token",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Requires dashboard authentication",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
+        "/oauth/exchange": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Registers a new redirect URI in the whitelist. Maximum 20 per user.\nThe URI must use HTTPS (HTTP is allowed only for localhost and 127.0.0.1).",
+                "description": "Exchanges an OAuth authorization code for a connected social account. Use this when\nyou handle the OAuth callback on your own server (proxy flow). For a single account\nthe response is a flat ConnectAccountResponse (HTTP 201). When a single OAuth flow\nconnects multiple accounts (e.g. Facebook Pages) the response is OAuthCallbackResponse.",
                 "tags": [
-                    "OAuth"
+                    "Accounts"
                 ],
-                "summary": "Add an allowed redirect URI",
+                "summary": "Exchange OAuth code",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.CreateRedirectURIRequest"
+                                "$ref": "#/components/schemas/api_endpoints.ExchangeRequest"
                             }
                         }
                     },
-                    "description": "Redirect URI to register",
+                    "description": "Platform, code, and metadata (redirect_uri + state required)",
                     "required": true
                 },
                 "responses": {
                     "201": {
-                        "description": "URI registered",
+                        "description": "Single account connected",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.RedirectURIResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.ConnectAccountResponse"
                                 }
                             }
                         }
                     },
                     "400": {
-                        "description": "Invalid URI format",
+                        "description": "Missing or invalid fields",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3933,7 +3984,7 @@
                         }
                     },
                     "401": {
-                        "description": "Invalid or missing token",
+                        "description": "Invalid or missing API key",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3943,77 +3994,7 @@
                         }
                     },
                     "403": {
-                        "description": "Requires dashboard authentication",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "409": {
-                        "description": "URI already registered",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/oauth/redirect-uris/{id}": {
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Deletes a redirect URI from the whitelist by ID.",
-                "tags": [
-                    "OAuth"
-                ],
-                "summary": "Remove an allowed redirect URI",
-                "parameters": [
-                    {
-                        "description": "Redirect URI ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "URI removed"
-                    },
-                    "401": {
-                        "description": "Invalid or missing token",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Requires dashboard authentication",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "URI not found",
+                        "description": "Plan limit reached (billing.platform_not_available or billing.brands_limit)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4140,177 +4121,22 @@
                 }
             }
         },
-        "/platforms/twitter/credentials": {
+        "/platforms/linkedin/insights": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the user's Twitter (X) bring-your-own-key credential entries. The full client secret is never returned, only a hint of the client ID. Dashboard JWT only; API keys are rejected.",
                 "tags": [
-                    "Platforms"
+                    "LinkedIn"
                 ],
-                "summary": "List Twitter BYOK credentials",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.TwitterByokListResponse"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Dashboard JWT required",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Stores or rotates the default Twitter (X) OAuth app credentials for the user. Applies to all brands without their own brand-scoped entry. Dashboard JWT only.",
-                "tags": [
-                    "Platforms"
-                ],
-                "summary": "Set default Twitter BYOK credentials",
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/api_endpoints.TwitterBYOKRequest"
-                },
-                "responses": {
-                    "204": {
-                        "description": "Credentials stored"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Dashboard JWT required",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Removes the user's default Twitter (X) OAuth app credentials. Brand-scoped entries are not affected. Dashboard JWT only.",
-                "tags": [
-                    "Platforms"
-                ],
-                "summary": "Delete default Twitter BYOK credentials",
-                "responses": {
-                    "204": {
-                        "description": "Credentials removed"
-                    },
-                    "403": {
-                        "description": "Dashboard JWT required",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/platforms/twitter/credentials/brand/{brand_id}": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Stores or rotates Twitter (X) OAuth app credentials for a specific brand. Overrides the default credentials for that brand only. Dashboard JWT only.",
-                "tags": [
-                    "Platforms"
-                ],
-                "summary": "Set brand-scoped Twitter BYOK credentials",
+                "summary": "Get LinkedIn page insights",
                 "parameters": [
                     {
-                        "description": "Brand ID",
-                        "name": "brand_id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "$ref": "#/components/requestBodies/api_endpoints.TwitterBYOKRequest"
-                },
-                "responses": {
-                    "204": {
-                        "description": "Credentials stored"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Dashboard JWT required",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Removes Twitter (X) OAuth app credentials for a specific brand. The brand falls back to the default credentials. Dashboard JWT only.",
-                "tags": [
-                    "Platforms"
-                ],
-                "summary": "Delete brand-scoped Twitter BYOK credentials",
-                "parameters": [
-                    {
-                        "description": "Brand ID",
-                        "name": "brand_id",
-                        "in": "path",
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -4318,58 +4144,48 @@
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Credentials removed"
-                    },
-                    "403": {
-                        "description": "Dashboard JWT required",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/platforms/twitter/credentials/test": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Validates a pair of Twitter (X) OAuth app credentials without storing them. Returns whether the credentials are usable and, if not, a human-readable reason. Dashboard JWT only.",
-                "tags": [
-                    "Platforms"
-                ],
-                "summary": "Test Twitter BYOK credentials",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.TwitterBYOKRequest"
-                            }
-                        }
-                    },
-                    "description": "Twitter OAuth app credentials to test",
-                    "required": true
-                },
-                "responses": {
                     "200": {
                         "description": "OK",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.TwitterByokTestResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.LinkedInInsightsResponse"
                                 }
                             }
                         }
                     },
-                    "403": {
-                        "description": "Dashboard JWT required",
+                    "400": {
+                        "description": "Missing account_id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream LinkedIn API error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5479,6 +5295,380 @@
                 }
             }
         },
+        "/platforms/youtube/accounts/{id}/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Get YouTube channel summary",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.YouTubeChannelSummaryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream YouTube API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/youtube/accounts/{id}/sync": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Re-sync a YouTube account's videos",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Account is not a YouTube account or connector does not support post sync",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream YouTube API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/youtube/accounts/{id}/videos/{videoId}": {
+            "patch": {
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Edit a published YouTube video",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YouTube video ID",
+                        "name": "videoId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.UpdateYouTubeVideoRequest"
+                            }
+                        }
+                    },
+                    "description": "Editable fields (all fields optional; omit any to leave unchanged)"
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/youtube/comments/{commentId}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Edits the text of one of the connected account's own YouTube comments via comments.update. Only the comment author (the connected account) can edit. YouTube only.",
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Edit a YouTube comment",
+                "parameters": [
+                    {
+                        "description": "YouTube comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.EditYouTubeCommentRequest"
+                            }
+                        }
+                    },
+                    "description": "New comment text (account_id, post_id, and text are all required to resolve the channel and edit the comment)",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Comment edited",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Account is not a YouTube account, or the connector does not support editing comments",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/youtube/comments/{commentId}/moderate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets the moderation status of a YouTube comment (published, held_for_review, or rejected), optionally banning the author. ban_author is only valid with status=rejected. YouTube only.",
+                "tags": [
+                    "YouTube"
+                ],
+                "summary": "Moderate a YouTube comment",
+                "parameters": [
+                    {
+                        "description": "YouTube comment ID",
+                        "name": "commentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.ModerateYouTubeCommentRequest"
+                            }
+                        }
+                    },
+                    "description": "Moderation action (account_id and post_id are both required to resolve the channel that owns the comment)",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Comment moderated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Account is not a YouTube account, or the connector does not support comment moderation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/posts": {
             "get": {
                 "security": [
@@ -5573,11 +5763,11 @@
                         }
                     },
                     {
-                        "description": "Include hidden posts (true/false, default false)",
+                        "description": "Include hidden posts (default false)",
                         "name": "hidden",
                         "in": "query",
                         "schema": {
-                            "type": "string"
+                            "type": "boolean"
                         }
                     }
                 ],
@@ -5620,7 +5810,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a post for one or more connected accounts. Set `publish_now: true` to publish\nimmediately (synchronous - blocks until all accounts respond). Set `scheduled_at` to queue\nthe post for future publication (asynchronous). With neither flag the post is saved as a\ndraft (this is the default, even when targets are provided); publish it later with\nPOST /posts/{pid}/publish. Consumes 1 post credit when the post is published or\nscheduled; saving a draft is free.",
+                "description": "Creates a post for one or more connected accounts. Set `publish_now: true` to publish\nimmediately: the post is accepted with status `publishing` and delivery runs in the\nbackground (so slow reel/video uploads do not block the request). The terminal status\n(`published`, `partial`, or `failed`) arrives via the `post.published`/`post.partial`/\n`post.failed` webhooks and by polling GET /posts/{pid}. Set `scheduled_at` to queue the\npost for future publication. With neither flag the post is saved as a draft (this is the\ndefault, even when targets are provided); publish it later with POST /posts/{pid}/publish.\nConsumes 1 post credit when the post is published or scheduled; saving a draft is free.",
                 "tags": [
                     "Posts"
                 ],
@@ -5638,7 +5828,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "All accounts published (sync) or post scheduled/drafted",
+                        "description": "Post accepted (publishing in background), scheduled, or drafted",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5648,7 +5838,7 @@
                         }
                     },
                     "207": {
-                        "description": "Some accounts published, some failed (sync only)",
+                        "description": "Some accounts published, some failed (fast completion)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5678,7 +5868,7 @@
                         }
                     },
                     "422": {
-                        "description": "publishing.delivery.all_failed",
+                        "description": "publishing.delivery.all_failed (fast completion)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5718,7 +5908,11 @@
                         "name": "dry_run",
                         "in": "query",
                         "schema": {
-                            "type": "boolean"
+                            "type": "string",
+                            "enum": [
+                                "true",
+                                "false"
+                            ]
                         }
                     }
                 ],
@@ -5808,6 +6002,26 @@
                                 }
                             }
                         }
+                    },
+                    "400": {
+                        "description": "Unknown platform",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -5846,6 +6060,16 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6041,6 +6265,16 @@
                                 }
                             }
                         }
+                    },
+                    "409": {
+                        "description": "Post is not in an editable state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -6109,7 +6343,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Publishes a post in `draft` or `scheduled` status immediately and synchronously\n(blocks until all accounts respond). Use this to publish a post that was saved as a\ndraft, or to publish a scheduled post ahead of its time. Consumes 1 post credit.",
+                "description": "Publishes a post in `draft` or `scheduled` status immediately. The post is accepted\nwith status `publishing` and delivery runs in the background (so slow reel/video uploads\ndo not block the request); the terminal status arrives via the `post.published`/\n`post.partial`/`post.failed` webhooks and by polling GET /posts/{pid}. Use this to publish\na post that was saved as a draft, or to publish a scheduled post ahead of its time.\nConsumes 1 post credit.",
                 "tags": [
                     "Posts"
                 ],
@@ -6127,7 +6361,7 @@
                 ],
                 "responses": {
                     "201": {
-                        "description": "All accounts published",
+                        "description": "Post accepted, publishing in the background",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6137,21 +6371,11 @@
                         }
                     },
                     "207": {
-                        "description": "Some accounts published, some failed",
+                        "description": "Some accounts published, some failed (fast completion)",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.PostResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Post is not in a publishable state",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
                                 }
                             }
                         }
@@ -6176,8 +6400,18 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Post is not in a publishable state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "422": {
-                        "description": "publishing.delivery.all_failed",
+                        "description": "publishing.delivery.all_failed (fast completion)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6233,6 +6467,16 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "Post is not retryable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "401": {
                         "description": "Invalid or missing API key",
                         "content": {
@@ -6245,6 +6489,16 @@
                     },
                     "404": {
                         "description": "Post not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Post is not in a retryable state",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6376,7 +6630,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the authenticated user's profile (id, email, plan tier, onboarding flag).",
+                "description": "Returns the authenticated user's profile (id, email, plan tier, onboarding flag, beta_tester flag, allowed_platforms list).",
                 "tags": [
                     "Users"
                 ],
@@ -6464,7 +6718,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the authenticated user's profile. Currently only supports setting onboarding=false to mark onboarding as complete.",
+                "description": "Updates the authenticated user's profile. Supports setting onboarding=false to mark onboarding as complete, and optionally storing use_case and referral for onboarding analytics.",
                 "tags": [
                     "Users"
                 ],
@@ -6524,332 +6778,6 @@
                 }
             }
         },
-        "/v1/platforms/linkedin/insights": {
-            "get": {
-                "tags": [
-                    "LinkedIn"
-                ],
-                "summary": "Get LinkedIn page insights",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "account_id",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.LinkedInInsightsResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platforms/youtube/accounts/{id}/summary": {
-            "get": {
-                "tags": [
-                    "YouTube"
-                ],
-                "summary": "Get YouTube channel summary",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.YouTubeChannelSummaryResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platforms/youtube/accounts/{id}/sync": {
-            "post": {
-                "tags": [
-                    "YouTube"
-                ],
-                "summary": "Re-sync a YouTube account's videos",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "boolean"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platforms/youtube/accounts/{id}/videos/{videoId}": {
-            "patch": {
-                "tags": [
-                    "YouTube"
-                ],
-                "summary": "Edit a published YouTube video",
-                "parameters": [
-                    {
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "YouTube video ID",
-                        "name": "videoId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.UpdateYouTubeVideoRequest"
-                            }
-                        }
-                    },
-                    "description": "Editable fields",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "boolean"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platforms/youtube/comments/{commentId}": {
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Edits the text of one of the connected account's own YouTube comments via comments.update. Only the comment author (the connected account) can edit. YouTube only.",
-                "tags": [
-                    "YouTube"
-                ],
-                "summary": "Edit a YouTube comment",
-                "parameters": [
-                    {
-                        "description": "YouTube comment ID",
-                        "name": "commentId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.EditYouTubeCommentRequest"
-                            }
-                        }
-                    },
-                    "description": "New comment text (post_id is required to resolve the channel that owns the comment)",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "Comment edited",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid parameters",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "501": {
-                        "description": "Account is not a YouTube account, or the connector does not support editing comments",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/platforms/youtube/comments/{commentId}/moderate": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Sets the moderation status of a YouTube comment (published, held_for_review, or rejected), optionally banning the author. ban_author is only valid with status=rejected. YouTube only.",
-                "tags": [
-                    "YouTube"
-                ],
-                "summary": "Moderate a YouTube comment",
-                "parameters": [
-                    {
-                        "description": "YouTube comment ID",
-                        "name": "commentId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.ModerateYouTubeCommentRequest"
-                            }
-                        }
-                    },
-                    "description": "Moderation action (post_id is required to resolve the channel that owns the comment)",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "Comment moderated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid parameters",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "501": {
-                        "description": "Account is not a YouTube account, or the connector does not support comment moderation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/webhooks": {
             "get": {
                 "security": [
@@ -6891,7 +6819,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Registers a new webhook endpoint. The generated secret is returned once - store it securely.",
+                "description": "Registers a new webhook endpoint and performs a live reachability ping. If the endpoint is unreachable or returns an unexpected response, the request fails with 400 (webhook_verification_failed). The generated secret is returned once - store it securely.",
                 "tags": [
                     "Webhooks"
                 ],
@@ -7007,6 +6935,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.WebhookDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
                                 }
                             }
                         }
@@ -7202,7 +7140,7 @@
                         }
                     },
                     {
-                        "description": "Page size (default 50)",
+                        "description": "Page size (1-100, default 50)",
                         "name": "limit",
                         "in": "query",
                         "schema": {
@@ -7217,6 +7155,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.DeliveryListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
                                 }
                             }
                         }
@@ -7277,6 +7225,16 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "content": {
@@ -7329,6 +7287,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.DeliveryDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
                                 }
                             }
                         }
@@ -7401,6 +7369,16 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "content": {
@@ -7421,19 +7399,6 @@
         }
     ],
     "components": {
-        "requestBodies": {
-            "api_endpoints.TwitterBYOKRequest": {
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "$ref": "#/components/schemas/api_endpoints.TwitterBYOKRequest"
-                        }
-                    }
-                },
-                "description": "Twitter OAuth app client_id and client_secret",
-                "required": true
-            }
-        },
         "securitySchemes": {
             "BearerAuth": {
                 "description": "Prefix your API key with \"Bearer \". Example: `Authorization: Bearer sapi_key_...`",
@@ -7784,6 +7749,9 @@
             },
             "api_endpoints.CreateBrandRequest": {
                 "type": "object",
+                "required": [
+                    "name"
+                ],
                 "properties": {
                     "name": {
                         "type": "string",
@@ -7943,6 +7911,9 @@
             },
             "api_endpoints.CreateWebhookRequest": {
                 "type": "object",
+                "required": [
+                    "events"
+                ],
                 "properties": {
                     "events": {
                         "description": "Events is the list of event types to subscribe to.",
@@ -8009,7 +7980,7 @@
                     },
                     "secret": {
                         "type": "string",
-                        "example": "whsec_a1b2c3d4e5f6..."
+                        "example": "4f3c2a1b9e8d7c6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2"
                     },
                     "url": {
                         "type": "string",
@@ -8317,6 +8288,26 @@
                     }
                 }
             },
+            "api_endpoints.ExchangeRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "description": "Code is the authorization code received from the platform callback.",
+                        "type": "string",
+                        "example": "AQDtbPB9X..."
+                    },
+                    "metadata": {
+                        "description": "Metadata must include redirect_uri and state for CSRF validation.",
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "platform": {
+                        "description": "Platform identifies the social platform (must match the connect call).",
+                        "type": "string",
+                        "example": "instagram"
+                    }
+                }
+            },
             "api_endpoints.ExportAcceptedResponse": {
                 "type": "object",
                 "properties": {
@@ -8418,6 +8409,88 @@
                     },
                     "total_videos": {
                         "type": "integer"
+                    }
+                }
+            },
+            "api_endpoints.ExportVideoItem": {
+                "type": "object",
+                "properties": {
+                    "comment_count": {
+                        "type": "integer"
+                    },
+                    "cover_image_url": {
+                        "type": "string"
+                    },
+                    "create_time": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "duration_seconds": {
+                        "type": "integer"
+                    },
+                    "height": {
+                        "type": "integer"
+                    },
+                    "like_count": {
+                        "type": "integer"
+                    },
+                    "platform": {
+                        "type": "string"
+                    },
+                    "platform_video_id": {
+                        "type": "string"
+                    },
+                    "share_count": {
+                        "type": "integer"
+                    },
+                    "share_url": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "transcript": {
+                        "type": "string"
+                    },
+                    "transcript_lang": {
+                        "type": "string"
+                    },
+                    "view_count": {
+                        "type": "integer"
+                    },
+                    "vision_category": {
+                        "type": "string"
+                    },
+                    "vision_elements": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "vision_summary": {
+                        "type": "string"
+                    },
+                    "width": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "api_endpoints.ExportVideosResponse": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "type": "string"
+                    },
+                    "videos": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.ExportVideoItem"
+                        }
                     }
                 }
             },
@@ -8688,14 +8761,14 @@
                         "type": "integer",
                         "example": 42
                     },
-                    "cursor": {
-                        "type": "string"
-                    },
                     "data": {
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.MediaItemResponse"
                         }
+                    },
+                    "next_cursor": {
+                        "type": "string"
                     }
                 }
             },
@@ -8891,6 +8964,11 @@
             "api_endpoints.PatchMeRequest": {
                 "type": "object",
                 "properties": {
+                    "lock_accounts_to_brand": {
+                        "description": "LockAccountsToBrand toggles whether a social account already connected to\none brand may be re-connected (moved) to a different brand. When true, such\na connect attempt is rejected with 409 account.already_linked.",
+                        "type": "boolean",
+                        "example": true
+                    },
                     "onboarding": {
                         "type": "boolean",
                         "example": false
@@ -9209,6 +9287,17 @@
                     "uri": {
                         "type": "string",
                         "example": "https://app.acme.com/oauth/done"
+                    }
+                }
+            },
+            "api_endpoints.ReplyReviewRequest": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    },
+                    "text": {
+                        "type": "string"
                     }
                 }
             },
@@ -9571,6 +9660,9 @@
             },
             "api_endpoints.UpdateBrandRequest": {
                 "type": "object",
+                "required": [
+                    "name"
+                ],
                 "properties": {
                     "name": {
                         "type": "string",
@@ -9806,6 +9898,11 @@
                     "id": {
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
+                    },
+                    "lock_accounts_to_brand": {
+                        "description": "LockAccountsToBrand, when true, rejects connecting a social account that is\nalready connected to another of your brands (409 account.already_linked)\ninstead of moving it. Default false.",
+                        "type": "boolean",
+                        "example": false
                     },
                     "onboarding": {
                         "type": "boolean",

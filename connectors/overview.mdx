@@ -26,7 +26,8 @@ Every connector except Twitter uses SocialAPI's managed platform app. You don't 
 | WhatsApp | SocialAPI |
 | Telegram | **You (bot token from @BotFather)** - no OAuth |
 | X / Twitter | **You (BYOK)** - see [setup guide](/connectors/twitter-byok) |
-| Google | SocialAPI (Coming soon) |
+| Google | SocialAPI (beta) |
+| Pinterest | SocialAPI |
 | Trustpilot | API key (Coming soon) |
 
 See [Platform credentials](/guides/platform-credentials) for the full story, including consent-screen branding and FAQs.
@@ -40,7 +41,9 @@ See [Platform credentials](/guides/platform-credentials) for the full story, inc
   "id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
   "platform": "instagram",
   "name": "Acme Corp",
-  "username": "acmecorp"
+  "username": "acmecorp",
+  "brand_id": "b7e2c1a0-4f3d-11ee-be56-0242ac120002",
+  "status": "active"
 }
 ```
 
@@ -50,19 +53,33 @@ See [Platform credentials](/guides/platform-credentials) for the full story, inc
 | `platform` | string | Platform identifier (e.g. `instagram`, `facebook`, `tiktok`, `youtube`, `twitter`). |
 | `name` | string | Display name of the connected page or profile. |
 | `username` | string | Platform handle or username. |
-| `metadata` | object | Optional. Platform-specific profile data. Omitted when empty. |
+| `brand_id` | string | Internal brand UUID this account belongs to. Always present. |
+| `status` | string | Account status. One of: `active`, `reconnect_required`. Always present. |
+| `profile_picture_url` | string | Profile picture URL. Omitted when not available. |
+| `bio` | string | Profile biography or description. Omitted when not available. |
+| `reconnect_reason` | string | Human-readable reason why reconnection is required. Only set when `status` is `reconnect_required`. |
 
-The `metadata` object is platform-specific. Currently only TikTok populates it:
+## Connect response metadata
+
+The `metadata` object is not included in the `GET /v1/accounts` account list response. It is returned only on the connect (`POST /v1/accounts/connect`) and OAuth exchange (`POST /v1/oauth/exchange`) responses. Use it to read platform-specific profile data at connection time.
+
+The following platforms populate `metadata`:
 
 | Key | Type | Platform |
 |---|---|---|
 | `avatar_url` | string | TikTok |
 | `follower_count` | integer | TikTok |
 | `following_count` | integer | TikTok |
-| `video_count` | integer | TikTok |
+| `video_count` | integer | TikTok, YouTube |
 | `likes_count` | integer | TikTok |
+| `subscriber_count` | integer | YouTube |
+| `uploads_playlist_id` | string | YouTube |
+| `byok_source` | string | X/Twitter (value: `"user"` or `"brand"`) |
+| `bot_id` | string | Telegram |
+| `phone_number_id` | string | WhatsApp |
+| `waba_id` | string | WhatsApp |
 
-Other platforms do not currently populate `metadata`. Their Account objects omit the field entirely.
+Platforms not listed above omit `metadata` entirely.
 
 ## What "not supported" means
 
@@ -72,10 +89,13 @@ When a platform doesn't support a feature (e.g. Instagram has no reviews), calli
 {
   "error": {
     "code": "resource.not_supported",
-    "message": "operation not supported for this platform"
-  }
+    "message": "Operation not supported for this platform"
+  },
+  "request_id": "01HZAB1234CDEF5678GHIJ9012"
 }
 ```
+
+The `request_id` field is always present on every error response. Use it when reporting issues.
 
 This is expected behavior, not a bug. Design your app to handle `501` gracefully.
 
@@ -88,4 +108,4 @@ This is expected behavior, not a bug. Design your app to handle `501` gracefully
 
 ## Private replies
 
-On Instagram, posting a reply with `"private": true` sends a DM to the commenter instead of a public reply. This is the platform's native "Send Private Reply" feature. The `private` field is silently ignored on platforms that don't support it.
+On Instagram and Facebook, posting a reply with `"private": true` sends a DM to the commenter instead of a public reply. This is the platform's native "Send Private Reply" feature. The `private` field is silently ignored on platforms that don't support it.

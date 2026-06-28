@@ -81,7 +81,27 @@ curl "https://api.social-api.ai/v1/inbox/conversations?account_id={id}" \
 curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "text": "Thanks for reaching out!" }'
+  -d '{
+    "account_id": "{account_id}",
+    "text": "Thanks for reaching out!"
+  }'
+```
+
+`account_id` is required. Omitting it returns `400 field_required`.
+
+### Send a DM with an attachment
+
+Use `attachment_url` to send a file. SocialAPI picks the Telegram method based on the URL extension: image extensions (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`) call `sendPhoto`; all other extensions call `sendDocument`.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "{account_id}",
+    "text": "Here is the file you requested.",
+    "attachment_url": "https://example.com/report.pdf"
+  }'
 ```
 
 ## Limitations and gotchas
@@ -95,7 +115,9 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 403 | `telegram.cannot_message` | The bot cannot message this chat: the user has not started the bot, or blocked or removed it |
+| 401 | `platform.telegram.auth` | The bot token is invalid or has been revoked via @BotFather. Reconnect the account with a fresh token. |
+| 403 | `telegram.cannot_message` | The bot cannot message this chat: the user has not started the bot, or blocked or removed it. |
+| 429 | `platform.telegram.rate_limit` | Telegram rate-limited the bot. The `retry_after` metadata field contains the number of seconds to wait before retrying. |
 
 See [Errors](/guides/errors) for the full catalog.
 
