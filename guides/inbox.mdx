@@ -113,46 +113,15 @@ Read conversations and send messages across platforms that support DMs.
 
 ### Sending text and attachments
 
-A message can carry text, one or more attachments, or both. Provide `text`, `attachments`, or both: at least one is required.
+A message can carry text, an attachment, or both. Provide `text`, `attachment_url`, or both: at least one is required.
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `account_id` | Yes | Connected account that owns the conversation |
-| `text` | Conditional | Message body. Required unless at least one attachment is provided |
-| `attachments` | Conditional | One or more media items to attach. Required unless `text` is set |
-| `reply_to_message_id` | No | Send the message as a reply to a specific earlier message. Instagram and Facebook only. Applied to the first bubble |
-| `message_tag` | No | Meta message tag to send outside the standard 24-hour window. Instagram and Facebook only. See below |
-| `attachment_url` | No | Deprecated single-attachment shorthand kept for backward compatibility. Prefer `attachments`. Ignored when `attachments` is set |
+| `text` | Conditional | Message body. Required unless `attachment_url` is set |
+| `attachment_url` | Conditional | Publicly reachable URL of a media file to attach. Required unless `text` is set |
 
-Each item in `attachments` sets exactly one of `url`, `media_id`, or `attachment_id`:
-
-| Field | Description |
-|-------|-------------|
-| `url` | Publicly reachable URL of a media file. The platform fetches it directly (max 25 MB) |
-| `media_id` | ID of a file in your media library (`GET /v1/media`). The server resolves it to a temporary URL before sending, so you can attach stored media without hosting a public URL yourself |
-| `attachment_id` | ID of media already uploaded to Meta, reused without re-fetching. Requires `type` |
-| `type` | Attachment type: `image`, `video`, `audio`, or `file`. Optional with `url` or `media_id` (inferred from the file extension), required with `attachment_id` |
-
-On Facebook and Instagram, each item is delivered as its own Messenger bubble. The Meta Send API sends one message per call, so a request is delivered as the text bubble first (if any), then each attachment in order. Sending `text` plus one attachment therefore delivers two separate bubbles, not one captioned image. When the type is inferred (from a `url` or `media_id`), use a direct media link with the correct extension (for example `.jpg`, `.mp4`, `.mp3`); links without a recognized media extension are sent as a generic file.
-
-The response returns `message_ids`, the platform message ID of every bubble that was sent, in order. The older `message_id` field (the first ID only) is deprecated in favor of `message_ids`.
-
-### Messaging window and message tags
-
-By default, Instagram and Facebook only let you send a DM within 24 hours of the user's last message. To reply later, set `message_tag` so the message is sent with a Meta message tag instead of a standard response.
-
-- Instagram accepts only `HUMAN_AGENT`, which extends the window to 7 days.
-- Facebook accepts `HUMAN_AGENT`, `ACCOUNT_UPDATE`, `CONFIRMED_EVENT_UPDATE`, `CUSTOMER_FEEDBACK`, and `POST_PURCHASE_UPDATE`.
-
-Sending `HUMAN_AGENT` requires your Meta app to hold the "Human Agent" advanced access, and asserts that a human (not a bot) is replying. An unsupported value returns `400 validation.invalid_message_tag`. The field is ignored on non-Meta platforms.
-
-```bash
-# Reply with the HUMAN_AGENT tag (up to 7 days after the user's last message)
-curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "account_id": "acc_abc123", "text": "Following up on your question", "message_tag": "HUMAN_AGENT" }'
-```
+On Facebook and Instagram, `attachment_url` is delivered as a Messenger attachment. The attachment type (image, video, audio, or file) is inferred from the URL file extension, so use a direct media link with the correct extension (for example `.jpg`, `.mp4`, `.mp3`). URLs without a recognized media extension are sent as a generic file. The media must be hosted on a publicly reachable URL (max 25 MB); the platform fetches it directly.
 
 ### Example: list conversations and send a message
 
@@ -167,17 +136,11 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7
   -H "Content-Type: application/json" \
   -d '{ "account_id": "acc_abc123", "text": "Your order has shipped!" }'
 
-# Send text plus an image attachment (delivered as two bubbles)
+# Send an image attachment (text optional)
 curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "account_id": "acc_abc123", "text": "Here is your receipt", "attachments": [{ "url": "https://cdn.example.com/receipt.jpg" }] }'
-
-# Attach a file from your media library by id, plus a second image
-curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "account_id": "acc_abc123", "attachments": [{ "media_id": "550e8400-e29b-41d4-a716-446655440000" }, { "url": "https://cdn.example.com/photo.jpg" }] }'
+  -d '{ "account_id": "acc_abc123", "text": "Here is your receipt", "attachment_url": "https://cdn.example.com/receipt.jpg" }'
 ```
 
 ## Reviews
@@ -214,30 +177,44 @@ curl -X POST https://api.social-api.ai/v1/inbox/reviews/sapi_rev_GXRM4BNTW7KFYSD
 
 ## Mentions
 
-Read mentions of a connected account.
+Read mentions of a connected account, and reply to them as a public comment.
 
-### Endpoint
+### Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/v1/accounts/:id/mentions` | List mentions for a connected account |
+| `POST` | `/v1/accounts/:id/mentions/reply` | Reply to a mention as a public comment |
 
 Mentions are scoped to a single connected account, not the workspace.
 
+Replying works even when the mention is on someone else's post, where the normal
+comment-reply endpoint is not allowed. Pass `media_id` (the post the mention is
+on, or the `sapi_mnt_` id from the list response) and `text`. Set `comment_id`
+only when the mention was inside a comment; omit it to reply to a mention in the
+post caption. A reply consumes 1 interaction credit.
+
 ### Platform support
 
-| Platform | Mentions |
-|----------|----------|
-| Instagram | Yes |
-| Facebook | Yes |
-| X / Twitter | Yes |
-| All others | No |
+| Platform | List mentions | Reply to mention |
+|----------|----------|----------|
+| Instagram | Yes | Yes |
+| Facebook | Yes | Yes |
+| X / Twitter | Yes | No |
+| All others | No | No |
 
 ### Example
 
 ```bash
+# List mentions
 curl "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions" \
   -H "Authorization: Bearer $SOCAPI_KEY"
+
+# Reply to a comment mention as a public comment
+curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions/reply \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"media_id": "17895695668004550", "comment_id": "17858893269577012", "text": "Thanks for the shout-out!"}'
 ```
 
 ## Interaction IDs
