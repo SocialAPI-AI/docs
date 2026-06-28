@@ -41,7 +41,8 @@ If the key is missing or invalid, the API returns:
   "error": {
     "code": "auth.invalid_key",
     "message": "invalid or inactive API key"
-  }
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 
@@ -104,6 +105,22 @@ Access tokens expire after **1 hour**. Use the refresh token to obtain a new acc
 4. If all checks fail, the request is rejected with `401`.
 
 All three paths result in the same internal representation: an `APIKey` record attached to the request context with the user's ID and plan tier.
+
+## Authentication error codes
+
+The middleware emits a consistent set of error codes when a request cannot be authenticated. Use `error.code` for programmatic handling.
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 401 | `auth.missing_header` | `Authorization` header is absent |
+| 401 | `auth.empty_token` | `Authorization: Bearer` with no token value |
+| 401 | `auth.invalid_key` | API key prefix detected but key does not match any active key |
+| 401 | `auth.invalid_token` | Bearer JWT or OAuth access token is invalid or expired |
+| 401 | `auth.not_provisioned` | Dashboard JWT resolved a user that has not been provisioned; call `POST /v1/users/provision` first |
+| 401 | `auth.user_not_found` | Token resolves to a user that no longer exists |
+| 403 | `auth.dashboard_only` | Endpoint only accepts dashboard JWTs, not raw API keys |
+
+See [Error reference](/guides/errors#authentication) for the complete list including OAuth-specific codes.
 
 ## Security best practices
 

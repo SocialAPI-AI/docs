@@ -3,7 +3,7 @@ title: Core concepts
 description: The five nouns SocialAPI's API exposes (Brand, Account, Post, Interaction, Capability) and how they fit together.
 ---
 
-SocialAPI.ai is a unified social media API: one REST endpoint and MCP server to read and respond to comments, direct messages, mentions, and reviews across Instagram, Facebook, TikTok, LinkedIn, YouTube, X, and Threads. Every platform returns the same `Interaction` schema.
+SocialAPI.ai is a unified social media API: one REST endpoint and MCP server to read and respond to comments, direct messages, mentions, and reviews across Instagram, Facebook, TikTok, LinkedIn, YouTube, X, Threads, WhatsApp, Telegram, Google Business Profile, and Pinterest. Every platform returns the same `Interaction` schema.
 
 SocialAPI's REST API is shaped around five nouns. Once you know what each one means, every endpoint slots into place: brands group accounts, accounts hold posts and interactions, and capabilities tell you which actions are valid for any given interaction.
 
@@ -11,11 +11,11 @@ This page is a short tour. The [API Reference](/api-reference/introduction) has 
 
 ## Brand
 
-A **Brand** is the top-level grouping in SocialAPI. One brand corresponds to one business, client, or project. All connected social accounts, posts, and interactions live under a brand.
+A **Brand** (called a *social profile* in pricing) is the top-level grouping in SocialAPI. One brand corresponds to one business, client, or location. All connected social accounts, posts, and interactions live under a brand.
 
 Brands matter for two reasons:
 
-1. **Billing.** Plans are sized in brands. Free includes 2 brands, Starter 10, Pro 50, Business 200, Enterprise unlimited.
+1. **Billing.** Plans are sized in social profiles (brands). Free includes 2, Starter 10, Pro 50, Business 200, Enterprise unlimited.
 2. **Isolation.** Accounts under one brand cannot see accounts under another. Use brands to keep agency clients separated, or to split staging from production.
 
 ```json
@@ -30,7 +30,7 @@ See [`/v1/brands`](/api-reference/introduction) for the full schema and CRUD end
 
 ## Account
 
-An **Account** is a connected social profile under a brand. One brand can hold many accounts, across any mix of platforms. SocialAPI stores the OAuth tokens (encrypted at rest) and refreshes them automatically.
+An **Account** is a connected social account under a brand. One brand can hold many accounts, across any mix of platforms. SocialAPI stores the OAuth tokens (encrypted at rest) and refreshes them automatically.
 
 You connect an account by calling `POST /v1/accounts/connect` and walking the user through OAuth. After connection, the account ID (prefixed `acc_`) is what you pass to every account-scoped endpoint.
 
@@ -79,7 +79,7 @@ Posts move through a state machine: `draft`, `scheduled`, `publishing`, then `pu
 
 ## Interaction
 
-An **Interaction** is anything inbound: a comment on one of your posts, a DM, a review, or a mention. The unified inbox API never stores interaction *content* (always proxied live from the platform), but it does mint stable IDs so your app can reference them.
+An **Interaction** is anything inbound: a comment on one of your posts, a DM, a review, or a mention. Comments, reviews, and mentions are proxied live from the platform; DM conversations and messages are stored in SocialAPI's database to support threading and pagination. The API mints stable IDs so your app can reference any interaction across calls.
 
 Interaction IDs encode their type as a prefix:
 
