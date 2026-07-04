@@ -146,6 +146,121 @@
                 }
             }
         },
+        "/accounts/pending/{connection_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the candidate Google Business Profiles for a pending connection created when a Google login manages more than one Profile. Choose one with the select endpoint.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Get a pending Google Profile selection",
+                "parameters": [
+                    {
+                        "description": "Pending connection ID",
+                        "name": "connection_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PendingConnectionDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown, expired, or not owner",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/pending/{connection_id}/select": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Promotes exactly one candidate Profile from a pending connection into a connected account. First selection wins; the pending connection is then consumed.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Select a Google Business Profile to connect",
+                "parameters": [
+                    {
+                        "description": "Pending connection ID",
+                        "name": "connection_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.SelectProfileRequest"
+                            }
+                        }
+                    },
+                    "description": "Chosen platform_account_id",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ConnectAccountResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "platform_account_id not in the candidate set",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown, expired, or not owner",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/accounts/{id}": {
             "delete": {
                 "security": [
@@ -3963,6 +4078,16 @@
                     "required": true
                 },
                 "responses": {
+                    "200": {
+                        "description": "Google login manages multiple Business Profiles; select one",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PendingConnectionResponse"
+                                }
+                            }
+                        }
+                    },
                     "201": {
                         "description": "Single account connected",
                         "content": {
@@ -8983,6 +9108,76 @@
                     }
                 }
             },
+            "api_endpoints.PendingConnectionDetailResponse": {
+                "type": "object",
+                "properties": {
+                    "connection_id": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "example": "2026-07-04T12:30:00Z"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "google"
+                    },
+                    "profiles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PendingProfile"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.PendingConnectionResponse": {
+                "type": "object",
+                "properties": {
+                    "connection_id": {
+                        "type": "string",
+                        "example": "pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "google"
+                    },
+                    "profiles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PendingProfile"
+                        }
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "selection_required"
+                    }
+                }
+            },
+            "api_endpoints.PendingProfile": {
+                "type": "object",
+                "properties": {
+                    "bio": {
+                        "type": "string",
+                        "example": "Wood-fired pizza since 1998"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "example": "Joe's Pizza (Downtown)"
+                    },
+                    "platform_account_id": {
+                        "type": "string",
+                        "example": "accounts/123/locations/456"
+                    },
+                    "profile_picture_url": {
+                        "type": "string",
+                        "example": ""
+                    },
+                    "username": {
+                        "type": "string",
+                        "example": ""
+                    }
+                }
+            },
             "api_endpoints.PinterestBoardItem": {
                 "type": "object",
                 "properties": {
@@ -9203,7 +9398,8 @@
                             "threads",
                             "tiktok",
                             "linkedin",
-                            "google"
+                            "google",
+                            "zalo"
                         ],
                         "example": "instagram"
                     },
@@ -9351,6 +9547,15 @@
                         "description": "Text is the post body for this segment. Required.",
                         "type": "string",
                         "example": "And here's the second post in the thread."
+                    }
+                }
+            },
+            "api_endpoints.SelectProfileRequest": {
+                "type": "object",
+                "properties": {
+                    "platform_account_id": {
+                        "type": "string",
+                        "example": "accounts/123/locations/456"
                     }
                 }
             },

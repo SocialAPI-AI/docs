@@ -82,6 +82,71 @@ https://app.example.com/oauth/callback
 
 Always check `status` first. On `success`, persist the `account_id` against your user record and call `/v1/accounts/{id}` for full account details. On `error`, surface a retry path in your UI — the customer can restart from Step 1.
 
+### Google: connecting a login with multiple Business Profiles
+
+This only applies to Google logins that manage more than one Business Profile. A Google login with a single Profile connects like any other platform, in a single request, with no extra step.
+
+Google accounts can manage several Business Profiles under one login (for example, a chain with multiple locations). When that happens, SocialAPI cannot know which Profile you want to connect, so it does not create an account yet. Instead it stores a pending connection and asks you to choose.
+
+**Server-callback flow.** If the Google login you just authorized manages more than one Profile, your `redirect_uri` receives `status=selection_required` instead of `status=success`, along with a `connection_id`:
+
+```
+https://app.example.com/oauth/callback
+  ?status=selection_required
+  &connection_id=pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2
+  &state=session_abc123
+```
+
+**Proxy flow.** If your server exchanges the authorization code itself via `POST /v1/oauth/exchange`, the same fork happens in the response body. A single Profile still returns the usual `ConnectAccountResponse` (HTTP 201). More than one Profile returns HTTP 200 instead:
+
+```json
+{
+  "status": "selection_required",
+  "connection_id": "pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "platform": "google",
+  "profiles": [
+    {
+      "platform_account_id": "accounts/123/locations/456",
+      "display_name": "Joe's Pizza (Downtown)",
+      "username": "",
+      "profile_picture_url": "",
+      "bio": "Wood-fired pizza since 1998"
+    },
+    {
+      "platform_account_id": "accounts/123/locations/789",
+      "display_name": "Joe's Pizza (Uptown)",
+      "username": "",
+      "profile_picture_url": "",
+      "bio": ""
+    }
+  ]
+}
+```
+
+**Resolving the selection.** In both cases no account exists yet. Finish the connection with the `connection_id`:
+
+1. `GET /v1/accounts/pending/{connection_id}` lists the candidate Profiles. This is usually optional since the callback redirect or the exchange response already includes them, but it is useful to re-fetch the list or check whether the pending connection is still valid.
+
+```bash
+curl https://api.social-api.ai/v1/accounts/pending/pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+2. `POST /v1/accounts/pending/{connection_id}/select` with the `platform_account_id` of exactly one Profile connects it:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/pending/pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2/select \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"platform_account_id": "accounts/123/locations/456"}'
+```
+
+This returns the same `ConnectAccountResponse` (HTTP 201) as a normal single-Profile connect.
+
+<Note>
+  A pending connection is single-use and expires 30 minutes after it is created. The first successful selection consumes it: a second `select` call, or one made after expiry, returns `404`. Selecting a `platform_account_id` that is not in the returned candidate set returns `400`.
+</Note>
+
 ### Fallback when `redirect_uri` is omitted
 
 If your connect call did not include `redirect_uri`, SocialAPI renders a built-in HTML success or error page in place of the redirect. This is intended for ad-hoc connections (for example, the SocialAPI dashboard itself); production integrations should always supply `redirect_uri`.
