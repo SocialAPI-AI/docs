@@ -68,9 +68,34 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
+### Where to put platform data
+
+You can pass the YouTube fields below in either of two places:
+
+- **Post level**, keyed by platform: `platform_data.youtube`. Applies to every YouTube target in the post.
+- **Target level**, flat (no `youtube` key): inside a target's own `platform_data` object. Applies only to that target.
+
+When both set the same field, the target-level value wins, so you can set channel-wide defaults at the post level and override per account:
+
+```json
+{
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": { "notify_subscribers": false }
+    }
+  ],
+  "platform_data": {
+    "youtube": { "category_id": "22", "notify_subscribers": true }
+  }
+}
+```
+
+Here the target publishes with `category_id: "22"` (inherited from the post level) and `notify_subscribers: false` (the target override wins).
+
 ### Platform data fields
 
-Pass these inside `platform_data.youtube`:
+Pass these inside `platform_data.youtube` (post level) or directly in a target's `platform_data` (target level):
 
 | Field | Type | Description |
 |---|---|---|
