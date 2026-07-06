@@ -3100,21 +3100,12 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Fetches reviews across connected accounts via real-time fan-out to platform APIs. Supports filtering by account and platform. Reviews are proxied live and not stored - results may vary based on platform availability. Currently only Google Business Profile returns reviews.",
+                "description": "Lists your review-capable connected Accounts, each with its live review summary (average rating, total count, last review time). Use this to build the reviews inbox navigation, then GET /inbox/reviews/{account_id} for one Account's reviews.",
                 "tags": [
                     "Inbox Reviews"
                 ],
-                "summary": "List reviews",
+                "summary": "List Accounts with reviews",
                 "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Filter by connected account ID",
-                        "name": "account_id",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
                     {
                         "example": "google",
                         "description": "Filter by platform (google)",
@@ -3123,19 +3114,58 @@
                         "schema": {
                             "type": "string"
                         }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accounts with review summaries",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ReviewAccountsResponse"
+                                }
+                            }
+                        }
                     },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/inbox/reviews/{account_id}": {
+            "get": {
+                "security": [
                     {
-                        "example": "2026-01-01T00:00:00Z",
-                        "description": "Only return reviews created after this timestamp (RFC3339)",
-                        "name": "since",
-                        "in": "query",
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns one page of reviews for a single connected Account, newest first by default. Reviews are proxied live from the platform and not stored. Currently only Google Business Profile returns reviews.",
+                "tags": [
+                    "Inbox Reviews"
+                ],
+                "summary": "List reviews for an Account",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true,
                         "schema": {
                             "type": "string"
                         }
                     },
                     {
-                        "example": 25,
-                        "description": "Maximum number of results (1-100, default 20)",
+                        "example": 20,
+                        "description": "Max results (1-50, default 20)",
                         "name": "limit",
                         "in": "query",
                         "schema": {
@@ -3149,15 +3179,28 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Sort order",
+                        "name": "order",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "newest",
+                                "rating_asc",
+                                "rating_desc"
+                            ]
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Reviews with fan-out metadata",
+                        "description": "Reviews with summary and pagination",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ReviewsFanOutResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.ReviewsListResponse"
                                 }
                             }
                         }
@@ -3174,6 +3217,26 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Account platform does not support reviews (account.platform_unsupported)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3271,8 +3334,8 @@
                             }
                         }
                     },
-                    "429": {
-                        "description": "Monthly interaction limit exceeded",
+                    "422": {
+                        "description": "Account platform does not support reviews (account.platform_unsupported)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3281,8 +3344,8 @@
                             }
                         }
                     },
-                    "501": {
-                        "description": "Platform does not support review replies",
+                    "429": {
+                        "description": "Monthly interaction limit exceeded",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -9521,15 +9584,126 @@
                     }
                 }
             },
-            "api_endpoints.ReviewsFanOutResponse": {
+            "api_endpoints.ReviewAccountRow": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01HZ..."
+                    },
+                    "average_rating": {
+                        "type": "number",
+                        "example": 4.2
+                    },
+                    "last_review_at": {
+                        "type": "string",
+                        "example": "2026-06-22T02:24:05Z"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Western Welding Academy"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "google"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "ok",
+                            "reconnection_required",
+                            "error"
+                        ],
+                        "example": "ok"
+                    },
+                    "total_count": {
+                        "type": "integer",
+                        "example": 87
+                    }
+                }
+            },
+            "api_endpoints.ReviewAccountsResponse": {
                 "type": "object",
                 "properties": {
                     "data": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.ReviewAccountRow"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.ReviewItem": {
+                "type": "object",
+                "properties": {
+                    "author": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Author"
                     },
-                    "meta": {
-                        "$ref": "#/components/schemas/social-api_ai_core_api_service.FanOutMeta"
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-06-20T18:24:31Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "sapi_rev_TXY..."
+                    },
+                    "rating": {
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "reply": {
+                        "$ref": "#/components/schemas/api_endpoints.ReviewReplyDTO"
+                    },
+                    "text": {
+                        "type": "string",
+                        "example": "Great school"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "example": "2026-06-20T18:24:31Z"
+                    }
+                }
+            },
+            "api_endpoints.ReviewReplyDTO": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "example": "Thanks for the feedback!"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "example": "2026-06-21T10:00:00Z"
+                    }
+                }
+            },
+            "api_endpoints.ReviewSummaryResponse": {
+                "type": "object",
+                "properties": {
+                    "average_rating": {
+                        "type": "number",
+                        "example": 4.2
+                    },
+                    "total_count": {
+                        "type": "integer",
+                        "example": 87
+                    }
+                }
+            },
+            "api_endpoints.ReviewsListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.ReviewItem"
+                        }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/api_endpoints.InboxPagination"
+                    },
+                    "summary": {
+                        "$ref": "#/components/schemas/api_endpoints.ReviewSummaryResponse"
                     }
                 }
             },
@@ -11390,40 +11564,6 @@
                     },
                     "failed": {
                         "type": "integer"
-                    }
-                }
-            },
-            "social-api_ai_core_api_service.FailedAccount": {
-                "type": "object",
-                "properties": {
-                    "account_id": {
-                        "type": "string"
-                    },
-                    "code": {
-                        "type": "string"
-                    },
-                    "error": {
-                        "type": "string"
-                    },
-                    "platform": {
-                        "type": "string"
-                    }
-                }
-            },
-            "social-api_ai_core_api_service.FanOutMeta": {
-                "type": "object",
-                "properties": {
-                    "accounts_failed": {
-                        "type": "integer"
-                    },
-                    "accounts_queried": {
-                        "type": "integer"
-                    },
-                    "failed_accounts": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/social-api_ai_core_api_service.FailedAccount"
-                        }
                     }
                 }
             },
