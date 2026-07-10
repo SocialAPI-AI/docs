@@ -949,6 +949,42 @@
                 }
             }
         },
+        "/billing/plans": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns every subscription tier with prices and resource limits, ordered from cheapest to most expensive. Prices are in USD. -1 means unlimited for limits and custom pricing for prices.",
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "List plans",
+                "responses": {
+                    "200": {
+                        "description": "Plan catalog",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.BillingPlansResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/brands": {
             "get": {
                 "security": [
@@ -7682,6 +7718,78 @@
                     }
                 }
             },
+            "api_endpoints.BillingPlan": {
+                "type": "object",
+                "properties": {
+                    "annual_price_usd": {
+                        "type": "integer",
+                        "example": 1044
+                    },
+                    "limits": {
+                        "$ref": "#/components/schemas/api_endpoints.BillingPlanLimits"
+                    },
+                    "monthly_price_usd": {
+                        "type": "integer",
+                        "example": 109
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Full Send"
+                    },
+                    "popular": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "tagline": {
+                        "type": "string",
+                        "example": "For growing teams and products"
+                    },
+                    "tier": {
+                        "type": "string",
+                        "example": "pro"
+                    }
+                }
+            },
+            "api_endpoints.BillingPlanLimits": {
+                "type": "object",
+                "properties": {
+                    "event_retention_days": {
+                        "type": "integer",
+                        "example": 30
+                    },
+                    "exports_per_month": {
+                        "type": "integer",
+                        "example": 20
+                    },
+                    "interactions_per_month": {
+                        "type": "integer",
+                        "example": -1
+                    },
+                    "posts_per_month": {
+                        "type": "integer",
+                        "example": -1
+                    },
+                    "profiles": {
+                        "type": "integer",
+                        "example": 50
+                    },
+                    "storage_bytes": {
+                        "type": "integer",
+                        "example": -1
+                    }
+                }
+            },
+            "api_endpoints.BillingPlansResponse": {
+                "type": "object",
+                "properties": {
+                    "plans": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.BillingPlan"
+                        }
+                    }
+                }
+            },
             "api_endpoints.BrandListItem": {
                 "type": "object",
                 "properties": {
@@ -10314,6 +10422,10 @@
                     "plan": {
                         "type": "string",
                         "example": "free"
+                    },
+                    "use_case": {
+                        "type": "string",
+                        "example": "Managing clients' accounts (agency)"
                     }
                 }
             },

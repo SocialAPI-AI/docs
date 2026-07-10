@@ -13,6 +13,58 @@ Upgrade at [app.social-api.ai](https://app.social-api.ai) &rarr; **Billing**. Co
   **All plans include managed platform apps** for Meta (Instagram, Facebook, Threads), Google, TikTok, LinkedIn, and YouTube - no developer registration or app review on your side. Twitter is BYOK on every plan ([setup guide](/connectors/twitter-byok)). See [Platform credentials](/guides/platform-credentials) for details.
 </Note>
 
+## Plan catalog endpoint
+
+To read the full plan catalog programmatically instead of hardcoding the table below, call:
+
+```bash
+curl https://api.social-api.ai/v1/billing/plans \
+  -H "Authorization: Bearer $SOCIALAPI_KEY"
+```
+
+The response lists every tier, ordered cheapest to most expensive, with its display metadata, prices, and resource limits (trimmed to two plans here):
+
+```json
+{
+  "plans": [
+    {
+      "tier": "free",
+      "name": "Hobby",
+      "tagline": "Kick the tires, no card required",
+      "monthly_price_usd": 0,
+      "annual_price_usd": 0,
+      "popular": false,
+      "limits": {
+        "profiles": 2,
+        "posts_per_month": 10,
+        "interactions_per_month": 50,
+        "storage_bytes": 104857600,
+        "event_retention_days": 1,
+        "exports_per_month": 2
+      }
+    },
+    {
+      "tier": "pro",
+      "name": "Full Send",
+      "tagline": "For growing teams and products",
+      "monthly_price_usd": 109,
+      "annual_price_usd": 1044,
+      "popular": true,
+      "limits": {
+        "profiles": 50,
+        "posts_per_month": -1,
+        "interactions_per_month": -1,
+        "storage_bytes": -1,
+        "event_retention_days": 30,
+        "exports_per_month": 20
+      }
+    }
+  ]
+}
+```
+
+`profiles` is the count of social profiles (brands) the plan allows. Prices are in USD. A value of `-1` means unlimited for any field under `limits`, and custom pricing for `monthly_price_usd` / `annual_price_usd` (shown on the Enterprise tier). `popular` flags the tier highlighted by default on pricing surfaces.
+
 ## Plan limits
 
 | Plan | Display Name | Brands | Posts / month | Interactions / month | Storage | Price |
