@@ -949,42 +949,6 @@
                 }
             }
         },
-        "/billing/plans": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns every subscription tier with prices and resource limits, ordered from cheapest to most expensive. Prices are in USD. -1 means unlimited for limits and custom pricing for prices.",
-                "tags": [
-                    "Billing"
-                ],
-                "summary": "List plans",
-                "responses": {
-                    "200": {
-                        "description": "Plan catalog",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.BillingPlansResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/brands": {
             "get": {
                 "security": [
@@ -3633,7 +3597,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all API keys for the authenticated user.",
+                "description": "Returns all API keys for the authenticated user, including each key's scope and brand restrictions.",
                 "tags": [
                     "API Keys"
                 ],
@@ -3667,7 +3631,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Generates a new API key for the authenticated user.",
+                "description": "Generates a new API key for the authenticated user. Optionally restrict it to a set of scopes (see GET /keys/scopes) and/or brands. Empty scopes or brand_ids mean unrestricted.",
                 "tags": [
                     "API Keys"
                 ],
@@ -3680,7 +3644,7 @@
                             }
                         }
                     },
-                    "description": "Key name",
+                    "description": "Key name and optional restrictions",
                     "required": true
                 },
                 "responses": {
@@ -3695,11 +3659,47 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid request body or missing name",
+                        "description": "Invalid request body, missing name, unknown scope, or invalid brand ID",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/keys/scopes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the catalog of scopes assignable to restricted API keys.",
+                "tags": [
+                    "API Keys"
+                ],
+                "summary": "List API key scopes",
+                "responses": {
+                    "200": {
+                        "description": "Scope catalog",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.KeyScopesResponse"
                                 }
                             }
                         }
@@ -3747,6 +3747,139 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api_endpoints.OKResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "API key not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Edits an existing key's name, scopes, and brand restrictions in place. The key value is unchanged (no new secret is issued). Empty scopes or brand_ids mean unrestricted. Requires a full-access key or the dashboard.",
+                "tags": [
+                    "API Keys"
+                ],
+                "summary": "Update API key",
+                "parameters": [
+                    {
+                        "description": "API key ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.UpdateKeyRequest"
+                            }
+                        }
+                    },
+                    "description": "New name and restrictions",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Key updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.UpdateKeyResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body, missing name, unknown scope, or invalid brand ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "API key not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/keys/{id}/rotate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Issues a new secret for an existing key, keeping its id, name, scopes, and brand restrictions. The old key value stops working immediately. The new raw key is shown once. Requires a full-access key or the dashboard.",
+                "tags": [
+                    "API Keys"
+                ],
+                "summary": "Rotate API key",
+                "parameters": [
+                    {
+                        "description": "API key ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Key rotated (new raw key shown once)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.CreateKeyResponse"
                                 }
                             }
                         }
@@ -7718,78 +7851,6 @@
                     }
                 }
             },
-            "api_endpoints.BillingPlan": {
-                "type": "object",
-                "properties": {
-                    "annual_price_usd": {
-                        "type": "integer",
-                        "example": 1044
-                    },
-                    "limits": {
-                        "$ref": "#/components/schemas/api_endpoints.BillingPlanLimits"
-                    },
-                    "monthly_price_usd": {
-                        "type": "integer",
-                        "example": 109
-                    },
-                    "name": {
-                        "type": "string",
-                        "example": "Full Send"
-                    },
-                    "popular": {
-                        "type": "boolean",
-                        "example": true
-                    },
-                    "tagline": {
-                        "type": "string",
-                        "example": "For growing teams and products"
-                    },
-                    "tier": {
-                        "type": "string",
-                        "example": "pro"
-                    }
-                }
-            },
-            "api_endpoints.BillingPlanLimits": {
-                "type": "object",
-                "properties": {
-                    "event_retention_days": {
-                        "type": "integer",
-                        "example": 30
-                    },
-                    "exports_per_month": {
-                        "type": "integer",
-                        "example": 20
-                    },
-                    "interactions_per_month": {
-                        "type": "integer",
-                        "example": -1
-                    },
-                    "posts_per_month": {
-                        "type": "integer",
-                        "example": -1
-                    },
-                    "profiles": {
-                        "type": "integer",
-                        "example": 50
-                    },
-                    "storage_bytes": {
-                        "type": "integer",
-                        "example": -1
-                    }
-                }
-            },
-            "api_endpoints.BillingPlansResponse": {
-                "type": "object",
-                "properties": {
-                    "plans": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/api_endpoints.BillingPlan"
-                        }
-                    }
-                }
-            },
             "api_endpoints.BrandListItem": {
                 "type": "object",
                 "properties": {
@@ -7999,7 +8060,7 @@
                 "properties": {
                     "auth_url": {
                         "type": "string",
-                        "example": "https://www.instagram.com/oauth/authorize?..."
+                        "example": "https://www.instagram.com/oauth/authorize/?..."
                     },
                     "message": {
                         "type": "string",
@@ -8112,15 +8173,39 @@
             "api_endpoints.CreateKeyRequest": {
                 "type": "object",
                 "properties": {
+                    "brand_ids": {
+                        "description": "BrandIDs restricts the key to specific brands. Empty means all brands.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "name": {
                         "type": "string",
                         "example": "My App"
+                    },
+                    "scopes": {
+                        "description": "Scopes restricts the key to specific actions. Empty means full access.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "posts:write",
+                            "inbox:read"
+                        ]
                     }
                 }
             },
             "api_endpoints.CreateKeyResponse": {
                 "type": "object",
                 "properties": {
+                    "brand_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "id": {
                         "type": "string"
                     },
@@ -8134,6 +8219,16 @@
                     "raw_key": {
                         "type": "string",
                         "example": "sapi_key_..."
+                    },
+                    "scopes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "posts:write",
+                            "inbox:read"
+                        ]
                     }
                 }
             },
@@ -8982,6 +9077,12 @@
             "api_endpoints.KeyListItem": {
                 "type": "object",
                 "properties": {
+                    "brand_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "created_at": {
                         "type": "string",
                         "example": "2026-02-28T12:00:00Z"
@@ -9002,6 +9103,47 @@
                     "preview": {
                         "type": "string",
                         "example": "sapi_key_a1b2c..."
+                    },
+                    "scopes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "posts:write",
+                            "inbox:read"
+                        ]
+                    }
+                }
+            },
+            "api_endpoints.KeyScopeItem": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "example": "Create, edit, publish, and delete posts"
+                    },
+                    "group": {
+                        "type": "string",
+                        "example": "Posts"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "posts:write"
+                    }
+                }
+            },
+            "api_endpoints.KeyScopesResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.KeyScopeItem"
+                        }
                     }
                 }
             },
@@ -10195,6 +10337,60 @@
                     }
                 }
             },
+            "api_endpoints.UpdateKeyRequest": {
+                "type": "object",
+                "properties": {
+                    "brand_ids": {
+                        "description": "BrandIDs restricts the key to specific brands. Empty means all brands.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "My App"
+                    },
+                    "scopes": {
+                        "description": "Scopes restricts the key to specific actions. Empty means full access.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "posts:write",
+                            "inbox:read"
+                        ]
+                    }
+                }
+            },
+            "api_endpoints.UpdateKeyResponse": {
+                "type": "object",
+                "properties": {
+                    "brand_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "scopes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "posts:write",
+                            "inbox:read"
+                        ]
+                    }
+                }
+            },
             "api_endpoints.UpdatePageRequest": {
                 "type": "object",
                 "properties": {
@@ -10422,10 +10618,6 @@
                     "plan": {
                         "type": "string",
                         "example": "free"
-                    },
-                    "use_case": {
-                        "type": "string",
-                        "example": "Managing clients' accounts (agency)"
                     }
                 }
             },

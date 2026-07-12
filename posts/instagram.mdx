@@ -37,6 +37,10 @@ Story publishing is supported via the API using `content_type: "stories"`. Note 
 
 **Carousel limits:** 2 to 10 items. Carousel child containers do not accept captions; only the parent container carries the caption.
 
+<Warning>
+  Attach media by **uploading it first and passing the returned `media_id`** in the `media_ids` array. There is no `image_url`, `video_url`, or `media_urls` field: passing a raw public URL is silently ignored, and the post publishes with no media (Instagram then returns `The parameter image_url is required`). Upload in one step with `POST /v1/media/upload` (multipart), or use the presigned-URL flow (`GET /v1/media/upload-url` → `PUT` the file → `POST /v1/media/:id/verify`). The `verify` step is required: without it the media stays `pending` and publishing fails with `Media not found`.
+</Warning>
+
 ---
 
 ## 3. Create post
@@ -228,7 +232,7 @@ The following example publishes a Reel with a cover image, a collaborator tag, a
 
 ```bash
 # Get a presigned upload URL
-curl "https://api.social-api.ai/v1/media/upload-url?filename=reel.mp4&content_type=video/mp4" \
+curl "https://api.social-api.ai/v1/media/upload-url?filename=reel.mp4&media_type=video/mp4" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 

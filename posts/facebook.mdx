@@ -1,11 +1,11 @@
 ---
 title: Facebook publishing
-description: Full reference for publishing Facebook Page posts via SocialAPI, including text, link preview, photo, and video posts.
+description: Full reference for publishing Facebook Page posts via SocialAPI, including text, link preview, photo, video, Reel, and Story posts.
 ---
 
 ## 1. Overview
 
-Facebook publishing uses the Meta Graph API directly against your connected Facebook Page. SocialAPI selects the correct Graph API endpoint based on the content type: text and link posts go to `/{page-id}/feed`, single-photo posts to `/{page-id}/photos`, single-video posts to `/{page-id}/videos`, and multi-photo albums use a two-step upload-then-feed flow described below.
+Facebook publishing uses the Meta Graph API directly against your connected Facebook Page. SocialAPI selects the correct Graph API endpoint based on the content type: text and link posts go to `/{page-id}/feed`, single-photo posts to `/{page-id}/photos`, single-video posts to `/{page-id}/videos`, and multi-photo albums use a two-step upload-then-feed flow. Two richer formats are opted into explicitly with `platform_data.content_type`: Reels (`content_type: "reel"`) publish through the Reels API, and 24-hour Stories (`content_type: "stories"`) publish through the photo or video Stories API. Every format is described below.
 
 | Field | Value |
 |---|---|
@@ -18,6 +18,8 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 | Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | Yes (best-effort) |
 | Carousel (multi-photo) | Yes (2 to 10 photos; images only) |
+| Reel | Yes (`content_type: "reel"`; one vertical video) |
+| Story | Yes (`content_type: "stories"`; one photo or video, expires after 24 hours) |
 
 ---
 
@@ -30,13 +32,16 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 | Single photo | One image entry in `media_ids` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
 | Single video | One video entry in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; only the `title` platform_data field is forwarded |
 | Reel | One vertical video entry in `media_ids` plus `content_type: "reel"` in the target's `platform_data` | Routes to the Reels API (`/{page-id}/video_reels`). Unlike standard videos, `platform_data` IS honored (`content_type`, `share_to_feed`). |
+| Story | One photo or video entry in `media_ids` plus `content_type: "stories"` in the target's `platform_data` | Publishes a Page Story that expires after 24 hours. Photos publish via `/{page-id}/photo_stories`; videos run the three-phase `/{page-id}/video_stories` flow. Captions, links, and audience targeting are ignored. |
 | Multi-photo album | 2 to 10 image entries in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
 
-Route selection is automatic:
+Route selection is mostly automatic, driven by how many `media_ids` you pass:
 
 - `media_ids` is empty → text or link post on `/{page-id}/feed`
 - `media_ids` has one entry → photo or video endpoint based on the file extension
 - `media_ids` has 2 to 10 entries → multi-photo album
+
+Reels and Stories override that extension-based routing. Set `content_type` in the target's `platform_data` to `"reel"` (one vertical video) or `"stories"` (one photo or video), and that intent takes precedence over the rules above.
 
 **Caption limit:** Follows Facebook's standard post message limit (approximately 63,206 characters, though shorter posts perform better).
 
@@ -161,7 +166,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Reel
 
-Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media_ids`. SocialAPI runs Facebook's Reels publishing flow (upload, processing, publish). The request blocks until the Reel is ready or published, polling up to 60 seconds (12 attempts at 5-second intervals). If the Reel does not finish processing within that window, the publish fails with `504 Gateway Timeout`.
+Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media_ids`. SocialAPI runs Facebook's Reels publishing flow (upload, processing, publish). The request blocks until the Reel is ready or published, polling for up to about 10 minutes (120 status checks at 5-second intervals). If the Reel does not finish processing within that window, the publish fails with `504 Gateway Timeout`.
 
 The `platform_data` object lives on the target (inside the `targets` array), and its keys are read directly (do not nest them under a `facebook` key).
 
@@ -190,6 +195,41 @@ Reel fields (inside the target's `platform_data`):
 | `share_to_feed` | boolean | `true` | When `true`, the Reel also appears in the Page feed, not just the Reels tab. |
 
 Requirements: exactly one video, vertical orientation (9:16), and a duration of 3 to 90 seconds. SocialAPI warns when the duration is outside that range; Facebook enforces the aspect ratio at publish time and rejects videos that do not comply.
+
+### Story
+
+Publish a 24-hour Page Story by setting `content_type: "stories"` in the target's `platform_data`. Provide exactly one photo or video entry in `media_ids`, and SocialAPI picks the right flow from the media type: a photo is uploaded as an unpublished photo and then published to `/{page-id}/photo_stories`, while a video runs Facebook's three-phase `/{page-id}/video_stories` flow (upload, processing, publish). For a video, the request blocks until processing finishes, polling for up to about 10 minutes (120 status checks at 5-second intervals); if it does not finish in that window, the publish fails with `504 Gateway Timeout`.
+
+Stories carry no caption, link, call-to-action, or audience targeting, so any `text` or `platform_data` field other than `content_type` is ignored.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "content_type": "stories"
+      }
+    }]
+  }'
+```
+
+Story fields (inside the target's `platform_data`):
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `content_type` | string | `"feed"` | Set to `"stories"` to publish a Story. |
+
+Requirements and limits:
+
+- Exactly one media item. Passing zero or more than one entry returns a validation error before any upload to Facebook.
+- Photos: JPEG, BMP, PNG, GIF, or TIFF, up to 10 MB (keep PNGs under 1 MB).
+- Videos: 9:16 vertical, 1080 by 1920 recommended (minimum 540 by 960), 3 to 90 seconds, 24 to 60 fps.
+- The photo or video must not have been used in a previously published post. Facebook rejects a Story whose media already appeared elsewhere, so upload a fresh asset for each Story.
+- Stories are a Pages-only format and expire after 24 hours (see [Stories expire](#stories-expire)).
 
 ### First comment
 
@@ -309,7 +349,7 @@ When a user completes the Facebook OAuth flow, SocialAPI connects all Facebook P
 
 ### platform_data forwarding rules
 
-The target's `platform_data` block is forwarded to the Graph API for text/link posts and for multi-photo albums (both go through the `/{page-id}/feed` endpoint). For single-photo and single-video posts, most `platform_data` keys are ignored: `alt_text` is honored for single-photo posts and `title` is honored for single-video posts. All other keys are silently dropped for those post types.
+The target's `platform_data` block is forwarded to the Graph API for text/link posts and for multi-photo albums (both go through the `/{page-id}/feed` endpoint). For single-photo and single-video posts, most `platform_data` keys are ignored: `alt_text` is honored for single-photo posts and `title` is honored for single-video posts. For Reels, `content_type` and `share_to_feed` apply; for Stories, only `content_type` applies (Stories take no caption, link, or targeting). All other keys are silently dropped for those post types.
 
 ### Multi-photo album semantics
 
@@ -318,6 +358,10 @@ Multi-photo albums (2 to 10 image entries in `media_ids`) use a two-step flow: e
 ### First comment is non-blocking
 
 If `first_comment` is set and the comment fails after publish, the post remains `published`. The comment failure is logged but does not roll back or change the post status.
+
+### Stories expire
+
+Facebook Page Stories are visible for 24 hours and then disappear from the Page. The post record in SocialAPI is not removed when the story expires on Facebook, so a `GET /v1/posts` result may still reference a story that is no longer live. Stories are also single-use per asset: the photo or video must not have appeared in a previously published post, or Facebook rejects the publish. Upload a fresh media item for each Story.
 
 ### Reviews deprecated
 
