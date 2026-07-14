@@ -67,7 +67,7 @@ https://app.example.com/oauth/callback
   &account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J
 ```
 
-One connection produces exactly one `account_id`. Facebook accounts that manage multiple Pages still resolve to a single account in the connection result; Page details are exposed separately under `/v1/accounts/{id}/pages` and are not part of this flow.
+One connection produces exactly one `account_id`, with one exception: Facebook never returns `status=success` directly. Every Facebook connect pauses for Page selection, described below in [Facebook: choosing which Pages to connect](#facebook-choosing-which-pages-to-connect). Google logins that manage more than one Business Profile follow the same pending-connection pattern; see the next section.
 
 **Error** (the user denied consent, the platform returned an error, or the link expired):
 
@@ -82,9 +82,15 @@ https://app.example.com/oauth/callback
 
 Always check `status` first. On `success`, persist the `account_id` against your user record and call `/v1/accounts/{id}` for full account details. On `error`, surface a retry path in your UI — the customer can restart from Step 1.
 
+### Pending connections: choosing among multiple candidates
+
+Some platforms cannot resolve a single account from an OAuth grant alone, so the connect flow pauses and asks you to choose before an account is created. Google takes this path only when a login manages more than one Business Profile. Facebook takes it on every connect, because one Facebook login can serve many brands and Pages must be assigned to a brand explicitly.
+
+When this happens, your `redirect_uri` (or the exchange response, in the proxy flow) receives `status: selection_required` and a `connection_id` instead of `status: success`. No account exists yet. Finish the connection with `POST /v1/accounts/pending/{connection_id}/select`, shaped differently per platform as shown below.
+
 ### Google: connecting a login with multiple Business Profiles
 
-This only applies to Google logins that manage more than one Business Profile. A Google login with a single Profile connects like any other platform, in a single request, with no extra step.
+A Google login with a single Profile connects like any other platform, in a single request, with no extra step.
 
 Google accounts can manage several Business Profiles under one login (for example, a chain with multiple locations). When that happens, SocialAPI cannot know which Profile you want to connect, so it does not create an account yet. Instead it stores a pending connection and asks you to choose.
 
@@ -145,6 +151,90 @@ This returns the same `ConnectAccountResponse` (HTTP 201) as a normal single-Pro
 
 <Note>
   A pending connection is single-use and expires 30 minutes after it is created. The first successful selection consumes it: a second `select` call, or one made after expiry, returns `404`. Selecting a `platform_account_id` that is not in the returned candidate set returns `400`.
+</Note>
+
+### Facebook: choosing which Pages to connect
+
+Every Facebook connect returns a pending connection, never `status: success` directly, even when the login manages a single Page. Facebook Pages are shared across brands: one login can serve several brands through one stored credential, and Pages must be assigned to a brand explicitly rather than attaching automatically.
+
+**Server-callback flow.** Your `redirect_uri` receives `status=selection_required` and a `connection_id`, the same shape as Google:
+
+```
+https://app.example.com/oauth/callback
+  ?status=selection_required
+  &connection_id=pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2
+  &state=session_abc123
+```
+
+**Proxy flow.** `POST /v1/oauth/exchange` returns the pending connection in the body, with Facebook-specific fields alongside the shared `status` and `connection_id`:
+
+```json
+{
+  "status": "selection_required",
+  "connection_id": "pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "platform": "facebook",
+  "login_id": "cred_01J8X3Q4R5M6N7P8V2K0W1J",
+  "pages": [
+    {
+      "platform_page_id": "17841400000000000",
+      "name": "Acme Bakery",
+      "assigned_brand_id": "",
+      "assignable": true
+    },
+    {
+      "platform_page_id": "17841400000000111",
+      "name": "Acme Cafe",
+      "assigned_brand_id": "b_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "assignable": false
+    }
+  ],
+  "lost_access": []
+}
+```
+
+Fields:
+
+| Field | Meaning |
+|---|---|
+| `login_id` | Identifies the shared Facebook credential behind this connection. Use it later with the [Facebook logins endpoints](/connectors/facebook#managing-pages-after-connecting) to list or assign Pages without a new OAuth round trip. |
+| `pages[].platform_page_id` | The Facebook Page ID. |
+| `pages[].name` | The Page's display name. |
+| `pages[].assigned_brand_id` | Empty when the Page is unassigned and available. Set to an existing brand ID when one of your other brands already owns the Page, in which case `assignable` is `false`. |
+| `pages[].assignable` | Whether this Page can be assigned to the brand you are connecting into right now. |
+| `lost_access[]` | Pages this authorization revoked access to, app-wide. Empty on a first connect; see below. |
+
+**Resolving the selection.** As with Google, `GET /v1/accounts/pending/{connection_id}` re-fetches the candidate list, and `POST /v1/accounts/pending/{connection_id}/select` completes the connection, but the body carries `page_ids` instead of a single `platform_account_id`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/pending/pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2/select \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"page_ids": ["17841400000000000"]}'
+```
+
+You do not have to assign every candidate Page at connect time. Pages you leave out stay unassigned and can be picked up later, from this brand or another one you own, via `GET /v1/platforms/facebook/logins/{login_id}/pages` and `POST /v1/platforms/facebook/logins/{login_id}/pages/{page_id}/assign`. See [Facebook connector: managing Pages after connecting](/connectors/facebook#managing-pages-after-connecting).
+
+**Lost access.** Facebook grants access per app, not per brand. When a user re-authenticates and unchecks a Page they had previously granted, that Page's access is revoked everywhere, including on brands other than the one being reconnected. `lost_access[]` names every Page this happened to, along with the brand that was using it:
+
+```json
+"lost_access": [
+  {
+    "platform_page_id": "17841400000000111",
+    "name": "Acme Cafe",
+    "brand_id": "b_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_name": "Acme Cafe LLC"
+  }
+]
+```
+
+Show the affected user this warning, filling in the Page and brand names from the entry:
+
+> Reconnecting removed access to {page}, used by {brand}. To restore it, reconnect Facebook and choose Edit previous settings, keeping {page} checked.
+
+The brand's assignment to a lost Page is preserved, not deleted. The next time the same login is re-granted access to that Page (by keeping it checked on Facebook's consent screen during a later reconnect), it reactivates in place, on the same brand, with no further steps.
+
+<Note>
+  A Facebook pending connection is single-use and expires 30 minutes after it is created, the same rule as Google. Selecting a `platform_page_id` you have no access to, or that another brand already owns, returns `400`.
 </Note>
 
 ### Fallback when `redirect_uri` is omitted

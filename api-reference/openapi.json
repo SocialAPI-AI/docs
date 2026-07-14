@@ -200,11 +200,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Promotes exactly one candidate Profile from a pending connection into a connected account. First selection wins; the pending connection is then consumed.",
+                "description": "Promotes a pending connection into a connected account. For Google, pass platform_account_id to choose exactly one candidate Profile. For Facebook, pass page_ids with the subset of candidate Pages to assign to the brand. First selection wins; the pending connection is then consumed.",
                 "tags": [
                     "Accounts"
                 ],
-                "summary": "Select a Google Business Profile to connect",
+                "summary": "Select a Google Business Profile or Facebook Pages to connect",
                 "parameters": [
                     {
                         "description": "Pending connection ID",
@@ -224,7 +224,7 @@
                             }
                         }
                     },
-                    "description": "Chosen platform_account_id",
+                    "description": "Chosen platform_account_id (Google) or page_ids (Facebook)",
                     "required": true
                 },
                 "responses": {
@@ -239,7 +239,7 @@
                         }
                     },
                     "400": {
-                        "description": "platform_account_id not in the candidate set",
+                        "description": "platform_account_id or page_ids not in the candidate set",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4379,6 +4379,150 @@
                 }
             }
         },
+        "/platforms/facebook/logins/{loginId}/pages": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists every Page the login's stored credential can manage, live from Meta, merged with assignment state. Pages granted after the last OAuth exchange appear here without re-authenticating. assignable reflects tenancy only; plan quota is enforced when assigning.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "List a Facebook login's Pages",
+                "parameters": [
+                    {
+                        "description": "Facebook login (credential) ID",
+                        "name": "loginId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.FacebookLoginPagesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown login",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/facebook/logins/{loginId}/pages/{pageId}/assign": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Assigns one unassigned Page from this login to the given brand. Each Page belongs to exactly one brand. Each brand includes 5 pages; additional pages consume a profile unit from the plan quota.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Assign a Facebook Page to a brand",
+                "parameters": [
+                    {
+                        "description": "Facebook login (credential) ID",
+                        "name": "loginId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Platform page ID",
+                        "name": "pageId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.AssignPageRequest"
+                            }
+                        }
+                    },
+                    "description": "Target brand",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AssignPageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Plan quota exceeded (billing.profile_units_limit)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown login or brand",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Brand connected through a different login",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/instagram/accounts/{id}/stories": {
             "get": {
                 "security": [
@@ -7851,6 +7995,30 @@
                     }
                 }
             },
+            "api_endpoints.AssignPageRequest": {
+                "type": "object",
+                "properties": {
+                    "brand_id": {
+                        "type": "string",
+                        "example": "b7f9..."
+                    }
+                }
+            },
+            "api_endpoints.AssignPageResponse": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01J..."
+                    },
+                    "brand_id": {
+                        "type": "string"
+                    },
+                    "platform_page_id": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.BrandListItem": {
                 "type": "object",
                 "properties": {
@@ -8920,6 +9088,25 @@
                     }
                 }
             },
+            "api_endpoints.FacebookLoginPagesResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "login_id": {
+                        "type": "string",
+                        "example": "cred_01J..."
+                    },
+                    "pages": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PendingPage"
+                        }
+                    }
+                }
+            },
             "api_endpoints.ImportPostsResponse": {
                 "type": "object",
                 "properties": {
@@ -9180,6 +9367,23 @@
                         "items": {
                             "$ref": "#/components/schemas/social-api_ai_core_api_service.WebhookEventInfo"
                         }
+                    }
+                }
+            },
+            "api_endpoints.LostPageAccess": {
+                "type": "object",
+                "properties": {
+                    "brand_id": {
+                        "type": "string"
+                    },
+                    "brand_name": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "platform_page_id": {
+                        "type": "string"
                     }
                 }
             },
@@ -9455,6 +9659,22 @@
                         "type": "string",
                         "example": "2026-07-04T12:30:00Z"
                     },
+                    "login_id": {
+                        "description": "Facebook page-selection fields (empty for Google Profile selection).",
+                        "type": "string"
+                    },
+                    "lost_access": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.LostPageAccess"
+                        }
+                    },
+                    "pages": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PendingPage"
+                        }
+                    },
                     "platform": {
                         "type": "string",
                         "example": "google"
@@ -9474,6 +9694,22 @@
                         "type": "string",
                         "example": "pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
                     },
+                    "login_id": {
+                        "description": "Facebook page-selection fields (empty for Google Profile selection).",
+                        "type": "string"
+                    },
+                    "lost_access": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.LostPageAccess"
+                        }
+                    },
+                    "pages": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PendingPage"
+                        }
+                    },
                     "platform": {
                         "type": "string",
                         "example": "google"
@@ -9487,6 +9723,37 @@
                     "status": {
                         "type": "string",
                         "example": "selection_required"
+                    }
+                }
+            },
+            "api_endpoints.PendingPage": {
+                "type": "object",
+                "properties": {
+                    "assignable": {
+                        "type": "boolean"
+                    },
+                    "assigned_account_id": {
+                        "type": "string"
+                    },
+                    "assigned_brand_id": {
+                        "type": "string"
+                    },
+                    "assigned_brand_name": {
+                        "type": "string"
+                    },
+                    "category": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Acme Bakery"
+                    },
+                    "picture_url": {
+                        "type": "string"
+                    },
+                    "platform_page_id": {
+                        "type": "string",
+                        "example": "17841400000000000"
                     }
                 }
             },
@@ -10001,7 +10268,15 @@
             "api_endpoints.SelectProfileRequest": {
                 "type": "object",
                 "properties": {
+                    "page_ids": {
+                        "description": "PageIDs selects the Facebook Pages to assign to the brand (Facebook pending connections only).",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "platform_account_id": {
+                        "description": "PlatformAccountID selects the Google Business Profile to connect (Google\npending connections only).",
                         "type": "string",
                         "example": "accounts/123/locations/456"
                     }
@@ -10559,6 +10834,14 @@
                         "type": "integer",
                         "example": 1200
                     },
+                    "page_allowance": {
+                        "type": "integer",
+                        "example": 5
+                    },
+                    "page_billing_exempt": {
+                        "type": "boolean",
+                        "example": false
+                    },
                     "period_end": {
                         "type": "string",
                         "example": "2026-03-15T00:00:00Z"
@@ -10574,6 +10857,14 @@
                     "posts_used": {
                         "type": "integer",
                         "example": 42
+                    },
+                    "profile_units_limit": {
+                        "type": "integer",
+                        "example": 10
+                    },
+                    "profile_units_used": {
+                        "type": "integer",
+                        "example": 4
                     }
                 }
             },
@@ -11407,6 +11698,10 @@
                         "description": "[always]",
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "login_id": {
+                        "description": "[optional] Shared credential (login) id; set for credential-backed platforms (e.g. facebook)",
+                        "type": "string"
                     },
                     "metadata": {
                         "description": "[optional] Platform-specific keys stored at connect time",

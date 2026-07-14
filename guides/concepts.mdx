@@ -18,6 +18,30 @@ Brands matter for two reasons:
 1. **Billing.** Plans are sized in social profiles (brands). Free includes 2, Starter 10, Pro 50, Business 200, Enterprise unlimited.
 2. **Isolation.** Accounts under one brand cannot see accounts under another. Use brands to keep agency clients separated, or to split staging from production.
 
+### Profile units
+
+The numbers above are unit limits, not a strict brand count. Billing counts **profile units**: each brand costs one unit, and for page-capable platforms (currently Facebook) each active Page beyond a 5-page allowance per brand costs one more unit. A brand with 5 or fewer Facebook Pages costs the same one unit as a brand with none; a 7-Page brand costs 3 units (1 for the brand, 2 for the Pages over the allowance).
+
+This mostly matters for Facebook's shared-login model (see [Facebook: one login, many brands](/connectors/facebook#one-login-many-brands)), where a single login can back many brands and a brand can accumulate Pages one at a time through the [Facebook logins endpoints](/connectors/facebook#managing-pages-after-connecting). Assigning a Page that would push you over your plan's unit allowance returns `403 billing.profile_units_limit`. Accounts created before 2026-07-14 are grandfathered out of page overage entirely (`page_billing_exempt`), so existing brands never pay for Pages they already had.
+
+`GET /v1/usage` reports where you stand:
+
+```json
+{
+  "profile_units_used": 4,
+  "profile_units_limit": 10,
+  "page_allowance": 5,
+  "page_billing_exempt": false
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `profile_units_used` | Units consumed so far: brands plus Page overage. |
+| `profile_units_limit` | Your plan's total unit allowance (`-1` for unlimited, Enterprise). |
+| `page_allowance` | Pages included free per brand, per page-capable platform, before overage applies (`5`). |
+| `page_billing_exempt` | `true` if your account is grandfathered out of Page overage billing. |
+
 ```json
 {
   "id": "b_01HZAB12CDEFGHJKMNPQRSTUVW",
