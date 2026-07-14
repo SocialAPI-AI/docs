@@ -20,9 +20,9 @@ Brands matter for two reasons:
 
 ### Profile units
 
-The numbers above are unit limits, not a strict brand count. Billing counts **profile units**: each brand costs one unit, and for page-capable platforms (currently Facebook) each active Page beyond a 5-page allowance per brand costs one more unit. A brand with 5 or fewer Facebook Pages costs the same one unit as a brand with none; a 7-Page brand costs 3 units (1 for the brand, 2 for the Pages over the allowance).
+The numbers above are unit limits, not a strict brand count. Billing counts **profile units**: each brand costs one unit. Profile units track brand count only, Facebook Pages do not add units.
 
-This mostly matters for Facebook's shared-login model (see [Facebook: one login, many brands](/connectors/facebook#one-login-many-brands)), where a single login can back many brands and a brand can accumulate Pages one at a time through the [Facebook logins endpoints](/connectors/facebook#managing-pages-after-connecting). Assigning a Page that would push you over your plan's unit allowance returns `403 billing.profile_units_limit`. Accounts created before 2026-07-14 are grandfathered out of page overage entirely (`page_billing_exempt`), so existing brands never pay for Pages they already had.
+Facebook Pages have their own limit instead: each brand can connect up to 5 Facebook Pages (see [Facebook: one login, many brands](/connectors/facebook#one-login-many-brands)), accumulated one at a time through the [Facebook logins endpoints](/connectors/facebook#managing-pages-after-connecting). This is a hard cap, not a billed allowance: there is no charge for staying under it, and assigning a Page beyond it returns `403 platform.facebook.page_cap` rather than a unit-limit error.
 
 `GET /v1/usage` reports where you stand:
 
@@ -37,10 +37,10 @@ This mostly matters for Facebook's shared-login model (see [Facebook: one login,
 
 | Field | Meaning |
 |---|---|
-| `profile_units_used` | Units consumed so far: brands plus Page overage. |
+| `profile_units_used` | Units consumed so far: brand count. |
 | `profile_units_limit` | Your plan's total unit allowance (`-1` for unlimited, Enterprise). |
-| `page_allowance` | Pages included free per brand, per page-capable platform, before overage applies (`5`). |
-| `page_billing_exempt` | `true` if your account is grandfathered out of Page overage billing. |
+| `page_allowance` | Facebook Pages allowed per brand before further assignment is refused (`5`). |
+| `page_billing_exempt` | Legacy flag from the earlier page-billing model. Page assignment is not billed for any account. |
 
 ```json
 {
