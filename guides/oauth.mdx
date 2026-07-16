@@ -179,6 +179,14 @@ curl https://api.social-api.ai/v1/accounts \
 
 If you call `POST /v1/accounts/connect` for an account that is already connected, the flow runs again and the stored token is upserted. This is safe to call when tokens expire and is the supported path for token refresh on platforms that lack long-lived tokens.
 
+### Disconnecting an account
+
+`DELETE /v1/accounts/{id}` removes the account and the tokens we hold for it. Where the platform offers a token-revocation endpoint, we also revoke the grant on the platform during disconnect: Facebook, Google, Instagram, Threads, X, TikTok, and YouTube all support this.
+
+LinkedIn, Pinterest, and Zalo do not offer a revocation API, so disconnect removes only the token stored on our side. On those platforms the user still sees the app authorized in their account settings and must remove it manually. If you offboard users under GDPR or similar rules, account for this manual step on those three platforms.
+
+This is separate from `POST /oauth/revoke` below, which revokes SocialAPI's own OAuth 2.1 tokens issued to MCP clients, not a platform grant.
+
 ---
 
 ## OAuth 2.1 for MCP and API clients
