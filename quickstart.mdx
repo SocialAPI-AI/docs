@@ -200,8 +200,41 @@ The platform for each target is inferred from `account_id`, no `platform` field 
   Omitting `scheduled_at` does **not** publish immediately, you must pass `"publish_now": true`. A post created without `publish_now` or `scheduled_at` is saved as a draft (drafts are free, no post credit is charged). To publish an existing draft later, call `POST /v1/posts/{pid}/publish`.
 </Note>
 
+### Publish a post with an image
+
+Text-only posts need just the call above. To attach an image, upload it first, verify it, then pass its ID in `media_ids` (a flat array of strings). This is a four-step flow:
+
+```bash
+# 1. Request a signed upload URL (media_type and filename are required)
+curl "https://api.social-api.ai/v1/media/upload-url?media_type=image/jpeg&filename=launch.jpg" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+# -> { "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479", "upload_url": "https://...", "expires_at": "..." }
+
+# 2. Upload the bytes to the signed URL (Content-Type must match media_type)
+curl -X PUT "https://...signed-upload-url..." \
+  -H "Content-Type: image/jpeg" \
+  --data-binary @launch.jpg
+
+# 3. Verify the upload (required: flips the media from pending to ready)
+curl -X POST https://api.social-api.ai/v1/media/f47ac10b-58cc-4372-a567-0e02b2c3d479/verify \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+
+# 4. Create the post, referencing the media by ID
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Our spring collection is live.",
+    "publish_now": true,
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "targets": [ { "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" } ]
+  }'
+```
+
+The field is `media_ids`, a flat array of ID strings. A raw image URL, or a different shape such as `media: [{ "media_id": "..." }]`, is not applied, and the post publishes without the image. Skipping step 3 leaves the media `pending`, and the publish fails rather than posting without it. See [Media uploads](/guides/media) for videos, carousels, and the server-side upload path.
+
 <Tip>
-  If `status` is `failed`, inspect `targets[].error` for the per-platform reason. The most common failure is missing required fields per platform: see [Posts](/posts/overview).
+  Publishing to several targets can partly succeed. A `201` means the post was created (delivery runs in the background); `207` means some targets published and others failed; `422` means all failed. When a target fails, the reason is under `targets[].error`. Do not treat `207` as a total failure. See [Publishing behavior and reliability](/guides/reliability#response-codes).
 </Tip>
 
 ## What you just built
