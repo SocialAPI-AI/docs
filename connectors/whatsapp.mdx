@@ -22,14 +22,14 @@ description: Connect a WhatsApp Business phone number to receive and reply to di
 | Feature | Supported | Notes |
 |---|---|---|
 | Receive DMs | Yes | Inbound messages arrive in real time via webhooks |
-| Reply to DMs | Yes | Text only, and only inside the open 24-hour service window (see below) |
+| Free-form reply | Yes | Text only, and only inside the open 24-hour service window (see below) |
+| Template messages | Yes | Create, list, edit, delete, and validate templates via the API, and send approved templates (including outside the 24-hour window) |
+| Media / interactive free-form replies | No | Free-form inbox replies are plain text; buttons and media are delivered through templates instead |
 | Conversation list / history | No | There is no history API; the inbox is built from webhooks received after you connect |
-| Template messages | No | Templates are created and managed in Meta Business Manager, but sending them is not exposed through our API yet |
-| Media / interactive replies | No | Replies are plain text; attachments, buttons, and reactions are not sent |
-| Publishing | No | WhatsApp has no posts concept |
-| Comments | No | Not applicable |
-| Reviews | No | Not applicable |
-| Mentions | No | Not applicable |
+| Phone-number management | Yes | Request a code, verify, register, deregister, and check status of the business number |
+| Business profile | Yes | Read and update the WhatsApp business profile |
+| Publishing (posts) | No | WhatsApp has no posts concept |
+| Comments / reviews / mentions | No | Not applicable |
 
 ## Requesting access
 
@@ -121,8 +121,60 @@ If you would rather not host the popup yourself, connect from our dashboard inst
 
 WhatsApp only lets a business send free-form messages within **24 hours** of the customer's most recent message. Each new inbound message from that customer resets the 24-hour timer.
 
-- **Inside the window:** you can send a free-form text reply.
-- **Outside the window:** WhatsApp requires an approved message template. Templates are created and managed in Meta Business Manager. Sending templates is **not yet available through our API**, so a reply attempted after the window has closed returns `whatsapp.window_closed` (see [Errors](#errors)).
+- **Inside the window:** you can send a free-form text reply from the inbox.
+- **Outside the window:** free-form replies are rejected with `whatsapp.window_closed`. To reach the customer, send an approved message template with `send-template` (see [Message templates](#message-templates) below), which is allowed at any time.
+
+## Message templates
+
+Templates are pre-approved messages you can send outside the 24-hour window (order updates, authentication codes, and the like). You create, manage, and send them entirely through the API, scoped to a connected account.
+
+### Create a template
+
+```bash
+curl -X POST https://api.social-api.ai/v1/platforms/whatsapp/accounts/{account_id}/templates \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "order_confirmation",
+    "category": "UTILITY",
+    "language": "en_US",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Hello {{1}}, your order {{2}} is confirmed.",
+        "example": { "body_text": [["Jordan", "A1234"]] }
+      }
+    ]
+  }'
+```
+
+A new template starts in `PENDING`; Meta reviews it and the status moves to `APPROVED` or `REJECTED` asynchronously. `category` is one of `UTILITY`, `MARKETING`, or `AUTHENTICATION` (marketing content in a `UTILITY` template is auto-rejected). Call `POST /v1/platforms/whatsapp/templates/validate` first to catch field-level problems before you submit.
+
+### Send a template
+
+```bash
+curl -X POST https://api.social-api.ai/v1/platforms/whatsapp/accounts/{account_id}/send-template \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "15551234567",
+    "template_name": "order_confirmation",
+    "language": "en_US",
+    "components": [
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "text": "Jordan" },
+          { "type": "text", "text": "A1234" }
+        ]
+      }
+    ]
+  }'
+```
+
+`to` is E.164 without the leading `+`. The template must already be `APPROVED` and `language` must match an approved variant. This send is allowed whether or not the 24-hour window is open, and the message is recorded in the inbox thread.
+
+Listing, editing, and deleting templates, plus phone-number management (`request-code`, `verify-code`, `register`, `deregister`, `status`) and the business profile, are also available. See the [API reference](/api-reference/introduction) for the full set of `/v1/platforms/whatsapp` endpoints and their schemas.
 
 ## Receiving and replying
 
@@ -153,7 +205,9 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 400 | `whatsapp.window_closed` | The 24-hour service window has closed. A free-form reply is no longer allowed; an approved template would be required, which is not sendable through the API. |
+| 400 | `whatsapp.window_closed` | The 24-hour service window has closed. Free-form replies are no longer allowed; send an approved template with `send-template` instead. |
+| 404 | `whatsapp.template_not_found` | The named template does not exist on this account's WABA. |
+| 400 | `whatsapp.template_paused` | The template is paused for quality reasons and cannot be sent. |
 | 400 | `whatsapp.undeliverable` | The recipient is not a WhatsApp user. |
 | 403 | `whatsapp.user_opted_out` | The recipient has opted out of messages from this business. |
 | 429 | `whatsapp.frequency_cap` | The recipient has hit their daily marketing-message limit. |
