@@ -101,6 +101,17 @@ The `code` always starts with `validation.`. The specific sub-code after the dot
 | 409 | `post.state_invalid` | Action does not apply to a post in this state (e.g. retry on a `published` post) |
 | 400 | `post.no_retryable_deliveries` | No failed deliveries on this post to retry |
 
+### Invite conflicts and validation
+
+`POST /v1/invites` returns `409 resource.conflict` for two different situations, distinguished by the `message`:
+
+- `an active invite already exists for this brand and platform`
+- `brand already has a connected account for this platform`
+
+Both share the `resource.conflict` code. Note that `GET /v1/invites` and `GET /v1/accounts` query different objects, so an empty invite list does not guarantee that a create will succeed: the brand may already have a connected account for that platform. Check both before treating a create as safe.
+
+`expires_in_days` is required on invite creation and must be one of `1`, `3`, `7`, `14`, or `30`. Any other value (including omitting it) returns `400 validation.field_invalid` with the message `expires_in_days must be one of: 1, 3, 7, 14, 30`.
+
 ## Billing and plan limits
 
 | HTTP | Code | When it occurs |
