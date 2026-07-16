@@ -1,0 +1,106 @@
+---
+title: WhatsApp
+description: Connect a WhatsApp Business phone number to receive and reply to direct messages through SocialAPI.
+---
+
+<Badge>Beta</Badge>
+
+**Messaging connector.** WhatsApp is a DM-only connector: you connect a WhatsApp Business phone number through Meta's Embedded Signup, and use SocialAPI's unified inbox to receive and reply to the messages that number gets. There are no posts, comments, reviews, or mentions.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `whatsapp` |
+| Auth type | Embedded Signup (OAuth), Meta-hosted |
+| API | WhatsApp Cloud API |
+| Access | Beta (request access) |
+| Best for | A unified inbox for the messages your WhatsApp Business number receives. |
+
+## Capabilities
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Receive DMs | Yes | Inbound messages arrive in real time via webhooks |
+| Reply to DMs | Yes | Text only, and only inside the open 24-hour service window (see below) |
+| Conversation list / history | No | There is no history API; the inbox is built from webhooks received after you connect |
+| Template messages | No | Templates are created and managed in Meta Business Manager, but sending them is not exposed through the SocialAPI API yet |
+| Media / interactive replies | No | Replies are plain text; attachments, buttons, and reactions are not sent |
+| Publishing | No | WhatsApp has no posts concept |
+| Comments | No | Not applicable |
+| Reviews | No | Not applicable |
+| Mentions | No | Not applicable |
+
+## Requesting access
+
+WhatsApp is in beta. Your account must have `whatsapp` in its `allowed_platforms` list before you can connect a number. Request access from the dashboard (or contact support). Once an admin approves the request, the WhatsApp connect option becomes available on your account.
+
+## What you need
+
+- A **WhatsApp Business phone number** that is not currently registered on the consumer WhatsApp or WhatsApp Business apps. During Embedded Signup you can select an existing number or create one.
+- **Admin access to a Meta Business** (business.facebook.com).
+
+You do **not** need to submit your own Meta App Review or complete business verification to connect. SocialAPI is the Tech Provider: the app review and provider-side setup are handled on our side. You sign in with your Meta Business account, pick your WhatsApp Business Account and phone number, and you are connected.
+
+## Connecting
+
+WhatsApp connects through a Meta-hosted popup (Embedded Signup), so you connect it from the SocialAPI dashboard rather than with a raw API call.
+
+1. In the dashboard, go to **Accounts** and choose to connect **WhatsApp**.
+2. Click **Continue with Facebook**. A Meta-hosted window opens.
+3. Sign in with your Meta Business account, then select (or create) the WhatsApp Business Account and phone number you want to connect.
+4. Finish the popup. SocialAPI stores the account and it appears in your accounts list.
+
+After connecting, the number's messages flow into your inbox as they arrive.
+
+## The 24-hour service window
+
+WhatsApp only lets a business send free-form messages within **24 hours** of the customer's most recent message. Each new inbound message from that customer resets the 24-hour timer.
+
+- **Inside the window:** you can send a free-form text reply.
+- **Outside the window:** WhatsApp requires an approved message template. Templates are created and managed in Meta Business Manager. Sending templates is **not yet available through the SocialAPI API**, so a reply attempted after the window has closed returns `whatsapp.window_closed` (see [Errors](#errors)).
+
+## Receiving and replying
+
+WhatsApp has no message-history API: SocialAPI builds the inbox from inbound webhook events from connect time onward. There is no backfill of messages sent before you connected.
+
+### List DM conversations
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id={id}" \
+  -H "Authorization: Bearer $SOCIALAPI_KEY"
+```
+
+### Reply to a message
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "{account_id}",
+    "text": "Thanks for reaching out!"
+  }'
+```
+
+`account_id` is required. The reply is sent as plain text and only succeeds while the 24-hour service window is open.
+
+## Errors
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `whatsapp.window_closed` | The 24-hour service window has closed. A free-form reply is no longer allowed; an approved template would be required, which is not sendable through the API. |
+| 400 | `whatsapp.undeliverable` | The recipient is not a WhatsApp user. |
+| 403 | `whatsapp.user_opted_out` | The recipient has opted out of messages from this business. |
+| 429 | `whatsapp.frequency_cap` | The recipient has hit their daily marketing-message limit. |
+| 429 | `whatsapp.pair_rate_limit` | Too many messages sent to this same recipient. |
+| 429 | `whatsapp.throughput_exceeded` | The number's messaging throughput limit was exceeded. |
+| 401 | `platform.whatsapp.auth` | The connection is no longer authorized. Reconnect the account. |
+
+See [Errors](/guides/errors) for the full catalog.
+
+## Related
+
+- [Platform support](/guides/platforms)
+- [Inbox](/guides/inbox)
+- [Errors](/guides/errors)
