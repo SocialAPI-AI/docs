@@ -15,7 +15,7 @@ TikTok publishing uses the TikTok Content Posting API v2 (PULL\_FROM\_URL flow).
 | Create post | Yes |
 | Update post | No (not supported by platform) |
 | Delete post | No (not supported by platform) |
-| Schedule | No |
+| Schedule | Yes (server-side; SocialAPI holds and publishes at the scheduled time) |
 | First comment | No |
 
 ---
@@ -24,10 +24,17 @@ TikTok publishing uses the TikTok Content Posting API v2 (PULL\_FROM\_URL flow).
 
 | Content type | How to trigger | Notes |
 |---|---|---|
-| Single video | `platform_data.tiktok.media_type: "video"` or omit (default) | One `media_ids` entry required; MP4 recommended |
-| Photo carousel | `platform_data.tiktok.media_type: "photo"` | 2 to 35 images required; `disable_duet` and `disable_stitch` are ignored |
+| Single video | `platform_data.tiktok.media_type: "video"` or omit (default) | One `media_ids` entry required. Accepted formats: MP4, MOV, WebM. |
+| Photo carousel | `platform_data.tiktok.media_type: "photo"` (or omit for 2+ images) | 2 to 35 images required. Accepted formats: JPEG and WebP only. `disable_duet` and `disable_stitch` are ignored. |
 
 Single images are not supported. Mixed media (video plus images) is not supported. The `media_ids` field takes IDs of media you upload first via the [media upload flow](/posts/instagram#1-upload-media). SocialAPI resolves each ID to a presigned HTTPS URL that TikTok pulls directly, so the underlying files must remain accessible while the post is being published.
+
+**Accepted formats.** TikTok is strict about formats, and a mismatch is rejected up front rather than failing silently mid-publish:
+
+- **Video posts** accept MP4, MOV, or WebM.
+- **Photo posts** accept **JPEG and WebP only**. PNG, AVIF, GIF, and other image formats are rejected by TikTok; convert them to JPEG or WebP before uploading.
+
+**Media type is resolved for you when omitted.** If you do not set `media_type`, SocialAPI infers it: 2 or more images with no video is treated as a photo carousel, and anything else is treated as a video. Attaching an image to a video post (for example, a single image with no `media_type`) is rejected with a clear `400` error, not accepted and then silently dropped. See [Media type must match the file](#media-type-must-match-the-file).
 
 **Video duration:** The maximum video duration is per-creator and returned by the TikTok creator info endpoint. SocialAPI validates duration during `POST /v1/posts/validate` when the media item includes a `duration_seconds` field.
 
@@ -173,6 +180,14 @@ The allowed values are not static: they are returned by the TikTok creator info 
 
 Sending fewer than 2 or more than 35 `media_ids` when `media_type` is `"photo"` returns a `400` validation error immediately. Single-image photo posts are not supported by TikTok.
 
+### Media type must match the file
+
+TikTok publishes videos and photos through different endpoints, and it will not build a video out of an image. If an image reaches the video path (for example, a single image with no `media_type`, which resolves to a video), TikTok accepts the job but never downloads the file, so it stalls until the 60-second timeout. SocialAPI now blocks this before publishing: both `POST /v1/posts/validate` and `POST /v1/posts` return a `400` error on the `media` field (code `validation.media_type_mismatch`) telling you to publish the images as a photo post instead. To post images, set `media_type` to `"photo"` and attach 2 or more JPEG or WebP images.
+
+### Photo posts accept only JPEG and WebP
+
+A photo carousel that includes a PNG, AVIF, GIF, or any non-JPEG/WebP image is rejected with a `400` error on the `media` field (code `validation.unsupported_photo_format`) that names the offending format. A video included in a photo post is rejected the same way. Convert images to JPEG or WebP before uploading.
+
 ### disable\_duet and disable\_stitch are silently ignored for photo posts
 
 Setting `disable_duet: true` or `disable_stitch: true` on a photo carousel post has no effect. TikTok does not expose these controls for photo posts. `POST /v1/posts/validate` will return a warning (not an error) if these fields are set on a photo post.
@@ -203,7 +218,7 @@ SocialAPI polls the publish status for up to 60 seconds. If TikTok has not compl
 |---|---|---|---|
 | `platform.tiktok.api_error` | `platform` | `platform` | Generic TikTok API error (includes publish failures and timeouts) |
 | `platform.tiktok.auth` | `auth` | `platform` | Invalid or expired token, missing scope |
-| `validation.*` | `validation` | `user` | Missing or invalid `platform_data.tiktok` fields (privacy level, media count, etc.) |
+| `validation.*` | `validation` | `user` | Missing or invalid `platform_data.tiktok` fields (privacy level, media count, media type mismatch, unsupported photo format, etc.) |
 
 ---
 
