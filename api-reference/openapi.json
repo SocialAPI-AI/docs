@@ -949,6 +949,100 @@
                 }
             }
         },
+        "/announcements": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns service announcements that are currently visible, newest first. Each item carries a `seen` flag for the calling user. `window_start` and `window_end` describe the announced maintenance window and are absent for non-maintenance announcements. Free operation, consumes no credits.",
+                "tags": [
+                    "Announcements"
+                ],
+                "summary": "List active announcements",
+                "responses": {
+                    "200": {
+                        "description": "Currently visible announcements",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AnnouncementsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/announcements/{id}/seen": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Records that the calling user has seen an announcement, so it is not shown again. Idempotent: repeat calls succeed without changing anything. Free operation, consumes no credits.",
+                "tags": [
+                    "Announcements"
+                ],
+                "summary": "Mark an announcement as seen",
+                "parameters": [
+                    {
+                        "example": "9c1e7f2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b",
+                        "description": "Announcement ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Announcement marked as seen",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.OKResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Announcement not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/brands": {
             "get": {
                 "security": [
@@ -5100,11 +5194,11 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Business profile (single entry in data array)",
+                        "description": "Business profile",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppBusinessProfileResponse"
+                                    "$ref": "#/components/schemas/api_endpoints.WhatsAppBusinessProfile"
                                 }
                             }
                         }
@@ -7995,6 +8089,62 @@
                     }
                 }
             },
+            "api_endpoints.AnnouncementItem": {
+                "type": "object",
+                "properties": {
+                    "body": {
+                        "type": "string",
+                        "example": "We are upgrading our database infrastructure."
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "9c1e7f2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "example": "maintenance"
+                    },
+                    "link_label": {
+                        "type": "string",
+                        "example": "Status page"
+                    },
+                    "link_url": {
+                        "type": "string",
+                        "example": "https://status.social-api.ai"
+                    },
+                    "seen": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Scheduled maintenance"
+                    },
+                    "window_end": {
+                        "type": "string",
+                        "example": "2026-08-02T04:00:00Z"
+                    },
+                    "window_start": {
+                        "type": "string",
+                        "example": "2026-08-02T02:00:00Z"
+                    }
+                }
+            },
+            "api_endpoints.AnnouncementsListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.AnnouncementItem"
+                        }
+                    }
+                }
+            },
             "api_endpoints.AssignPageRequest": {
                 "type": "object",
                 "properties": {
@@ -8431,7 +8581,7 @@
                         "example": "2026-04-01T10:00:00Z"
                     },
                     "segments": {
-                        "description": "Segments are continuation posts that publish as a native thread on X and Threads.",
+                        "description": "Segments are continuation posts that publish as a native thread on X. Threads chaining is temporarily unavailable.",
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
@@ -10252,7 +10402,7 @@
                 "type": "object",
                 "properties": {
                     "media_ids": {
-                        "description": "MediaIDs attach media to this segment (Threads only; ignored by X).",
+                        "description": "MediaIDs attach media to this segment. Currently ignored: X drops segment media, and Threads chaining is temporarily unavailable.",
                         "type": "array",
                         "items": {
                             "type": "string"
@@ -10707,7 +10857,7 @@
                         "example": "2026-04-02T14:00:00Z"
                     },
                     "segments": {
-                        "description": "Segments are continuation posts that publish as a native thread on X and Threads.",
+                        "description": "Segments are continuation posts that publish as a native thread on X. Threads chaining is temporarily unavailable.",
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
@@ -10893,6 +11043,11 @@
                         "type": "string",
                         "example": "user@example.com"
                     },
+                    "facebook_page_selection": {
+                        "description": "FacebookPageSelection, when true, enables the shared-credential Facebook\nconnect flow (page selection) in the dashboard. Read-only here.",
+                        "type": "boolean",
+                        "example": false
+                    },
                     "id": {
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
@@ -10947,7 +11102,7 @@
                         "example": "2026-04-01T10:00:00Z"
                     },
                     "segments": {
-                        "description": "Segments are continuation posts that publish as a native thread on X and Threads.",
+                        "description": "Segments are continuation posts that publish as a native thread on X. Threads chaining is temporarily unavailable.",
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.SegmentRequest"
@@ -11154,17 +11309,6 @@
                         "example": [
                             "https://acme.com"
                         ]
-                    }
-                }
-            },
-            "api_endpoints.WhatsAppBusinessProfileResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/api_endpoints.WhatsAppBusinessProfile"
-                        }
                     }
                 }
             },
@@ -11712,6 +11856,10 @@
                         "description": "[always] Display name of the account or page",
                         "type": "string",
                         "example": "Acme Corp"
+                    },
+                    "page_name": {
+                        "description": "[optional] Name of the single active page bound to this account; set only when exactly one page is active (e.g. facebook), so clients can label the tile with the page instead of the login identity",
+                        "type": "string"
                     },
                     "platform": {
                         "description": "[always]",
@@ -12326,8 +12474,24 @@
                     "media": {
                         "$ref": "#/components/schemas/social-api_ai_core_api_service.MediaConstraints"
                     },
+                    "scheduling": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.SchedulingConstraints"
+                    },
                     "text": {
                         "$ref": "#/components/schemas/social-api_ai_core_api_service.TextConstraints"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.SchedulingConstraints": {
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "description": "Mode reflects the platform's native scheduling support: \"native\" when the\nplatform can schedule the post itself, \"server_side\" when the platform has\nno native scheduling and SocialAPI holds the post and publishes it at the\nscheduled time. Regardless of mode, scheduled_at is accepted whenever\nSupported is true. Empty when Supported is false.",
+                        "type": "string"
+                    },
+                    "supported": {
+                        "description": "whether scheduled_at is accepted for this platform",
+                        "type": "boolean"
                     }
                 }
             },

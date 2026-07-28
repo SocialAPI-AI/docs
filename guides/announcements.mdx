@@ -1,0 +1,74 @@
+---
+title: Announcements
+description: Read scheduled maintenance windows, incidents, and product updates, and track which ones a user has seen.
+---
+
+## What announcements are
+
+Announcements are service notices we publish: scheduled maintenance, incidents, product updates, and breaking changes. They are the same for every customer, so there is no per-account targeting and nothing to subscribe to.
+
+The dashboard shows each announcement once as a modal. If you have built your own integration, poll the endpoint below so your users hear about a maintenance window before it starts rather than when calls begin failing.
+
+<Note>
+  Announcements are **read-only**. There is no API for creating, editing, or deleting one. Both operations below are free and consume no credits.
+</Note>
+
+## List active announcements
+
+Returns every announcement currently inside its visibility window, newest first.
+
+```bash
+curl https://api.social-api.ai/v1/announcements \
+  -H "Authorization: Bearer $SOCIALAPI_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "9c1e7f2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b",
+      "kind": "maintenance",
+      "title": "Scheduled maintenance",
+      "body": "We are upgrading our database infrastructure. Publishing and inbox reads will be briefly unavailable.",
+      "link_url": "https://status.social-api.ai",
+      "link_label": "Status page",
+      "window_start": "2026-08-02T02:00:00Z",
+      "window_end": "2026-08-02T04:00:00Z",
+      "seen": false
+    }
+  ],
+  "count": 1
+}
+```
+
+### Fields
+
+| Field | Notes |
+| --- | --- |
+| `kind` | One of `maintenance`, `incident`, `product_update`, `breaking_change`. |
+| `window_start`, `window_end` | The announced downtime, in UTC. Present for `maintenance`, absent for other kinds. Render these in the reader's local timezone. |
+| `link_url`, `link_label` | Optional. A place to send people for detail, usually the status page. |
+| `seen` | Whether **the user who owns this API key** has marked it seen. |
+
+An empty `data` array is the normal state and means there is nothing to announce.
+
+<Warning>
+  `window_start` and `window_end` describe the downtime being announced, not how long the announcement itself is displayed. An announcement is typically published days before its maintenance window opens. The visibility window is internal and is not exposed by the API.
+</Warning>
+
+## Mark an announcement as seen
+
+Records that the current user has seen an announcement so it is not shown again.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/announcements/9c1e7f2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b/seen \
+  -H "Authorization: Bearer $SOCIALAPI_KEY"
+```
+
+```json
+{ "ok": true }
+```
+
+The call is idempotent, so repeating it succeeds and changes nothing. Seen state is stored per user, not per API key, so dismissing an announcement in the dashboard also clears it for your API key and the other way around.
+
+Returns `404` if the ID is not a valid announcement, including the case where the announcement expired or was withdrawn between your list call and your dismissal. That is safe to ignore.
