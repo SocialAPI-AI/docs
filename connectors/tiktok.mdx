@@ -117,6 +117,44 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 For the full field reference, media constraints, and error recovery, see [TikTok posts](/posts/tiktok).
 
+## Account summary
+
+Retrieve live profile statistics for a connected TikTok account: display name, username, avatar URL, and the follower, following, likes, and video counts.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/tiktok/accounts/{id}/summary" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "display_name": "Acme Corp",
+  "username": "acmecorp",
+  "avatar_url": "https://p16-sign.tiktokcdn-us.com/...",
+  "follower_count": 12400,
+  "following_count": 87,
+  "likes_count": 980000,
+  "video_count": 47
+}
+```
+
+The statistics come from TikTok's `user.info.stats` scope. Accounts connected before this scope was granted must be reconnected before the endpoint can return counts.
+
+## Force sync
+
+Force an immediate re-sync of the stored video list for an account. This pulls the most recent videos (up to 20) from TikTok, including view, like, comment, and share counts. Synced videos are then available from `GET /v1/posts?platform=tiktok`.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/platforms/tiktok/accounts/{id}/sync" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Returns `{"success": true}` on success.
+
+This endpoint uses TikTok's `video.list` scope and requires a reconnect for accounts connected before the scope was granted.
+
 ## Limitations and gotchas
 
 - **Publishing.** Post creation uses the TikTok Content Posting API. Videos are uploaded via media upload, then published.
