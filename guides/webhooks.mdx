@@ -55,15 +55,15 @@ Events are grouped into three categories: **inbox** (incoming interactions), **p
 |---|---|---|
 | `comment.received` | inbox | A new comment arrives on any connected account |
 | `dm.received` | inbox | A new direct message arrives (may include `metadata.referral` if the DM originated from an ad) |
-| `dm.sent` | inbox | Your account sent a direct message (echo confirmation from Meta) |
+| `dm.sent` | inbox | Your account sent a direct message (echo confirmation from Meta). Fires for every echo the platform delivers, including replies sent from the native app or Meta Business Suite, not only messages sent through the API. On Facebook the echo's `raw_payload` carries `app_id`, which lets you tell the two apart |
 | `dm.referral` | inbox | A user clicked an ad or referral link without sending a message. The interaction has empty content and includes `metadata.referral` |
 | `dm.postback` | inbox | A user tapped a button or quick reply in a DM |
 | `review.received` | inbox | A new review arrives (Google Business Profile) |
-| `mention.received` | inbox | Your account is mentioned on a supported platform |
-| `dm.status.sent` | inbox | A direct message you sent was accepted by the platform |
-| `dm.status.delivered` | inbox | A direct message you sent was delivered to the recipient |
-| `dm.status.read` | inbox | A direct message you sent was read by the recipient |
-| `dm.status.failed` | inbox | A direct message you sent failed to deliver |
+| `mention.received` | inbox | Your account is @mentioned in a comment or a post caption (`metadata.mention_type` is `comment` or `caption`). Instagram story mentions are delivered as `dm.received` with an attachment of type `story_mention`, not as this event |
+| `dm.status.sent` | inbox | A direct message you sent was accepted by the platform (Instagram, Facebook, WhatsApp) |
+| `dm.status.delivered` | inbox | A direct message you sent was delivered to the recipient (Facebook and WhatsApp; Instagram sends no delivery receipts) |
+| `dm.status.read` | inbox | A direct message you sent was read by the recipient (Instagram, Facebook, WhatsApp) |
+| `dm.status.failed` | inbox | A direct message you sent failed to deliver (WhatsApp only) |
 | `post.scheduled` | posts | A post was created with a future `scheduled_at` and entered the `scheduled` state |
 | `post.published` | posts | A post finished publishing successfully on all targets |
 | `post.partial` | posts | A post published on some targets but failed on others |
@@ -233,6 +233,10 @@ Every webhook POST has a JSON body with an `event` field and a `data` field cont
 ```
 
 The `data` object is the same `Interaction` shape returned by `GET /accounts/{id}/comments` (and the equivalent DM, review, and mention endpoints). The `id` field is a stable SocialAPI interaction ID - see [Interaction IDs](/guides/interaction-ids).
+
+For platform-originated events, the body also includes a top-level `raw_payload` field alongside `data`: the verbatim per-event webhook fragment as the platform sent it to us. Use it when you need a platform detail the normalized `data` object does not carry (for example, `app_id` on Facebook message echoes to distinguish API-sent messages from replies typed in the Page inbox). The shape of `raw_payload` is defined by the platform and can change with platform API versions, so prefer `data` whenever it has what you need.
+
+The `dm.status.*` events use a smaller payload instead of the full interaction object: `data` contains `status`, `mids` (the platform message IDs the receipt covers), and `recipient_id`.
 
 ### Referral metadata
 

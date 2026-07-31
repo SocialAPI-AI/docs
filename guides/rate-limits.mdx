@@ -213,7 +213,7 @@ Platforms (Instagram, Facebook, etc.) have their own rate limits independent of 
 {
   "error": {
     "code": "platform.instagram.rate_limit",
-    "message": "platform rate limit exceeded"
+    "message": "Platform rate limit exceeded"
   },
   "request_id": "a1b2c3d4"
 }
@@ -222,6 +222,10 @@ Platforms (Instagram, Facebook, etc.) have their own rate limits independent of 
 The `instagram` segment is replaced with the actual platform name (`facebook`, `tiktok`, etc.). Match on the `platform.*.rate_limit` shape to handle all platforms.
 
 This does **not** consume your post or interaction quota. Retry after a short wait (typically a few minutes).
+
+### Live inbox reads
+
+Comments, reviews, and mentions are proxied live from the platform on every request, with no server-side cache. Each page of comments for one post is a single platform call (`limit` accepts up to 100, so a few hundred comments is a handful of calls), and listing commented posts is served from SocialAPI's database without touching the platform. Read operations consume no SocialAPI quota and are not throttled by us, so the only ceiling is the platform's own limit, which for Meta scales with your account's reach and is far above operator-paced browsing. If your UI re-fetches the same view often (tab switches, refreshes), cache pages client-side for 30 to 60 seconds and back off for a few minutes on any `platform.*.rate_limit` response.
 
 ## Handling 429s
 
