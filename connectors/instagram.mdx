@@ -238,6 +238,37 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 For the full field reference, media constraints, and error recovery, see [Instagram posts](/posts/instagram).
 
+## Account summary (beta)
+
+Retrieve live profile statistics and trailing-30-day insights for a connected Instagram account: username, display name, picture, follower, following, and media counts, plus reach, views, interactions, engaged accounts, and net follower change.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/instagram/accounts/{id}/summary" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "username": "acmecorp",
+  "display_name": "Acme Corp",
+  "picture_url": "https://scontent.cdninstagram.com/...",
+  "follower_count": 12400,
+  "following_count": 87,
+  "media_count": 340,
+  "reach": 22400,
+  "views": 90100,
+  "interactions": 5500,
+  "accounts_engaged": 4000,
+  "net_follows": 120,
+  "period_start": "2026-07-01T10:00:00Z",
+  "period_end": "2026-07-31T10:00:00Z"
+}
+```
+
+This endpoint is in beta. The insight totals come from Instagram's `instagram_business_manage_insights` permission: accounts connected before the permission was granted must be reconnected before totals can be returned.
+
 ## Limitations and gotchas
 
 - **Private replies.** Replying to a comment with `"private": true` sends a DM to the commenter. This is Instagram's native "Send Private Reply" feature, not a [SocialAPI](https://social-api.ai) workaround. Meta allows one private reply per comment, within 7 days of the comment, and the reply does not open a standard 24-hour messaging window: the user must respond before you can send another message.
