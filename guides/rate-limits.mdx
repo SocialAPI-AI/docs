@@ -227,6 +227,20 @@ This does **not** consume your post or interaction quota. Retry after a short wa
 
 Comments, reviews, and mentions are proxied live from the platform on every request, with no server-side cache. Each page of comments for one post is a single platform call (`limit` accepts up to 100, so a few hundred comments is a handful of calls), and listing commented posts is served from SocialAPI's database without touching the platform. Read operations consume no SocialAPI quota and are not throttled by us, so the only ceiling is the platform's own limit, which for Meta scales with your account's reach and is far above operator-paced browsing. If your UI re-fetches the same view often (tab switches, refreshes), cache pages client-side for 30 to 60 seconds and back off for a few minutes on any `platform.*.rate_limit` response.
 
+### Platform publishing ceilings
+
+Each platform sets its own publishing limits, which apply in addition to your plan quota. These are the platforms' own published figures:
+
+| Platform | Publishing ceiling (set by the platform) |
+|---|---|
+| Instagram | 25 posts per 24 hours |
+| Threads | 250 posts and 1,000 replies per 24 hours |
+| YouTube | A daily upload quota (Google's default is 10,000 quota units per day, roughly 100 video uploads per day), reset at midnight Pacific time |
+| Google Business Profile | 300 requests per minute per API, and about 10 edits per location per minute |
+| Facebook, X | Enforced per app and per user through limits the platform reports in response headers; there is no single fixed number |
+
+We monitor each platform's reported usage and pace requests to stay within the platform's ceiling. SocialAPI itself adds no per-request throttle beyond your monthly plan quota, and read operations (inbox, reviews, comments) are not throttled on our side. If you run scheduled, unattended publishing across many accounts, design against the platform ceilings above.
+
 ## Handling 429s
 
 ```python

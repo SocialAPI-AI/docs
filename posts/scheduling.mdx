@@ -109,18 +109,29 @@ Deleting a post permanently removes it (the post returns `404` on subsequent fet
 
 ## Platform scheduling support
 
-Not all platforms support deferred publishing through their APIs. For platforms that do not support scheduling natively, SocialAPI holds the post server-side and publishes it at the scheduled time.
+When you set `scheduled_at`, SocialAPI holds the post in its own queue and publishes it when the scheduled time arrives. This works the same way for every platform: the post is sent to the platform only at the scheduled moment, and the platform's own scheduler is never used. Every platform below accepts `scheduled_at`.
 
-| Platform | Native scheduling | Media types | Notes |
-|----------|-------------------|-------------|-------|
-| Instagram | No (server-side) | Image, Video (Reel), Carousel (2-10) | SocialAPI holds and publishes at scheduled time |
-| Facebook | No (server-side) | Image, Video | SocialAPI holds and publishes at scheduled time |
-| Threads | No (server-side) | Image, Video, Carousel | SocialAPI holds and publishes at scheduled time |
-| LinkedIn | No (server-side) | Image, Video, Carousel | SocialAPI holds and publishes at scheduled time |
-| Google | No (server-side) | Image | SocialAPI holds and publishes at scheduled time |
-| TikTok | No (server-side) | Video, Photo carousel (2-35) | SocialAPI holds and publishes at scheduled time |
-| YouTube | Coming soon | Video | Not yet available |
-| X / Twitter | Coming soon | - | Not yet available |
+### YouTube: `scheduled_at` vs `publish_at`
+
+YouTube has its own native scheduling, which is a **separate feature** from `scheduled_at`. The two behave differently:
+
+- **`scheduled_at`** (this page): SocialAPI holds the post and uploads it to YouTube at the scheduled time. YouTube is not told about the schedule.
+- **`platform_data.youtube.publish_at`**: SocialAPI uploads the video to YouTube right away, and YouTube itself makes it public at the given time.
+
+Use `scheduled_at` to have SocialAPI do the waiting; use `publish_at` to hand scheduling to YouTube. See [YouTube posts](/posts/youtube) for details.
+
+To discover scheduling support programmatically instead of hardcoding this table, call [`GET /v1/posts/validate`](/api-reference/posts/get-platform-constraints). Each platform includes a `scheduling` object with a `supported` boolean. It is `true` for every publishing platform today, but querying it means your integration never relies on a hardcoded list that can silently go stale.
+
+```json
+{
+  "data": {
+    "tiktok": {
+      "scheduling": { "supported": true },
+      "text": { "max_length": 2200, "counting_mode": "utf16" }
+    }
+  }
+}
+```
 
 ## Related
 
