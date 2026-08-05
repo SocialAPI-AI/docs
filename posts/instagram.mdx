@@ -215,12 +215,24 @@ When a publish fails, the post target's `error` field contains a structured erro
 | `platform.instagram.api_error` | `platform` | `platform` | Meta Graph API rejected the request. Check `message` for details. |
 | `platform.instagram.rate_limit` | `rate_limit` | `platform` | Instagram rate limit hit. Retry after a delay. |
 | `platform.instagram.auth` | `auth` | `platform` | Access token expired or revoked. Reconnect the account. |
+| `platform.instagram.container_failed` | `platform` | `platform` | Instagram accepted the media container, then failed to process it. See "Container failures report no reason" below. |
+| `platform.instagram.container_expired` | `platform` | `platform` | The media container was not published within its 24-hour validity window. Create the post again. |
+| `platform.instagram.container_timeout` | `platform` | `platform` | The container was still `IN_PROGRESS` after roughly 5 minutes of polling. |
+
+Codes of the form `platform.instagram.<number>` (for example `platform.instagram.36003`) carry a Meta error code, and the `message` is Meta's own text ("The aspect ratio is not supported."). These are the most actionable failures.
+
+### Container failures report no reason
+
+Instagram publishing is a two-step flow: SocialAPI creates a media container, then polls it until Instagram finishes processing. When Instagram rejects the media at that second step, its container-status endpoint returns only a status enum (`ERROR`), with no error code and no message. Meta exposes no field carrying the reason, so SocialAPI cannot forward one.
+
+`platform.instagram.container_failed` therefore reports the fact of the failure plus the container ID, not a cause. In practice it almost always means the file does not meet Instagram's specs: for Reels, MOV or MP4 with H.264 or HEVC video, up to 300 MB and 15 minutes, 9:16 recommended. Re-encoding the video and retrying usually resolves it.
 
 ### Recovery
 
 - **Rate limit:** Retry the post via `POST /v1/posts/:pid/retry` after waiting. SocialAPI applies exponential backoff for scheduled retries.
 - **Auth error:** Disconnect and reconnect the Instagram account through the OAuth flow to obtain a fresh token.
 - **Container timeout:** Usually caused by a large video file or a slow upstream URL. Re-upload the media and retry.
+- **Container failed:** Instagram gives no reason, so a transient processing fault and a rejected file look identical. Retry once via `POST /v1/posts/:pid/retry`; if it fails again, re-encode the media to the specs above rather than retrying further.
 
 ---
 

@@ -16,7 +16,7 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 | Update post | Yes (message text only) |
 | Delete post | Yes |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
-| First comment | Yes (best-effort) |
+| First comment | Yes (best-effort; not on Stories) |
 | Carousel (multi-photo) | Yes (2 to 10 photos; images only) |
 | Reel | Yes (`content_type: "reel"`; one vertical video) |
 | Story | Yes (`content_type: "stories"`; one photo or video, expires after 24 hours) |
@@ -235,6 +235,8 @@ Requirements and limits:
 
 Set `first_comment` to a string to post an automated comment immediately after publish. This is best-effort: if the comment fails (for example due to a temporary rate limit), the post is still considered published.
 
+Page Stories are the one exception: a Story has no comments edge on the Graph API, so `first_comment` is skipped for `content_type: "stories"` targets. Every other post type (text, link, single photo, multi-photo album, single video, Reel) accepts one.
+
 ```json
 {
   "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
@@ -357,7 +359,7 @@ Multi-photo albums (2 to 10 image entries in `media_ids`) use a two-step flow: e
 
 ### First comment is non-blocking
 
-If `first_comment` is set and the comment fails after publish, the post remains `published`. The comment failure is logged but does not roll back or change the post status.
+If `first_comment` is set and the comment fails after publish, the post remains `published`. The comment failure is logged but does not roll back or change the post status. Because the post status stays `published` either way, the server log is the only record that a first comment did not land.
 
 ### Stories expire
 
