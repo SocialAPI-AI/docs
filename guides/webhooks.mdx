@@ -47,6 +47,10 @@ The `secret` is returned **once**. Store it immediately in your environment. It 
   When you create an endpoint, SocialAPI sends a verification ping to your URL. Your server must respond with a `2xx` status code or the endpoint will not be saved. Make sure your server is running and reachable before registering.
 </Info>
 
+<Warning>
+  The verification ping arrives as a `webhook.test` event, signed with the endpoint's new secret. Because the secret is only revealed to you after verification succeeds, your endpoint cannot verify this first signature. Respond `2xx` to requests with `X-SocialAPI-Event: webhook.test` without checking the signature, or registration will fail with `webhook_verification_failed`.
+</Warning>
+
 ## Event types
 
 Events are grouped into three categories: **inbox** (incoming interactions), **posts** (post lifecycle transitions), and **accounts** (connection state).
@@ -277,8 +281,15 @@ Every webhook request includes:
 | Header | Value |
 |---|---|
 | `Content-Type` | `application/json` |
-| `X-SocialAPI-Signature` | `sha256=<hmac-sha256-hex>` |
+| `X-SocialAPI-Signature` | `sha256=<hmac-sha256-hex>` of the raw body (v1, kept for backward compatibility) |
+| `X-SocialAPI-Signature-V2` | `sha256=<hmac-sha256-hex>` of `<timestamp>.<raw body>`, for replay protection |
+| `X-SocialAPI-Timestamp` | Unix timestamp (seconds) of when the delivery attempt was sent |
+| `X-SocialAPI-Delivery` | Unique delivery ID, stable across retries of the same delivery. Use it for idempotency |
 | `X-SocialAPI-Event` | The event type, e.g. `comment.received` |
+
+<Note>
+  `X-SocialAPI-Delivery` is present on real event deliveries. Verification pings and test deliveries carry the signature, timestamp, and event headers but no delivery ID.
+</Note>
 
 ## Verifying signatures
 
@@ -350,6 +361,33 @@ func verifySignature(secret string, body []byte, sigHeader string) bool {
 
 <Note>
   Use a constant-time comparison (`timingSafeEqual` / `compare_digest` / `hmac.Equal`) to prevent timing attacks. A simple string equality check is not safe.
+</Note>
+
+## Replay protection
+
+The v1 signature proves authenticity but not freshness: a captured request could be replayed later and would still verify. To bound replay, use the v2 scheme:
+
+1. Read `X-SocialAPI-Timestamp` and reject the request if it is older than your tolerance window (5 minutes is a sensible default).
+2. Compute HMAC-SHA256 over the string `<timestamp>.<raw body>` (the timestamp header value, a literal dot, then the raw request body) with your endpoint secret, prefix with `sha256=`, and compare it to `X-SocialAPI-Signature-V2` in constant time.
+
+Because the timestamp is inside the signed message, an attacker cannot extend the window by editing the header.
+
+```javascript
+function verifySignatureV2(secret, rawBody, timestampHeader, signatureHeader, toleranceSec = 300) {
+  const age = Math.abs(Date.now() / 1000 - Number(timestampHeader));
+  if (!Number.isFinite(age) || age > toleranceSec) return false;
+  const expected = "sha256=" + crypto
+    .createHmac("sha256", secret)
+    .update(timestampHeader + "." + rawBody)
+    .digest("hex");
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
+}
+```
+
+For exact once-only processing, additionally record `X-SocialAPI-Delivery` IDs you have already handled and skip duplicates. The ID is stable across retries of the same delivery, so this also deduplicates legitimate retries after a timeout.
+
+<Note>
+  The timestamp reflects the current delivery attempt, so a retry of an old event carries a fresh timestamp and still passes the window check. Use the delivery ID for deduplication; use the timestamp to reject replays of captured requests.
 </Note>
 
 ## Responding to webhooks
@@ -425,8 +463,9 @@ See the [API Reference](/api-reference) for full request and response schemas.
 
 ## Security best practices
 
-- **Always verify signatures** - never trust a webhook payload without checking `X-SocialAPI-Signature`
+- **Always verify signatures** - never trust a webhook payload without checking `X-SocialAPI-Signature` (or, preferably, `X-SocialAPI-Signature-V2`)
+- **Bound replay** - prefer the v2 signature with a timestamp tolerance window (see [Replay protection](#replay-protection))
 - **Store your secret in an environment variable** - never hardcode it or commit it to source control
 - **Use HTTPS** - HTTP endpoints are rejected at registration time
 - **Respond quickly** - return `200` before doing heavy processing to avoid timeouts and spurious retries
-- **Make handlers idempotent** - retries mean the same event may arrive more than once; use the interaction `id` to deduplicate
+- **Make handlers idempotent** - retries mean the same event may arrive more than once; use `X-SocialAPI-Delivery` (stable across retries) or the interaction `id` to deduplicate
