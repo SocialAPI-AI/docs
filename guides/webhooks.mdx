@@ -242,6 +242,18 @@ For platform-originated events, the body also includes a top-level `raw_payload`
 
 The `dm.status.*` events use a smaller payload instead of the full interaction object: `data` contains `status`, `mids` (the platform message IDs the receipt covers), and `recipient_id`.
 
+### Post permalink
+
+Instagram `comment.received` events include a `permalink` field inside `data`: the public URL of the post the comment was left on. When we have not seen the post before, we fetch it from Instagram while handling the webhook, so the first comment on a newly published post normally carries the link too.
+
+The field is best-effort. If the post cannot be fetched (it was deleted, or the fetch times out), the event is still delivered with `permalink` omitted. Other platforms do not set it: on Facebook, comment webhooks carry no permalink, and a post's URL must be read from the posts API.
+
+### Fields that are not always present
+
+`platform_post_id` is not sent on every comment event. Instagram and Facebook comments include it; Threads replies do not, and carry `parent_id` inside `metadata` instead. Treat the field as optional.
+
+On `comment.received`, `raw_payload` is always the verbatim Meta change entry (the single object from the platform's `changes` array, not the whole envelope), because every platform that produces comment events is Meta-based. It sits at the top level of the body, alongside `data` rather than inside it.
+
 ### Referral metadata
 
 When a DM originates from an ad click (Instagram CTD or Facebook CTM ads), the interaction includes referral context in `metadata.referral`:
