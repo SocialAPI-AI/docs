@@ -27,6 +27,15 @@ Photos and videos are upload-first. Upload a file to receive a `media_id`, then 
 | Carousel | Yes (2-10) | Yes (2-10) | Yes (2-20) | Yes (2-20) | Photo carousel only | No | No | No |
 | Max media per post | 10 | 10 | 20 | 20 | 35 (photo) / 1 (video) | 1 (video + thumb) | 0 (text only) | 1 |
 
+## Retrieving a post
+
+`GET /v1/posts/{pid}` and `GET /v1/posts/{pid}/metrics` accept either identifier:
+
+- The SocialAPI post ID (UUID) returned when the post was created.
+- A platform post ID: the platform's own ID for a published target, for example a TikTok video ID or a Facebook post ID.
+
+A platform post ID resolves to the SocialAPI post it was published from, so you can fetch a post or its live metrics using the ID you already track on the platform side. If a platform post ID happens to match more than one post across your accounts, the API returns `409` with code `ambiguous_post_id`; retry with the SocialAPI post ID. Mutating endpoints (update, delete, publish, retry, unpublish) accept only the SocialAPI post ID.
+
 ## Deleting posts
 
 `DELETE /v1/posts/{pid}` is best-effort and never lets the dashboard drift from the platform.
