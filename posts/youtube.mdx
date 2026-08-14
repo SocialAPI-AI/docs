@@ -45,7 +45,7 @@ Use `POST /v1/posts` with `targets` targeting a YouTube account.
 
 - `text` becomes the video description.
 - The title comes from the top-level `title` field, or from `platform_data.youtube.title` as a fallback. The top-level value wins when both are present.
-- `visibility` maps to the video's privacy status. It defaults to `private` when omitted. `public` and `unlisted` both work normally.
+- `visibility` maps to the video's privacy status. It defaults to `public` when omitted, so a published video is viewable right away. Pass `private` or `unlisted` explicitly if you do not want that. The one exception is `publish_at` (see [Native scheduling](#native-scheduling)), which defaults `visibility` to `private` because YouTube only schedules private videos.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -132,7 +132,7 @@ YouTube schedules a publish natively: you upload the video as `private` with a `
 }
 ```
 
-`publish_at` with any visibility other than `private` returns a validation error on the `publish_at` field. Leaving `visibility` unset is allowed because the connector defaults it to `private`.
+`publish_at` with any visibility other than `private` returns a validation error on the `publish_at` field. Leaving `visibility` unset is allowed: uploads normally default to `public`, but setting `publish_at` switches that default to `private` so the schedule is honored.
 
 ### First comment
 

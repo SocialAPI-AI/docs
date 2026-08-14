@@ -1043,6 +1043,42 @@
                 }
             }
         },
+        "/billing/plans": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns every subscription tier with prices and resource limits, ordered from cheapest to most expensive. Prices are in USD. -1 means unlimited for limits and custom pricing for prices.",
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "List plans",
+                "responses": {
+                    "200": {
+                        "description": "Plan catalog",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.BillingPlansResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/brands": {
             "get": {
                 "security": [
@@ -4606,6 +4642,290 @@
                     },
                     "409": {
                         "description": "Brand connected through a different login",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/instagram/accounts/{id}/media/{mediaId}/collab/accept": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Accepts a pending collaboration invite on an Instagram media object, publishing the co-authored post to this account's feed. Call with the invited account, not the publishing account. Invites expire 14 days after they are sent.",
+                "tags": [
+                    "Instagram"
+                ],
+                "summary": "Accept an Instagram collaboration invite",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (the invited account)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17895695668004550",
+                        "description": "Instagram media ID carrying the invite",
+                        "name": "mediaId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invite accepted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "No pending invite for this account on this media",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account or media not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support collaborators",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Instagram API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/instagram/accounts/{id}/media/{mediaId}/collab/decline": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Declines a pending collaboration invite on an Instagram media object. The post will not appear on this account's feed. Call with the invited account, not the publishing account.",
+                "tags": [
+                    "Instagram"
+                ],
+                "summary": "Decline an Instagram collaboration invite",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (the invited account)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17895695668004550",
+                        "description": "Instagram media ID carrying the invite",
+                        "name": "mediaId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invite declined",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "No pending invite for this account on this media",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account or media not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support collaborators",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Instagram API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/instagram/accounts/{id}/media/{mediaId}/collaborators": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the collaborators invited on a co-authored Instagram post and the state of each invite (accepted, pending, declined). Readable only by the account that published the media: Meta scopes co-authored media data to the publisher, so a collaborating account cannot read this edge. Collaborators can only be invited when the post is created (platform_data.collaborators); Instagram exposes no API to add one to an already-published post.",
+                "tags": [
+                    "Instagram"
+                ],
+                "summary": "List collaborators on an Instagram post",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID (must be the publishing account)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "17895695668004550",
+                        "description": "Instagram media ID",
+                        "name": "mediaId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Collaborators and invite status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InstagramCollaboratorsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account or media not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support collaborators",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Instagram API error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8412,6 +8732,78 @@
                     }
                 }
             },
+            "api_endpoints.BillingPlan": {
+                "type": "object",
+                "properties": {
+                    "annual_price_usd": {
+                        "type": "integer",
+                        "example": 1044
+                    },
+                    "limits": {
+                        "$ref": "#/components/schemas/api_endpoints.BillingPlanLimits"
+                    },
+                    "monthly_price_usd": {
+                        "type": "integer",
+                        "example": 109
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Full Send"
+                    },
+                    "popular": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "tagline": {
+                        "type": "string",
+                        "example": "For growing teams and products"
+                    },
+                    "tier": {
+                        "type": "string",
+                        "example": "pro"
+                    }
+                }
+            },
+            "api_endpoints.BillingPlanLimits": {
+                "type": "object",
+                "properties": {
+                    "event_retention_days": {
+                        "type": "integer",
+                        "example": 30
+                    },
+                    "exports_per_month": {
+                        "type": "integer",
+                        "example": 20
+                    },
+                    "interactions_per_month": {
+                        "type": "integer",
+                        "example": -1
+                    },
+                    "posts_per_month": {
+                        "type": "integer",
+                        "example": -1
+                    },
+                    "profiles": {
+                        "type": "integer",
+                        "example": 50
+                    },
+                    "storage_bytes": {
+                        "type": "integer",
+                        "example": -1
+                    }
+                }
+            },
+            "api_endpoints.BillingPlansResponse": {
+                "type": "object",
+                "properties": {
+                    "plans": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.BillingPlan"
+                        }
+                    }
+                }
+            },
             "api_endpoints.BrandListItem": {
                 "type": "object",
                 "properties": {
@@ -9605,6 +9997,20 @@
                     },
                     "views": {
                         "type": "integer"
+                    }
+                }
+            },
+            "api_endpoints.InstagramCollaboratorsResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Collaborator"
+                        }
                     }
                 }
             },
@@ -11386,6 +11792,10 @@
                     "plan": {
                         "type": "string",
                         "example": "free"
+                    },
+                    "use_case": {
+                        "type": "string",
+                        "example": "Managing clients' accounts (agency)"
                     }
                 }
             },
@@ -12222,6 +12632,23 @@
                     "name": {
                         "type": "string",
                         "example": "Jane Smith"
+                    },
+                    "username": {
+                        "type": "string",
+                        "example": "janesmith"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.Collaborator": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "17841405793187218"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "pending"
                     },
                     "username": {
                         "type": "string",
