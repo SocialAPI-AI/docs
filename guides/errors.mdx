@@ -125,8 +125,33 @@ Both share the `resource.conflict` code. Note that `GET /v1/invites` and `GET /v
 | 429 | `billing.export_limit` | Daily export allowance is exhausted |
 | 429 | `billing.export_concurrent` | Too many exports running at once for this plan |
 | 429 | `billing.export_cooldown` | Cooldown active between exports |
+| 402 | `billing.past_due` | Subscription is past due after two failed payment attempts. See below |
 
 Limit responses include `error.meta.plan` and `error.meta.max` so clients can prompt the user to upgrade.
+
+### Past-due accounts
+
+When a subscription's payment fails twice (the initial charge plus one automatic
+retry), API access is paused. Every `/v1` endpoint returns `402` with code
+`billing.past_due` until the invoice is paid.
+
+Three things stay reachable so the account can be recovered:
+
+- `GET /v1/users/me` and `PATCH /v1/users/me`
+- every `/v1/billing/*` endpoint
+- inbound platform webhooks, which are unaffected
+
+`GET /v1/users/me` reports the state in two fields: `billing_blocked` (boolean)
+and `billing_blocked_at` (when the block began, or null).
+
+**Outbound webhooks are not delivered while an account is past due.** Events that
+occur during this window are dropped, not queued, and are not replayed after
+payment. Ingestion is unaffected, so the underlying data is still recorded and
+remains queryable through `GET /v1/events` once access is restored.
+
+Access is restored automatically within seconds of a successful payment. There is
+no endpoint to call and no support ticket to open: paying the invoice, whether
+through the dashboard's Stripe portal or an automatic retry, lifts the block.
 
 ## Platform errors
 

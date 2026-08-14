@@ -422,6 +422,18 @@ Failed deliveries are automatically retried up to **5 attempts** with exponentia
 
 After 5 failed attempts, the delivery is marked `failed` and no further retries occur.
 
+## Past-due accounts
+
+Outbound delivery stops entirely while a subscription is past due. Events that
+occur during the block are dropped: no delivery is attempted, no delivery record
+is created, and nothing is replayed once the invoice is paid.
+
+Ingestion continues throughout, so the underlying comments, messages, and other
+events are still recorded. Query `GET /v1/events` after access is restored to see
+what happened during the gap.
+
+See [`billing.past_due`](/guides/errors#past-due-accounts) for the full behavior.
+
 ## Managing endpoints
 
 ### List endpoints
