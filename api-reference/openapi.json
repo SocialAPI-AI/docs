@@ -318,7 +318,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the boards for a connected Pinterest account, for choosing a publish destination.",
+                "description": "Returns the boards for a connected Pinterest account, with their default and active status. Boards refresh from Pinterest automatically when the stored copy is more than 5 minutes old.",
                 "tags": [
                     "Accounts"
                 ],
@@ -345,8 +345,95 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{id}/boards/{boardId}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update a board's is_default or is_active status. boardId accepts either the internal board handle or the Pinterest board id.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Update Pinterest board",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Board ID",
+                        "name": "boardId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.UpdateBoardRequest"
+                            }
+                        }
+                    },
+                    "description": "Board update",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PinterestBoardItem"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7856,7 +7943,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Permanently deletes the authenticated user account and all associated data (API keys, connected accounts, usage logs). This action is irreversible.",
+                "description": "Permanently deletes the authenticated user account and all associated data (API keys, connected accounts, usage logs). Any active subscription is cancelled immediately, with no refund for the remainder of the current billing period. This action is irreversible.",
                 "tags": [
                     "Users"
                 ],
@@ -10628,14 +10715,32 @@
             "api_endpoints.PinterestBoardItem": {
                 "type": "object",
                 "properties": {
+                    "board_id": {
+                        "type": "string",
+                        "example": "8828"
+                    },
                     "id": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "sapi_page_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "is_default": {
+                        "type": "boolean"
                     },
                     "name": {
-                        "type": "string"
+                        "type": "string",
+                        "example": "Recipes"
                     },
                     "privacy": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "PUBLIC",
+                            "PROTECTED",
+                            "SECRET"
+                        ],
+                        "example": "PUBLIC"
                     }
                 }
             },
@@ -10801,6 +10906,10 @@
                     "account_id": {
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "board_id": {
+                        "type": "string",
+                        "example": "8828"
                     },
                     "error": {
                         "$ref": "#/components/schemas/api_endpoints.PostTargetErrorResponse"
@@ -11283,6 +11392,11 @@
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
+                    "board_id": {
+                        "description": "BoardID targets a specific board within a Pinterest account. Pinterest\ntargets use board_id; page_id is also accepted as an alias, but supplying\nboth is an error.",
+                        "type": "string",
+                        "example": "8828"
+                    },
                     "first_comment": {
                         "description": "FirstComment overrides the post-level first comment for this target.",
                         "type": "string"
@@ -11461,6 +11575,17 @@
                         "description": "AccountID optionally scopes the unpublish to a single platform target.",
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    }
+                }
+            },
+            "api_endpoints.UpdateBoardRequest": {
+                "type": "object",
+                "properties": {
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "is_default": {
+                        "type": "boolean"
                     }
                 }
             },
