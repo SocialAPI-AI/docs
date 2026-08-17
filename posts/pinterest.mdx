@@ -1,0 +1,191 @@
+---
+title: Pinterest publishing
+description: Full reference for publishing Pins via SocialAPI, plus board management (create, update, delete).
+---
+
+## 1. Overview
+
+Pinterest publishing uses the Pinterest API v5 against your connected Pinterest account. Every Pin needs a destination board and an image, there is no text-only or link-only post type. SocialAPI also exposes board management endpoints so you can create, rename, or remove boards without leaving the API.
+
+| Field | Value |
+|---|---|
+| Platform slug | `pinterest` |
+| Auth type | OAuth 2.0 |
+| API | Pinterest API v5 |
+| Create post | Yes (Pin) |
+| Update post | No (Pinterest's PATCH /pins is still beta) |
+| Delete post | Yes |
+| Schedule | Yes (deferred publish via `scheduled_at`) |
+| Board management | Yes (create, update, delete) |
+
+---
+
+## 2. Create a Pin
+
+Use `POST /v1/posts` with a target pointing at a Pinterest board account. `media_ids` must contain exactly one image, Pinterest has no text-only Pin type.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Weeknight dinner idea: sheet-pan salmon.",
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "board_id": "8828",
+        "title": "Sheet-pan salmon",
+        "link": "https://example.com/recipes/salmon"
+      }
+    }]
+  }'
+```
+
+### Platform data fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `board_id` | string | Yes | The board to Pin to. Use a board id returned by [List boards](#4-list-boards) or [Create board](#5-create-board). |
+| `title` | string | No | Pin title, up to 100 characters. |
+| `description` | string | No | Overrides `text` as the Pin description, up to 800 characters. |
+| `link` | string | No | Destination URL the Pin links to, up to 2,048 characters. |
+| `alt_text` | string | No | Accessibility alt text for the image, up to 500 characters. |
+
+`board_id` must be passed inside the target's `platform_data`, not as a top-level field: passing it at the top level returns a validation error telling you to use `platform_data.board_id`.
+
+### Limits
+
+- Exactly one image in `media_ids`. Pinterest Pins are image-only through this endpoint.
+- Title: 100 characters. Description: 800 characters. Alt text: 500 characters. Link: 2,048 characters, and must be a valid `http` or `https` URL.
+
+### Scheduling
+
+```json
+{
+  "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+  "targets": [{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform_data": { "board_id": "8828" }
+  }],
+  "scheduled_at": "2026-04-15T10:00:00Z"
+}
+```
+
+---
+
+## 3. Update and delete a Pin
+
+**Update is not supported.** Pinterest's `PATCH /pins` endpoint is still in beta and not available to every app, so `PATCH /v1/posts/:pid` returns a `not_supported` error for Pinterest targets. Pin media is also immutable once created: even with beta access, only title, description, link, and board placement could change. To change the image, delete the Pin and create a new one.
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+---
+
+## 4. List boards
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_page_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "board_id": "8828",
+      "name": "Recipes",
+      "privacy": "PUBLIC",
+      "is_default": true,
+      "is_active": true
+    }
+  ]
+}
+```
+
+Boards refresh from Pinterest automatically when the stored copy is more than 5 minutes old, so this list can lag Pinterest by up to that window.
+
+---
+
+## 5. Create board
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Recipes",
+    "description": "Weeknight dinners",
+    "privacy": "PUBLIC"
+  }'
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Board name. |
+| `description` | string | No | Board description. |
+| `privacy` | string | No | `PUBLIC`, `PROTECTED`, or `SECRET`. Defaults to `PUBLIC` if omitted. |
+
+Returns `201` with the created board. The first board created for an account becomes its default publishing destination.
+
+---
+
+## 6. Update board
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards/8828 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Weeknight Recipes",
+    "privacy": "SECRET"
+  }'
+```
+
+`is_default` and `is_active` are SocialAPI-only flags stored locally and never sent to Pinterest. `name`, `description`, and `privacy` are pushed upstream. `boardId` accepts either the internal board handle or the raw Pinterest board id.
+
+**Privacy cannot be set to PROTECTED via update.** Pinterest's update schema only accepts `PUBLIC` or `SECRET` on `PATCH /boards/{id}`, unlike create, which also accepts `PROTECTED`. If a board is already `PROTECTED`, its privacy cannot be changed at all through this endpoint: recreate the board instead.
+
+---
+
+## 7. Delete board
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards/8828 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+**Deleting a board permanently deletes every Pin saved to it, and this cannot be undone.** There is no soft-delete or recovery path on Pinterest's side. If the deleted board was the account's default, SocialAPI promotes another active board to take its place.
+
+Returns `204` on success.
+
+---
+
+## 8. Get account summary
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/pinterest/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Returns the connected account's public profile counts (username, profile image, followers, pins, boards, monthly views), fetched live from Pinterest on every call.
+
+---
+
+## 9. Required OAuth scopes
+
+| Scope | Purpose |
+|---|---|
+| `boards:read` | List boards |
+| `boards:write` | Create, rename, or delete boards |
+| `pins:read` | List Pins |
+| `pins:write` | Create and delete Pins |
+| `user_accounts:read` | Read account profile summary |
+
+Add `boards:read_secret` and `pins:read_secret` if the user's secret boards and Pins should be accessible. To verify which scopes your connected account has granted, call `GET /v1/accounts/:id/limits`.

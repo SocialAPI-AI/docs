@@ -376,16 +376,179 @@
                         }
                     }
                 }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a board on Pinterest and adds it to the account's board list. The first board created for an account becomes its default publishing destination.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Create Pinterest board",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.CreateBoardRequest"
+                            }
+                        }
+                    },
+                    "description": "Board to create",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PinterestBoardItem"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/accounts/{id}/boards/{boardId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes the board on Pinterest along with every pin saved to it, then removes it from the account's board list. This cannot be undone. If the deleted board was the default, another active board is promoted.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Delete Pinterest board",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Board ID",
+                        "name": "boardId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Board deleted"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "patch": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a board's is_default or is_active status. boardId accepts either the internal board handle or the Pinterest board id.",
+                "description": "Update a board. is_default and is_active are SocialAPI flags stored locally; name, description, and privacy are pushed to Pinterest. Privacy accepts only PUBLIC or SECRET. boardId accepts either the internal board handle or the Pinterest board id.",
                 "tags": [
                     "Accounts"
                 ],
@@ -442,8 +605,28 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5293,6 +5476,83 @@
                 }
             }
         },
+        "/platforms/pinterest/accounts/{id}/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the connected Pinterest account's public profile counts: followers, pins, boards, and monthly views. Values are fetched live from Pinterest.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Get Pinterest account summary",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PinterestSummaryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/tiktok/accounts/{id}/summary": {
             "get": {
                 "security": [
@@ -9168,6 +9428,28 @@
                     }
                 }
             },
+            "api_endpoints.CreateBoardRequest": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "example": "Weeknight dinners"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Recipes"
+                    },
+                    "privacy": {
+                        "type": "string",
+                        "enum": [
+                            "PUBLIC",
+                            "PROTECTED",
+                            "SECRET"
+                        ],
+                        "example": "PUBLIC"
+                    }
+                }
+            },
             "api_endpoints.CreateBrandRequest": {
                 "type": "object",
                 "required": [
@@ -10755,6 +11037,35 @@
                     }
                 }
             },
+            "api_endpoints.PinterestSummaryResponse": {
+                "type": "object",
+                "properties": {
+                    "board_count": {
+                        "type": "integer",
+                        "example": 23
+                    },
+                    "follower_count": {
+                        "type": "integer",
+                        "example": 12400
+                    },
+                    "monthly_views": {
+                        "type": "integer",
+                        "example": 1200000
+                    },
+                    "pin_count": {
+                        "type": "integer",
+                        "example": 847
+                    },
+                    "profile_image": {
+                        "type": "string",
+                        "example": "https://i.pinimg.com/x.jpg"
+                    },
+                    "username": {
+                        "type": "string",
+                        "example": "boardandco"
+                    }
+                }
+            },
             "api_endpoints.PlatformConstraintsResponse": {
                 "type": "object",
                 "properties": {
@@ -11581,11 +11892,27 @@
             "api_endpoints.UpdateBoardRequest": {
                 "type": "object",
                 "properties": {
+                    "description": {
+                        "type": "string",
+                        "example": "Weeknight dinners"
+                    },
                     "is_active": {
                         "type": "boolean"
                     },
                     "is_default": {
                         "type": "boolean"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Recipes"
+                    },
+                    "privacy": {
+                        "type": "string",
+                        "enum": [
+                            "PUBLIC",
+                            "SECRET"
+                        ],
+                        "example": "PUBLIC"
                     }
                 }
             },
