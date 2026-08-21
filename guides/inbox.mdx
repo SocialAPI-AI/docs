@@ -115,15 +115,49 @@ Read conversations and send messages across platforms that support DMs.
 
 ### Sending text and attachments
 
-A message can carry text, an attachment, or both. Provide `text`, `attachment_url`, or both: at least one is required.
+A message can carry text, an attachment, interactive content, or a combination. Provide `text`, `attachment_url`, or interactive content (`quick_replies`, `buttons`, or `cards`): at least one is required.
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `account_id` | Yes | Connected account that owns the conversation |
-| `text` | Conditional | Message body. Required unless `attachment_url` is set |
-| `attachment_url` | Conditional | Publicly reachable URL of a media file to attach. Required unless `text` is set |
+| `text` | Conditional | Message body. Required unless `attachment_url` or interactive content is set |
+| `attachment_url` | Conditional | Publicly reachable URL of a media file to attach. Required unless `text` or interactive content is set |
+| `quick_replies` | No | Tappable reply chips (Instagram, Facebook). See Interactive messages below |
+| `buttons` | No | Button template with 1 to 3 call-to-action buttons (Instagram, Facebook) |
+| `cards` | No | Carousel of cards, each with an image and buttons (Instagram, Facebook) |
 
 On Facebook and Instagram, `attachment_url` is delivered as a Messenger attachment. The attachment type (image, video, audio, or file) is inferred from the URL file extension, so use a direct media link with the correct extension (for example `.jpg`, `.mp4`, `.mp3`). URLs without a recognized media extension are sent as a generic file. The media must be hosted on a publicly reachable URL (max 25 MB); the platform fetches it directly.
+
+### Interactive messages
+
+On Instagram and Facebook you can send structured, tappable content alongside or instead of plain text. Set at most one of `quick_replies`, `buttons`, or `cards` per message. When the recipient taps a quick reply or a `postback` button, you receive a [`dm.postback` webhook](/guides/webhooks#event-types) carrying the `payload` you defined, so you can drive automated flows.
+
+These features require the recipient to be inside the 24 hour messaging window, the same as any other message.
+
+**Quick replies** render up to 13 tappable chips above the keyboard. They require `text` and are plain text only.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `quick_replies[].title` | Yes | Chip label (20 characters or fewer) |
+| `quick_replies[].payload` | No | Value echoed back to your webhook when the chip is tapped |
+
+**Buttons** render a text bubble with 1 to 3 call-to-action buttons. They use `text` as the bubble body (640 characters or fewer).
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `buttons[].type` | Yes | `url` (opens a link) or `postback` (sends a `dm.postback` webhook) |
+| `buttons[].title` | Yes | Button label (20 characters or fewer) |
+| `buttons[].url` | Conditional | Destination URL. Required when `type` is `url` |
+| `buttons[].payload` | Conditional | Value echoed back to your webhook. Required when `type` is `postback` |
+
+**Cards** render a horizontally scrollable carousel of up to 10 cards, each with an image, title, subtitle, and up to 3 buttons. (Carousels are not available in the MCP `send_dm` tool; use the REST endpoint.)
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `cards[].title` | Yes | Card title (80 characters or fewer) |
+| `cards[].subtitle` | No | Card subtitle (80 characters or fewer) |
+| `cards[].image_url` | No | Card image URL |
+| `cards[].buttons` | No | Up to 3 buttons, same shape as `buttons` above |
 
 ### Example: list conversations and send a message
 
@@ -143,6 +177,32 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "account_id": "acc_abc123", "text": "Here is your receipt", "attachment_url": "https://cdn.example.com/receipt.jpg" }'
+
+# Send quick replies (Instagram, Facebook)
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "account_id": "acc_abc123",
+        "text": "How can we help?",
+        "quick_replies": [
+          { "title": "Track my order", "payload": "TRACK_ORDER" },
+          { "title": "Talk to support", "payload": "SUPPORT" }
+        ]
+      }'
+
+# Send a button template (Instagram, Facebook)
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/messages \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "account_id": "acc_abc123",
+        "text": "Your order has shipped.",
+        "buttons": [
+          { "type": "url", "title": "Track order", "url": "https://shop.example.com/orders/123" },
+          { "type": "postback", "title": "Talk to support", "payload": "SUPPORT" }
+        ]
+      }'
 ```
 
 ## Reviews

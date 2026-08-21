@@ -61,7 +61,7 @@ Events are grouped into three categories: **inbox** (incoming interactions), **p
 | `dm.received` | inbox | A new direct message arrives (may include `metadata.referral` if the DM originated from an ad) |
 | `dm.sent` | inbox | Your account sent a direct message (echo confirmation from Meta). Fires for every echo the platform delivers, including replies sent from the native app or Meta Business Suite, not only messages sent through the API. On Facebook the echo's `raw_payload` carries `app_id`, which lets you tell the two apart |
 | `dm.referral` | inbox | A user clicked an ad or referral link without sending a message. The interaction has empty content and includes `metadata.referral` |
-| `dm.postback` | inbox | A user tapped a button or quick reply in a DM |
+| `dm.postback` | inbox | A user tapped a quick reply or a `postback` button in a DM (Instagram, Facebook). The interaction carries the button `payload` and `title` in `metadata` |
 | `review.received` | inbox | A new review arrives (Google Business Profile) |
 | `mention.received` | inbox | Your account is @mentioned in a comment or a post caption (`metadata.mention_type` is `comment` or `caption`). Instagram story mentions are delivered as `dm.received` with an attachment of type `story_mention`, not as this event |
 | `dm.status.sent` | inbox | A direct message you sent was accepted by the platform (Instagram, Facebook, WhatsApp) |
@@ -285,6 +285,31 @@ When a DM originates from an ad click (Instagram CTD or Facebook CTM ads), the i
 ```
 
 Only non-empty referral fields are included. `dm.referral` events (standalone ad clicks without a message) have empty `content.text` and always include `metadata.referral`.
+
+### Postback metadata
+
+When a user taps a quick reply or a `postback` button you sent (see [interactive messages](/guides/inbox#interactive-messages)), you receive a `dm.postback` event. The `payload` you defined and the tapped button's `title` are carried in `metadata`:
+
+```json
+{
+  "event": "dm.postback",
+  "data": {
+    "id": "sapi_dm_aW5zdGFncmFtOm1pZC5wYjE",
+    "type": "dm",
+    "platform": "instagram",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "author": { "id": "17846744073097661" },
+    "content": { "text": "" },
+    "received_at": "2026-03-01T14:31:00Z",
+    "metadata": {
+      "title": "Track my order",
+      "payload": "TRACK_ORDER"
+    }
+  }
+}
+```
+
+When the tap arrives through an ig.me link or icebreaker, `metadata.referral` is also included. URL buttons (`type: url`) open the link in the in-app browser and do not generate a webhook.
 
 ## Request headers
 
