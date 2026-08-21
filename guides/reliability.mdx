@@ -1,0 +1,58 @@
+---
+title: "Publishing behavior and reliability"
+description: "How to tell what actually happened: response codes, media verification, delete semantics, and treating IDs as opaque strings."
+---
+
+A successful HTTP status tells you a request was accepted, not that every part of it did what you intended. This page collects the behaviors that are easy to miss when you build against examples alone, so you can tell what actually happened.
+
+## A 201 confirms creation, not every field
+
+When you create a post, a `201` means the post was created. It is not a guarantee that every field you sent was recognized. Fields we do not recognize are not applied, so a small naming mistake (for example sending `media` instead of `media_ids`, or a misspelled key) can produce a post that publishes without the media you intended.
+
+Two habits keep you safe:
+
+- Send only the fields documented for the endpoint, with their exact names. Validate your request body against the [API Reference](/api-reference/introduction) before you rely on a field.
+- When a dropped field would be costly, read the object back with `GET /v1/posts/{id}` and confirm the field is present before you depend on it.
+
+## Verify media before you publish
+
+The presigned upload path has four steps: request a signed URL, `PUT` the bytes, verify, then attach. Media that has not been verified stays in a `pending` state, and a `pending` media reference does not publish silently: on a validated publish it returns `400` (`media ... is not ready or not found`), and on delivery it fails that target. Always confirm your media is `ready` before you attach it. See [Media uploads](/guides/media) for the full flow.
+
+## Response codes
+
+Creating or publishing a post can return three statuses. Read them, and read the per-target detail:
+
+| Status | Meaning |
+|---|---|
+| `201` | The post was created (or, with `publish_now`, accepted for delivery). Delivery runs in the background, so the target status is often `publishing` at this point. |
+| `207` | Partial success. Some targets published, others failed. This is not a total failure. |
+| `422` | Every target failed. |
+
+When a target fails, the reason is on that target under `targets[].error`, with the shape `{ "category", "caused_by", "code", "message" }`. Surface `targets[].error.message` to your users rather than a generic retry prompt. See [Error handling](/guides/errors) for the code catalog.
+
+## Delete semantics
+
+Delete does not mean the same thing on every resource. All three return `204 No Content`, but what they leave behind differs:
+
+| Endpoint | Effect |
+|---|---|
+| `DELETE /v1/invites/{id}` | Soft. The invite is marked inactive and still appears in `GET /v1/invites` with `is_active: false`. |
+| `DELETE /v1/accounts/{id}` | Hard. The account is removed and disappears from `GET /v1/accounts`. |
+| `DELETE /v1/brands/{id}` | Cascade. The brand and its connected accounts and pending invites are all removed. |
+
+So you detect a revoked invite from a field value, but you detect a disconnected account from its absence in the list. Two different code paths.
+
+<Warning>
+`DELETE /v1/brands/{id}` is destructive. It disconnects every account under the brand and kills its pending connect links, so `GET /v1/invites?brand_id=<deleted>` afterward returns `404`. Keep brand deletion behind a deliberate action, never in a retry or cleanup path.
+</Warning>
+
+The brand delete takes the ID in the path with an empty body:
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/brands/3fa85f64-5717-4562-b3fc-2c963f66afa6 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## IDs are opaque strings
+
+Treat every ID we return as an opaque string. Do not parse it, and do not assume a format. Today, posts, brands, and invites are UUIDs, while accounts are prefixed with `acc_`, and interaction IDs carry a type prefix such as `sapi_cmt_`. These formats can differ per object type and may change, so persist IDs as text, not as a typed `uuid` column.

@@ -9,6 +9,10 @@ Publishing uses a single endpoint, `POST /v1/posts`, with per-platform behavior 
 
 Use `POST /v1/posts/validate` to check constraints before publishing, and `GET /v1/posts/validate` to fetch platform-specific constraints (e.g. TikTok's per-creator privacy levels and duration limits).
 
+## Attaching media
+
+Photos and videos are upload-first. Upload a file to receive a `media_id`, then pass that ID in the `media_ids` array. A raw public URL in `media_ids` is ignored. See the [Media uploads guide](/guides/media) for the two upload paths, the verify step, and storage limits.
+
 ## Capability matrix
 
 | Capability | Instagram | Facebook | LinkedIn | Threads | TikTok | YouTube | X / Twitter | Google |
@@ -16,12 +20,21 @@ Use `POST /v1/posts/validate` to check constraints before publishing, and `GET /
 | Create post | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Coming soon |
 | Update post | No | Yes (text only) | Yes (text only) | No | No | Yes | No | Coming soon |
 | Delete post | Yes | Yes | Yes | Yes | No | Yes | Yes | Coming soon |
-| Schedule | Yes | Yes | Yes | Yes | No | No | No | Coming soon |
-| First comment | Yes (best-effort) | No | No | No | No | No | No | No |
+| Schedule | Yes | Yes | Yes | Yes | No | Native | No | Coming soon |
+| First comment | Yes (best-effort) | Yes (best-effort) | No | No | No | Yes (best-effort) | No | No |
 | Image | Yes | Yes | Yes | Yes | Yes (1-35) | Thumbnail | No | Coming soon |
 | Video | Yes (as Reel) | Yes | Yes | Yes | Yes | Yes | No | No |
 | Carousel | Yes (2-10) | Yes (2-10) | Yes (2-20) | Yes (2-20) | Photo carousel only | No | No | No |
 | Max media per post | 10 | 10 | 20 | 20 | 35 (photo) / 1 (video) | 1 (video + thumb) | 0 (text only) | 1 |
+
+## Retrieving a post
+
+`GET /v1/posts/{pid}` and `GET /v1/posts/{pid}/metrics` accept either identifier:
+
+- The SocialAPI post ID (UUID) returned when the post was created.
+- A platform post ID: the platform's own ID for a published target, for example a TikTok video ID or a Facebook post ID.
+
+A platform post ID resolves to the SocialAPI post it was published from, so you can fetch a post or its live metrics using the ID you already track on the platform side. If a platform post ID happens to match more than one post across your accounts, the API returns `409` with code `ambiguous_post_id`; retry with the SocialAPI post ID. Mutating endpoints (update, delete, publish, retry, unpublish) accept only the SocialAPI post ID.
 
 ## Deleting posts
 
@@ -55,7 +68,7 @@ How each platform interprets the shared `PostDraft` fields:
 |---|---|---|---|---|---|---|---|---|
 | `text` | Caption (max 2200 chars) | Post message | Commentary | Post text (max 500 chars) | Video description | Video description | Tweet text (max 280) | Summary |
 | `media_ids` | Presigned URLs; determines image/video/carousel | First URL only; photo or video | Presigned URLs; image or video | Presigned URLs | Presigned URLs; video or photo carousel | Single video URL | Not supported (text only) | Single image URL |
-| `first_comment` | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported |
+| `first_comment` | Posted as a comment after publish (best-effort, non-blocking) | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported | Not supported | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported |
 | `scheduled_at` | Deferred publish | Deferred publish | Deferred publish | Deferred publish | Not supported | Not supported | Not supported | Not supported |
 
 ## Platform-specific `platform_data` summary
@@ -67,12 +80,12 @@ Pass these inside each target's `platform_data` object (per-target overrides sup
 | Platform | Required fields | Notable optional fields |
 |---|---|---|
 | [Instagram](/posts/instagram) | None | `alt_text`, `location_id`, `share_to_feed`, `cover_url` |
-| [Facebook](/posts/facebook) | None | `link`, `picture` (text posts only; photo posts ignore platform_data) |
-| [LinkedIn](/posts/linkedin) | None | No platform_data keys supported |
+| [Facebook](/posts/facebook) | None | `link`, `cta_type`, `cta_link`, `min_age`, `max_age` (text, link, album posts); `alt_text` (single-photo); `title` (single-video) |
+| [LinkedIn](/posts/linkedin) | None | `disable_reshare`, `cta_label`, `cta_url`, `article_url`, `article_title`, `article_description`, `media_title`, `alt_text`, `alt_texts` |
 | [Threads](/posts/threads) | None | `reply_control`, `link_attachment` |
 | [TikTok](/posts/tiktok) | `privacy_level` | `media_type`, `brand_content_toggle`, `disable_duet`, `disable_stitch`, `disable_comment`, `is_aigc`, `video_cover_timestamp_ms` |
-| [YouTube](/connectors/youtube) | None | `category_id`, `tags`, `made_for_kids`, `embeddable`, `notify_subscribers` |
-| [X / Twitter](/connectors/twitter) | None | `reply_settings` (`everyone`, `following`, `verified`) |
+| [YouTube](/posts/youtube) | None | `category_id`, `tags`, `made_for_kids`, `embeddable`, `notify_subscribers`, `publish_at` |
+| [X / Twitter](/connectors/twitter) | None | `reply_settings` (`following`, `mentionedUsers`, `subscribers`, `verified`) |
 | [Google](/posts/google) | None (defaults to STANDARD) | `topicType` (STANDARD, EVENT, OFFER, ALERT), `updateMask` |
 
 ## Required OAuth scopes
@@ -106,7 +119,7 @@ Pass these inside each target's `platform_data` object (per-target overrides sup
   <Card title="TikTok" href="/posts/tiktok">
     Video and photo carousel posts. TikTok Content Posting API.
   </Card>
-  <Card title="YouTube" href="/connectors/youtube">
+  <Card title="YouTube" href="/posts/youtube">
     Video uploads. YouTube Data API v3.
   </Card>
   <Card title="X / Twitter" href="/connectors/twitter">

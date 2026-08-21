@@ -63,4 +63,19 @@ Rotating the Client Secret in Twitter's developer portal invalidates all tokens 
 ## Security
 
 - Your Client Secret is encrypted at rest with AES-256-GCM and is never returned by any API endpoint. Only the first six characters of the Client ID are stored in plaintext for UI preview.
-- Credential CRUD endpoints (`/v1/integrations/twitter/credentials`) are dashboard-only, so a leaked API key cannot read or write BYOK credentials.
+- Credential CRUD endpoints (`/v1/platforms/twitter/credentials`) are dashboard-only: they require a Dashboard JWT and reject Bearer API keys, so a leaked API key cannot read or write BYOK credentials.
+
+## Endpoints
+
+These endpoints are **dashboard-only** (Dashboard JWT required; Bearer API keys are rejected):
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/platforms/twitter/credentials` | List stored credential sets (default + brand overrides) |
+| `PUT` | `/v1/platforms/twitter/credentials` | Create or update the default credential set |
+| `DELETE` | `/v1/platforms/twitter/credentials` | Delete the default credential set |
+| `PUT` | `/v1/platforms/twitter/credentials/brand/:brand_id` | Create or update a brand-scoped credential override |
+| `DELETE` | `/v1/platforms/twitter/credentials/brand/:brand_id` | Delete a brand-scoped credential override |
+| `POST` | `/v1/platforms/twitter/credentials/test` | Test a credential pair before saving |
+
+These routes are not included in the public OpenAPI spec. They are used exclusively by the SocialAPI dashboard.

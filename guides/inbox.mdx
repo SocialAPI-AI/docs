@@ -7,7 +7,7 @@ The inbox is a unified social inbox API: a single endpoint that returns comments
 
 SocialAPI provides a unified inbox API for reading and responding to all inbound engagement across your connected accounts. Comments, DMs, reviews, and mentions are accessed through consistent endpoints with the same response shape regardless of platform.
 
-SocialAPI never stores interaction content in its database. Every inbox call proxies live data from the platform API, so you always see the latest state.
+SocialAPI proxies comments, reviews, and mentions live from the platform API, so you always see the latest state. DM conversations and messages are stored in SocialAPI's database to support threading and pagination.
 
 ## Comments
 
@@ -28,7 +28,9 @@ List comments across all connected accounts, reply, and moderate.
 | `DELETE` | `/v1/inbox/comments/:postId/:commentId/like` | Unlike a comment |
 | `POST` | `/v1/inbox/comments/:postId/:commentId/private-reply` | Send a private DM in reply to a comment |
 
-`:postId` and `:commentId` accept SocialAPI interaction IDs (`sapi_cmt_...`). See [Interaction IDs](/guides/interaction-ids) for the encoding.
+`:postId` accepts a platform post ID (e.g., `17895695668004550`). `:commentId` accepts a SocialAPI interaction ID (`sapi_cmt_...`). See [Interaction IDs](/guides/interaction-ids) for the encoding.
+
+Comment likes are supported on Facebook and LinkedIn Page only (see the matrix below); other platforms return `501` with code `resource.not_supported`. Private replies (Instagram and Facebook) are limited by Meta to one per comment, within 7 days of the comment. On Facebook the commenter's response continues as a normal Messenger conversation; on Instagram a private reply does not open a standard 24-hour messaging window.
 
 ### Platform capabilities
 
@@ -38,12 +40,13 @@ List comments across all connected accounts, reply, and moderate.
 | Facebook | Yes | Yes | Yes | Yes | Yes |
 | Threads | Yes | Conditional | No | Conditional | No |
 | Google | Yes | No | No | No | No |
-| LinkedIn | Soon | No | Soon | Soon | No |
+| LinkedIn Page | Yes | No | Yes | Yes | No |
+| LinkedIn | Soon | No | No | No | No |
 | YouTube | Yes | Yes | No | Yes | No |
-| X / Twitter | Yes | Yes | No | Conditional | No |
+| X / Twitter | Yes | No | No | No | No |
 | TikTok | No | No | No | No | No |
 
-For Threads, Hide is available on comments not owned by the user; Delete is available on own replies. For X / Twitter, Delete is available on own posts. Each comment in the response includes a `capabilities` object so your code can check what is actually allowed for that specific item.
+For Threads, Hide is available on comments not owned by the user; Delete is available on own replies. LinkedIn Page (`linkedin_page`) is the organization page connector and is available in beta. Each comment in the response includes a `capabilities` object so your code can check what is actually allowed for that specific item.
 
 ### Example: list and reply
 
@@ -53,11 +56,11 @@ curl https://api.social-api.ai/v1/inbox/comments \
   -H "Authorization: Bearer $SOCAPI_KEY"
 
 # List comments on one post
-curl "https://api.social-api.ai/v1/inbox/comments/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U" \
+curl "https://api.social-api.ai/v1/inbox/comments/17895695668004550" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 
-# Reply to a comment on that post
-curl -X POST "https://api.social-api.ai/v1/inbox/comments/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U" \
+# Reply to a specific comment on a post (postId is the platform post ID)
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/17895695668004550" \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -82,8 +85,21 @@ Read conversations and send messages across platforms that support DMs.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/v1/inbox/conversations` | List DM conversations |
+| `GET` | `/v1/inbox/conversations/:id` | Get a single conversation |
+| `PATCH` | `/v1/inbox/conversations/:id` | Update a conversation (set status to `active` or `archived`) |
+| `POST` | `/v1/inbox/conversations/:id/read` | Mark a conversation as read |
 | `GET` | `/v1/inbox/conversations/:id/messages` | Get messages in a conversation |
 | `POST` | `/v1/inbox/conversations/:id/messages` | Send a message |
+
+### List conversations query parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `account_id` | string | | Filter by connected account ID |
+| `platform` | string | | Filter by platform (e.g., `instagram`, `facebook`) |
+| `status` | string | `active` | Conversation status: `active` or `archived` |
+| `limit` | integer | `25` | Page size (1-100) |
+| `cursor` | string | | Pagination cursor from the previous response |
 
 ### Platform support
 
@@ -218,35 +234,49 @@ curl https://api.social-api.ai/v1/inbox/reviews \
 curl -X POST https://api.social-api.ai/v1/inbox/reviews/sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/reply \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "text": "Thank you for the review!" }'
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "text": "Thank you for the review!" }'
 ```
 
 ## Mentions
 
-Read mentions of a connected account.
+Read mentions of a connected account, and reply to them as a public comment.
 
-### Endpoint
+### Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/v1/accounts/:id/mentions` | List mentions for a connected account |
+| `POST` | `/v1/accounts/:id/mentions/reply` | Reply to a mention as a public comment |
 
 Mentions are scoped to a single connected account, not the workspace.
 
+Replying works even when the mention is on someone else's post, where the normal
+comment-reply endpoint is not allowed. Pass `media_id` (the post the mention is
+on, or the `sapi_mnt_` id from the list response) and `text`. Set `comment_id`
+only when the mention was inside a comment; omit it to reply to a mention in the
+post caption. A reply consumes 1 interaction credit.
+
 ### Platform support
 
-| Platform | Mentions |
-|----------|----------|
-| Instagram | Yes |
-| Facebook | Yes |
-| X / Twitter | Yes |
-| All others | No |
+| Platform | List mentions | Reply to mention |
+|----------|----------|----------|
+| Instagram | Yes | Yes |
+| Facebook | Yes | Yes |
+| X / Twitter | Yes | No |
+| All others | No | No |
 
 ### Example
 
 ```bash
+# List mentions
 curl "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions" \
   -H "Authorization: Bearer $SOCAPI_KEY"
+
+# Reply to a comment mention as a public comment
+curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions/reply \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"media_id": "17895695668004550", "comment_id": "17858893269577012", "text": "Thanks for the shout-out!"}'
 ```
 
 ## Interaction IDs

@@ -31,11 +31,13 @@ Facebook Pages are fully supported. The connector uses the Meta Graph API for po
 | Toggle post comments | No | Not supported by Facebook Graph API |
 | DMs | Yes | Via Messenger (24-hour messaging window) |
 | Send DM | Yes | Text and/or media attachment (`attachment_url`) |
-| Send DM attachment | Yes | Image, video, audio, or file via `attachment_url` (type inferred from URL extension, max 25 MB) |
+| Send DM attachment | Yes | Image, video, audio, or file via `attachment_url` (type inferred from URL extension, max 25 MB), or by `attachment_id` (requires `attachment_type`) |
 | Get DM thread by user | Yes | |
 | Reviews | No | Deprecated in Graph API v22.0 |
 | Mentions | Yes | Posts where the Page is tagged |
-| Create post | Yes | Text, photos, links |
+| Reply to mention | Yes | Posts a public comment reply on a mention (post or comment mention) |
+| Like/unlike comment | Yes | Page can like or unlike a comment |
+| Create post | Yes | Text, photos, links, videos, Reels (set `content_type: reel` in platform_data) |
 | Delete post | Yes | |
 
 ## Connecting
@@ -60,7 +62,73 @@ Response:
 }
 ```
 
-Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the code with Facebook and redirects the user to your `redirect_uri` with the connection result. See [OAuth flows](/guides/oauth#step-3-receive-the-result-at-your-redirect_uri) for the redirect parameters.
+Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the code with Facebook, but the result is never an immediate `status=success`: every Facebook connect returns a pending connection that asks you to choose which Pages to assign. See [OAuth flows: Facebook, choosing which Pages to connect](/guides/oauth#facebook-choosing-which-pages-to-connect) for the full `login_id` / `pages[]` / `lost_access[]` shape and the `POST /v1/accounts/pending/{connection_id}/select` call that completes it.
+
+### One login, many brands
+
+A Facebook login is a shared credential, not a one-to-one link to a brand. The same login can serve many brands at once: each Page you have access to belongs to exactly one brand, but the login behind it, and the OAuth grant that keeps it alive, is shared across all of them.
+
+This has two practical consequences:
+
+- **Assigning Pages is explicit.** Connecting a login does not attach every Page it can see to the brand you connected from. Each Page is assigned to a brand only when you select it, either during the connect flow's pending-selection step or afterward through the endpoints below.
+- **Re-authenticating refreshes everyone.** When you or a teammate re-runs the OAuth flow for a login that already backs one or more brands, the refreshed token and Page grant apply to every brand using that login, not just the one you happened to reconnect from.
+
+### Managing Pages after connecting
+
+Pages don't have to be assigned at connect time. List a login's current Pages, live from Meta, merged with which brand (if any) already owns each one:
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/facebook/logins/{loginId}/pages" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+```json
+{
+  "login_id": "cred_01J8X3Q4R5M6N7P8V2K0W1J",
+  "pages": [
+    {
+      "platform_page_id": "17841400000000000",
+      "name": "Acme Bakery",
+      "assigned_brand_id": "",
+      "assignable": true
+    }
+  ],
+  "count": 1
+}
+```
+
+Assign one unassigned Page to a brand:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/platforms/facebook/logins/{loginId}/pages/{pageId}/assign" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"brand_id": "b_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
+```
+
+A Page already assigned to one of your brands cannot be assigned to a different one while it stays connected there. Trying to connect the same login into a brand whose Facebook account is already tied to a different login returns `409`:
+
+```json
+{
+  "error": {
+    "code": "account.different_login",
+    "message": "This brand's Facebook is connected through a different login. Disconnect it first."
+  }
+}
+```
+
+Disconnect the brand's existing Facebook account first if you intend to move it to a different login.
+
+Each brand can connect up to 5 Facebook Pages. This is a hard cap, the same on every plan, not a billed allowance: there is no per-page charge for staying under it, and no way to go over it. Assigning a 6th Page to a brand returns `403 platform.facebook.page_cap`:
+
+```json
+{
+  "error": {
+    "code": "platform.facebook.page_cap",
+    "message": "Each brand can connect up to 5 Facebook Pages. Disconnect one or connect the rest to another brand."
+  }
+}
+```
 
 ## Reading samples
 
@@ -162,11 +230,11 @@ For the full field reference, media constraints, and error recovery, see [Facebo
 
 ## Limitations and gotchas
 
-- **Multi-Page OAuth**: a single OAuth flow connects all Facebook Pages the user manages. Each Page gets its own `account_id`.
+- **Shared login, one Page per brand**: a single OAuth flow surfaces every Page the login can manage, but each Page belongs to exactly one brand's `account_id`, assigned explicitly during the pending-connection step or later. See [One login, many brands](#one-login-many-brands).
 - **Page tokens never expire**: unlike Instagram, Facebook Page tokens derived from long-lived user tokens do not expire. No reconnection needed unless the user revokes access.
 - **Private replies**: replying to a comment with `"private": true` sends a one-time DM to the commenter. Can only be sent once per comment, within 7 days of the comment.
 - **24-hour messaging window**: Pages can send any message within 24 hours of the user's last message. After that, only approved message tags are allowed. If you get an error sending a DM, the window may have closed.
-- **Reviews deprecated**: Facebook deprecated Page Recommendations/Reviews in Graph API v22.0 (March 2025). The API returns `501` for review endpoints.
+- **Reviews deprecated**: Facebook deprecated Page Recommendations/Reviews in Graph API v22.0 (January 2025). The API returns `501` for review endpoints.
 
 ## Permissions
 

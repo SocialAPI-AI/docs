@@ -27,7 +27,7 @@ Response:
 
 ```json
 {
-  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "p_01HZ9X3Q4R5M6N7P8V2K0W1J",
   "status": "scheduled",
   "scheduled_at": "2026-06-01T09:00:00Z",
   "targets": [
@@ -37,7 +37,7 @@ Response:
 }
 ```
 
-Omit `scheduled_at` (or set it to `null`) to publish immediately.
+To publish immediately instead of scheduling, pass `"publish_now": true`. Passing neither `scheduled_at` nor `publish_now` saves the post as a **draft** (even when targets are provided), it is not published.
 
 ## Managing scheduled posts
 
@@ -50,37 +50,51 @@ curl "https://api.social-api.ai/v1/posts?status=scheduled" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-### Reschedule a post
+### Edit or reschedule a post
 
-Update the scheduled time with `PATCH`:
+Use `PATCH /v1/posts/:pid` to update the text, media, or schedule time of a post in `draft`, `scheduled`, or `failed` status. Editing a failed post lets you correct content issues before calling `POST /v1/posts/:pid/retry`. Update the scheduled time with:
 
 ```bash
-curl -X PATCH https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+curl -X PATCH https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "scheduled_at": "2026-06-02T14:00:00Z" }'
 ```
+
+### Publish a draft or scheduled post now
+
+To publish a post that is currently in `draft` or `scheduled` status, call the publish endpoint. This sends it to all targets immediately and synchronously (the response reflects the final delivery result):
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J/publish \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+This is the only way to publish an existing draft. `PATCH` only edits a post's content, it does not trigger publishing. Consumes 1 post credit.
 
 ### Cancel a scheduled post
 
 Delete it before it publishes:
 
 ```bash
-curl -X DELETE https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+curl -X DELETE https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Only posts in `scheduled` or `draft` status can be cancelled. Once a post enters `publishing`, it cannot be stopped.
+Only posts in `scheduled`, `draft`, or `failed` status can be deleted. Once a post enters `publishing`, it cannot be stopped.
 
 ## Status lifecycle
 
 Every post moves through this state machine:
 
 ```
-draft --> scheduled --> publishing --> published
-                                  \-> partial
-                                  \-> failed
+draft ------> scheduled --> publishing --> published
+   \                   /                \-> partial
+    \-----------------/                  \-> failed
+   (publish_now / POST /posts/{pid}/publish)
 ```
+
+A `draft` reaches `publishing` either by being created with `publish_now: true`, or later via `POST /v1/posts/{pid}/publish`.
 
 | Status | Meaning |
 |--------|---------|
@@ -91,22 +105,33 @@ draft --> scheduled --> publishing --> published
 | `partial` | Some targets succeeded, some failed (check per-target status) |
 | `failed` | All targets failed |
 
-A post can also be set to `cancelled` by deleting it while it is in `draft` or `scheduled` status.
+Deleting a post permanently removes it (the post returns `404` on subsequent fetch). For scheduled posts, any pending platform deliveries are marked `cancelled` before the post row is removed.
 
 ## Platform scheduling support
 
-Not all platforms support deferred publishing through their APIs. For platforms that do not support scheduling natively, SocialAPI holds the post server-side and publishes it at the scheduled time.
+When you set `scheduled_at`, SocialAPI holds the post in its own queue and publishes it when the scheduled time arrives. This works the same way for every platform: the post is sent to the platform only at the scheduled moment, and the platform's own scheduler is never used. Every platform below accepts `scheduled_at`.
 
-| Platform | Native scheduling | Media types | Notes |
-|----------|-------------------|-------------|-------|
-| Instagram | Yes | Image, Video (Reel), Carousel (2-10) | Min 10 min in future, max 75 days |
-| Facebook | Yes | Image, Video | Min 10 min in future |
-| Threads | Yes | Image, Video, Carousel | Min 10 min in future |
-| LinkedIn | Yes | Image, Video, Carousel | Min 10 min in future |
-| Google | No (server-side) | Image | SocialAPI holds and publishes at scheduled time |
-| TikTok | No (server-side) | Video, Photo carousel (2-35) | SocialAPI holds and publishes at scheduled time |
-| YouTube | Coming soon | Video | Not yet available |
-| X / Twitter | Coming soon | - | Not yet available |
+### YouTube: `scheduled_at` vs `publish_at`
+
+YouTube has its own native scheduling, which is a **separate feature** from `scheduled_at`. The two behave differently:
+
+- **`scheduled_at`** (this page): SocialAPI holds the post and uploads it to YouTube at the scheduled time. YouTube is not told about the schedule.
+- **`platform_data.youtube.publish_at`**: SocialAPI uploads the video to YouTube right away, and YouTube itself makes it public at the given time.
+
+Use `scheduled_at` to have SocialAPI do the waiting; use `publish_at` to hand scheduling to YouTube. See [YouTube posts](/posts/youtube) for details.
+
+To discover scheduling support programmatically instead of hardcoding this table, call [`GET /v1/posts/validate`](/api-reference/posts/get-platform-constraints). Each platform includes a `scheduling` object with a `supported` boolean. It is `true` for every publishing platform today, but querying it means your integration never relies on a hardcoded list that can silently go stale.
+
+```json
+{
+  "data": {
+    "tiktok": {
+      "scheduling": { "supported": true },
+      "text": { "max_length": 2200, "counting_mode": "utf16" }
+    }
+  }
+}
+```
 
 ## Related
 

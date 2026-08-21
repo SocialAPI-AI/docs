@@ -1,0 +1,153 @@
+---
+title: "Media uploads"
+description: "Upload images and videos, then attach them to posts with a media ID."
+---
+
+SocialAPI is upload-first for media. You upload a file once, receive a `media_id` (a UUID), then reference that ID in the `media_ids` array when you create a post. There is no `image_url` or `video_url` field on a post: a raw public URL placed in `media_ids` is silently ignored, and the post publishes with no media.
+
+Uploading and verifying media does not cost credits. A credit is charged only when the post publishes or is scheduled.
+
+## Choosing an upload path
+
+There are two ways to get a file into SocialAPI. Both return a `media_id` that you use the same way.
+
+| | Server-side upload | Presigned URL |
+|---|---|---|
+| Endpoint(s) | `POST /v1/media/upload` | `GET /v1/media/upload-url`, then `PUT`, then `POST /v1/media/{id}/verify` |
+| Calls | One | Three |
+| Max file size | 50 MB | No API limit (plan storage quota applies) |
+| Best for | Small files, or clients that cannot reach S3 directly (for example AI sandboxes) | Large files, especially video |
+
+If a file is larger than 50 MB, use the presigned-URL path.
+
+## Server-side upload
+
+Send the file as multipart form data in a single request. The `file` field is required.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/media/upload \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -F "file=@photo.jpg"
+```
+
+Response:
+
+```json
+{
+  "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+}
+```
+
+The returned media is immediately `ready`. Pass the `media_id` in `media_ids` on your next `POST /v1/posts` call (see [Using media in posts](#using-media-in-posts)).
+
+## Presigned URL upload
+
+Use this path for large files. It has three steps: request a signed URL, upload the bytes to it, then verify.
+
+**Step 1: Request a signed upload URL.** Both `media_type` (the file's MIME type) and `filename` are required.
+
+```bash
+curl "https://api.social-api.ai/v1/media/upload-url?media_type=video/mp4&filename=reel.mp4" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "upload_url": "https://storage.example.com/media/...?X-Amz-Signature=...",
+  "expires_at": "2026-07-07T09:15:00Z"
+}
+```
+
+The `upload_url` is valid for 15 minutes.
+
+**Step 2: Upload the file** with an HTTP `PUT` to `upload_url`. The `Content-Type` must match the `media_type` you declared in step 1.
+
+```bash
+curl -X PUT "https://storage.example.com/media/...?X-Amz-Signature=..." \
+  -H "Content-Type: video/mp4" \
+  --data-binary @reel.mp4
+```
+
+**Step 3: Verify the upload.** This step is required. It confirms the bytes landed, records the file size, and flips the media from `pending` to `ready`.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/media/f47ac10b-58cc-4372-a567-0e02b2c3d479/verify \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+<Warning>
+If you skip verification, the media stays `pending` and publishing fails with `Media not found`.
+</Warning>
+
+## Using media in posts
+
+Pass one or more `media_id` values in the `media_ids` array on `POST /v1/posts`. Order is preserved. A single entry produces an image or video; multiple entries produce a carousel, subject to each platform's limits.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "Behind the scenes from our studio shoot.",
+    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
+  }'
+```
+
+Per-platform media limits (image versus video, carousel counts, maximum items per post) are listed in the [Posts overview](/posts/overview) capability matrix.
+
+<Warning>
+A raw public URL in `media_ids` is ignored. Always upload first and pass the returned `media_id`.
+</Warning>
+
+## Managing your library
+
+**List media.** Returns your `ready` files, newest first, with cursor pagination (default 50 per page, max 100). Each item includes a short-lived `url` for previewing the file.
+
+```bash
+curl "https://api.social-api.ai/v1/media?limit=50" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+**Delete media.**
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/media/f47ac10b-58cc-4372-a567-0e02b2c3d479 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+**Check storage usage.** Returns bytes used, the plan limit, and file count. The same values come back as `X-Storage-Used` and `X-Storage-Limit` response headers on media requests (`-1` means unlimited).
+
+```bash
+curl https://api.social-api.ai/v1/media/storage \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+```json
+{
+  "used_bytes": 52428800,
+  "limit_bytes": 104857600,
+  "count": 12
+}
+```
+
+### Storage limits
+
+| Plan | Storage |
+|---|---|
+| Free | 100 MB |
+| Starter, Pro, Business, Enterprise | Unlimited |
+
+An upload that would exceed your quota returns `413`. On the presigned path the object is removed and the media is marked `failed`.
+
+## Constraints and gotchas
+
+- A raw public URL in `media_ids` is silently ignored. Upload first, then pass the `media_id`.
+- The verify step is mandatory on the presigned path. Without it, media stays `pending` and publishing fails with `Media not found`.
+- The server-side upload endpoint caps files at 50 MB. Use the presigned path for anything larger.
+- Media has three states: `pending` (created, bytes not yet confirmed), `ready` (usable in posts), and `failed` (quota exceeded, or the object was missing at verify).
+- Video duration is detected automatically at verify or upload time. You do not need to send it.
+- Per-platform format, size, and count rules are enforced when you publish. See each platform's posts page.

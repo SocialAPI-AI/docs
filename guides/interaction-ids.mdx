@@ -11,7 +11,7 @@ Every comment, DM, review, and mention returned by the API has a stable, opaque 
 sapi_{type}_{32 character payload}
 ```
 
-The 32-character payload encodes `platform:platformID` using a SocialAPI custom base-35 alphabet. It is reversible: given the ID, the API recovers the original platform and the platform's native ID without a database lookup.
+The 32-character payload encodes `platform:platformID` using a SocialAPI custom base-33 alphabet. It is reversible: given the ID, the API recovers the original platform and the platform's native ID without a database lookup.
 
 The prefix tells you the interaction type:
 
@@ -28,17 +28,17 @@ Examples:
 - `sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U` — a review
 - `sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U` — a DM
 
-The payload alphabet uses `A-Z` and `1-9` (no `0`) in a shuffled, non-standard order, so do not assume the payload is base64url or hex.
+The payload alphabet uses `A-Z` and `1-9` (excluding `0`, `O`, and `8`) in a shuffled, non-standard order, so do not assume the payload is base64url or hex.
 
 ## Why this matters
 
 The prefix lets handlers route requests without a lookup. Each inbox endpoint accepts the appropriate prefix in its path parameter:
 
-- Comment routes (`POST /v1/inbox/comments/:postId`, `POST /v1/inbox/comments/:postId/:commentId/hide`, etc.) accept `sapi_cmt_` IDs in `:postId` and `:commentId`.
+- Comment routes (`POST /v1/inbox/comments/:postId`, `POST /v1/inbox/comments/:postId/:commentId/hide`, etc.) accept a platform post ID in `:postId` and a `sapi_cmt_` interaction ID in `:commentId`.
 - Review routes (`POST /v1/inbox/reviews/:id/reply`) accept `sapi_rev_` IDs in `:id`.
 - Conversation routes (`POST /v1/inbox/conversations/:id/messages`) accept `sapi_dm_` thread IDs in `:id`.
 
-If you pass an ID with the wrong prefix to a route, the call returns `400 validation.field_invalid`.
+REST routes do not enforce a prefix type check: passing a mismatched prefix ID (for example, a `sapi_rev_` ID on a comment route) decodes silently and the raw platform ID is forwarded to the connector. MCP tools, by contrast, validate the prefix and return an error if the type does not match the operation.
 
 ## Stability
 
@@ -53,9 +53,9 @@ List comments on a connected account, then reply to one using the comment's `id`
 curl "https://api.social-api.ai/v1/inbox/comments" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 
-# 2. Reply to a comment on a given post
+# 2. Reply to a specific comment on a post (postId is the platform post ID)
 curl -X POST \
-  "https://api.social-api.ai/v1/inbox/comments/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U" \
+  "https://api.social-api.ai/v1/inbox/comments/17895695668004550" \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -71,6 +71,7 @@ Hide a comment:
 curl -X POST \
   "https://api.social-api.ai/v1/inbox/comments/{postId}/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/hide" \
   -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
   -d '{"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
 ```
 

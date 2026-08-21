@@ -3,7 +3,7 @@ title: Core concepts
 description: The five nouns SocialAPI's API exposes (Brand, Account, Post, Interaction, Capability) and how they fit together.
 ---
 
-SocialAPI.ai is a unified social media API: one REST endpoint and MCP server to read and respond to comments, direct messages, mentions, and reviews across Instagram, Facebook, TikTok, LinkedIn, YouTube, X, and Threads. Every platform returns the same `Interaction` schema.
+SocialAPI.ai is a unified social media API: one REST endpoint and MCP server to read and respond to comments, direct messages, mentions, and reviews across Instagram, Facebook, TikTok, LinkedIn, YouTube, X, Threads, WhatsApp, Telegram, Google Business Profile, and Pinterest. Every platform returns the same `Interaction` schema.
 
 SocialAPI's REST API is shaped around five nouns. Once you know what each one means, every endpoint slots into place: brands group accounts, accounts hold posts and interactions, and capabilities tell you which actions are valid for any given interaction.
 
@@ -11,16 +11,40 @@ This page is a short tour. The [API Reference](/api-reference/introduction) has 
 
 ## Brand
 
-A **Brand** is the top-level grouping in SocialAPI. One brand corresponds to one business, client, or project. All connected social accounts, posts, and interactions live under a brand.
+A **Brand** (called a *social profile* in pricing) is the top-level grouping in SocialAPI. One brand corresponds to one business, client, or location. All connected social accounts, posts, and interactions live under a brand. New accounts start with a brand named "Default", created automatically at signup: rename or delete it freely.
 
 Brands matter for two reasons:
 
-1. **Billing.** Plans are sized in brands. Free includes 2 brands, Starter 10, Pro 50, Business 200, Enterprise unlimited.
+1. **Billing.** Plans are sized in social profiles (brands). Free includes 2, Starter 10, Pro 50, Business 200, Enterprise unlimited.
 2. **Isolation.** Accounts under one brand cannot see accounts under another. Use brands to keep agency clients separated, or to split staging from production.
+
+### Profile units
+
+The numbers above are unit limits, not a strict brand count. Billing counts **profile units**: each brand costs one unit. Profile units track brand count only, Facebook Pages do not add units.
+
+Facebook Pages have their own limit instead: each brand can connect up to 5 Facebook Pages (see [Facebook: one login, many brands](/connectors/facebook#one-login-many-brands)), accumulated one at a time through the [Facebook logins endpoints](/connectors/facebook#managing-pages-after-connecting). This is a hard cap, not a billed allowance: there is no charge for staying under it, and assigning a Page beyond it returns `403 platform.facebook.page_cap` rather than a unit-limit error.
+
+`GET /v1/usage` reports where you stand:
 
 ```json
 {
-  "id": "b_01HZAB12CDEFGHJKMNPQRSTUVW",
+  "profile_units_used": 4,
+  "profile_units_limit": 10,
+  "page_allowance": 5,
+  "page_billing_exempt": false
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `profile_units_used` | Units consumed so far: brand count. |
+| `profile_units_limit` | Your plan's total unit allowance (`-1` for unlimited, Enterprise). |
+| `page_allowance` | Facebook Pages allowed per brand before further assignment is refused (`5`). |
+| `page_billing_exempt` | Legacy flag from the earlier page-billing model. Page assignment is not billed for any account. |
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "name": "Acme Corp",
   "created_at": "2026-04-12T09:30:00Z"
 }
@@ -28,9 +52,15 @@ Brands matter for two reasons:
 
 See [`/v1/brands`](/api-reference/introduction) for the full schema and CRUD endpoints.
 
+<Note>
+  Treat IDs as opaque strings. Brands, posts, and invites are UUIDs; accounts are prefixed with `acc_`. Do not parse them or assume a format, and store them as text. See [IDs are opaque strings](/guides/reliability#ids-are-opaque-strings).
+
+  Brand creation is not idempotent: there is no `external_id` or idempotency key, and brand names are not unique, so a retried `POST /v1/brands` creates a duplicate. Persist the returned brand ID immediately, and check for an existing brand before creating another.
+</Note>
+
 ## Account
 
-An **Account** is a connected social profile under a brand. One brand can hold many accounts, across any mix of platforms. SocialAPI stores the OAuth tokens (encrypted at rest) and refreshes them automatically.
+An **Account** is a connected social account under a brand. One brand can hold many accounts, across any mix of platforms. SocialAPI stores the OAuth tokens (encrypted at rest) and refreshes them automatically.
 
 You connect an account by calling `POST /v1/accounts/connect` and walking the user through OAuth. After connection, the account ID (prefixed `acc_`) is what you pass to every account-scoped endpoint.
 
@@ -57,7 +87,7 @@ Internally a post has two parts: the post itself (text, media, scheduled time) a
 
 ```json
 {
-  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
   "text": "Spring collection is live.",
   "status": "published",
   "scheduled_at": null,
@@ -79,7 +109,7 @@ Posts move through a state machine: `draft`, `scheduled`, `publishing`, then `pu
 
 ## Interaction
 
-An **Interaction** is anything inbound: a comment on one of your posts, a DM, a review, or a mention. The unified inbox API never stores interaction *content* (always proxied live from the platform), but it does mint stable IDs so your app can reference them.
+An **Interaction** is anything inbound: a comment on one of your posts, a DM, a review, or a mention. Comments, reviews, and mentions are proxied live from the platform; DM conversations and messages are stored in SocialAPI's database to support threading and pagination. The API mints stable IDs so your app can reference any interaction across calls.
 
 Interaction IDs encode their type as a prefix:
 

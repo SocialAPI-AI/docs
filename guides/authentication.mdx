@@ -1,19 +1,18 @@
 ---
 title: Authentication
-description: How to authenticate requests using API keys, dashboard JWTs, or OAuth 2.1 tokens.
+description: How to authenticate requests using API keys or OAuth 2.1 access tokens.
 ---
 
-Every request to the SocialAPI `/v1` endpoints requires a Bearer token in the `Authorization` header. The API accepts three token types.
+Every request to the SocialAPI `/v1` endpoints requires a Bearer token in the `Authorization` header. The API accepts two token types.
 
 ## Token types
 
-| Token type | Who uses it | Format | Validation method |
-|---|---|---|---|
-| **API key** | External developers, API clients | `sapi_key_<hex>` prefix | SHA-256 lookup hash, then bcrypt verify against `api_keys` table |
-| **Auth service JWT** | Dashboard frontend (Next.js) | EdDSA/Ed25519 signed JWT | Signature verified via JWKS endpoint on the auth service (cached 15 min) |
-| **OAuth 2.1 access token** | MCP clients (Claude, ChatGPT, Cursor) | EdDSA/Ed25519 signed JWT | Signature verified via the API's own OAuth public key |
+| Token type | Who uses it | Format |
+|---|---|---|
+| **API key** | External developers, API clients | `sapi_key_` prefix |
+| **OAuth 2.1 access token** | MCP clients (Claude, ChatGPT, Cursor) | Short-lived token issued by the OAuth flow |
 
-The middleware detects the token type automatically. Tokens starting with `sapi_key_` are treated as API keys. All other tokens are validated as JWTs: first against the auth service public key, then (if that fails) against the OAuth 2.1 public key.
+Most integrations use an API key. The OAuth flow is only for MCP clients. Tokens that start with `sapi_key_` are treated as API keys; any other token is treated as an OAuth 2.1 access token.
 
 ## API keys
 
@@ -41,7 +40,8 @@ If the key is missing or invalid, the API returns:
   "error": {
     "code": "auth.invalid_key",
     "message": "invalid or inactive API key"
-  }
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 
@@ -57,6 +57,19 @@ curl -X POST https://api.social-api.ai/v1/keys \
 ```
 
 The full key is returned **once** in `raw_key`. Store it immediately. Subsequent reads only show a truncated preview like `sapi_key_a1b2c...`.
+
+By default a key has full access to every brand and operation. To hand out a least-privilege or client-scoped key, pass `scopes` and `brand_ids` when you create it. See [Scoped API keys](/guides/scoped-keys).
+
+### Rotating keys
+
+Issue a new secret for an existing key without changing its id, name, or restrictions:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/keys/<key-id>/rotate \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+The new `raw_key` is shown once, and the old secret stops working immediately. To change a key's name or restrictions in place without issuing a new secret, use `PATCH /v1/keys/<key-id>`.
 
 ### Revoking keys
 
@@ -74,41 +87,35 @@ curl https://api.social-api.ai/v1/keys \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-The response includes `preview` (suffix only), `is_active`, and `last_used_at`.
-
-## Auth service JWTs (dashboard)
-
-The SocialAPI dashboard authenticates users through a standalone auth service that issues EdDSA/Ed25519 signed JWTs. When a dashboard user makes an API call, their JWT is sent as a Bearer token.
-
-The API validates the JWT signature by fetching the auth service's public key from its JWKS endpoint (`AUTH_SERVICE_URL/internal/.well-known/jwks.json`). The public key is cached for 15 minutes.
-
-The JWT's `sub` (subject) claim contains the auth service user UUID, which is mapped to a user record in the API database via `POST /v1/users/provision`.
-
-<Note>
-  Before a dashboard user can call any endpoint, they must be provisioned via `POST /v1/users/provision`. This creates the user record that JWT authentication depends on. The dashboard calls this automatically after every login. If this record is missing, JWT-authenticated requests return `401 user not provisioned`.
-</Note>
+The response includes `preview` (suffix only), `is_active`, `last_used_at`, and each key's `scopes` and `brand_ids` restrictions (both empty means full access). See [Scoped API keys](/guides/scoped-keys).
 
 ## OAuth 2.1 access tokens (MCP clients)
 
-MCP clients (Claude, ChatGPT, Cursor) authenticate via the API's built-in OAuth 2.1 authorization server. After completing the OAuth flow (see [OAuth guide](/guides/oauth)), the client receives an EdDSA/Ed25519 signed JWT access token.
+MCP clients (Claude, ChatGPT, Cursor) authenticate through the API's built-in OAuth 2.1 authorization server instead of a static API key. After the user completes the OAuth flow (see the [OAuth guide](/guides/oauth)), the client receives an access token to send as its Bearer token.
 
-These tokens look identical to auth service JWTs at the wire level, but they are signed with the API's own OAuth private key (configured via `OAUTH_JWT_PRIVATE_KEY`) and contain a `type: "oauth_access"` claim.
+Access tokens expire after **1 hour**. The client uses its refresh token to obtain a new access token without asking the user to re-authorize.
 
-Access tokens expire after **1 hour**. Use the refresh token to obtain a new access token without re-authorization.
+## Authentication error codes
 
-## How the middleware resolves tokens
+The API returns a consistent set of error codes when a request cannot be authenticated. Use `error.code` for programmatic handling.
 
-1. If the token starts with `sapi_key_`, it is validated as an API key (SHA-256 lookup hash, bcrypt verify).
-2. Otherwise, the token is validated as an auth service JWT (EdDSA signature check against the JWKS endpoint).
-3. If auth service JWT validation fails, the token is validated as an OAuth 2.1 access token (EdDSA signature check against the OAuth public key).
-4. If all checks fail, the request is rejected with `401`.
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 401 | `auth.missing_header` | `Authorization` header is absent |
+| 401 | `auth.empty_token` | `Authorization: Bearer` with no token value |
+| 401 | `auth.invalid_key` | Token has the `sapi_key_` prefix but does not match any active key |
+| 401 | `auth.invalid_token` | OAuth access token is invalid or expired |
+| 401 | `auth.user_not_found` | Token resolves to a user that no longer exists |
+| 403 | `auth.dashboard_only` | Endpoint is available only in the dashboard, not to API keys |
+| 403 | `auth.insufficient_scope` | A [scoped key](/guides/scoped-keys) lacks the scope for this operation, or a restricted key called an admin operation |
 
-All three paths result in the same internal representation: an `APIKey` record attached to the request context with the user's ID and plan tier.
+See [Error reference](/guides/errors#authentication) for the complete list including OAuth-specific codes.
 
 ## Security best practices
 
 - **Never expose keys in frontend code.** Keys must only be used server-side.
 - **Use environment variables.** Do not hardcode keys in source code.
 - **Create one key per service.** Revoke individual keys if compromised without disrupting others.
+- **Grant least privilege.** Restrict a key to the [scopes and brands](/guides/scoped-keys) it actually needs, so a leaked key cannot cross clients or perform actions it never should.
 - **Monitor `last_used_at`.** Unused keys should be revoked.
 - **Rotate OAuth refresh tokens.** The API enforces refresh token rotation. Each refresh grants a new token pair.

@@ -1,0 +1,218 @@
+---
+title: WhatsApp
+description: Connect a WhatsApp Business phone number to receive and reply to direct messages through SocialAPI.
+---
+
+**Messaging connector.** WhatsApp is a DM-only connector: you connect a WhatsApp Business phone number through Meta's Embedded Signup, then use our unified inbox to receive and reply to the messages that number gets. There are no posts, comments, reviews, or mentions.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `whatsapp` |
+| Auth type | Embedded Signup (OAuth), Meta-hosted |
+| API | WhatsApp Cloud API |
+| Access | Live (available on all plans) |
+| Best for | A unified inbox for the messages your WhatsApp Business number receives. |
+
+## Capabilities
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Receive DMs | Yes | Inbound messages arrive in real time via webhooks |
+| Free-form reply | Yes | Text only, and only inside the open 24-hour service window (see below) |
+| Template messages | Yes | Create, list, edit, delete, and validate templates via the API, and send approved templates (including outside the 24-hour window) |
+| Media / interactive free-form replies | No | Free-form inbox replies are plain text; buttons and media are delivered through templates instead |
+| Conversation list / history | No | There is no history API; the inbox is built from webhooks received after you connect |
+| Phone-number management | Yes | Request a code, verify, register, deregister, and check status of the business number |
+| Business profile | Yes | Read and update the WhatsApp business profile |
+| Publishing (posts) | No | WhatsApp has no posts concept |
+| Comments / reviews / mentions | No | Not applicable |
+
+## What you need
+
+- A **WhatsApp Business phone number** that is not currently registered on the consumer WhatsApp or WhatsApp Business apps. During Embedded Signup you can select an existing number or create one.
+- **Admin access to a Meta Business** (business.facebook.com).
+
+You do **not** need to submit your own Meta App Review or complete business verification to connect. We are the Tech Provider, so the app review and provider-side setup are handled on our side. The person connecting signs in with their Meta Business account, picks their WhatsApp Business Account and phone number, and the number is connected.
+
+## Connecting
+
+WhatsApp uses Meta's Embedded Signup, a three-leg flow that you drive from your own backend and frontend with your API key. Your customer only ever interacts with Meta's hosted popup; your API key stays server-side the whole time. (You can also connect from our dashboard, which runs this same flow for you.)
+
+### Leg 1: start the connection (your backend)
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "platform": "whatsapp" }'
+```
+
+Response (HTTP 202):
+
+```json
+{
+  "auth_url": "",
+  "state": "<CSRF token, bound to your API key, 10-minute TTL>",
+  "metadata": {
+    "app_id": "...",
+    "config_id": "...",
+    "solution_id": "..."
+  }
+}
+```
+
+The `metadata` is exactly what Meta's JavaScript SDK needs to launch the popup. Pass `state` through to your frontend, hold onto it for leg 3.
+
+### Leg 2: launch the Meta popup (browser)
+
+Load Facebook's JavaScript SDK and call `FB.login` with the `config_id` and `solution_id` from leg 1:
+
+```javascript
+FB.login(
+  (response) => {
+    const code = response.authResponse?.code;
+    // send code (plus waba_id + phone_number_id from the event below) to your backend
+  },
+  {
+    config_id: CONFIG_ID,
+    response_type: "code",
+    override_default_response_type: true,
+    extras: { setup: { solutionID: SOLUTION_ID } },
+  },
+);
+```
+
+As the customer completes the popup, Meta fires the `WA_EMBEDDED_SIGNUP` message event carrying their `waba_id` and `phone_number_id`. Capture the `code` and both IDs, and send them to your backend. See Meta's [Embedded Signup](https://developers.facebook.com/docs/whatsapp/embedded-signup) docs for the exact SDK and event wiring.
+
+### Leg 3: complete the connection (your backend)
+
+```bash
+curl -X POST https://api.social-api.ai/v1/oauth/exchange \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "whatsapp",
+    "code": "<from the popup>",
+    "metadata": {
+      "state": "<from leg 1>",
+      "waba_id": "<from the popup>",
+      "phone_number_id": "<from the popup>"
+    }
+  }'
+```
+
+We validate `state` against the one we issued to your API key, exchange the `code` for the customer's token, store the account, and return HTTP 201 with the connected account. The number's messages now flow into your inbox.
+
+### Registering your domain
+
+The popup runs against our Meta app, and Meta's Login-for-Business SDK enforces an allowlist of domains that are permitted to launch it. To run `FB.login` from your own domain (for example, `app.yourcompany.com`), we have to register that domain in our Meta app first, so contact us to add it.
+
+If you would rather not host the popup yourself, connect from our dashboard instead. It runs the flow on our domain and works for any customer without a per-domain step.
+
+## The 24-hour service window
+
+WhatsApp only lets a business send free-form messages within **24 hours** of the customer's most recent message. Each new inbound message from that customer resets the 24-hour timer.
+
+- **Inside the window:** you can send a free-form text reply from the inbox.
+- **Outside the window:** free-form replies are rejected with `whatsapp.window_closed`. To reach the customer, send an approved message template with `send-template` (see [Message templates](#message-templates) below), which is allowed at any time.
+
+## Message templates
+
+Templates are pre-approved messages you can send outside the 24-hour window (order updates, authentication codes, and the like). You create, manage, and send them entirely through the API, scoped to a connected account.
+
+### Create a template
+
+```bash
+curl -X POST https://api.social-api.ai/v1/platforms/whatsapp/accounts/{account_id}/templates \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "order_confirmation",
+    "category": "UTILITY",
+    "language": "en_US",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Hello {{1}}, your order {{2}} is confirmed.",
+        "example": { "body_text": [["Jordan", "A1234"]] }
+      }
+    ]
+  }'
+```
+
+A new template starts in `PENDING`; Meta reviews it and the status moves to `APPROVED` or `REJECTED` asynchronously. `category` is one of `UTILITY`, `MARKETING`, or `AUTHENTICATION` (marketing content in a `UTILITY` template is auto-rejected). Call `POST /v1/platforms/whatsapp/templates/validate` first to catch field-level problems before you submit.
+
+### Send a template
+
+```bash
+curl -X POST https://api.social-api.ai/v1/platforms/whatsapp/accounts/{account_id}/send-template \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "15551234567",
+    "template_name": "order_confirmation",
+    "language": "en_US",
+    "components": [
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "text": "Jordan" },
+          { "type": "text", "text": "A1234" }
+        ]
+      }
+    ]
+  }'
+```
+
+`to` is E.164 without the leading `+`. The template must already be `APPROVED` and `language` must match an approved variant. This send is allowed whether or not the 24-hour window is open, and the message is recorded in the inbox thread.
+
+Listing, editing, and deleting templates, plus phone-number management (`request-code`, `verify-code`, `register`, `deregister`, `status`) and the business profile, are also available. See the [API reference](/api-reference/introduction) for the full set of `/v1/platforms/whatsapp` endpoints and their schemas.
+
+## Receiving and replying
+
+WhatsApp has no message-history API, so we build the inbox from inbound webhook events from connect time onward. There is no backfill of messages sent before you connected.
+
+### List DM conversations
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id={id}" \
+  -H "Authorization: Bearer $SOCIALAPI_KEY"
+```
+
+### Reply to a message
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "{account_id}",
+    "text": "Thanks for reaching out!"
+  }'
+```
+
+`account_id` is required. The reply is sent as plain text and only succeeds while the 24-hour service window is open.
+
+## Errors
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `whatsapp.window_closed` | The 24-hour service window has closed. Free-form replies are no longer allowed; send an approved template with `send-template` instead. |
+| 404 | `whatsapp.template_not_found` | The named template does not exist on this account's WABA. |
+| 400 | `whatsapp.template_paused` | The template is paused for quality reasons and cannot be sent. |
+| 400 | `whatsapp.undeliverable` | The recipient is not a WhatsApp user. |
+| 403 | `whatsapp.user_opted_out` | The recipient has opted out of messages from this business. |
+| 429 | `whatsapp.frequency_cap` | The recipient has hit their daily marketing-message limit. |
+| 429 | `whatsapp.pair_rate_limit` | Too many messages sent to this same recipient. |
+| 429 | `whatsapp.throughput_exceeded` | The number's messaging throughput limit was exceeded. |
+| 401 | `platform.whatsapp.auth` | The connection is no longer authorized. Reconnect the account. |
+
+See [Errors](/guides/errors) for the full catalog.
+
+## Related
+
+- [Platform support](/guides/platforms)
+- [Inbox](/guides/inbox)
+- [Errors](/guides/errors)

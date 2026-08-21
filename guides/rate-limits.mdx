@@ -13,6 +13,58 @@ Upgrade at [app.social-api.ai](https://app.social-api.ai) &rarr; **Billing**. Co
   **All plans include managed platform apps** for Meta (Instagram, Facebook, Threads), Google, TikTok, LinkedIn, and YouTube - no developer registration or app review on your side. Twitter is BYOK on every plan ([setup guide](/connectors/twitter-byok)). See [Platform credentials](/guides/platform-credentials) for details.
 </Note>
 
+## Plan catalog endpoint
+
+To read the full plan catalog programmatically instead of hardcoding the table below, call:
+
+```bash
+curl https://api.social-api.ai/v1/billing/plans \
+  -H "Authorization: Bearer $SOCIALAPI_KEY"
+```
+
+The response lists every tier, ordered cheapest to most expensive, with its display metadata, prices, and resource limits (trimmed to two plans here):
+
+```json
+{
+  "plans": [
+    {
+      "tier": "free",
+      "name": "Hobby",
+      "tagline": "Kick the tires, no card required",
+      "monthly_price_usd": 0,
+      "annual_price_usd": 0,
+      "popular": false,
+      "limits": {
+        "profiles": 2,
+        "posts_per_month": 10,
+        "interactions_per_month": 50,
+        "storage_bytes": 104857600,
+        "event_retention_days": 1,
+        "exports_per_month": 2
+      }
+    },
+    {
+      "tier": "pro",
+      "name": "Full Send",
+      "tagline": "For growing teams and products",
+      "monthly_price_usd": 109,
+      "annual_price_usd": 1044,
+      "popular": true,
+      "limits": {
+        "profiles": 50,
+        "posts_per_month": -1,
+        "interactions_per_month": -1,
+        "storage_bytes": -1,
+        "event_retention_days": 30,
+        "exports_per_month": 20
+      }
+    }
+  ]
+}
+```
+
+`profiles` is the count of social profiles (brands) the plan allows. Prices are in USD. A value of `-1` means unlimited for any field under `limits`, and custom pricing for `monthly_price_usd` / `annual_price_usd` (shown on the Enterprise tier). `popular` flags the tier highlighted by default on pricing surfaces.
+
 ## Plan limits
 
 | Plan | Display Name | Brands | Posts / month | Interactions / month | Storage | Price |
@@ -44,7 +96,8 @@ Each plan includes different export quotas for analytics reports.
 ## What counts as a post or interaction
 
 **Post operations** (each consumes 1 post from your monthly allowance):
-- `create_post` - publishing a new post
+- `create_post` - publishing or scheduling a new post (saving a **draft** is free; the credit is charged when you publish it)
+- `publish_post` - publishing an existing draft or scheduled post (`POST /v1/posts/{pid}/publish`)
 - `retry_post` - retrying a failed post
 
 **Interaction operations** (each consumes 1 interaction from your monthly allowance):
@@ -71,13 +124,18 @@ When you exceed your monthly post or interaction allowance, the API returns HTTP
 ```json
 {
   "error": {
-    "code": "billing.post_limit",
-    "message": "not enough post credits: need 1, have 0 remaining"
-  }
+    "code": "validation.post_limit_exhausted",
+    "message": "Monthly post limit exhausted"
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 
-The interaction-limit response uses the same shape with `error.code` set to `billing.interaction_limit`. Your counters reset at the start of your next billing period. To get more capacity immediately, upgrade your plan.
+The interaction-limit response uses the same shape with `error.code` set to `validation.interaction_limit_exhausted`. Your counters reset at the start of your next billing period. To get more capacity immediately, upgrade your plan.
+
+<Note>
+  The `billing.post_limit` code is emitted by the bulk-import endpoint (`POST /v1/posts/import`) when the batch size exceeds your remaining post allowance.
+</Note>
 
 When you exceed your storage quota, the API returns HTTP `413`:
 
@@ -86,7 +144,8 @@ When you exceed your storage quota, the API returns HTTP `413`:
   "error": {
     "code": "billing.storage_quota",
     "message": "Storage quota exceeded. Free plan is limited to 100MB. Upgrade your plan for more storage."
-  }
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 
@@ -154,14 +213,33 @@ Platforms (Instagram, Facebook, etc.) have their own rate limits independent of 
 {
   "error": {
     "code": "platform.instagram.rate_limit",
-    "message": "platform rate limit exceeded"
-  }
+    "message": "Platform rate limit exceeded"
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 
 The `instagram` segment is replaced with the actual platform name (`facebook`, `tiktok`, etc.). Match on the `platform.*.rate_limit` shape to handle all platforms.
 
 This does **not** consume your post or interaction quota. Retry after a short wait (typically a few minutes).
+
+### Live inbox reads
+
+Comments, reviews, and mentions are proxied live from the platform on every request, with no server-side cache. Each page of comments for one post is a single platform call (`limit` accepts up to 100, so a few hundred comments is a handful of calls), and listing commented posts is served from SocialAPI's database without touching the platform. Read operations consume no SocialAPI quota and are not throttled by us, so the only ceiling is the platform's own limit, which for Meta scales with your account's reach and is far above operator-paced browsing. If your UI re-fetches the same view often (tab switches, refreshes), cache pages client-side for 30 to 60 seconds and back off for a few minutes on any `platform.*.rate_limit` response.
+
+### Platform publishing ceilings
+
+Each platform sets its own publishing limits, which apply in addition to your plan quota. These are the platforms' own published figures:
+
+| Platform | Publishing ceiling (set by the platform) |
+|---|---|
+| Instagram | 25 posts per 24 hours |
+| Threads | 250 posts and 1,000 replies per 24 hours |
+| YouTube | A daily upload quota (Google's default is 10,000 quota units per day, roughly 100 video uploads per day), reset at midnight Pacific time |
+| Google Business Profile | 300 requests per minute per API, and about 10 edits per location per minute |
+| Facebook, X | Enforced per app and per user through limits the platform reports in response headers; there is no single fixed number |
+
+We monitor each platform's reported usage and pace requests to stay within the platform's ceiling. SocialAPI itself adds no per-request throttle beyond your monthly plan quota, and read operations (inbox, reviews, comments) are not throttled on our side. If you run scheduled, unattended publishing across many accounts, design against the platform ceilings above.
 
 ## Handling 429s
 

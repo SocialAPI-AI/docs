@@ -5,7 +5,7 @@ description: Full reference for publishing Threads posts via SocialAPI, includin
 
 ## 1. Overview
 
-Threads publishing uses the Threads Graph API two-step flow: SocialAPI creates a media container, optionally polls until a video container is ready, then publishes it. Text-only posts skip polling and publish immediately.
+Threads publishing uses three distinct flows depending on content type. Text-only posts use a single atomic API call (no container polling). Image and video posts use a two-step flow: container creation then publish, with polling added for video containers until they reach `FINISHED`. Carousel posts use a three-step flow: one container per item, then a parent carousel container, then publish.
 
 | Field | Value |
 |---|---|
@@ -27,7 +27,7 @@ Threads publishing uses the Threads Graph API two-step flow: SocialAPI creates a
 | Text only | Omit `media_ids` | Supported natively; unlike Instagram, text-only posts work without any media |
 | Single image | One `media_ids` entry pointing to an image URL | Sent as `media_type: IMAGE` |
 | Single video | One `media_ids` entry pointing to a video URL (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Sent as `media_type: VIDEO`; container is polled until `FINISHED` |
-| Carousel | Two or more `media_ids` entries | Up to 20 items; mix of images allowed |
+| Carousel | Two or more `media_ids` entries | Up to 20 items; mix of images and videos allowed |
 
 SocialAPI auto-detects the media type from the URL file extension. Video detection inspects the URL path, ignoring query parameters (safe for presigned S3 URLs).
 
@@ -145,7 +145,7 @@ Each post includes a `targets` array with per-platform status and engagement met
 
 **Metrics notes:**
 
-The Threads API does not expose engagement metrics (likes, comments, shares) through the publishing API. All metric values are always `0` and `metrics_synced_at` is `null`. This is a platform limitation, not a SocialAPI limitation.
+SocialAPI fetches likes and replies via the Threads `/insights` endpoint (requires the `threads_manage_insights` scope). However, that scope is not requested by default, so like and reply counts remain `0` for most connected accounts. Shares and saves are not available from the Threads API at all. To enable metric collection, contact us about the `threads_manage_insights` beta scope.
 
 ---
 
@@ -155,7 +155,7 @@ The Threads API does not expose engagement metrics (likes, comments, shares) thr
 
 After creating a video container, SocialAPI polls the container status (once per minute, up to 5 attempts) before publishing. If the container reaches `FINISHED` or `PUBLISHED`, the post is immediately sent to `threads_publish`. If the container returns `ERROR` or `EXPIRED`, the publish fails. If the container does not finish within 5 minutes, SocialAPI returns `504 Gateway Timeout` and marks the post target as `failed`.
 
-Image and text posts skip polling entirely and proceed directly to publish.
+Image posts proceed to publish directly after container creation, without polling. Text posts use a single atomic call and skip both container creation and polling entirely.
 
 ### No post editing
 
@@ -207,7 +207,7 @@ The following example publishes a video post with restricted reply control, then
 
 ```bash
 # Get a presigned upload URL
-curl "https://api.social-api.ai/v1/media/upload-url?filename=clip.mp4&content_type=video/mp4" \
+curl "https://api.social-api.ai/v1/media/upload-url?filename=clip.mp4&media_type=video/mp4" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
@@ -309,5 +309,6 @@ SocialAPI's managed Meta Threads App requests the following scopes on your behal
 | `threads_content_publish` | Create and publish media containers |
 | `threads_read_replies` | Read replies on posts |
 | `threads_delete` | Delete published posts |
+| `threads_manage_insights` | Fetch engagement metrics (likes, replies) via the insights endpoint. Not requested by default; contact us to enable. |
 
 To verify which scopes your connected account has granted, call `GET /v1/accounts/:id/limits`.
