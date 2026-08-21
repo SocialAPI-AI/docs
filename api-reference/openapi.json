@@ -5207,6 +5207,114 @@
                 }
             }
         },
+        "/platforms/instagram/accounts/{id}/participants/{participantId}/profile": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the profile Instagram exposes for a messaging participant, including the follow relationship in both directions (is_user_follow_business, is_business_follow_user). Read live from Instagram on every call, never cached, because follow status changes the moment someone unfollows. Instagram only returns this data for users who have consented by messaging your account or tapping an icebreaker or the persistent menu; for anyone else this returns 403 platform.instagram.230, which means Instagram will not disclose the relationship and is NOT the same as \"does not follow\". Branch on that error rather than treating it as a negative. Fields name and profile_pic are absent for users who have set neither; the follow fields are still returned. profile_pic URLs expire after a few days, so do not store them.",
+                "tags": [
+                    "Instagram"
+                ],
+                "summary": "Get an Instagram messaging participant's profile",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2287522528728101",
+                        "description": "Instagram-scoped user ID (IGSID) of the participant, as returned in conversation payloads",
+                        "name": "participantId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Participant profile",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InstagramParticipantProfileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "User consent required (platform.instagram.230), or platform access not permitted for your plan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account or participant not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support participant profiles",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Instagram API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/instagram/accounts/{id}/stories": {
             "get": {
                 "security": [
@@ -10386,6 +10494,36 @@
                         "items": {
                             "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Collaborator"
                         }
+                    }
+                }
+            },
+            "api_endpoints.InstagramParticipantProfileResponse": {
+                "type": "object",
+                "properties": {
+                    "follower_count": {
+                        "type": "integer"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "is_business_follow_user": {
+                        "type": "boolean"
+                    },
+                    "is_user_follow_business": {
+                        "type": "boolean"
+                    },
+                    "is_verified_user": {
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "profile_pic": {
+                        "description": "ProfilePic URLs expire after a few days; never persist one as durable.",
+                        "type": "string"
+                    },
+                    "username": {
+                        "type": "string"
                     }
                 }
             },
