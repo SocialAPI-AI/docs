@@ -336,6 +336,8 @@ Each post includes a `targets` array with per-platform status and engagement met
 - `shares` is populated for Facebook posts. Facebook is the only platform where SocialAPI reports a non-zero share count.
 - `saves` is not exposed by the Facebook Pages API and is always `0`.
 - `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Facebook.
+- Reels are included, and report a different set of counts than feed posts. A Reel is published through the Reels API and does not appear in the Page feed at all, so SocialAPI reads it directly by its video ID. A Reel returns `likes`, `comments`, and a view count under `metrics.extra.views`. `shares` stays `0` for a Reel: a share count for Reels exists only on the Graph API's video insights edge, which requires the `read_insights` permission that SocialAPI does not currently request, and it is reported there combined with comments rather than as a separate figure. We leave the field at `0` rather than report a number we cannot read.
+- A target whose metrics cannot be read is returned with a structured `error` object rather than omitted from the response. An absent target therefore means the post was never published to that platform, not that the refresh failed. Check `error.code` to tell the cases apart: `resource.not_found` means the platform did not return the post in its recent listing, and `resource.not_supported` means the platform does not expose metrics for it.
 
 ---
 

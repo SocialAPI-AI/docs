@@ -318,7 +318,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the boards for a connected Pinterest account, with their default and active status. Boards refresh from Pinterest automatically when the stored copy is more than 5 minutes old.",
+                "description": "Returns the boards for a connected Pinterest account.",
                 "tags": [
                     "Accounts"
                 ],
@@ -383,7 +383,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a board on Pinterest and adds it to the account's board list. The first board created for an account becomes its default publishing destination.",
+                "description": "Creates a board on Pinterest and returns it.",
                 "tags": [
                     "Accounts"
                 ],
@@ -471,7 +471,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes the board on Pinterest along with every pin saved to it, then removes it from the account's board list. This cannot be undone. If the deleted board was the default, another active board is promoted.",
+                "description": "Deletes the board on Pinterest along with every pin saved to it. This cannot be undone.",
                 "tags": [
                     "Accounts"
                 ],
@@ -548,7 +548,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a board. is_default and is_active are SocialAPI flags stored locally; name, description, and privacy are pushed to Pinterest. Privacy accepts only PUBLIC or SECRET. boardId accepts either the internal board handle or the Pinterest board id.",
+                "description": "Update a board. Privacy accepts only PUBLIC or SECRET.",
                 "tags": [
                     "Accounts"
                 ],
@@ -5585,6 +5585,91 @@
                 }
             }
         },
+        "/platforms/pinterest/accounts/{id}/pins": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the connected Pinterest account's pins.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "List Pinterest pins",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Maximum pins to return (default 50, max 50)",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PinterestPinsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/pinterest/accounts/{id}/summary": {
             "get": {
                 "security": [
@@ -5592,7 +5677,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the connected Pinterest account's public profile counts: followers, pins, boards, and monthly views. Values are fetched live from Pinterest.",
+                "description": "Returns the connected Pinterest account's public profile counts: followers, pins, boards, and monthly views.",
                 "tags": [
                     "Accounts"
                 ],
@@ -7515,7 +7600,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Upload a CSV file to create multiple posts. Use dry_run=true to validate without creating.",
+                "description": "Upload a CSV file to create multiple posts. Use dry_run=true to validate without creating. Columns, in order: text, title, account_ids, scheduled_at, visibility, first_comment, platform_data, board_id. Only text is required. account_ids is pipe separated.",
                 "tags": [
                     "Posts"
                 ],
@@ -11149,12 +11234,6 @@
                         "type": "string",
                         "example": "sapi_board_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
-                    "is_active": {
-                        "type": "boolean"
-                    },
-                    "is_default": {
-                        "type": "boolean"
-                    },
                     "name": {
                         "type": "string",
                         "example": "Recipes"
@@ -11177,6 +11256,47 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.PinterestBoardItem"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.PinterestPinItem": {
+                "type": "object",
+                "properties": {
+                    "board_id": {
+                        "type": "string",
+                        "example": "8828"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-08-01T12:00:00Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "813744South"
+                    },
+                    "media_url": {
+                        "type": "string",
+                        "example": "https://i.pinimg.com/x.jpg"
+                    },
+                    "permalink": {
+                        "type": "string",
+                        "example": "https://www.pinterest.com/pin/813744/"
+                    },
+                    "title": {
+                        "description": "Title carries the pin's description, not Pinterest's separate title field.",
+                        "type": "string",
+                        "example": "Roast chicken"
+                    }
+                }
+            },
+            "api_endpoints.PinterestPinsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PinterestPinItem"
                         }
                     }
                 }
@@ -12039,12 +12159,6 @@
                     "description": {
                         "type": "string",
                         "example": "Weeknight dinners"
-                    },
-                    "is_active": {
-                        "type": "boolean"
-                    },
-                    "is_default": {
-                        "type": "boolean"
                     },
                     "name": {
                         "type": "string",

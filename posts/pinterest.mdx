@@ -7,6 +7,8 @@ description: Full reference for publishing Pins via SocialAPI, plus board manage
 
 Pinterest publishing uses the Pinterest API v5 against your connected Pinterest account. Every Pin needs a destination board and an image, there is no text-only or link-only post type. SocialAPI also exposes board management endpoints so you can create, rename, or remove boards without leaving the API.
 
+Pinterest's Developer Terms of Service prohibit storing information accessed through the API. Boards and Pins are never persisted: every read hits Pinterest live, on every request, with no cache and no TTL.
+
 | Field | Value |
 |---|---|
 | Platform slug | `pinterest` |
@@ -22,7 +24,7 @@ Pinterest publishing uses the Pinterest API v5 against your connected Pinterest 
 
 ## 2. Create a Pin
 
-Use `POST /v1/posts` with a target pointing at a Pinterest board account. `media_ids` must contain exactly one image, Pinterest has no text-only Pin type.
+Use `POST /v1/posts` with a target pointing at a Pinterest account. `media_ids` must contain exactly one image, Pinterest has no text-only Pin type.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -33,8 +35,8 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
     "targets": [{
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "board_id": "8828",
       "platform_data": {
-        "board_id": "8828",
         "title": "Sheet-pan salmon",
         "link": "https://example.com/recipes/salmon"
       }
@@ -42,17 +44,22 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
+### Target field
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `board_id` | string | Yes | The board to Pin to, as a top-level field on the target. Use a board id returned by [List boards](#4-list-boards) or [Create board](#5-create-board). `page_id` is accepted as an alias, but sending both is an error. |
+
+`board_id` must be a top-level field on the target, not inside `platform_data`: Pinterest has no default board, so a target with neither `board_id` nor `page_id` set returns `400 validation.board_id_required`, and setting `board_id` inside `platform_data` returns `400 validation.use_board_id`.
+
 ### Platform data fields
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `board_id` | string | Yes | The board to Pin to. Use a board id returned by [List boards](#4-list-boards) or [Create board](#5-create-board). |
 | `title` | string | No | Pin title, up to 100 characters. |
 | `description` | string | No | Overrides `text` as the Pin description, up to 800 characters. |
 | `link` | string | No | Destination URL the Pin links to, up to 2,048 characters. |
 | `alt_text` | string | No | Accessibility alt text for the image, up to 500 characters. |
-
-`board_id` must be passed inside the target's `platform_data`, not as a top-level field: passing it at the top level returns a validation error telling you to use `platform_data.board_id`.
 
 ### Limits
 
@@ -66,7 +73,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
   "targets": [{
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "platform_data": { "board_id": "8828" }
+    "board_id": "8828"
   }],
   "scheduled_at": "2026-04-15T10:00:00Z"
 }
@@ -101,15 +108,13 @@ Response:
       "id": "sapi_board_01HZ9X3Q4R5M6N7P8V2K0W1J",
       "board_id": "8828",
       "name": "Recipes",
-      "privacy": "PUBLIC",
-      "is_default": true,
-      "is_active": true
+      "privacy": "PUBLIC"
     }
   ]
 }
 ```
 
-Boards refresh from Pinterest automatically when the stored copy is more than 5 minutes old, so this list can lag Pinterest by up to that window.
+Boards are fetched live from Pinterest on every call. SocialAPI stores neither the board name nor its privacy setting, so there is no cache and no lag: a name change on Pinterest shows up on the next request.
 
 ---
 
@@ -132,7 +137,7 @@ curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/
 | `description` | string | No | Board description. |
 | `privacy` | string | No | `PUBLIC`, `PROTECTED`, or `SECRET`. Defaults to `PUBLIC` if omitted. |
 
-Returns `201` with the created board. The first board created for an account becomes its default publishing destination.
+Returns `201` with the created board. There is no default board: every publish target must set `board_id` explicitly.
 
 ---
 
@@ -148,7 +153,7 @@ curl -X PATCH https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J
   }'
 ```
 
-`is_default` and `is_active` are SocialAPI-only flags stored locally and never sent to Pinterest. `name`, `description`, and `privacy` are pushed upstream. `boardId` accepts either the internal board handle or the raw Pinterest board id.
+`name`, `description`, and `privacy` are pushed to Pinterest. `boardId` accepts either the internal board handle or the raw Pinterest board id.
 
 **Privacy cannot be set to PROTECTED via update.** Pinterest's update schema only accepts `PUBLIC` or `SECRET` on `PATCH /boards/{id}`, unlike create, which also accepts `PROTECTED`. If a board is already `PROTECTED`, its privacy cannot be changed at all through this endpoint: recreate the board instead.
 
@@ -161,7 +166,7 @@ curl -X DELETE https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-**Deleting a board permanently deletes every Pin saved to it, and this cannot be undone.** There is no soft-delete or recovery path on Pinterest's side. If the deleted board was the account's default, SocialAPI promotes another active board to take its place.
+**Deleting a board permanently deletes every Pin saved to it, and this cannot be undone.** There is no soft-delete or recovery path on Pinterest's side.
 
 Returns `204` on success.
 
@@ -178,7 +183,35 @@ Returns the connected account's public profile counts (username, profile image, 
 
 ---
 
-## 9. Required OAuth scopes
+## 9. List pins
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/pinterest/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/pins?limit=50" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": "813744",
+      "title": "Roast chicken",
+      "board_id": "8828",
+      "permalink": "https://www.pinterest.com/pin/813744/",
+      "media_url": "https://i.pinimg.com/x.jpg",
+      "created_at": "2026-08-01T12:00:00Z"
+    }
+  ]
+}
+```
+
+Pins are fetched live from Pinterest on every request and are never stored by SocialAPI. `limit` is optional, defaults to 50, and caps at 50. If Pinterest cannot be reached, the request fails rather than returning a stale or empty list.
+
+---
+
+## 10. Required OAuth scopes
 
 | Scope | Purpose |
 |---|---|
