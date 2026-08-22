@@ -26,10 +26,10 @@ Instagram publishing uses the Meta Graph API two-step flow: SocialAPI creates a 
 |---|---|---|
 | Single image | `content_type: "feed"` | Standard image post |
 | Single video (Reel) | URL ending in `.mp4`, `.mov`, etc., or `content_type: "reel"` | Published as `media_type: REELS` |
-| Carousel | Two or more `media_ids` entries, or `content_type: "carousel"` | 2 to 10 items; mix of images and videos allowed |
+| Carousel | Two or more `media` entries, or `content_type: "carousel"` | 2 to 10 items; mix of images and videos allowed |
 | Story | `content_type: "stories"` | Single image or video; captions not supported |
 
-`content_type` is required when publishing or scheduling an Instagram post. Without it, validation returns an error. When saving a draft (without publishing), `content_type` can be omitted and SocialAPI auto-detects at publish time: multiple `media_ids` produce a carousel, a single entry produces a feed image or reel depending on file extension.
+`content_type` is required when publishing or scheduling an Instagram post. Without it, validation returns an error. When saving a draft (without publishing), `content_type` can be omitted and SocialAPI auto-detects at publish time: multiple `media` entries produce a carousel, a single entry produces a feed image or reel depending on file extension.
 
 <Note>
   For Instagram feed images, use JPEG. PNG uploads can be rejected by Meta at the container-creation step. This is a Meta-side constraint, so SocialAPI does not block a PNG in advance; if a feed image fails to publish, re-encode it as JPEG.
@@ -42,7 +42,9 @@ Story publishing is supported via the API using `content_type: "stories"`. Note 
 **Carousel limits:** 2 to 10 items. Carousel child containers do not accept captions; only the parent container carries the caption.
 
 <Warning>
-  Attach media by **uploading it first and passing the returned `media_id`** in the `media_ids` array. There is no `image_url`, `video_url`, or `media_urls` field: passing a raw public URL is silently ignored, and the post publishes with no media (Instagram then returns `The parameter image_url is required`). Upload in one step with `POST /v1/media/upload` (multipart), or use the presigned-URL flow (`GET /v1/media/upload-url` → `PUT` the file → `POST /v1/media/:id/verify`). The `verify` step is required: without it the media stays `pending` and publishing fails with `Media not found`.
+  Attach media through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, or `url` for a public `http(s)` URL we fetch at publish time. There is no separate `image_url`, `video_url`, or `media_urls` field. To upload first, use `POST /v1/media/upload` (multipart) or the presigned-URL flow (`GET /v1/media/upload-url` → `PUT` the file → `POST /v1/media/:id/verify`); the `verify` step is required, without it the media stays `pending` and publishing fails with `Media not found`.
+
+  Instagram also accepts `source_type: "platform_attachment_id"` for a container you created through the Graph API yourself. It must then be the only item in `media`: Instagram cannot combine a pre-built container with other media, and doing so returns `422 publishing.media.mixing_unsupported`.
 </Warning>
 
 ---
@@ -58,7 +60,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Check out our new collection. #fashion #style",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "platform_data": {
       "instagram": {
         "alt_text": "A flat-lay photo of our spring collection",
@@ -92,7 +94,7 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
 {
   "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
   "text": "Scheduled caption",
-  "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
   "scheduled_at": "2026-04-15T10:00:00Z"
 }
 ```
@@ -105,7 +107,7 @@ Set `first_comment` to a string to post an automated comment immediately after p
 {
   "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
   "text": "New drop. Link in bio.",
-  "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
   "first_comment": "Shop now: https://example.com/shop"
 }
 ```
@@ -278,7 +280,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Behind the scenes from our studio shoot. #bts #fashion",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "first_comment": "Full video on YouTube: https://youtube.com/watch?v=example",
     "platform_data": {
       "instagram": {

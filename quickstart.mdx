@@ -202,7 +202,7 @@ The platform for each target is inferred from `account_id`, no `platform` field 
 
 ### Publish a post with an image
 
-Text-only posts need just the call above. To attach an image, upload it first, verify it, then pass its ID in `media_ids` (a flat array of strings). This is a four-step flow:
+Text-only posts need just the call above. To attach an image, upload it first, verify it, then reference it in the `media` array. This is a four-step flow:
 
 ```bash
 # 1. Request a signed upload URL (media_type and filename are required)
@@ -226,12 +226,16 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "text": "Our spring collection is live.",
     "publish_now": true,
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "media": [
+      { "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }
+    ],
     "targets": [ { "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" } ]
   }'
 ```
 
-The field is `media_ids`, a flat array of ID strings. A raw image URL, or a different shape such as `media: [{ "media_id": "..." }]`, is not applied, and the post publishes without the image. Skipping step 3 leaves the media `pending`, and the publish fails rather than posting without it. See [Media uploads](/guides/media) for videos, carousels, and the server-side upload path.
+Each `media` item names its `source_type`. Here it is `media_id`, referencing the upload above. You can skip steps 1 to 3 entirely by pointing at a public URL instead, with `{ "source_type": "url", "source": "https://cdn.example.com/launch.jpg" }`. Skipping step 3 on the upload path leaves the media `pending`, and the publish fails rather than posting without it. See [Media uploads](/guides/media) for URLs, platform attachment IDs, videos, and carousels.
+
+The older flat `media_ids: ["..."]` array still works and is equivalent to a list of `media_id` sources.
 
 <Tip>
   Publishing to several targets can partly succeed. A `201` means the post was created (delivery runs in the background); `207` means some targets published and others failed; `422` means all failed. When a target fails, the reason is under `targets[].error`. Do not treat `207` as a total failure. See [Publishing behavior and reliability](/guides/reliability#response-codes).

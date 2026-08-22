@@ -1,9 +1,30 @@
 ---
 title: "Media uploads"
-description: "Upload images and videos, then attach them to posts with a media ID."
+description: "Attach media to posts from an uploaded file, a public URL, or a platform attachment ID."
 ---
 
-SocialAPI is upload-first for media. You upload a file once, receive a `media_id` (a UUID), then reference that ID in the `media_ids` array when you create a post. There is no `image_url` or `video_url` field on a post: a raw public URL placed in `media_ids` is silently ignored, and the post publishes with no media.
+Posts carry an ordered `media` array. Each item names where the media comes from with `source_type`, so one list can mix an uploaded file, a public URL, and media you uploaded to a platform yourself. Order is preserved and decides carousel sequence.
+
+| `source_type` | `source` is | Use it when |
+|---|---|---|
+| `media_id` | A media library UUID from an upload | You uploaded the file to SocialAPI (see below) |
+| `url` | A public `http(s)` URL | The file is already hosted somewhere public and you do not want to upload it |
+| `platform_attachment_id` | A media ID from the target platform's own API | You uploaded to the platform directly and want to publish it without re-upload |
+
+```json
+{
+  "text": "Behind the scenes from our studio shoot.",
+  "media": [
+    { "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" },
+    { "source_type": "url", "source": "https://cdn.example.com/photo.jpg" }
+  ],
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }]
+}
+```
+
+<Note>
+The older `media_ids` array still works and is not going away without notice. `["abc"]` is exactly equivalent to `[{ "source_type": "media_id", "source": "abc" }]`. If you send both, `media` wins and `media_ids` is ignored. Responses continue to include `media_ids` alongside `media`, listing the `media_id` items only.
+</Note>
 
 Uploading and verifying media does not cost credits. A credit is charged only when the post publishes or is scheduled.
 
@@ -38,7 +59,7 @@ Response:
 }
 ```
 
-The returned media is immediately `ready`. Pass the `media_id` in `media_ids` on your next `POST /v1/posts` call (see [Using media in posts](#using-media-in-posts)).
+The returned media is immediately `ready`. Pass it as a `media_id` source on your next `POST /v1/posts` call (see [Using media in posts](#using-media-in-posts)).
 
 ## Presigned URL upload
 
@@ -84,7 +105,7 @@ If you skip verification, the media stays `pending` and publishing fails with `M
 
 ## Using media in posts
 
-Pass one or more `media_id` values in the `media_ids` array on `POST /v1/posts`. Order is preserved. A single entry produces an image or video; multiple entries produce a carousel, subject to each platform's limits.
+Pass the `media` array on `POST /v1/posts`. Order is preserved. A single entry produces an image or video; multiple entries produce a carousel, subject to each platform's limits.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -93,15 +114,58 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Behind the scenes from our studio shoot.",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
+    "media": [
+      { "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }
+    ]
   }'
 ```
 
+`media` is also accepted per target, where it overrides the post-level list for that platform only. A target that sets no `media` inherits the post-level one.
+
 Per-platform media limits (image versus video, carousel counts, maximum items per post) are listed in the [Posts overview](/posts/overview) capability matrix.
 
-<Warning>
-A raw public URL in `media_ids` is ignored. Always upload first and pass the returned `media_id`.
-</Warning>
+### Publishing from a public URL
+
+Set `source_type` to `url` and we fetch the file at publish time. Nothing is stored in your media library and no storage quota is consumed.
+
+```json
+{
+  "media": [
+    { "source_type": "url", "source": "https://cdn.example.com/photo.jpg" }
+  ]
+}
+```
+
+The URL must be publicly reachable over `http` or `https`. URLs resolving to private, loopback, link-local, or otherwise internal addresses are rejected. The check runs again at publish time, so a URL that stops resolving publicly between scheduling and publishing fails the post rather than silently dropping the media.
+
+Because the fetch happens when the post publishes, the URL must still be live at that moment. For a post scheduled weeks out, an uploaded `media_id` is the safer choice: a link that expires or rotates in the meantime will fail the post.
+
+### Publishing a platform attachment ID
+
+If you have already uploaded media to a platform through its own API, pass that ID directly and we publish it without re-uploading.
+
+```json
+{
+  "media": [
+    { "source_type": "platform_attachment_id", "source": "18234567890123456", "type": "image" }
+  ]
+}
+```
+
+`type` is required here (`image`, `video`, `audio`, or `file`). For `url` and `media_id` we infer it from the file, but a platform attachment ID is opaque to us, so you have to declare it.
+
+Supported on **Instagram, Threads, LinkedIn, LinkedIn Page, and X/Twitter**. Any other platform returns `422 publishing.media.unsupported_source`.
+
+Mixing rules differ by platform:
+
+| Platform | Can mix an attachment ID with other media? |
+|---|---|
+| LinkedIn, LinkedIn Page, X/Twitter | Yes, combine freely with `url` and `media_id` items |
+| Instagram, Threads | No. The attachment must be the only item in `media` |
+
+On Instagram and Threads a `platform_attachment_id` is one finished, publishable container (a single photo or video, or a carousel you assembled yourself), so it cannot be combined with anything else. Sending more than one item returns `422 publishing.media.mixing_unsupported`. To build a mixed carousel there, pass `url` or `media_id` items and we assemble it for you.
+
+These gates are per target: a post can still publish to its other targets when one target is rejected.
 
 ## Managing your library
 
@@ -145,7 +209,9 @@ An upload that would exceed your quota returns `413`. On the presigned path the 
 
 ## Constraints and gotchas
 
-- A raw public URL in `media_ids` is silently ignored. Upload first, then pass the `media_id`.
+- A public URL now publishes directly as a `url` source. In the deprecated `media_ids` array a raw URL is still ignored: `media_ids` only accepts media library IDs.
+- `url` sources are fetched at publish time and must still be reachable then. Prefer an uploaded `media_id` for posts scheduled far ahead.
+- `platform_attachment_id` requires an explicit `type`, works only on Instagram, Threads, LinkedIn, LinkedIn Page, and X/Twitter, and cannot be mixed with other media on Instagram or Threads.
 - The verify step is mandatory on the presigned path. Without it, media stays `pending` and publishing fails with `Media not found`.
 - The server-side upload endpoint caps files at 50 MB. Use the presigned path for anything larger.
 - Media has three states: `pending` (created, bytes not yet confirmed), `ready` (usable in posts), and `failed` (quota exceeded, or the object was missing at verify).

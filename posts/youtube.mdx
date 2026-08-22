@@ -25,7 +25,7 @@ YouTube publishing uploads a single video through the YouTube Data API v3 resuma
 
 | Content type | How to trigger | Notes |
 |---|---|---|
-| Single video | One `media_ids` entry | The only supported format. MP4 recommended. |
+| Single video | One `media` entry | The only supported format. MP4 recommended. |
 
 YouTube publishing takes exactly one video. Image posts and carousels are not supported: images surface only as thumbnails when you retrieve posts. Accepted media is `video/*`, uploaded via the resumable protocol, up to 256 GB.
 
@@ -34,7 +34,7 @@ YouTube publishing takes exactly one video. Image posts and carousels are not su
 **Description limit:** 5000 bytes (maps from the `text` field).
 
 <Warning>
-  Attach the video by **uploading it first and passing the returned `media_id`** in the `media_ids` array. There is no `video_url` or `media_url` field. Upload in one step with `POST /v1/media/upload` (multipart), or use the presigned-URL flow (`GET /v1/media/upload-url` → `PUT` the file → `POST /v1/media/:id/verify`). The `verify` step is required: without it the media stays `pending` and publishing fails.
+  Attach the video through the `media` array, as either a `media_id` source (a file uploaded to SocialAPI) or a `url` source (a public `http(s)` URL we fetch at publish time). There is no separate `video_url` or `media_url` field. To upload first, use `POST /v1/media/upload` (multipart) or the presigned-URL flow (`GET /v1/media/upload-url` → `PUT` the file → `POST /v1/media/:id/verify`); the `verify` step is required, without it the media stays `pending` and publishing fails. YouTube does not support `platform_attachment_id`.
 </Warning>
 
 ---
@@ -56,7 +56,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "title": "Our spring collection walkthrough",
     "text": "A full tour of the new lineup. Chapters in the description below.",
     "visibility": "public",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "platform_data": {
       "youtube": {
         "category_id": "22",
@@ -123,7 +123,7 @@ YouTube schedules a publish natively: you upload the video as `private` with a `
   "title": "Launch day announcement",
   "text": "Going live for everyone at 10am.",
   "visibility": "private",
-  "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
   "platform_data": {
     "youtube": {
       "publish_at": "2026-04-15T10:00:00Z"
@@ -312,7 +312,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "title": "Spring collection walkthrough",
     "text": "A full tour of the new lineup. Chapters below.",
     "visibility": "private",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "first_comment": "Which piece is your favorite? Let us know below.",
     "platform_data": {
       "youtube": {

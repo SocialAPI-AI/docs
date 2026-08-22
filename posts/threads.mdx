@@ -24,10 +24,10 @@ Threads publishing uses three distinct flows depending on content type. Text-onl
 
 | Content type | How to trigger | Notes |
 |---|---|---|
-| Text only | Omit `media_ids` | Supported natively; unlike Instagram, text-only posts work without any media |
-| Single image | One `media_ids` entry pointing to an image URL | Sent as `media_type: IMAGE` |
-| Single video | One `media_ids` entry pointing to a video URL (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Sent as `media_type: VIDEO`; container is polled until `FINISHED` |
-| Carousel | Two or more `media_ids` entries | Up to 20 items; mix of images and videos allowed |
+| Text only | Omit `media` | Supported natively; unlike Instagram, text-only posts work without any media |
+| Single image | One `media` entry pointing to an image | Sent as `media_type: IMAGE` |
+| Single video | One `media` entry pointing to a video (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Sent as `media_type: VIDEO`; container is polled until `FINISHED` |
+| Carousel | Two or more `media` entries | Up to 20 items; mix of images and videos allowed |
 
 SocialAPI auto-detects the media type from the URL file extension. Video detection inspects the URL path, ignoring query parameters (safe for presigned S3 URLs).
 
@@ -48,7 +48,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Shipping updates for April. Full details on our site.",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "platform_data": {
       "threads": {
         "reply_control": "accounts_you_follow"
@@ -163,7 +163,7 @@ Threads has no API for editing a post's text or media after publication. Attempt
 
 ### Text-only posts
 
-Unlike Instagram, Threads supports text-only posts natively. Omit `media_ids` entirely to create a post with just a text body. The container is created with `media_type: TEXT`.
+Unlike Instagram, Threads supports text-only posts natively. Omit `media` entirely to create a post with just a text body. The container is created with `media_type: TEXT`.
 
 ### reply_control defaults to "everyone"
 
@@ -237,7 +237,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Our April product update is live. Check the link in bio for full details.",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "platform_data": {
       "threads": {
         "reply_control": "accounts_you_follow",

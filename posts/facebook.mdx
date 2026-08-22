@@ -27,19 +27,19 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 
 | Content type | How to trigger | Notes |
 |---|---|---|
-| Text only | No `media_ids`; no `link` in `platform_data` | Publishes a plain text status update |
-| Link preview | No `media_ids`; include `link` in the target's `platform_data` | Facebook generates an Open Graph preview card |
-| Single photo | One image entry in `media_ids` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
-| Single video | One video entry in `media_ids` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; only the `title` platform_data field is forwarded |
-| Reel | One vertical video entry in `media_ids` plus `content_type: "reel"` in the target's `platform_data` | Routes to the Reels API (`/{page-id}/video_reels`). Unlike standard videos, `platform_data` IS honored (`content_type`, `share_to_feed`). |
-| Story | One photo or video entry in `media_ids` plus `content_type: "stories"` in the target's `platform_data` | Publishes a Page Story that expires after 24 hours. Photos publish via `/{page-id}/photo_stories`; videos run the three-phase `/{page-id}/video_stories` flow. Captions, links, and audience targeting are ignored. |
-| Multi-photo album | 2 to 10 image entries in `media_ids` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
+| Text only | No `media`; no `link` in `platform_data` | Publishes a plain text status update |
+| Link preview | No `media`; include `link` in the target's `platform_data` | Facebook generates an Open Graph preview card |
+| Single photo | One image entry in `media` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
+| Single video | One video entry in `media` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; only the `title` platform_data field is forwarded |
+| Reel | One vertical video entry in `media` plus `content_type: "reel"` in the target's `platform_data` | Routes to the Reels API (`/{page-id}/video_reels`). Unlike standard videos, `platform_data` IS honored (`content_type`, `share_to_feed`). |
+| Story | One photo or video entry in `media` plus `content_type: "stories"` in the target's `platform_data` | Publishes a Page Story that expires after 24 hours. Photos publish via `/{page-id}/photo_stories`; videos run the three-phase `/{page-id}/video_stories` flow. Captions, links, and audience targeting are ignored. |
+| Multi-photo album | 2 to 10 image entries in `media` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
 
-Route selection is mostly automatic, driven by how many `media_ids` you pass:
+Route selection is mostly automatic, driven by how many `media` entries you pass:
 
-- `media_ids` is empty → text or link post on `/{page-id}/feed`
-- `media_ids` has one entry → photo or video endpoint based on the file extension
-- `media_ids` has 2 to 10 entries → multi-photo album
+- `media` is empty → text or link post on `/{page-id}/feed`
+- `media` has one entry → photo or video endpoint based on the file extension
+- `media` has 2 to 10 entries → multi-photo album
 
 Reels and Stories override that extension-based routing. Set `content_type` in the target's `platform_data` to `"reel"` (one vertical video) or `"stories"` (one photo or video), and that intent takes precedence over the rules above.
 
@@ -89,7 +89,7 @@ Only the documented fields above are forwarded to the Graph API; any additional 
 
 ### Photo post
 
-Provide a single image entry in `media_ids`. The `alt_text` platform_data field is forwarded as `alt_text_custom` on the photo; all other `platform_data` keys are ignored for single-photo posts.
+Provide a single image entry in `media`. The `alt_text` platform_data field is forwarded as `alt_text_custom` on the photo; all other `platform_data` keys are ignored for single-photo posts.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -98,13 +98,13 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Our new product is here.",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }]
   }'
 ```
 
 ### Multi-photo album
 
-Provide 2 to 10 image entries in `media_ids` to publish a multi-photo album. SocialAPI handles the two-step Graph API flow internally: each photo is uploaded with `published=false` to obtain a `media_fbid`, then a single `/{page-id}/feed` call attaches all photo IDs via `attached_media[]` and sets the caption.
+Provide 2 to 10 image entries in `media` to publish a multi-photo album. SocialAPI handles the two-step Graph API flow internally: each photo is uploaded with `published=false` to obtain a `media_fbid`, then a single `/{page-id}/feed` call attaches all photo IDs via `attached_media[]` and sets the caption.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -113,10 +113,10 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Highlights from this week.",
-    "media_ids": [
-      "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b",
-      "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17"
+    "media": [
+      { "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" },
+      { "source_type": "media_id", "source": "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b" },
+      { "source_type": "media_id", "source": "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17" }
     ]
   }'
 ```
@@ -129,11 +129,11 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Content-Type: application/json" \
   -d '{
     "text": "Shop the spring collection.",
-    "media_ids": [
-      "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b",
-      "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17",
-      "5e2c8a14-7b9d-4f03-a6c1-9d8e0b3f4a26"
+    "media": [
+      { "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" },
+      { "source_type": "media_id", "source": "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b" },
+      { "source_type": "media_id", "source": "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17" },
+      { "source_type": "media_id", "source": "5e2c8a14-7b9d-4f03-a6c1-9d8e0b3f4a26" }
     ],
     "targets": [{
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
@@ -147,11 +147,11 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 **Limits:**
 - Minimum 2, maximum 10 photos per album.
-- Images only. Including a video entry (any of `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) in a 2+ item `media_ids` returns a validation error before any upload to Facebook.
+- Images only. Including a video entry (any of `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) in a 2+ item `media` list returns a validation error before any upload to Facebook.
 
 ### Video post
 
-Provide a single video entry in `media_ids`. SocialAPI detects the video extension and routes to `/{page-id}/videos`. The `title` platform_data field is forwarded as the video title; all other `platform_data` keys are ignored for single-video posts.
+Provide a single video entry in `media`. SocialAPI detects the video extension and routes to `/{page-id}/videos`. The `title` platform_data field is forwarded as the video title; all other `platform_data` keys are ignored for single-video posts.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -160,13 +160,13 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Watch our latest brand film.",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }]
   }'
 ```
 
 ### Reel
 
-Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media_ids`. SocialAPI runs Facebook's Reels publishing flow (upload, processing, publish). The request blocks until the Reel is ready or published, polling for up to about 10 minutes (120 status checks at 5-second intervals). If the Reel does not finish processing within that window, the publish fails with `504 Gateway Timeout`.
+Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media`. SocialAPI runs Facebook's Reels publishing flow (upload, processing, publish). The request blocks until the Reel is ready or published, polling for up to about 10 minutes (120 status checks at 5-second intervals). If the Reel does not finish processing within that window, the publish fails with `504 Gateway Timeout`.
 
 The `platform_data` object lives on the target (inside the `targets` array), and its keys are read directly (do not nest them under a `facebook` key).
 
@@ -176,7 +176,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Content-Type: application/json" \
   -d '{
     "text": "Behind the scenes #reels",
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "targets": [{
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
       "platform_data": {
@@ -198,7 +198,7 @@ Requirements: exactly one video, vertical orientation (9:16), and a duration of 
 
 ### Story
 
-Publish a 24-hour Page Story by setting `content_type: "stories"` in the target's `platform_data`. Provide exactly one photo or video entry in `media_ids`, and SocialAPI picks the right flow from the media type: a photo is uploaded as an unpublished photo and then published to `/{page-id}/photo_stories`, while a video runs Facebook's three-phase `/{page-id}/video_stories` flow (upload, processing, publish). For a video, the request blocks until processing finishes, polling for up to about 10 minutes (120 status checks at 5-second intervals); if it does not finish in that window, the publish fails with `504 Gateway Timeout`.
+Publish a 24-hour Page Story by setting `content_type: "stories"` in the target's `platform_data`. Provide exactly one photo or video entry in `media`, and SocialAPI picks the right flow from the media type: a photo is uploaded as an unpublished photo and then published to `/{page-id}/photo_stories`, while a video runs Facebook's three-phase `/{page-id}/video_stories` flow (upload, processing, publish). For a video, the request blocks until processing finishes, polling for up to about 10 minutes (120 status checks at 5-second intervals); if it does not finish in that window, the publish fails with `504 Gateway Timeout`.
 
 Stories carry no caption, link, call-to-action, or audience targeting, so any `text` or `platform_data` field other than `content_type` is ignored.
 
@@ -207,7 +207,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "targets": [{
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
       "platform_data": {
@@ -357,7 +357,7 @@ The target's `platform_data` block is forwarded to the Graph API for text/link p
 
 ### Multi-photo album semantics
 
-Multi-photo albums (2 to 10 image entries in `media_ids`) use a two-step flow: each photo is uploaded with `published=false`, then attached to a single feed post. The unpublished photos Facebook stores during step one expire after about 24 hours, so if the second step fails the photos are simply abandoned and you can retry the entire post. Mixing images and videos in the same album returns a validation error before any upload happens, and passing more than 10 entries also fails validation.
+Multi-photo albums (2 to 10 image entries in `media`) use a two-step flow: each photo is uploaded with `published=false`, then attached to a single feed post. The unpublished photos Facebook stores during step one expire after about 24 hours, so if the second step fails the photos are simply abandoned and you can retry the entire post. Mixing images and videos in the same album returns a validation error before any upload happens, and passing more than 10 entries also fails validation.
 
 ### First comment is non-blocking
 

@@ -11,7 +11,7 @@ Use `POST /v1/posts/validate` to check constraints before publishing, and `GET /
 
 ## Attaching media
 
-Photos and videos are upload-first. Upload a file to receive a `media_id`, then pass that ID in the `media_ids` array. A raw public URL in `media_ids` is ignored. See the [Media uploads guide](/guides/media) for the two upload paths, the verify step, and storage limits.
+Photos and videos are attached through the ordered `media` array. Each item sets a `source_type`: an uploaded library file (`media_id`), a public URL we fetch at publish time (`url`), or media you uploaded to the platform yourself (`platform_attachment_id`, supported on Instagram, Threads, LinkedIn, LinkedIn Page, and X/Twitter). The older flat `media_ids` array still works and is equivalent to a list of `media_id` sources. See the [Media uploads guide](/guides/media) for upload paths, URL rules, and storage limits.
 
 ## Capability matrix
 
@@ -67,7 +67,7 @@ How each platform interprets the shared `PostDraft` fields:
 | Field | Instagram | Facebook | LinkedIn | Threads | TikTok | YouTube | X / Twitter | Google |
 |---|---|---|---|---|---|---|---|---|
 | `text` | Caption (max 2200 chars) | Post message | Commentary | Post text (max 500 chars) | Video description | Video description | Tweet text (max 280) | Summary |
-| `media_ids` | Presigned URLs; determines image/video/carousel | First URL only; photo or video | Presigned URLs; image or video | Presigned URLs | Presigned URLs; video or photo carousel | Single video URL | Not supported (text only) | Single image URL |
+| `media` | Determines image/video/carousel | First item only; photo or video | Image or video | Image or video | Video, or photo carousel | Single video | Up to 4 photos, or one video, or one GIF | Single image |
 | `first_comment` | Posted as a comment after publish (best-effort, non-blocking) | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported | Not supported | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported |
 | `scheduled_at` | Deferred publish | Deferred publish | Deferred publish | Deferred publish | Not supported | Not supported | Not supported | Not supported |
 
