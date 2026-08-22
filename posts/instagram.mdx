@@ -14,7 +14,7 @@ Instagram publishing uses the Meta Graph API two-step flow: SocialAPI creates a 
 | API | Meta Graph API |
 | Create post | Yes |
 | Update post | No (not supported by platform) |
-| Delete post | Yes |
+| Delete post | No (requires an account connected with Facebook Login, not yet available) |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | Yes (best-effort, non-blocking) |
 
@@ -118,25 +118,19 @@ Set `first_comment` to a string to post an automated comment immediately after p
 
 Instagram does not support editing a published post's caption or media via the API. `PATCH /v1/posts/:pid` for an Instagram target returns `501 Not Implemented`.
 
-If you need to correct a caption, delete the post and recreate it.
+To correct a caption, delete the post in the Instagram app and publish a new one. Deleting through the API is not currently available (see Delete post below).
 
 ---
 
 ## 5. Delete post
 
-```bash
-curl -X DELETE https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+Deleting an Instagram post through the API is not currently available. `DELETE /v1/posts/:pid` and `POST /v1/posts/:pid/unpublish` return `501 Not Implemented` with code `resource.not_supported` for an Instagram target, and the post stays live on Instagram.
 
-Or, to delete only the Instagram target of a cross-platform post:
+Meta only exposes media deletion to accounts connected with Facebook Login for Business. SocialAPI connects Instagram accounts with Instagram Login, which has no deletion endpoint, so the connector refuses the call rather than reporting a success that never happened. Facebook Login support is in progress; this page will be updated when deletion becomes available.
 
-```bash
-curl -X DELETE "https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J?platform=instagram" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+In the meantime, delete the post in the Instagram app.
 
-Deletion calls `DELETE /{ig-media-id}` on the Meta Graph API. If the media ID no longer exists on Instagram, the API returns success.
+For a cross-platform post, the other platforms are still deleted or unpublished normally. The response names every platform whose content is still live, so an Instagram target refusing does not roll back the targets that succeeded.
 
 ---
 
