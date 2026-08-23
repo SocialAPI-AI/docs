@@ -1,0 +1,61 @@
+---
+title: Zalo
+description: Connect a Zalo Official Account to send and receive direct messages and publish articles and videos through SocialAPI.
+---
+
+A Zalo Official Account (OA) is the business-facing account type on Zalo, Vietnam's dominant messaging app. The Zalo connector authenticates an OA through OAuth 2.0 with PKCE, and OAuth is provided by SocialAPI.ai: you don't register your own Zalo app.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `zalo` |
+| Auth type | OAuth 2.0 with PKCE |
+| API | Zalo Official Account Open API |
+| Best for | A unified inbox and article/video publishing for a Zalo Official Account. |
+
+## Capabilities
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Receive and send DMs | Yes | Customer service messaging, subject to the 7-day window below |
+| Message reactions | Yes | React to an inbound message |
+| Publish articles | Yes | Text articles, created asynchronously (see below) |
+| Publish videos | Yes | |
+| Update posts | Yes | |
+| Delete posts | Yes | |
+| Webhooks | Yes | Inbound events are verified with an `X-ZEvent-Signature` header |
+| Comments | No | Zalo has no public API for comments |
+| Reviews | No | Zalo has no public API for reviews |
+| Mentions | No | Zalo has no public API for mentions |
+
+Comments, reviews, and mentions aren't planned as "coming soon": Zalo simply doesn't expose a public API for any of the three, so SocialAPI has nothing to connect to.
+
+## Connecting
+
+Zalo uses OAuth 2.0 with PKCE (Proof Key for Code Exchange). Start the connection through the standard connect flow with `platform=zalo`; SocialAPI generates the PKCE verifier and challenge, sends the user to Zalo's authorization screen, and completes the code exchange on the callback.
+
+Each Zalo OAuth token is scoped to exactly one Official Account: listing accounts after connecting always returns a single account, the OA that authorized.
+
+### Redirect URI domain verification
+
+Zalo requires the callback domain to be **both** registered as the app's callback URL **and** domain-verified in the Zalo portal, using DNS TXT, an HTML file, or a meta tag. Registering the callback URL alone is not enough: Zalo rejects the authorization request with "invalid redirect uri" until the domain is also verified. Complete both steps in the Zalo portal before connecting an account.
+
+### Token lifetime
+
+Access tokens last about 25 hours. Refresh tokens last 3 months and are single-use: Zalo issues a new refresh token every time the current one is used, and the old one stops working. SocialAPI.ai handles this rotation automatically, so you never see or manage a refresh token directly.
+
+## The 7-day messaging window
+
+Zalo only lets an Official Account send a customer service message to a user who has interacted with the OA within the last **7 days**. Messages sent inside the first **48 hours** of that window are free; messages sent after 48 hours but within 7 days may incur a cost on Zalo's side. Sending outside the 7-day window is rejected and surfaces to you as an **HTTP 422**.
+
+## Publishing articles and videos
+
+Zalo Official Accounts publish articles (and video posts) rather than short-form posts. Article creation is **asynchronous**: after you submit a draft, SocialAPI polls Zalo's verification endpoint until the article finishes processing and returns its final ID. See [Zalo publishing](/posts/zalo) for the full request and response shapes, including the `title` requirement enforced before an article can be submitted.
+
+## Related
+
+- [Zalo publishing](/posts/zalo)
+- [Platform support](/guides/platforms)
+- [Inbox](/guides/inbox)
+- [Errors](/guides/errors)

@@ -1,0 +1,87 @@
+---
+title: Zalo publishing
+description: Full reference for publishing articles and videos to a Zalo Official Account, including asynchronous article creation and draft validation.
+---
+
+## 1. Overview
+
+Zalo publishing goes through the generic `POST /v1/posts` endpoint, the same one used for every other platform: there are no Zalo-specific publishing endpoints. A target pointing at a connected Zalo account creates an article on that Official Account.
+
+| Field | Value |
+|---|---|
+| Platform slug | `zalo` |
+| Auth type | OAuth 2.0 with PKCE |
+| Create post | Yes (article or video) |
+| Update post | Yes |
+| Delete post | Yes |
+
+---
+
+## 2. Create an article
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Our new store opens this weekend.",
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+    }]
+  }'
+```
+
+Zalo builds the article body as a "normal" type article with status "show". `text` becomes the article title if no separate title is set, and also becomes the article body content.
+
+### Asynchronous creation
+
+Article creation on Zalo is asynchronous. After SocialAPI submits the article, Zalo returns a processing token rather than a finished article, and SocialAPI polls Zalo's verification endpoint until the article is published and a final article ID is available. While the article is still processing, Zalo's verification check returns its own in-progress code, and SocialAPI keeps polling. If the article is still processing once the poll budget is exhausted, the create request returns rather than blocking indefinitely; retry shortly after.
+
+### Draft validation
+
+Before an article is created, SocialAPI validates the draft. Zalo requires a title: if both the title and text are empty, the draft is rejected with:
+
+```json
+{
+  "type": "error",
+  "field": "title",
+  "message": "Zalo articles require a title"
+}
+```
+
+If a title isn't set but `text` is, the title falls back to `text`, so a normal post with only `text` set passes validation.
+
+---
+
+## 3. Update an article
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Updated: our new store opens this weekend, now with extended hours."
+  }'
+```
+
+Unlike article creation, updating an existing article is synchronous: there is no verification poll on update.
+
+---
+
+## 4. Delete an article
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+---
+
+## 5. List articles
+
+```bash
+curl "https://api.social-api.ai/v1/posts?platform=zalo&account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Returns the Official Account's normal-type articles, most recent first.
