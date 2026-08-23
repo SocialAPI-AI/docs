@@ -878,7 +878,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Fetches posts and stories where your brand account was mentioned or tagged. Results are sorted newest-first. Returns 501 for platforms that do not support mention tracking.",
+                "description": "Fetches posts and stories where your brand account was mentioned or tagged. Results are sorted newest-first. Returns 501 for platforms that do not support mention tracking. Threads support is beta and requires the threads_manage_mentions permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
                 "tags": [
                     "Mentions"
                 ],
@@ -2437,7 +2437,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, Threads, and YouTube. Check the can_hide capability flag.",
+                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, Threads, and YouTube. Check the can_hide capability flag. Threads support is beta and requires the threads_manage_replies permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -2539,7 +2539,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, Threads, and YouTube.",
+                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, Threads, and YouTube. Threads support is beta and requires the threads_manage_replies permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -3773,6 +3773,156 @@
                 }
             }
         },
+        "/inbox/sync": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Reports whether a sync is running for the given target and when that target last completed one. Poll this after POST /inbox/sync until state leaves \"syncing\", then refetch the conversation or message list.",
+                "tags": [
+                    "Inbox"
+                ],
+                "summary": "Get inbox sync status",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Conversation ID, to report on a thread sync instead of the account's list",
+                        "name": "conversation_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Current sync state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InboxSyncResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing account_id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account or conversation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Forces a refresh from the platform, bypassing the normal staleness window. With only account_id the job refreshes that account's conversation list; add conversation_id to refresh one thread's messages instead. Returns immediately: poll GET /inbox/sync for progress. Calling this while a sync for the same target is already running returns the running job rather than starting a second one.",
+                "tags": [
+                    "Inbox"
+                ],
+                "summary": "Start an inbox sync",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.InboxSyncRequest"
+                            }
+                        }
+                    },
+                    "description": "Sync target",
+                    "required": true
+                },
+                "responses": {
+                    "202": {
+                        "description": "Sync started, or already running",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.InboxSyncResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing or invalid account_id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account or conversation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "A sync for this target ran too recently. The Retry-After header carries the seconds to wait.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/invite/{token}": {
             "get": {
                 "description": "Public endpoint (no auth). Validates the invite token and redirects the user\nto the platform's OAuth authorization page. On successful OAuth callback,\nthe account is connected to the invite creator's brand.",
@@ -4779,6 +4929,84 @@
                 }
             }
         },
+        "/platforms/facebook/accounts/{id}/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Beta. Returns trailing-30-day Page insight aggregates (followers, views, reach, post engagements, net follower change) for a connected Facebook Page. Access is limited to beta testers while the read_insights permission is in Meta App Review, and non-beta keys receive 403 platform.facebook.beta_required. Pages connected without the permission return 403 platform.facebook.insights_scope_missing and must be reconnected. The response shape may change without notice while this endpoint is in beta.",
+                "tags": [
+                    "Facebook"
+                ],
+                "summary": "Get Facebook Page insights summary (beta)",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Page insights summary",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.FacebookAccountSummaryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Beta access required, or Page connected without the insights permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Facebook API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/facebook/logins/{loginId}/pages": {
             "get": {
                 "security": [
@@ -5736,6 +5964,228 @@
                     },
                     "502": {
                         "description": "Bad Gateway",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/threads/insights": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Beta. Returns engagement metrics for a single Threads post (level=media) or for the connected account (level=account). Requires the threads_manage_insights Threads permission, which is pending Meta App Review, so calls may return an upstream authorization error for accounts outside the app's tester roster until that permission is granted. Media metrics are views, likes, replies, reposts, quotes and shares. Account metrics are those five plus clicks, followers_count and follower_demographics. shares is media-only and clicks is account-only. follower_demographics requires exactly one breakdown (country, city, age or gender) and rejects since or until.",
+                "tags": [
+                    "Threads"
+                ],
+                "summary": "Get Threads insights (beta)",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "media or account",
+                        "name": "level",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Platform post ID, required when level is media",
+                        "name": "post_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Comma-separated metric names, defaults to all metrics valid for the level",
+                        "name": "metric",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "One of country, city, age, gender; only valid with follower_demographics",
+                        "name": "breakdown",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Unix timestamp lower bound, must be >= 1712991600",
+                        "name": "since",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Unix timestamp upper bound, must be >= 1712991600",
+                        "name": "until",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ThreadsInsightsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing or invalid parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Threads API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/threads/profile-lookup": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Beta. Resolves a public Threads profile by exact username and returns its public metrics. Requires the threads_profile_discovery Threads permission, which is pending Meta App Review, so calls may return an upstream authorization error for accounts outside the app's tester roster until that permission is granted. Matching is exact, with no fuzzy or prefix search. Only profiles with 100 or more followers are discoverable, anything else returns 404. The upstream budget is 1000 lookups per user per rolling 24 hours.",
+                "tags": [
+                    "Threads"
+                ],
+                "summary": "Look up a public Threads profile (beta)",
+                "parameters": [
+                    {
+                        "description": "Connected account ID whose token authorizes the lookup",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Exact Threads username, with or without a leading @",
+                        "name": "username",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ThreadsProfileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing account_id or username",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Profile not discoverable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Lookup budget exhausted for this user",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Threads API error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -9632,8 +10082,21 @@
                             "$ref": "#/components/schemas/social-api_ai_core_api_service.ConversationRow"
                         }
                     },
+                    "last_synced_at": {
+                        "type": "string"
+                    },
                     "pagination": {
                         "$ref": "#/components/schemas/api_endpoints.InboxPagination"
+                    },
+                    "sync_state": {
+                        "description": "SyncState is \"idle\", \"syncing\", or \"failed\" for this account's\nconversation-list sync. Additive: reading it never triggers a sync, and a\nclient that ignores it sees exactly the previous response.",
+                        "type": "string",
+                        "enum": [
+                            "idle",
+                            "syncing",
+                            "failed"
+                        ],
+                        "example": "idle"
                     }
                 }
             },
@@ -10458,6 +10921,32 @@
                     }
                 }
             },
+            "api_endpoints.FacebookAccountSummaryResponse": {
+                "type": "object",
+                "properties": {
+                    "follower_count": {
+                        "type": "integer"
+                    },
+                    "interactions": {
+                        "type": "integer"
+                    },
+                    "net_follows": {
+                        "type": "integer"
+                    },
+                    "period_end": {
+                        "type": "string"
+                    },
+                    "period_start": {
+                        "type": "string"
+                    },
+                    "reach": {
+                        "type": "integer"
+                    },
+                    "views": {
+                        "type": "integer"
+                    }
+                }
+            },
             "api_endpoints.FacebookLoginPagesResponse": {
                 "type": "object",
                 "properties": {
@@ -10538,6 +11027,60 @@
                     },
                     "next_cursor": {
                         "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.InboxSyncRequest": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01H..."
+                    },
+                    "conversation_id": {
+                        "type": "string",
+                        "example": "6f1c..."
+                    }
+                }
+            },
+            "api_endpoints.InboxSyncResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/api_endpoints.InboxSyncStatus"
+                    }
+                }
+            },
+            "api_endpoints.InboxSyncStatus": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": ""
+                    },
+                    "finished_at": {
+                        "type": "string"
+                    },
+                    "last_synced_at": {
+                        "type": "string"
+                    },
+                    "started_at": {
+                        "type": "string"
+                    },
+                    "state": {
+                        "description": "State is \"idle\", \"syncing\", or \"failed\". A finished job is idle with a\nfresher LastSyncedAt; there is no terminal \"done\".",
+                        "type": "string",
+                        "enum": [
+                            "idle",
+                            "syncing",
+                            "failed"
+                        ],
+                        "example": "syncing"
+                    },
+                    "synced": {
+                        "description": "Synced counts what the last completed job wrote. Display only.",
+                        "type": "integer",
+                        "example": 12
                     }
                 }
             },
@@ -11034,8 +11577,21 @@
                             "$ref": "#/components/schemas/social-api_ai_core_api_service.MessageRow"
                         }
                     },
+                    "last_synced_at": {
+                        "type": "string"
+                    },
                     "pagination": {
                         "$ref": "#/components/schemas/api_endpoints.InboxPagination"
+                    },
+                    "sync_state": {
+                        "description": "SyncState is \"idle\", \"syncing\", or \"failed\" for this thread's message sync.",
+                        "type": "string",
+                        "enum": [
+                            "idle",
+                            "syncing",
+                            "failed"
+                        ],
+                        "example": "idle"
                     }
                 }
             },
@@ -12131,6 +12687,22 @@
                         "items": {
                             "type": "integer"
                         }
+                    }
+                }
+            },
+            "api_endpoints.ThreadsInsightsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.ThreadsInsights"
+                    }
+                }
+            },
+            "api_endpoints.ThreadsProfileResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.ThreadsPublicProfile"
                     }
                 }
             },
@@ -13703,6 +14275,77 @@
                         "type": "string"
                     },
                     "unique_views": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.ThreadsInsights": {
+                "type": "object",
+                "properties": {
+                    "metrics": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.ThreadsMetricValue"
+                        }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.ThreadsMetricValue": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "integer"
+                    },
+                    "values": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.ThreadsTimeSeriesPoint"
+                        }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.ThreadsPublicProfile": {
+                "type": "object",
+                "properties": {
+                    "biography": {
+                        "type": "string"
+                    },
+                    "follower_count": {
+                        "type": "integer"
+                    },
+                    "is_verified": {
+                        "type": "boolean"
+                    },
+                    "likes_count": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "profile_picture_url": {
+                        "type": "string"
+                    },
+                    "quotes_count": {
+                        "type": "integer"
+                    },
+                    "reposts_count": {
+                        "type": "integer"
+                    },
+                    "username": {
+                        "type": "string"
+                    },
+                    "views_count": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.ThreadsTimeSeriesPoint": {
+                "type": "object",
+                "properties": {
+                    "end_time": {
+                        "type": "string"
+                    },
+                    "value": {
                         "type": "integer"
                     }
                 }

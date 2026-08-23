@@ -205,6 +205,74 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/sapi_dm_GXRM4BNTW7
       }'
 ```
 
+### Manual sync
+
+Conversations and messages are normally refreshed on a staleness window: a read that finds stale data syncs before serving it. Use `/v1/inbox/sync` when you want to trigger a refresh independently of a read, for example to warm a thread before opening it.
+
+There are two targets. With only `account_id`, the job refreshes that account's conversation list, not every thread's messages: refreshing 200 threads on one button press is a rate-limit incident waiting to happen, so a list sync stays scoped to the list. Add `conversation_id` to instead refresh one thread's messages.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/v1/inbox/sync` | Start a sync for an account's conversation list, or one thread |
+| `GET` | `/v1/inbox/sync` | Get the current sync state for a target |
+
+**POST body**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `account_id` | Yes | Connected account to sync |
+| `conversation_id` | No | Thread to sync instead of the conversation list |
+
+**GET query parameters**
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `account_id` | Yes | Connected account to check |
+| `conversation_id` | No | Thread to check instead of the conversation list |
+
+**Response**
+
+| Field | Description |
+|-------|--------------|
+| `state` | `idle`, `syncing`, or `failed` |
+| `started_at` | When the current or most recent job started |
+| `finished_at` | When the current or most recent job finished (null while syncing) |
+| `last_synced_at` | When this target last completed a sync. GET only: a POST response is the job that just started, so the value worth reading is the one you poll back |
+| `error` | Error message if the last job failed |
+| `synced` | Count from the last completed job: conversations upserted for a list sync, messages inserted for a thread sync. Display only |
+
+POST returns immediately (`202`) with the job's starting state. Calling it again for the same target while a job is already running returns that running job rather than starting a second one.
+
+**Rate limit.** Each target accepts one forced sync every 5 minutes. A second attempt inside that window returns `429` with a `Retry-After` header carrying the seconds to wait, and the error code `inbox.sync_rate_limited`. Wait that long rather than retrying sooner: the limit exists because the platforms have their own, stricter limits, and burning them affects every sync for that account.
+
+The limit applies only to syncs you trigger. Ordinary reads of the inbox refresh data on their own schedule and never consume it, so opening the inbox does not make the next manual refresh fail.
+
+A sync that is already running is not rate-limited: polling `POST` for a target you are already waiting on returns that job's state rather than a `429`.
+
+The poll pattern is: `POST /v1/inbox/sync`, then poll `GET /v1/inbox/sync` until `state` is no longer `syncing`, then refetch the conversation or message list.
+
+If you want a fast cold open on a slow platform (Instagram in particular), sync the thread first and read it once it is warm, rather than opening it cold: the read path still blocks on a cold open, so reading first gets you the same wait either way.
+
+`GET /v1/inbox/conversations` and `GET /v1/inbox/conversations/:id/messages` also return `sync_state` and `last_synced_at` on the list response itself, so a client already polling those lists can watch sync state without a separate call to `/v1/inbox/sync`. Both fields are additive: a client that ignores them sees exactly the response it saw before.
+
+```bash
+# Start a conversation-list sync
+curl -X POST https://api.social-api.ai/v1/inbox/sync \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+
+# Start a sync for one thread
+curl -X POST https://api.social-api.ai/v1/inbox/sync \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "conversation_id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U" }'
+
+# Poll status for the thread
+curl "https://api.social-api.ai/v1/inbox/sync?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&conversation_id=sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
 ## Reviews
 
 Read and reply to reviews on platforms that support them.
