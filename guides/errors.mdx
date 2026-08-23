@@ -213,6 +213,21 @@ WhatsApp Cloud API has a richer error surface than other platforms because of it
 |---|---|---|
 | 403 | `telegram.cannot_message` | The bot cannot message this chat. The user must start the bot first, or the bot was blocked or removed. There is no 24-hour window once started. |
 
+## Zalo
+
+Zalo uses the generic `platform.zalo.*` namespace (see the `platform.<name>.*` row above), not a dedicated top-level namespace.
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 422 | `platform.zalo.not_deliverable` | Outside the customer service messaging window, or the recipient is not eligible |
+| 401 | `platform.zalo.auth` | Access token expired or revoked, or the Official Account is no longer authorized |
+| 429 | `platform.zalo.rate_limit` | Zalo per-app or per-OA quota exhausted |
+| 400 | `validation.platform_param` | Zalo rejected a parameter |
+| 404 | `resource.not_found` | The referenced Zalo object or account does not exist |
+| 502 | `platform.zalo.api_error` | Unmapped Zalo error; check the message for raw detail |
+
+`platform.zalo.not_deliverable` is the one you're most likely to hit: Zalo only allows a customer service message within 7 days of the user's last interaction with your Official Account (free within 48 hours), and rejects sends outside that window with a 422 instead of queuing them.
+
 ## System
 
 | HTTP | Code | When it occurs |
