@@ -35,7 +35,7 @@ Zalo builds the article body as a "normal" type article with status "show". `tex
 
 ### Asynchronous creation
 
-Article creation on Zalo is asynchronous. After SocialAPI submits the article, Zalo returns a processing token rather than a finished article, and SocialAPI polls Zalo's verification endpoint until the article is published and a final article ID is available. While the article is still processing, Zalo's verification check returns its own in-progress code, and SocialAPI keeps polling. If the article is still processing once the poll budget is exhausted, the create request returns rather than blocking indefinitely; retry shortly after.
+Article creation on Zalo is asynchronous. After SocialAPI submits the article, Zalo returns a processing token rather than a finished article, and SocialAPI polls Zalo's verification endpoint until the article is published and a final article ID is available. While the article is still processing, Zalo's verification check returns its own in-progress code, and SocialAPI keeps polling. If the article is still processing once the poll budget is exhausted, the target lands in a failed state carrying `platform.zalo.article_processing`. The article may still finish publishing on Zalo's side, so check the Official Account before retrying, otherwise you risk publishing a duplicate.
 
 ### Draft validation
 
@@ -84,4 +84,4 @@ curl "https://api.social-api.ai/v1/posts?platform=zalo&account_ids=acc_01HZ9X3Q4
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Returns the Official Account's normal-type articles, most recent first.
+Returns the posts SocialAPI.ai has stored for that account, not the articles that already exist on the Official Account. An article published outside SocialAPI.ai will not appear here. Results default to `sort=scheduled_asc`; pass `sort` to change the order. Each post includes a `targets` array with the per-platform status.
