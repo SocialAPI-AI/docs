@@ -13,7 +13,7 @@ YouTube publishing uploads a single video through the YouTube Data API v3 resuma
 | Auth type | OAuth 2.0 (Google) |
 | API | YouTube Data API v3 |
 | Create post | Yes |
-| Update post | Yes (title, description, tags, privacy, category, status flags) |
+| Update post | Yes (title, description, tags, privacy, category, status flags). Published videos edit through `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` |
 | Delete post | Yes |
 | Schedule | Native (via `publish_at` + `private` visibility) |
 | First comment | Yes (best-effort, non-blocking) |
@@ -146,7 +146,11 @@ Set `platform_data.youtube.playlist_id` to add the newly published video to one 
 
 ## 4. Update post
 
-YouTube supports editing a video's metadata after publish. `PATCH /v1/posts/:pid` updates the title, description, tags, category, privacy, and status flags.
+YouTube supports editing a video's metadata after publish, but which endpoint you use depends on whether the post has been published yet.
+
+### Before publish: `PATCH /v1/posts/:pid`
+
+`PATCH /v1/posts/:pid` edits the SocialAPI post record and only accepts posts in `draft`, `scheduled`, or `failed` state. It updates the title, description, tags, category, privacy, and status flags that will be applied at publish time.
 
 ```bash
 curl -X PATCH https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
@@ -164,10 +168,37 @@ curl -X PATCH https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
   }'
 ```
 
-Partial edits are safe: fields you do not provide are preserved. SocialAPI fetches the current video and backfills any unspecified snippet field, so an omitted field is never wiped.
+Calling this on an already-published post returns `409 post.state_invalid` with the message "Only draft, scheduled, or failed posts can be edited". Use the published-video endpoint below instead.
+
+### After publish: `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}`
+
+Once the video is live on YouTube, edit it through the dedicated video endpoint, keyed by the connected account ID and the YouTube video ID. This writes straight to the YouTube Data API and accepts the title, description, visibility, and Studio tags.
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/platforms/youtube/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/videos/dQw4w9WgXcQ \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Our spring collection walkthrough (updated)",
+    "description": "Updated description with corrected chapter timestamps.",
+    "tags": ["fashion", "spring", "lookbook", "2026"]
+  }'
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `title` | string | Video title. |
+| `description` | string | Video description. |
+| `visibility` | string | `public`, `unlisted`, or `private`. |
+| `tags` | string or array | YouTube Studio tags (`snippet.tags`). Accepts a JSON array or a comma-separated string, same as create-time `platform_data.youtube.tags`. |
+
+`tags` sets Studio Tags, which are a separate field from any `#hashtags` written into the description. Editing the description does not change Studio Tags, and setting tags does not change the description.
+
+Partial edits are safe on both endpoints: fields you do not provide are preserved. SocialAPI fetches the current video and backfills any unspecified snippet field, so an omitted field is never wiped.
 
 **Notes:**
 - Updating the snippet always requires a title and a category. SocialAPI backfills both from the current video when you omit them.
+- Omit `tags` to leave the video's existing tags unchanged. Sending an empty array is a no-op rather than a clear, since the current tags are backfilled. Clearing tags is not supported through the API.
 - `publish_at` can only be set before the first publish. It cannot be changed once the video is public.
 
 ---
