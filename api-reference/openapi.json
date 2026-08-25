@@ -3853,7 +3853,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Forces a refresh from the platform, bypassing the normal staleness window. With only account_id the job refreshes that account's conversation list; add conversation_id to refresh one thread's messages instead. Returns immediately: poll GET /inbox/sync for progress. Calling this while a sync for the same target is already running returns the running job rather than starting a second one.",
+                "description": "Forces a refresh from the platform, bypassing the normal staleness window. With only account_id the job refreshes that account's conversation list; add conversation_id to refresh one thread's messages instead. Set include_messages to also prewarm messages for the account's most recently active unsynced threads, so opening them is a DB read rather than a blocking platform fetch (opt-in: it costs one platform round trip per thread). Returns immediately: poll GET /inbox/sync for progress. Calling this while a sync for the same target is already running returns the running job rather than starting a second one.",
                 "tags": [
                     "Inbox"
                 ],
@@ -10288,7 +10288,7 @@
                         }
                     },
                     "text": {
-                        "description": "Text is the post body content. Required.",
+                        "description": "Text is the post body content. Required, unless every target supplies a\nbody of its own through text or a platform_data field the connector uses\nas the body (e.g. Pinterest's platform_data.description IS the pin body).",
                         "type": "string",
                         "example": "Check out our new product launch! #newproduct"
                     },
@@ -11040,6 +11040,11 @@
                     "conversation_id": {
                         "type": "string",
                         "example": "6f1c..."
+                    },
+                    "include_messages": {
+                        "description": "IncludeMessages also prewarms messages for the account's most recently\nactive threads that have never been synced, so their first open is a DB\nread instead of a blocking platform fetch. Opt-in: it costs one platform\nround trip per thread. Ignored when ConversationID is set, since a thread\nsync already fetches that thread's messages.",
+                        "type": "boolean",
+                        "example": true
                     }
                 }
             },
