@@ -3452,6 +3452,241 @@
                 }
             }
         },
+        "/inbox/conversations/{id}/messages/{messageId}/reaction": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds or replaces the connected account's emoji reaction on a message in a conversation. Supported on Instagram and Facebook Messenger. The platform accepts any emoji, not a fixed list, so send the character itself (🎉) and not a name like \"love\". Sending a different emoji on a message that already carries one replaces it: platforms allow at most one reaction per sender per message. Note the reaction webhooks report only a handful of named types and classify everything else as \"other\" while still carrying the raw character, so an unusual emoji sends fine but reads back unnamed. The recipient is taken from the conversation, so no participant id is needed. Use DELETE on this path to remove a reaction.",
+                "tags": [
+                    "Inbox Conversations"
+                ],
+                "summary": "React to a message",
+                "parameters": [
+                    {
+                        "example": "conv_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Conversation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "m_AbCdEfGhIjKl",
+                        "description": "Platform message ID to react to",
+                        "name": "messageId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.ReactToMessageRequest"
+                            }
+                        }
+                    },
+                    "description": "Account and emoji",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reaction applied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body, missing account_id, or reaction is not a single emoji",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Conversation or account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support message reactions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream platform API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes the connected account's emoji reaction from a message in a conversation. Supported on Instagram and Facebook Messenger.",
+                "tags": [
+                    "Inbox Conversations"
+                ],
+                "summary": "Remove a reaction from a message",
+                "parameters": [
+                    {
+                        "example": "conv_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Conversation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "m_AbCdEfGhIjKl",
+                        "description": "Platform message ID to remove the reaction from",
+                        "name": "messageId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reaction removed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing account_id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Conversation or account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support message reactions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream platform API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/inbox/conversations/{id}/read": {
             "post": {
                 "security": [
@@ -4929,241 +5164,6 @@
                 }
             }
         },
-        "/platforms/facebook/accounts/{id}/messages/{messageId}/reaction": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Adds or replaces the connected Page's emoji reaction on a Messenger message. Messenger accepts any emoji here, not a fixed list, so send the character itself (🎉) and not a name like \"love\". Sending a different emoji on a message that already carries one replaces it: Messenger allows at most one reaction per sender per message. Note the reaction webhook reports only named types (smile, angry, sad, wow, love, like, dislike) and classifies everything else as \"other\" while still carrying the raw character, so an unusual emoji sends fine but reads back unnamed. Use DELETE on this path to remove a reaction.",
-                "tags": [
-                    "Facebook"
-                ],
-                "summary": "React to a Facebook Messenger message",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "m_AbCdEfGhIjKl",
-                        "description": "Messenger message ID to react to",
-                        "name": "messageId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.FacebookReactionRequest"
-                            }
-                        }
-                    },
-                    "description": "Participant and emoji",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "Reaction applied",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid body, missing participant_id, or reaction is not a single emoji",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account or message not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "501": {
-                        "description": "Platform does not support message reactions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "Upstream Facebook API error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Removes the connected Page's emoji reaction from a Messenger message. The participant_id query parameter is the PSID of the other participant in the conversation.",
-                "tags": [
-                    "Facebook"
-                ],
-                "summary": "Remove a reaction from a Facebook Messenger message",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "m_AbCdEfGhIjKl",
-                        "description": "Messenger message ID to remove the reaction from",
-                        "name": "messageId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "3891234567890123",
-                        "description": "Page-scoped user ID (PSID) of the other participant",
-                        "name": "participant_id",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Reaction removed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Missing participant_id",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account or message not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "501": {
-                        "description": "Platform does not support message reactions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "Upstream Facebook API error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/platforms/facebook/accounts/{id}/summary": {
             "get": {
                 "security": [
@@ -5649,241 +5649,6 @@
                     },
                     "501": {
                         "description": "Platform does not support collaborators",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "Upstream Instagram API error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/platforms/instagram/accounts/{id}/messages/{messageId}/reaction": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Adds or replaces the connected account's emoji reaction on a direct message. Instagram accepts any emoji here, not a fixed list, so send the character itself (🎉) and not a name like \"love\". Sending a different emoji on a message that already carries one replaces it: Instagram allows at most one reaction per sender per message. Note the reaction webhook reports only six named types (love, like, laugh, wow, sad, angry) and classifies everything else as \"other\" while still carrying the raw character, so an unusual emoji sends fine but reads back unnamed. Use DELETE on this path to remove a reaction.",
-                "tags": [
-                    "Instagram"
-                ],
-                "summary": "React to an Instagram direct message",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "m_AbCdEfGhIjKl",
-                        "description": "Instagram message ID to react to",
-                        "name": "messageId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/api_endpoints.InstagramReactionRequest"
-                            }
-                        }
-                    },
-                    "description": "Participant and emoji",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "Reaction applied",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid body, missing participant_id, or reaction is not a single emoji",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account or message not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "501": {
-                        "description": "Platform does not support message reactions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "502": {
-                        "description": "Upstream Instagram API error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Removes the connected account's emoji reaction from a direct message. The participant_id query parameter is the IGSID of the other participant in the conversation.",
-                "tags": [
-                    "Instagram"
-                ],
-                "summary": "Remove a reaction from an Instagram direct message",
-                "parameters": [
-                    {
-                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-                        "description": "Connected account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "m_AbCdEfGhIjKl",
-                        "description": "Instagram message ID to remove the reaction from",
-                        "name": "messageId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "example": "2287522528728101",
-                        "description": "Instagram-scoped user ID (IGSID) of the other participant",
-                        "name": "participant_id",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Reaction removed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Missing participant_id",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Account or message not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "501": {
-                        "description": "Platform does not support message reactions",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11436,21 +11201,6 @@
                     }
                 }
             },
-            "api_endpoints.FacebookReactionRequest": {
-                "type": "object",
-                "properties": {
-                    "participant_id": {
-                        "description": "ParticipantID is the PSID of the other participant in the conversation.",
-                        "type": "string",
-                        "example": "3891234567890123"
-                    },
-                    "reaction": {
-                        "description": "Reaction is the emoji to apply. Any emoji Messenger accepts, not a fixed\nlist. Send the character itself, not a name like \"love\".",
-                        "type": "string",
-                        "example": "🎉"
-                    }
-                }
-            },
             "api_endpoints.ImportPostsResponse": {
                 "type": "object",
                 "properties": {
@@ -11654,21 +11404,6 @@
                     },
                     "username": {
                         "type": "string"
-                    }
-                }
-            },
-            "api_endpoints.InstagramReactionRequest": {
-                "type": "object",
-                "properties": {
-                    "participant_id": {
-                        "description": "ParticipantID is the IGSID of the other participant in the conversation.",
-                        "type": "string",
-                        "example": "2287522528728101"
-                    },
-                    "reaction": {
-                        "description": "Reaction is the emoji to apply. Any emoji Instagram accepts, not a fixed\nlist. Send the character itself, not a name like \"love\".",
-                        "type": "string",
-                        "example": "🎉"
                     }
                 }
             },
@@ -12700,6 +12435,19 @@
                     },
                     "pagination": {
                         "$ref": "#/components/schemas/api_endpoints.PaginationInfo"
+                    }
+                }
+            },
+            "api_endpoints.ReactToMessageRequest": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string"
+                    },
+                    "reaction": {
+                        "description": "Reaction is the emoji to apply. Any emoji the platform accepts, not a\nfixed list. Send the character itself, not a name like \"love\".",
+                        "type": "string",
+                        "example": "🎉"
                     }
                 }
             },
