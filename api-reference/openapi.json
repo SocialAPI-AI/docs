@@ -3459,7 +3459,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Adds or replaces the connected account's emoji reaction on a message in a conversation. Supported on Instagram and Facebook Messenger. The platform accepts any emoji, not a fixed list, so send the character itself (🎉) and not a name like \"love\". Sending a different emoji on a message that already carries one replaces it: platforms allow at most one reaction per sender per message. Note the reaction webhooks report only a handful of named types and classify everything else as \"other\" while still carrying the raw character, so an unusual emoji sends fine but reads back unnamed. The recipient is taken from the conversation, so no participant id is needed. Use DELETE on this path to remove a reaction.",
+                "description": "Adds or replaces the account's emoji reaction on a message. Send the emoji character itself. Supported on Instagram and Facebook Messenger.",
                 "tags": [
                     "Inbox Conversations"
                 ],
@@ -3576,7 +3576,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Removes the connected account's emoji reaction from a message in a conversation. Supported on Instagram and Facebook Messenger.",
+                "description": "Removes the account's emoji reaction from a message.",
                 "tags": [
                     "Inbox Conversations"
                 ],
@@ -5375,6 +5375,150 @@
                     },
                     "409": {
                         "description": "Brand connected through a different login",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/logins/{loginId}/locations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists every Business Profile location the login's stored credential can manage, live from Google, merged with assignment state. Locations added in Google Business Profile after the last authorization appear here without re-authenticating. assignable reflects tenancy only. login_email identifies the Google account itself, and is empty for a login authorized before it was captured.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "List a Google login's Business Profile locations",
+                "parameters": [
+                    {
+                        "description": "Google login (credential) ID",
+                        "name": "loginId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleLoginLocationsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown login",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/logins/{loginId}/locations/{locationId}/assign": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Assigns one location from this login to the given brand, without re-doing OAuth. Each location belongs to exactly one brand, and each brand holds at most one Google Business Profile.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Assign a Google Business Profile location to a brand",
+                "parameters": [
+                    {
+                        "description": "Google login (credential) ID",
+                        "name": "loginId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Location resource name (URL-encoded), e.g. accounts%2F123%2Flocations%2F456",
+                        "name": "locationId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.AssignLocationRequest"
+                            }
+                        }
+                    },
+                    "description": "Target brand",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AssignLocationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Location is not accessible through this login, or already belongs to another brand",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown login or brand",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Brand already has a Google Business Profile",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -9944,6 +10088,30 @@
                     }
                 }
             },
+            "api_endpoints.AssignLocationRequest": {
+                "type": "object",
+                "properties": {
+                    "brand_id": {
+                        "type": "string",
+                        "example": "b7f9..."
+                    }
+                }
+            },
+            "api_endpoints.AssignLocationResponse": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01J..."
+                    },
+                    "brand_id": {
+                        "type": "string"
+                    },
+                    "platform_account_id": {
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.AssignPageRequest": {
                 "type": "object",
                 "properties": {
@@ -11201,6 +11369,62 @@
                     }
                 }
             },
+            "api_endpoints.GoogleLocation": {
+                "type": "object",
+                "properties": {
+                    "assignable": {
+                        "type": "boolean"
+                    },
+                    "assigned_account_id": {
+                        "type": "string"
+                    },
+                    "assigned_brand_id": {
+                        "type": "string"
+                    },
+                    "assigned_brand_name": {
+                        "type": "string"
+                    },
+                    "bio": {
+                        "type": "string",
+                        "example": "Wood-fired pizza since 1998"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Joe's Pizza (Downtown)"
+                    },
+                    "platform_account_id": {
+                        "type": "string",
+                        "example": "accounts/123/locations/456"
+                    }
+                }
+            },
+            "api_endpoints.GoogleLoginLocationsResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "locations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.GoogleLocation"
+                        }
+                    },
+                    "login_email": {
+                        "type": "string",
+                        "example": "joe@example.com"
+                    },
+                    "login_id": {
+                        "type": "string",
+                        "example": "cred_01J..."
+                    },
+                    "login_name": {
+                        "type": "string",
+                        "example": "joe@example.com"
+                    }
+                }
+            },
             "api_endpoints.ImportPostsResponse": {
                 "type": "object",
                 "properties": {
@@ -11937,7 +12161,7 @@
                         "example": "2026-07-04T12:30:00Z"
                     },
                     "login_id": {
-                        "description": "Facebook page-selection fields (empty for Google Profile selection).",
+                        "description": "login_id identifies the stored login and is set for both Facebook and\nGoogle. pages and lost_access are Facebook page-selection only.",
                         "type": "string"
                     },
                     "lost_access": {
@@ -11972,7 +12196,7 @@
                         "example": "pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
                     },
                     "login_id": {
-                        "description": "Facebook page-selection fields (empty for Google Profile selection).",
+                        "description": "login_id identifies the stored login and is set for both Facebook and\nGoogle. pages and lost_access are Facebook page-selection only.",
                         "type": "string"
                     },
                     "lost_access": {
@@ -12445,7 +12669,6 @@
                         "type": "string"
                     },
                     "reaction": {
-                        "description": "Reaction is the emoji to apply. Any emoji the platform accepts, not a\nfixed list. Send the character itself, not a name like \"love\".",
                         "type": "string",
                         "example": "🎉"
                     }

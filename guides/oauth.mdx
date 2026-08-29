@@ -153,6 +153,50 @@ This returns the same `ConnectAccountResponse` (HTTP 201) as a normal single-Pro
   A pending connection is single-use and expires 30 minutes after it is created. The first successful selection consumes it: a second `select` call, or one made after expiry, returns `404`. Selecting a `platform_account_id` that is not in the returned candidate set returns `400`.
 </Note>
 
+**Connecting a second Profile later.** The pending connection expires, but the login itself is kept. Once a Google login has been connected, its other Business Profiles can be attributed to your brands at any time without a new authorization. Both endpoints work from the login (credential) id, returned as `login_id` on the pending connection and on every account that login backs.
+
+`GET /v1/platforms/google/logins/{loginId}/locations` lists everything the stored login can manage, read live from Google and merged with what you have already attributed. A Profile created in Google Business Profile after that authorization appears here with no re-authorization. `login_email` identifies the Google account itself; it is empty for a login authorized before that was captured.
+
+```bash
+curl https://api.social-api.ai/v1/platforms/google/logins/cred_01J.../locations   -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+```json
+{
+  "login_id": "cred_01J...",
+  "login_email": "joe@example.com",
+  "locations": [
+    {
+      "platform_account_id": "accounts/123/locations/456",
+      "name": "Joe's Pizza (Downtown)",
+      "assigned_brand_id": "b7f9...",
+      "assigned_brand_name": "Downtown",
+      "assignable": false
+    },
+    {
+      "platform_account_id": "accounts/123/locations/789",
+      "name": "Joe's Pizza (Uptown)",
+      "assignable": true
+    }
+  ],
+  "count": 2
+}
+```
+
+`POST /v1/platforms/google/logins/{loginId}/locations/{locationId}/assign` attributes one of them to a brand. A location id is a compound resource name containing slashes, so percent-encode it in the path:
+
+```bash
+curl -X POST   "https://api.social-api.ai/v1/platforms/google/logins/cred_01J.../locations/accounts%2F123%2Flocations%2F789/assign"   -H "Authorization: Bearer $SOCAPI_KEY"   -H "Content-Type: application/json"   -d '{"brand_id": "b7f9..."}'
+```
+
+<Note>
+  Each Business Profile belongs to exactly one brand, and each brand holds at most one Google Business Profile.
+
+  Assigning to a brand that already has a Profile returns `409` (`platform.google.brand_has_account`). Assigning a location another brand already holds returns `400` (`validation.location_already_assigned`), as does a location the login can no longer manage (`validation.location_not_granted`). An unknown login or brand returns `404`.
+
+  A successful assign returns `201` with `account_id`, `brand_id`, and `platform_account_id`. Assigning a location to the brand that already holds it is idempotent: it returns the existing account rather than an error.
+</Note>
+
 ### Facebook: choosing which Pages to connect
 
 Every Facebook connect returns a pending connection, never `status: success` directly, even when the login manages a single Page. Facebook Pages are shared across brands: one login can serve several brands through one stored credential, and Pages must be assigned to a brand explicitly rather than attaching automatically.
