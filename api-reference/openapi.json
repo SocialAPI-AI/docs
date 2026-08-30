@@ -3906,7 +3906,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Posts a public reply to a review on the platform (e.g. Google Business Profile). The reply is visible to anyone who views the review. Consumes 1 interaction credit.",
+                "description": "Posts a public reply to a review on the platform (e.g. Google Business Profile). Consumes 1 interaction credit. On Google, replies are moderated: a successful response returns state PENDING and the reply is not publicly visible until it becomes APPROVED. A rejected reply is never published, and the reason is reported as policy_violation on the review.",
                 "tags": [
                     "Inbox Reviews"
                 ],
@@ -12738,6 +12738,10 @@
                         "type": "string",
                         "example": "r_abc123"
                     },
+                    "state": {
+                        "type": "string",
+                        "example": "PENDING"
+                    },
                     "success": {
                         "type": "boolean",
                         "example": true
@@ -12807,12 +12811,23 @@
                         "type": "string",
                         "example": "sapi_rev_TXY..."
                     },
+                    "media": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.ReviewMediaDTO"
+                        }
+                    },
                     "rating": {
                         "type": "integer",
                         "example": 3
                     },
                     "reply": {
                         "$ref": "#/components/schemas/api_endpoints.ReviewReplyDTO"
+                    },
+                    "reply_url": {
+                        "description": "ReplyURL is the platform-hosted page for replying to this review, when\nthe platform exposes one (Google). Empty elsewhere.",
+                        "type": "string",
+                        "example": "https://business.google.com/reviews/reply/abc"
                     },
                     "text": {
                         "type": "string",
@@ -12824,9 +12839,35 @@
                     }
                 }
             },
+            "api_endpoints.ReviewMediaDTO": {
+                "type": "object",
+                "properties": {
+                    "thumbnail_label": {
+                        "type": "string",
+                        "example": "Photo 1"
+                    },
+                    "thumbnail_url": {
+                        "type": "string",
+                        "example": "https://lh3.googleusercontent.com/p/abc"
+                    },
+                    "video_url": {
+                        "type": "string",
+                        "example": "https://lh3.googleusercontent.com/v/xyz"
+                    }
+                }
+            },
             "api_endpoints.ReviewReplyDTO": {
                 "type": "object",
                 "properties": {
+                    "policy_violation": {
+                        "description": "PolicyViolation explains a REJECTED reply, passed through verbatim from\nthe platform. Absent otherwise.",
+                        "type": "object"
+                    },
+                    "state": {
+                        "description": "State is the moderation outcome: PENDING, APPROVED, or REJECTED.\nOmitted on platforms that publish replies synchronously.",
+                        "type": "string",
+                        "example": "APPROVED"
+                    },
                     "text": {
                         "type": "string",
                         "example": "Thanks for the feedback!"

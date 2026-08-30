@@ -97,11 +97,19 @@ Sample response:
       },
       "created_at": "2026-06-20T18:24:31Z",
       "id": "sapi_rev_TXY...",
+      "media": [
+        {
+          "thumbnail_label": "Storefront",
+          "thumbnail_url": "https://lh3.googleusercontent.com/p/abc"
+        }
+      ],
       "rating": 3,
       "reply": {
+        "state": "APPROVED",
         "text": "Thanks for the feedback!",
         "updated_at": "2026-06-21T10:00:00Z"
       },
+      "reply_url": "https://business.google.com/reviews/reply/abc",
       "text": "Great school",
       "updated_at": "2026-06-20T18:24:31Z"
     }
@@ -117,7 +125,9 @@ Sample response:
 }
 ```
 
-To reply to a review:
+Reviews may carry photos or videos the reviewer attached, returned in `media` as Google-hosted URLs. The `reply_url` field links to the reply page for that review in the Google Business Profile interface.
+
+### Reply to a review
 
 ```bash
 curl -X POST \
@@ -126,6 +136,47 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"text": "Thank you for your kind review, Jane!", "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
 ```
+
+Sample response:
+
+```json
+{
+  "reply_id": "sapi_rev_TXY...",
+  "state": "PENDING",
+  "success": true
+}
+```
+
+<Warning>
+  **A successful reply is not yet published.** Google moderates review replies, so `success: true` means Google accepted your reply, not that anyone can see it. The reply goes live only once its state becomes `APPROVED`.
+</Warning>
+
+The `state` field reports where a reply sits in Google's moderation:
+
+| State | Meaning |
+| --- | --- |
+| `PENDING` | Submitted and awaiting review. This is what a fresh reply returns. |
+| `APPROVED` | Published and publicly visible on the listing. |
+| `REJECTED` | Not published, and it never will be. Google explains why in `policy_violation`. |
+
+To check where a reply ended up, read the review again with `GET /v1/inbox/reviews/{account_id}` and look at `reply.state`. A rejected reply also carries `reply.policy_violation`, passed through exactly as Google sends it:
+
+```json
+{
+  "reply": {
+    "policy_violation": {
+      "reason": "PROMOTIONAL_CONTENT"
+    },
+    "state": "REJECTED",
+    "text": "Thanks! Use code SAVE10 for 10% off.",
+    "updated_at": "2026-07-03T10:00:00Z"
+  }
+}
+```
+
+Rejections are commonly caused by promotional language, discount codes, or links to sales pages. Rewrite the reply without them and send it again. Replies are also eventually consistent: reading a review immediately after replying may not show the new reply yet.
+
+Platforms that publish replies instantly omit `state` entirely, so treat a missing `state` as "already live".
 
 ## Publishing
 
