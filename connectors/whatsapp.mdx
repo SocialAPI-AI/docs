@@ -195,6 +195,10 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/
 
 `account_id` is required. The reply is sent as plain text and only succeeds while the 24-hour service window is open.
 
+### Inbound media
+
+When a customer sends a photo, voice note, or other attachment, WhatsApp's webhook hands us a media id, not a URL, and that id is redeemable only with the connected account's own access token, not your API key. So for WhatsApp, and only WhatsApp, we fetch the bytes ourselves and mirror them into SocialAPI's storage: `messages.attachment_url` on a WhatsApp message is a SocialAPI URL (`/v1/inbox/media/{id}`) that you retrieve with your API key, unlike every other connector where `attachment_url` is the platform's own URL. See [Inbox media](/guides/inbox#media) for the endpoint and its response codes.
+
 ## Errors
 
 | HTTP | Code | When it occurs |

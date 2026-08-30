@@ -347,6 +347,34 @@ curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/
   -d '{"media_id": "17895695668004550", "comment_id": "17858893269577012", "text": "Thanks for the shout-out!"}'
 ```
 
+## Media
+
+Some inbound messages carry an attachment. For most platforms `messages.attachment_url` is the platform's own URL and you fetch it directly (subject to whatever expiry the platform applies). WhatsApp is the exception: Meta's webhook hands you a short-lived media id, not a URL, and that id can only be redeemed with the connected account's own access token, which your API key cannot present. SocialAPI fetches the bytes on your behalf and mirrors them into its own storage, and `attachment_url` for a WhatsApp message is a SocialAPI URL you retrieve with your API key instead.
+
+### Endpoint
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/inbox/media/:id` | Retrieve a mirrored inbound attachment |
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/media/7f3c1e2a-9b4d-4e5f-8a6b-1c2d3e4f5a6b" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -o attachment
+```
+
+### Responses
+
+| Status | Meaning |
+|--------|---------|
+| `200` | The attachment bytes, with `Content-Type` set to the original media type |
+| `404` | Unknown media ID, or it belongs to a different account than your key |
+| `410` | Gone for good: expired, or the platform reported the source unrecoverable. Retrying will not help |
+| `503` | Too many concurrent fetches in progress on this server. Retry shortly |
+| `504` | The fetch from the platform is still in progress. Retry shortly, this is not a failure |
+
+A `410` and a `504` mean opposite things and are not interchangeable: `410` means stop retrying, `504` means keep retrying. The mirroring itself happens automatically when the inbound message arrives; there is nothing to trigger, this endpoint only reads back what SocialAPI already fetched or is in the middle of fetching.
+
 ## Interaction IDs
 
 Every interaction returned by the inbox has a stable ID with a type prefix:
