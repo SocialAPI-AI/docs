@@ -5464,6 +5464,663 @@
                 }
             }
         },
+        "/platforms/google/accounts/{id}/insights": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns daily time series for a location: how many people saw it on Google Search and Maps, and how many then called, asked for directions, messaged, booked, ordered, or clicked through to the website. start_date and end_date are inclusive and formatted YYYY-MM-DD. metric takes a comma-separated list and defaults to every metric. A day with no activity comes back as a zero rather than a gap. Google publishes no retention window and no freshness lag for this data, so a recent day may still be filling in and an old range may return nothing.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Get Google Business Profile performance metrics",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Inclusive start date, YYYY-MM-DD",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Inclusive end date, YYYY-MM-DD",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Comma-separated metric names, defaults to all",
+                        "name": "metric",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleInsightsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing or invalid parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/media": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the photos and videos on a location's public profile: its logo, cover, interior shots, and so on. This is profile media, not the media attached to a post. Set contributed=true to read the separate, read-only gallery of photos customers submitted; those items carry an attribution block that Google requires you to display as provided, unaltered.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "List a Google Business Profile location's media",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Read the customer-contributed gallery instead of your own media",
+                        "name": "contributed",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor from a previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleMediaListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Attaches one photo or video to a location's public profile under the given category. media takes exactly one item in the same form the publishing endpoints accept: a stored media library id (source_type media_id), a public URL (url), or a reference to bytes you uploaded to Google yourself (platform_attachment_id). SocialAPI resolves a library id and hands Google a URL to fetch, and derives the photo or video format from the stored file, so you never set Google's own upload fields. Google limits a location to 10 edits per minute, and that limit cannot be raised.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Add media to a Google Business Profile location",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.CreateGoogleMediaRequest"
+                            }
+                        }
+                    },
+                    "description": "Media item and category",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleMediaItem"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid media source or category",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/media/{mediaId}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns one photo or video from a location's profile. mediaId accepts either the bare id or the full Google resource name returned by the list endpoint.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Get one Google Business Profile media item",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Media item ID",
+                        "name": "mediaId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleMediaItem"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account or media item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes one photo or video you added to a location's profile. Photos contributed by customers cannot be deleted through the API and return a permission error; use the takedown_url on the item instead.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Remove media from a Google Business Profile location",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Media item ID",
+                        "name": "mediaId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Deleted"
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Customer-contributed media cannot be deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account or media item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/notification-setting": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the Cloud Pub/Sub topic events for this account are published to, and which event types are enabled. Google Business Profile has no HTTP webhooks: push delivery goes to a Pub/Sub topic you own, which you create and subscribe to yourself. An account with nothing configured returns an empty pubsub_topic. Note that Google never redelivers a missed message, so notifications lower latency but do not replace polling.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Get a Google Business Profile account's push notification setting",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleNotificationSettingResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Points the account's push notifications at a Cloud Pub/Sub topic you own and selects the event types to receive. Before calling this, create the topic and grant mybusiness-api-pubsub@system.gserviceaccount.com the Pub/Sub Publisher role on it, or Google rejects the registration. A Google account holds exactly one topic, so this overwrites rather than adds: if a different topic is already registered the call returns 400 with the existing topic named, and force=true takes it over. An empty notification_types turns notifications off while leaving the topic registered. Delivery is at-least-once, so your subscriber must be idempotent, and missed messages are never redelivered.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Register a Pub/Sub topic for Google Business Profile notifications",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.SetGoogleNotificationRequest"
+                            }
+                        }
+                    },
+                    "description": "Topic and event types",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleNotificationSettingResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid topic, unknown event type, or a different topic is already registered",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/search-keywords": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the keywords people searched before seeing the location, aggregated by month over an inclusive YYYY-MM range. A low-volume keyword comes back with threshold and is_threshold=true instead of value: Google withholds the exact count and gives an upper bound, so treating a threshold as a count overstates the keyword. limit is capped at 100 by Google.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Get the search keywords that surfaced a Google Business Profile",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Inclusive start month, YYYY-MM",
+                        "name": "start_month",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Inclusive end month, YYYY-MM",
+                        "name": "end_month",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Keywords per page, maximum 100",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor from a previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleSearchKeywordsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing or invalid parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/google/logins/{loginId}/locations": {
             "get": {
                 "security": [
@@ -6806,7 +7463,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sends an approved WhatsApp template message to a recipient phone number. Template messages can be sent outside the 24-hour customer service window. The template must already be APPROVED on the WABA, and the language code must match an approved variant. Component parameter order must match the template's placeholders.",
+                "description": "Sends an approved WhatsApp template message to a recipient phone number. Template messages can be sent outside the 24-hour customer service window. The template must already be APPROVED on the WABA, and the language code must match an approved variant. Component parameter order must match the template's placeholders. The response includes message_id, the SocialAPI message ID for the send, which matches the id field on the dm.status.* webhooks for this message.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -10628,6 +11285,40 @@
                     }
                 }
             },
+            "api_endpoints.CreateGoogleMediaRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "COVER",
+                            "PROFILE",
+                            "LOGO",
+                            "EXTERIOR",
+                            "INTERIOR",
+                            "PRODUCT",
+                            "AT_WORK",
+                            "FOOD_AND_DRINK",
+                            "MENU",
+                            "COMMON_AREA",
+                            "ROOMS",
+                            "TEAMS",
+                            "ADDITIONAL"
+                        ],
+                        "example": "INTERIOR"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Main dining room"
+                    },
+                    "media": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MediaInput"
+                        }
+                    }
+                }
+            },
             "api_endpoints.CreateInviteRequest": {
                 "type": "object",
                 "properties": {
@@ -10836,9 +11527,11 @@
                                 "dm.status.read",
                                 "dm.status.failed",
                                 "review.received",
+                                "review.updated",
                                 "mention.received",
                                 "account.connected",
                                 "account.disconnected",
+                                "account.updated",
                                 "page.removed"
                             ]
                         },
@@ -11452,6 +12145,14 @@
                     }
                 }
             },
+            "api_endpoints.GoogleInsightsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPInsights"
+                    }
+                }
+            },
             "api_endpoints.GoogleLocation": {
                 "type": "object",
                 "properties": {
@@ -11505,6 +12206,100 @@
                     "login_name": {
                         "type": "string",
                         "example": "joe@example.com"
+                    }
+                }
+            },
+            "api_endpoints.GoogleMediaAttribution": {
+                "type": "object",
+                "properties": {
+                    "profile_name": {
+                        "type": "string",
+                        "example": "Jane S."
+                    },
+                    "profile_photo_url": {
+                        "type": "string"
+                    },
+                    "profile_url": {
+                        "type": "string"
+                    },
+                    "takedown_url": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.GoogleMediaItem": {
+                "type": "object",
+                "properties": {
+                    "attribution": {
+                        "$ref": "#/components/schemas/api_endpoints.GoogleMediaAttribution"
+                    },
+                    "category": {
+                        "type": "string",
+                        "example": "INTERIOR"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-01T12:00:00Z"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Main dining room"
+                    },
+                    "height_pixels": {
+                        "type": "integer",
+                        "example": 1200
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "accounts/123/locations/456/media/789"
+                    },
+                    "media": {
+                        "$ref": "#/components/schemas/api_endpoints.MediaRef"
+                    },
+                    "thumbnail_url": {
+                        "type": "string"
+                    },
+                    "width_pixels": {
+                        "type": "integer",
+                        "example": 1600
+                    }
+                }
+            },
+            "api_endpoints.GoogleMediaListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 12
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.GoogleMediaItem"
+                        }
+                    },
+                    "next_cursor": {
+                        "type": "string"
+                    },
+                    "total_count": {
+                        "type": "integer",
+                        "example": 42
+                    }
+                }
+            },
+            "api_endpoints.GoogleNotificationSettingResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPNotificationSetting"
+                    }
+                }
+            },
+            "api_endpoints.GoogleSearchKeywordsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPKeywordsPage"
                     }
                 }
             },
@@ -12009,6 +12804,23 @@
                     }
                 }
             },
+            "api_endpoints.MediaRef": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "image",
+                            "video"
+                        ],
+                        "example": "image"
+                    },
+                    "url": {
+                        "type": "string",
+                        "example": "https://lh3.googleusercontent.com/p/abc"
+                    }
+                }
+            },
             "api_endpoints.MediaUploadInfoResponse": {
                 "type": "object",
                 "properties": {
@@ -12094,6 +12906,38 @@
                     "title": {
                         "type": "string",
                         "example": "Product name"
+                    }
+                }
+            },
+            "api_endpoints.MessageListRow": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "example": "3 posts waiting"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "menu:review_drafts"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Review drafts"
+                    }
+                }
+            },
+            "api_endpoints.MessageListSection": {
+                "type": "object",
+                "properties": {
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MessageListRow"
+                        }
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "This week"
                     }
                 }
             },
@@ -13070,7 +13914,7 @@
                         }
                     },
                     "buttons": {
-                        "description": "Buttons renders a button template (1-3 buttons); uses text as the bubble body.",
+                        "description": "Buttons renders a button template (1-3 buttons); uses text as the bubble body.\nOn WhatsApp every button must be type postback with a unique payload.",
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.MessageButton"
@@ -13081,6 +13925,18 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.MessageCard"
+                        }
+                    },
+                    "list_button": {
+                        "description": "ListButton is the label on the button that opens the list. Required with\nlist_sections, max 20 characters.",
+                        "type": "string",
+                        "example": "View options"
+                    },
+                    "list_sections": {
+                        "description": "ListSections renders a tappable list behind a single button, for menus wider\nthan the 3 buttons a reply-button message allows (up to 10 rows in total,\nacross up to 10 sections). WhatsApp only; requires text and list_button.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MessageListSection"
                         }
                     },
                     "message_tag": {
@@ -13127,6 +13983,29 @@
                     "success": {
                         "type": "boolean",
                         "example": true
+                    }
+                }
+            },
+            "api_endpoints.SetGoogleNotificationRequest": {
+                "type": "object",
+                "properties": {
+                    "force": {
+                        "description": "Force overwrites a topic already registered on the account. Without it a\ndifferent existing topic is a 400 rather than a silent takeover.",
+                        "type": "boolean"
+                    },
+                    "notification_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "NEW_REVIEW",
+                            "UPDATED_REVIEW"
+                        ]
+                    },
+                    "pubsub_topic": {
+                        "type": "string",
+                        "example": "projects/my-gcp-project/topics/gbp-notifications"
                     }
                 }
             },
@@ -13616,9 +14495,11 @@
                                 "dm.status.read",
                                 "dm.status.failed",
                                 "review.received",
+                                "review.updated",
                                 "mention.received",
                                 "account.connected",
                                 "account.disconnected",
+                                "account.updated",
                                 "page.removed"
                             ]
                         }
@@ -14178,6 +15059,11 @@
                             "$ref": "#/components/schemas/api_endpoints.WhatsAppContact"
                         }
                     },
+                    "message_id": {
+                        "description": "MessageID is the SocialAPI message ID for the send, matching the \"id\"\nfield on the dm.status.* webhooks for this message. Empty when WhatsApp\nreturned no wamid or no canonical wa_id, since an ID built from half the\npair would collide across conversations.",
+                        "type": "string",
+                        "example": "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL"
+                    },
                     "messages": {
                         "description": "Messages contains one entry per delivered message, with its platform ID.",
                         "type": "array",
@@ -14653,6 +15539,96 @@
                     "text": {
                         "type": "string",
                         "example": "Love this product! Really glad I found it."
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPInsights": {
+                "type": "object",
+                "properties": {
+                    "end_date": {
+                        "type": "string"
+                    },
+                    "metrics": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMetricSeries"
+                        }
+                    },
+                    "start_date": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPInsightsPoint": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPKeywordsPage": {
+                "type": "object",
+                "properties": {
+                    "keywords": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPSearchKeyword"
+                        }
+                    },
+                    "next_cursor": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPMetricSeries": {
+                "type": "object",
+                "properties": {
+                    "metric": {
+                        "type": "string"
+                    },
+                    "points": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPInsightsPoint"
+                        }
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPNotificationSetting": {
+                "type": "object",
+                "properties": {
+                    "notification_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "pubsub_topic": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPSearchKeyword": {
+                "type": "object",
+                "properties": {
+                    "is_threshold": {
+                        "type": "boolean"
+                    },
+                    "keyword": {
+                        "type": "string"
+                    },
+                    "threshold": {
+                        "type": "integer"
+                    },
+                    "value": {
+                        "type": "integer"
                     }
                 }
             },

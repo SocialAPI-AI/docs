@@ -1,0 +1,89 @@
+---
+title: Bluesky
+description: Connect a Bluesky account with an app password to publish posts and read and reply to comments, mentions, and direct messages through SocialAPI.
+---
+
+<Badge>Available (beta)</Badge>
+
+Bluesky is a beta-gated connector: your account needs `bluesky` in its `allowed_platforms` list. Contact support to request access. Authentication uses an app password rather than OAuth, so there is no authorization redirect and no developer app to register.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `bluesky` |
+| Auth type | App password |
+| API | AT Protocol (XRPC) |
+| Best for | A unified inbox and publishing for a Bluesky account, including direct messages with a privileged app password. |
+
+## Capabilities
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Posts | Yes | Create and delete. Published posts cannot be edited, see below |
+| Comments | Yes | Read, reply, hide. Threads come back flattened, see below |
+| Mentions | Yes | Read from the notification feed |
+| DMs | Yes (beta) | Requires an app password created with direct messages enabled |
+| Reviews | No | Bluesky has no review model |
+| Editing published posts | No | The AT Protocol has no update operation for a post record |
+| Webhooks | No | No real-time delivery, poll the API instead |
+
+## Connecting
+
+Bluesky does not use OAuth. There is no authorization URL and no code exchange. You create an app password in your Bluesky account settings and pass your handle and the app password in `metadata`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "bluesky",
+    "metadata": {
+      "identifier": "yourhandle.bsky.social",
+      "app_password": "xxxx-xxxx-xxxx-xxxx"
+    }
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "bluesky",
+  "username": "yourhandle.bsky.social",
+  "display_name": "Your Name"
+}
+```
+
+SocialAPI resolves your handle to its DID and PDS host, validates the app password by signing in, and stores the account. No redirect, no second call.
+
+### Creating an app password
+
+1. Sign in to Bluesky in a browser and open **Settings > App passwords**.
+2. Click **Add app password** and give it a name, for example `socialapi`.
+3. If you want SocialAPI to read and send direct messages, tick **Allow access to your direct messages** before creating the password. This option can only be set at creation time: it cannot be added to an app password after the fact. If you skip it and later want DM access, you must create a second app password with the option enabled and reconnect with it.
+4. Bluesky shows the password once. Copy it and paste it as `metadata.app_password` in the connect request above.
+
+### Two-factor accounts
+
+If your account has email-based two-factor authentication enabled, the first sign-in attempt returns `platform.bluesky.auth_factor_required` and Bluesky emails you a confirmation code. Retry the connect request with that code as `metadata.auth_factor_token`.
+
+## Disconnecting
+
+Disconnecting a Bluesky account through SocialAPI removes the stored credential from SocialAPI's database, but it does not revoke the app password on Bluesky's side: the AT Protocol has no app-password revocation API. To fully cut off access, delete the app password yourself in **Settings > App passwords** on Bluesky.
+
+## Known limitations
+
+- **Posts cannot be edited after publishing.** The AT Protocol has no update operation for a post record. To change a post, delete it and create a new one.
+- **Comment threads come back flattened.** Bluesky's thread endpoint returns a tree with no pagination cursor, so SocialAPI flattens it into a single list rather than paging through it. Very large threads may be truncated.
+- **You can hide a reply but not delete it.** Hiding a reply to one of your posts updates your post's moderation settings so the reply no longer shows by default. There is no way to delete a reply that another account posted; only that account can delete its own reply.
+- **No real-time webhooks.** Bluesky does not push events to SocialAPI. Poll the inbox and post endpoints for new comments, mentions, and messages.
+- **Typing @handle in a post does not create a real mention.** SocialAPI auto-detects links and hashtags in post text, but not mentions. An @handle in your post text publishes as plain text rather than a linked mention, so the mentioned account is not notified.
+
+## Related
+
+- [Platform support](/guides/platforms)
+- [Platform credentials](/guides/platform-credentials)
+- [Inbox](/guides/inbox)
+- [Errors](/guides/errors)

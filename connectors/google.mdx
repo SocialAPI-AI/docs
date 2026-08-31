@@ -33,6 +33,8 @@ description: Connect and interact with Google Business Profile locations via the
 | Update post | Yes | |
 | Delete post | Yes | |
 | Profile media | Yes | Photos and videos on the location's public listing (logo, cover, interior) |
+| Analytics | Yes | Daily performance and monthly search keywords from the Business Profile Performance API |
+| Webhooks | Yes | Delivered as ordinary SocialAPI webhooks. Google itself has no HTTP webhooks, so we consume its Cloud Pub/Sub topic for you (see below) |
 
 ## Connecting
 
@@ -257,6 +259,113 @@ Those items carry an `attribution` block naming the contributor, and Google requ
 <Note>
   Google limits a location to 10 edits per minute, and that limit cannot be raised. Adding or deleting several photos in a burst will hit it, so space out bulk changes.
 </Note>
+
+## Performance metrics
+
+`GET /v1/platforms/google/accounts/{account_id}/insights` returns how the location performed day by day: how many people saw it on Google Search and Maps, and how many then called, asked for directions, messaged, booked, ordered, or clicked through to the website.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/insights?start_date=2026-08-01&end_date=2026-08-31" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+`start_date` and `end_date` are inclusive and formatted `YYYY-MM-DD`. `metric` takes a comma-separated list and defaults to every metric:
+
+```json
+{
+  "data": {
+    "start_date": "2026-08-01",
+    "end_date": "2026-08-31",
+    "metrics": [
+      {
+        "metric": "CALL_CLICKS",
+        "points": [
+          { "date": "2026-08-01", "value": 12 },
+          { "date": "2026-08-02", "value": 0 }
+        ],
+        "total": 12
+      }
+    ]
+  }
+}
+```
+
+A day with no activity comes back as an explicit zero rather than a gap, so a series reads as flat instead of broken. Google publishes no retention window and no freshness lag for this data: a recent day may still be filling in, and an old range may simply return nothing.
+
+The available metrics are `BUSINESS_IMPRESSIONS_DESKTOP_MAPS`, `BUSINESS_IMPRESSIONS_DESKTOP_SEARCH`, `BUSINESS_IMPRESSIONS_MOBILE_MAPS`, `BUSINESS_IMPRESSIONS_MOBILE_SEARCH`, `BUSINESS_CONVERSATIONS`, `BUSINESS_DIRECTION_REQUESTS`, `CALL_CLICKS`, `WEBSITE_CLICKS`, `BUSINESS_BOOKINGS`, `BUSINESS_FOOD_ORDERS`, and `BUSINESS_FOOD_MENU_CLICKS`.
+
+### Search keywords
+
+`GET /v1/platforms/google/accounts/{account_id}/search-keywords` returns what people searched before seeing the location, aggregated by month over an inclusive `YYYY-MM` range:
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/search-keywords?start_month=2026-06&end_month=2026-08" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+```json
+{
+  "data": {
+    "keywords": [
+      { "keyword": "pizza near me", "value": 1420, "is_threshold": false },
+      { "keyword": "late night pizza", "threshold": 15, "is_threshold": true }
+    ]
+  }
+}
+```
+
+<Warning>
+  A keyword with `is_threshold: true` carries `threshold` instead of `value`. Google withholds counts that are too low to disclose and gives an upper bound in their place, so the real number is *below* the threshold. Charting a threshold as a count overstates the keyword.
+</Warning>
+
+`limit` is capped at 100 by Google, and `cursor` pages through the rest.
+
+## Push notifications
+
+Google Business Profile has no HTTP webhooks. Events are published to a Google Cloud Pub/Sub topic instead, and [SocialAPI](https://social-api.ai) runs that topic for you: when you connect a location, we point it at our topic automatically, consume the messages, and deliver them to your own webhook endpoints like every other platform's events. There is nothing to set up on your side, and no Google Cloud project of your own is required.
+
+New reviews arrive as `review.received`. A reviewer editing their own review arrives as `review.updated` with `change: "review_edited"`, which is the same event the reply-moderation outcomes use, so branch on `change`:
+
+| `change` | Event | Meaning |
+|---|---|---|
+| `new_review` | `review.received` | Someone left a new review |
+| `review_edited` | `review.updated` | The reviewer edited their own review |
+| `reply_approved` | `review.updated` | A reply you posted cleared moderation and is live |
+| `reply_rejected` | `review.updated` | A reply you posted was rejected on policy grounds |
+
+Location-level changes arrive as `account.updated`, again with `change` naming the cause: `customer_media_added`, `google_update_pending`, `voice_of_merchant_changed`, or `duplicate_location`.
+
+<Note>
+  Push lowers latency; it does not replace polling. Google never redelivers a notification that was missed, so a gap in delivery is permanent and reading reviews on a schedule remains the backfill path. Keep your existing sync in place.
+</Note>
+
+### Using your own Pub/Sub topic
+
+If you already run your own Pub/Sub pipeline and would rather receive GBP events there directly, you can point a location at your own topic. Create it, then grant Google's service account permission to publish to it:
+
+```bash
+gcloud pubsub topics add-iam-policy-binding my-topic \
+  --member="serviceAccount:mybusiness-api-pubsub@system.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
+```
+
+Then register it:
+
+```bash
+curl -X PUT "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/notification-setting" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pubsub_topic": "projects/my-gcp-project/topics/my-topic",
+    "notification_types": ["NEW_REVIEW", "UPDATED_REVIEW"]
+  }'
+```
+
+`GET` on the same path reads back what is registered. The subscribable types are `NEW_REVIEW`, `UPDATED_REVIEW`, `NEW_CUSTOMER_MEDIA`, `GOOGLE_UPDATE`, `VOICE_OF_MERCHANT_UPDATED`, and `DUPLICATE_LOCATION`. An empty `notification_types` turns notifications off while leaving the topic registered.
+
+<Warning>
+  A Google account holds exactly one topic, and registering a new one replaces it. Pointing a location at your own topic therefore stops our delivery for that location, and you will no longer receive its events as SocialAPI webhooks. If a different topic is already registered, the call returns `400` naming it rather than silently repointing delivery; pass `"force": true` when you mean to take it over.
+</Warning>
 
 ## Limitations and gotchas
 
