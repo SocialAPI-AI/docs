@@ -79,6 +79,7 @@ Events are grouped into three categories: **inbox** (incoming interactions), **p
 | `post.retried` | posts | A failed or partial post is being retried. A subsequent `post.published`, `post.partial`, or `post.failed` event fires once the retry completes |
 | `account.connected` | accounts | A social account finished connecting. Payload includes username, display name, profile picture, bio, and a public profile link |
 | `account.disconnected` | accounts | A connected account was revoked by the user on the platform side (Meta deauthorize webhook, TikTok deauthorize webhook), or flagged for reconnection because all of its pages were removed or its access was revoked. When the payload includes `reconnect_required: true`, the account still exists but needs to be reconnected |
+| `account.updated` | accounts | Something changed on the account at the platform itself. Currently Google Business Profile only, where it covers a customer adding media, Google having pending updates to review, a Voice of Merchant status change, and the location being flagged as a duplicate. Branch on the `change` field to tell them apart |
 | `page.removed` | accounts | A page on a multi-page account (for example a Facebook Page) was detected as removed during a periodic refresh and was deactivated. Other pages on the same account are unaffected |
 
 You can subscribe to any combination. Fetch the authoritative list with `GET /v1/webhooks/events` and subscribe to everything by passing the full set.
@@ -241,7 +242,7 @@ The `data` object is the same `Interaction` shape returned by `GET /accounts/{id
 
 For platform-originated events, the body also includes a top-level `raw_payload` field alongside `data`: the verbatim per-event webhook fragment as the platform sent it to us. Use it when you need a platform detail the normalized `data` object does not carry (for example, `app_id` on Facebook message echoes to distinguish API-sent messages from replies typed in the Page inbox). The shape of `raw_payload` is defined by the platform and can change with platform API versions, so prefer `data` whenever it has what you need.
 
-The `dm.status.*` events use a smaller payload instead of the full interaction object: `data` contains `status`, `mids` (the platform message IDs the receipt covers), and `recipient_id`.
+The `dm.status.*` events use a smaller payload instead of the full interaction object. On Instagram and Facebook, `data` contains `status`, `mids` (the platform message IDs the receipt covers), and `recipient_id`. On WhatsApp, `data` contains `status`, `recipient_id`, `message_id` (the WhatsApp `wamid`), and `id`: the same SocialAPI message ID returned by `POST /v1/inbox/conversations/{id}/messages` and by the `send-template` endpoint's `message_id`, so you can match a receipt to the row you stored without guessing by recency when several messages are in flight.
 
 ### Post permalink
 
