@@ -339,34 +339,6 @@ Location-level changes arrive as `account.updated`, again with `change` naming t
   Push lowers latency; it does not replace polling. Google never redelivers a notification that was missed, so a gap in delivery is permanent and reading reviews on a schedule remains the backfill path. Keep your existing sync in place.
 </Note>
 
-### Using your own Pub/Sub topic
-
-If you already run your own Pub/Sub pipeline and would rather receive GBP events there directly, you can point a location at your own topic. Create it, then grant Google's service account permission to publish to it:
-
-```bash
-gcloud pubsub topics add-iam-policy-binding my-topic \
-  --member="serviceAccount:mybusiness-api-pubsub@system.gserviceaccount.com" \
-  --role="roles/pubsub.publisher"
-```
-
-Then register it:
-
-```bash
-curl -X PUT "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/notification-setting" \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pubsub_topic": "projects/my-gcp-project/topics/my-topic",
-    "notification_types": ["NEW_REVIEW", "UPDATED_REVIEW"]
-  }'
-```
-
-`GET` on the same path reads back what is registered. The subscribable types are `NEW_REVIEW`, `UPDATED_REVIEW`, `NEW_CUSTOMER_MEDIA`, `GOOGLE_UPDATE`, `VOICE_OF_MERCHANT_UPDATED`, and `DUPLICATE_LOCATION`. An empty `notification_types` turns notifications off while leaving the topic registered.
-
-<Warning>
-  A Google account holds exactly one topic, and registering a new one replaces it. Pointing a location at your own topic therefore stops our delivery for that location, and you will no longer receive its events as SocialAPI webhooks. If a different topic is already registered, the call returns `400` naming it rather than silently repointing delivery; pass `"force": true` when you mean to take it over.
-</Warning>
-
 ## Limitations and gotchas
 
 - **Local posts** include updates, offers, and event posts published through Google Business Profile.
