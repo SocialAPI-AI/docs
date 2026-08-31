@@ -20,9 +20,9 @@ description: Connect a WhatsApp Business phone number to receive and reply to di
 | Feature | Supported | Notes |
 |---|---|---|
 | Receive DMs | Yes | Inbound messages arrive in real time via webhooks |
-| Free-form reply | Yes | Text only, and only inside the open 24-hour service window (see below) |
+| Free-form reply | Yes | Text, media, or interactive, and only inside the open 24-hour service window (see below) |
 | Template messages | Yes | Create, list, edit, delete, and validate templates via the API, and send approved templates (including outside the 24-hour window) |
-| Media / interactive free-form replies | No | Free-form inbox replies are plain text; buttons and media are delivered through templates instead |
+| Interactive messages | Yes | Up to 3 reply buttons, or a list of up to 10 rows. Taps arrive on your webhook as `dm.received` |
 | Conversation list / history | No | There is no history API; the inbox is built from webhooks received after you connect |
 | Phone-number management | Yes | Request a code, verify, register, deregister, and check status of the business number |
 | Business profile | Yes | Read and update the WhatsApp business profile |
@@ -218,6 +218,71 @@ WhatsApp has no generic attachment type, so `file` and anything we cannot classi
 A `url` attachment is fetched by WhatsApp's own servers, so it must be publicly reachable without authentication (a `media_id` always is). WhatsApp's limits apply: images 5 MB (JPEG, PNG), video 16 MB (MP4, 3GPP), audio 16 MB (AAC, AMR, MP3, M4A, OGG), documents 100 MB. A file it cannot fetch, or one over a limit, returns `whatsapp.media_download_failed`.
 
 `source_type: "platform_attachment_id"` is not supported on WhatsApp.
+
+### Interactive messages
+
+Send up to 3 reply buttons, or a list of up to 10 rows, so the recipient answers by tapping instead of typing. Both need `text`, which becomes the message body.
+
+Every button carries a `payload` (a row carries an `id`) that you choose. WhatsApp never interprets it: it is echoed back to you untouched when the recipient taps, so use it as your own routing key.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "{account_id}",
+    "text": "Your weekly digest is ready. What next?",
+    "buttons": [
+      { "type": "postback", "title": "Review drafts", "payload": "menu:review_drafts" },
+      { "type": "postback", "title": "Skip this week", "payload": "menu:skip" }
+    ]
+  }'
+```
+
+For more than 3 options, send a list instead. `list_button` is the label on the button that opens it:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "{account_id}",
+    "text": "Which location?",
+    "list_button": "View locations",
+    "list_sections": [
+      {
+        "title": "Your locations",
+        "rows": [
+          { "id": "loc:1", "title": "Downtown", "description": "3 reviews waiting" },
+          { "id": "loc:2", "title": "Airport" }
+        ]
+      }
+    ]
+  }'
+```
+
+Limits: button titles 20 characters, row titles 24, row descriptions 72, `list_button` 20, and 10 rows in total across at most 10 sections. Payloads and row ids must be unique within a message, since a tap echoes only the id. Buttons and `list_sections` are mutually exclusive, and neither can be combined with an attachment.
+
+`quick_replies` and `cards` are Instagram and Facebook only; sending them to WhatsApp returns a validation error rather than silently dropping them. A url button is available on [templates](#message-templates), not on interactive messages.
+
+Interactive messages are free-form, so they are subject to the 24-hour service window. To open a menu outside it, send an approved template with `QUICK_REPLY` buttons instead; taps on those reach your webhook the same way.
+
+### Receiving taps
+
+A tap is delivered as an ordinary `dm.received` event, not a separate event type: on WhatsApp the tapped title is posted into the conversation as the contact's own message, and it opens the 24-hour window like any inbound message. The payload you set rides on the event's metadata:
+
+```json
+{
+  "content": { "text": "Review drafts" },
+  "metadata": {
+    "platform_id": "wamid.xxx",
+    "interactive_type": "button_reply",
+    "payload": "menu:review_drafts"
+  }
+}
+```
+
+`interactive_type` is `button_reply` (a reply button), `list_reply` (a list row), or `button` (a template quick reply). Both fields are absent on an ordinary message, so switch on `metadata.payload` when it is present and treat the message as text otherwise.
 
 ### Inbound media
 
