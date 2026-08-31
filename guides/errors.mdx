@@ -230,6 +230,18 @@ Zalo uses the generic `platform.zalo.*` namespace (see the `platform.<name>.*` r
 
 `platform.zalo.not_deliverable` is the one you're most likely to hit: Zalo only allows a customer service message within 7 days of the user's last interaction with your Official Account (free within 48 hours), and rejects sends outside that window with a 422 instead of queuing them.
 
+## Bluesky
+
+Bluesky uses the generic `platform.bluesky.*` namespace (see the `platform.<name>.*` row above), not a dedicated top-level namespace.
+
+| Status | Code | Meaning |
+|---|---|---|
+| 401 | `platform.bluesky.auth_factor_required` | The account has email two-factor authentication enabled. Bluesky emailed a confirmation code; retry the connect request with it as `metadata.auth_factor_token` |
+| 403 | `platform.bluesky.dm_scope_missing` | The app password was created without direct message access. DM access cannot be added to an existing app password: create a new one with the option enabled and reconnect. Posts, comments, and mentions keep working |
+| 429 | `platform.bluesky.rate_limit` | Bluesky quota exhausted. Sign-in is limited to 30 requests per 5 minutes per account |
+
+`platform.bluesky.dm_scope_missing` only affects the DM endpoints, so treat it as a per-capability failure rather than a dead connection.
+
 ## System
 
 | HTTP | Code | When it occurs |

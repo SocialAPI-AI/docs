@@ -66,6 +66,55 @@ Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the 
   You choose one Profile at that point, but you are not limited to it. The login is kept, so its other Profiles can be attributed to your brands later through `GET` and `POST /v1/platforms/google/logins/{loginId}/locations`, with no second authorization.
 </Note>
 
+## Location details
+
+`GET /v1/platforms/google/logins/{loginId}/locations` returns everything Google publishes about each location, so you do not need a second call to render it:
+
+```json
+{
+  "platform_account_id": "accounts/123/locations/456",
+  "name": "Joe's Pizza (Downtown)",
+  "bio": "Wood-fired pizza since 1998",
+  "category": "Pizza restaurant",
+  "maps_uri": "https://maps.google.com/?cid=123",
+  "assignable": true,
+  "details": {
+    "place_id": "ChIJabc",
+    "new_review_uri": "https://g.page/r/abc/review",
+    "website_uri": "https://joes.example",
+    "primary_phone": "+33 1 23 45 67 89",
+    "additional_phones": ["+33 1 98 76 54 32"],
+    "storefront_address": {
+      "region_code": "FR",
+      "postal_code": "75001",
+      "locality": "Paris",
+      "address_lines": ["12 rue de Rivoli"]
+    },
+    "primary_category": { "name": "categories/gcid:pizza_restaurant", "display_name": "Pizza restaurant" },
+    "additional_categories": [{ "name": "categories/gcid:takeout", "display_name": "Takeout" }],
+    "latlng": { "latitude": 48.8566, "longitude": 2.3522 },
+    "regular_hours": [
+      { "open_day": "MONDAY", "open_time": "09:00", "close_day": "MONDAY", "close_time": "17:30" }
+    ],
+    "open_status": "OPEN",
+    "store_code": "JP-01",
+    "labels": ["flagship"],
+    "language_code": "en",
+    "has_voice_of_merchant": true
+  }
+}
+```
+
+`place_id` is the standard Google Places identifier, so you can join a location to Places, Maps, and Geocoding results. `new_review_uri` is the short link that opens the review form for that location, useful for review-request campaigns. `maps_uri` is also promoted to the top level since it is the most commonly used one.
+
+<Note>
+  Every key inside `details` is omitted when Google returns no value for it, and `details` itself is absent when Google returns nothing beyond the name and description. A service-area business (a locksmith, a plumber) has no `storefront_address`, and a location can legitimately have no website or phone. Treat every key as optional rather than assuming a fixed shape.
+</Note>
+
+<Note>
+  `has_voice_of_merchant` tells you whether the location is in good standing. When it is false the merchant does not currently have control of the profile, and posting or replying will fail until they resolve it in Google Business Profile. `has_pending_edits` and `has_google_updated` flag edits awaiting review and Google-suggested updates respectively.
+</Note>
+
 ## Reading samples
 
 ### List posts
@@ -324,7 +373,7 @@ curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7
 
 Google Business Profile has no HTTP webhooks. Events are published to a Google Cloud Pub/Sub topic instead, and [SocialAPI](https://social-api.ai) runs that topic for you: when you connect a location, we point it at our topic automatically, consume the messages, and deliver them to your own webhook endpoints like every other platform's events. There is nothing to set up on your side, and no Google Cloud project of your own is required.
 
-New reviews arrive as `review.received`. A reviewer editing their own review arrives as `review.updated` with `change: "review_edited"`, which is the same event the reply-moderation outcomes use, so branch on `change`:
+New reviews arrive as `review.received`, carrying the whole review (rating, text, author, attached photos) in `data.review`, so you do not have to call back for it. A reviewer editing their own review arrives as `review.updated` with `change: "review_edited"`, which is the same event the reply-moderation outcomes use, so branch on `change`:
 
 | `change` | Event | Meaning |
 |---|---|---|

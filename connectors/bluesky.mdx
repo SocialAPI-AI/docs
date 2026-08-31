@@ -3,9 +3,9 @@ title: Bluesky
 description: Connect a Bluesky account with an app password to publish posts and read and reply to comments, mentions, and direct messages through SocialAPI.
 ---
 
-<Badge>Available (beta)</Badge>
+<Badge>Available</Badge>
 
-Bluesky is a beta-gated connector: your account needs `bluesky` in its `allowed_platforms` list. Contact support to request access. Authentication uses an app password rather than OAuth, so there is no authorization redirect and no developer app to register.
+Bluesky is available to every account on every plan, with no access request. Authentication uses an app password rather than OAuth, so there is no authorization redirect and no developer app to register.
 
 ## At a glance
 
@@ -23,7 +23,7 @@ Bluesky is a beta-gated connector: your account needs `bluesky` in its `allowed_
 | Posts | Yes | Create and delete. Published posts cannot be edited, see below |
 | Comments | Yes | Read, reply, hide. Threads come back flattened, see below |
 | Mentions | Yes | Read from the notification feed |
-| DMs | Yes (beta) | Requires an app password created with direct messages enabled |
+| DMs | Yes | Requires an app password created with direct messages enabled, see below |
 | Reviews | No | Bluesky has no review model |
 | Editing published posts | No | The AT Protocol has no update operation for a post record |
 | Webhooks | No | No real-time delivery, poll the API instead |
@@ -68,6 +68,23 @@ SocialAPI resolves your handle to its DID and PDS host, validates the app passwo
 ### Two-factor accounts
 
 If your account has email-based two-factor authentication enabled, the first sign-in attempt returns `platform.bluesky.auth_factor_required` and Bluesky emails you a confirmation code. Retry the connect request with that code as `metadata.auth_factor_token`.
+
+## Direct messages
+
+DMs work only with an app password created with the direct messages option enabled. SocialAPI probes for that flag when you connect and remembers the answer.
+
+If the app password does not carry DM access, every DM call returns `403` with `platform.bluesky.dm_scope_missing` rather than an opaque `401` from Bluesky:
+
+```json
+{
+  "error": {
+    "code": "platform.bluesky.dm_scope_missing",
+    "message": "This app password does not have direct message access. Create a new app password in Bluesky settings with the direct messages option enabled, then reconnect."
+  }
+}
+```
+
+The account keeps working for posts, comments, and mentions: only the DM endpoints are affected. Because the flag cannot be added to an existing app password, the fix is to create a new one with the option ticked and reconnect, not to re-authorize.
 
 ## Disconnecting
 

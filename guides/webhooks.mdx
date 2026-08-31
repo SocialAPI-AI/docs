@@ -62,8 +62,8 @@ Events are grouped into three categories: **inbox** (incoming interactions), **p
 | `dm.sent` | inbox | Your account sent a direct message (echo confirmation from Meta). Fires for every echo the platform delivers, including replies sent from the native app or Meta Business Suite, not only messages sent through the API. On Facebook the echo's `raw_payload` carries `app_id`, which lets you tell the two apart |
 | `dm.referral` | inbox | A user clicked an ad or referral link without sending a message. The interaction has empty content and includes `metadata.referral` |
 | `dm.postback` | inbox | A user tapped a quick reply or a `postback` button in a DM (Instagram, Facebook). The interaction carries the button `payload` and `title` in `metadata` |
-| `review.received` | inbox | A new review arrives (Google Business Profile) |
-| `review.updated` | inbox | Something about a review changed (Google Business Profile). The payload's `change` field names what: `reply_approved` (a reply you posted passed moderation and is now public) or `reply_rejected` (it was rejected and will never publish). Branch on `change`, since one event covers every kind of review update. On a rejection, read the review to see `reply.policy_violation` for the reason, then rewrite and send it again |
+| `review.received` | inbox | A new review arrives (Google Business Profile). The payload carries the full review in `data.review`: rating, text, author, and any photos the reviewer attached |
+| `review.updated` | inbox | Something about a review changed (Google Business Profile). The payload's `change` field names what: `reply_approved` (a reply you posted passed moderation and is now public) or `reply_rejected` (it was rejected and will never publish). Branch on `change`, since one event covers every kind of review update. On a rejection, `data.review.reply.policy_violation` carries the reason inline, so you can rewrite and send it again without a follow-up call |
 | `mention.received` | inbox | Your account is @mentioned in a comment or a post caption (`metadata.mention_type` is `comment` or `caption`). Instagram story mentions are delivered as `dm.received` with an attachment of type `story_mention`, not as this event |
 | `dm.status.sent` | inbox | A direct message you sent was accepted by the platform (Instagram, Facebook, WhatsApp) |
 | `dm.status.delivered` | inbox | A direct message you sent was delivered to the recipient (Facebook and WhatsApp; Instagram sends no delivery receipts) |
@@ -238,11 +238,41 @@ Every webhook POST has a JSON body with an `event` field and a `data` field cont
 }
 ```
 
-The `data` object is the same `Interaction` shape returned by `GET /accounts/{id}/comments` (and the equivalent DM, review, and mention endpoints). The `id` field is a stable SocialAPI interaction ID - see [Interaction IDs](/guides/interaction-ids).
+The `data` object is the same `Interaction` shape returned by `GET /accounts/{id}/comments` (and the equivalent DM and mention endpoints). Google review events are the exception: see [Review event payloads](#review-event-payloads). The `id` field is a stable SocialAPI interaction ID - see [Interaction IDs](/guides/interaction-ids).
 
 For platform-originated events, the body also includes a top-level `raw_payload` field alongside `data`: the verbatim per-event webhook fragment as the platform sent it to us. Use it when you need a platform detail the normalized `data` object does not carry (for example, `app_id` on Facebook message echoes to distinguish API-sent messages from replies typed in the Page inbox). The shape of `raw_payload` is defined by the platform and can change with platform API versions, so prefer `data` whenever it has what you need.
 
 The `dm.status.*` events use a smaller payload instead of the full interaction object. On Instagram and Facebook, `data` contains `status`, `mids` (the platform message IDs the receipt covers), and `recipient_id`. On WhatsApp, `data` contains `status`, `recipient_id`, `message_id` (the WhatsApp `wamid`), and `id`: the same SocialAPI message ID returned by `POST /v1/inbox/conversations/{id}/messages` and by the `send-template` endpoint's `message_id`, so you can match a receipt to the row you stored without guessing by recency when several messages are in flight.
+
+### Review event payloads
+
+Google Business Profile review events do not follow the full-interaction shape above. Google's notification carries only a resource name, never the review's content, so `data` holds the identifiers plus a `review` object we read for you:
+
+```json
+{
+  "event": "review.received",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "review_id": "sapi_rev_Z29vZ2xlOmFjY291bnRz",
+    "change": "new_review",
+    "review": {
+      "id": "sapi_rev_Z29vZ2xlOmFjY291bnRz",
+      "rating": 4,
+      "text": "Friendly staff, quick service.",
+      "author": { "name": "Jane Smith", "avatar_url": "https://lh3.googleusercontent.com/a/abc" },
+      "reply": null,
+      "created_at": "2026-08-31T14:30:00Z",
+      "updated_at": "2026-08-31T14:30:00Z"
+    }
+  }
+}
+```
+
+The `review` object is the same shape as an item in `GET /v1/inbox/reviews/{account_id}`, so one parser handles both. On `review.updated` with `change: "reply_rejected"`, `review.reply.policy_violation` explains why the reply was refused.
+
+<Note>
+  `review` is best-effort and can be absent. We read it while handling the notification, and a review deleted between the notification and the read, or a token that has since been revoked, leaves us with nothing to send. The event is still delivered with `account_id`, `review_id`, and `change`, so treat `review` as optional and fall back to `GET /v1/inbox/reviews/{account_id}` when it is missing.
+</Note>
 
 ### Post permalink
 
