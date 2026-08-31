@@ -68,7 +68,7 @@ Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the 
 
 ## Location details
 
-`GET /v1/platforms/google/logins/{loginId}/locations` returns everything Google publishes about each location, so you do not need a second call to render it:
+`GET /v1/platforms/google/logins/{loginId}/locations` returns everything Google publishes about each location, so you do not need a second call to render it. The full schema is in the [API reference](/api-reference/platforms/list-a-google-logins-business-profile-locations):
 
 ```json
 {
@@ -96,6 +96,9 @@ Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the 
     "regular_hours": [
       { "open_day": "MONDAY", "open_time": "09:00", "close_day": "MONDAY", "close_time": "17:30" }
     ],
+    "special_hours": [
+      { "start_date": "2026-12-25", "end_date": "2026-12-25", "closed": true }
+    ],
     "open_status": "OPEN",
     "store_code": "JP-01",
     "labels": ["flagship"],
@@ -105,14 +108,16 @@ Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the 
 }
 ```
 
+`details` mirrors Google's Location resource in full. Beyond the fields above it also carries `more_hours` (per-department hours such as a drive-through), `service_area` (where a business without a storefront operates), `service_items` (services offered, with prices), `relationship_data` (chain and parent/child locations), `ad_phone`, `opening_date`, and the capability flags described below.
+
 `place_id` is the standard Google Places identifier, so you can join a location to Places, Maps, and Geocoding results. `new_review_uri` is the short link that opens the review form for that location, useful for review-request campaigns. `maps_uri` is also promoted to the top level since it is the most commonly used one.
 
 <Note>
-  Every key inside `details` is omitted when Google returns no value for it, and `details` itself is absent when Google returns nothing beyond the name and description. A service-area business (a locksmith, a plumber) has no `storefront_address`, and a location can legitimately have no website or phone. Treat every key as optional rather than assuming a fixed shape.
+  Every field inside `details` is omitted when Google returns no value for it, and `details` itself is absent when Google returns nothing beyond the name and description. A service-area business (a locksmith, a plumber) has no `storefront_address` and carries `service_area` instead, and a location can legitimately have no website or phone. Treat every field as optional rather than assuming a fixed shape.
 </Note>
 
 <Note>
-  `has_voice_of_merchant` tells you whether the location is in good standing. When it is false the merchant does not currently have control of the profile, and posting or replying will fail until they resolve it in Google Business Profile. `has_pending_edits` and `has_google_updated` flag edits awaiting review and Google-suggested updates respectively.
+  `has_voice_of_merchant` tells you whether the location is in good standing. When it is `false` the merchant does not currently have control of the profile, and posting or replying will fail until they resolve it in Google Business Profile. When the field is absent entirely, Google told us nothing either way: the boolean flags distinguish a real `false` from an unknown, so check for presence before treating one as a denial. `has_pending_edits` and `has_google_updated` flag edits awaiting review and Google-suggested updates respectively. The `can_*` flags say which surfaces the location supports, for example `can_operate_local_post` for publishing and `can_have_food_menus` for restaurants.
 </Note>
 
 ## Reading samples

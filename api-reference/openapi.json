@@ -12025,8 +12025,12 @@
                         "example": "Pizza restaurant"
                     },
                     "details": {
-                        "description": "Details carries the rest of what Google publishes about the location:\nplace_id, storefront_address, primary_phone, additional_phones,\nwebsite_uri, primary_category, additional_categories, latlng,\nregular_hours, new_review_uri, open_status, labels, store_code, and the\nhas_* status flags. Keys are omitted when Google returns no value, so a\nservice-area business has no storefront_address rather than an empty one.",
-                        "type": "object"
+                        "description": "Details is the rest of what Google publishes about the location: address,\nphone numbers, categories, opening hours, service area, and the Maps and\nreview links. Fields are omitted when Google returns no value, so a\nservice-area business has no storefront_address rather than an empty one.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPLocationDetails"
+                            }
+                        ]
                     },
                     "maps_uri": {
                         "description": "MapsURI is the location's page on Google Maps.",
@@ -12143,6 +12147,7 @@
                         "type": "string"
                     },
                     "total_count": {
+                        "description": "TotalCount carries no omitempty: zero is a real count (an empty gallery),\nnot an absent one.",
                         "type": "integer",
                         "example": 42
                     }
@@ -15372,6 +15377,30 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.GBPCategory": {
+                "type": "object",
+                "properties": {
+                    "display_name": {
+                        "type": "string",
+                        "example": "Pizza restaurant"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "categories/gcid:pizza_restaurant"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPFreeFormService": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPLabel"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.GBPInsights": {
                 "type": "object",
                 "properties": {
@@ -15414,6 +15443,185 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.GBPLabel": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "example": "Emergency unlock"
+                    },
+                    "language_code": {
+                        "type": "string",
+                        "example": "en"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPLatLng": {
+                "type": "object",
+                "properties": {
+                    "latitude": {
+                        "type": "number",
+                        "example": 48.8566
+                    },
+                    "longitude": {
+                        "type": "number",
+                        "example": 2.3522
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPLocationDetails": {
+                "type": "object",
+                "properties": {
+                    "ad_phone": {
+                        "description": "AdPhone is the alternate number shown on Google Ads extensions.",
+                        "type": "string"
+                    },
+                    "additional_categories": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPCategory"
+                        }
+                    },
+                    "additional_phones": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "can_delete": {
+                        "description": "Capability flags, pointers for the same reason as the status flags above.",
+                        "type": "boolean"
+                    },
+                    "can_have_business_calls": {
+                        "type": "boolean"
+                    },
+                    "can_have_food_menus": {
+                        "type": "boolean"
+                    },
+                    "can_modify_service_list": {
+                        "type": "boolean"
+                    },
+                    "can_operate_health_data": {
+                        "type": "boolean"
+                    },
+                    "can_operate_local_post": {
+                        "type": "boolean"
+                    },
+                    "can_operate_lodging_data": {
+                        "type": "boolean"
+                    },
+                    "can_reopen": {
+                        "description": "CanReopen is set on a temporarily closed location that can be reopened.",
+                        "type": "boolean"
+                    },
+                    "duplicate_location": {
+                        "description": "DuplicateLocation names the location this one was flagged a duplicate of.",
+                        "type": "string"
+                    },
+                    "has_google_updated": {
+                        "type": "boolean"
+                    },
+                    "has_pending_edits": {
+                        "type": "boolean"
+                    },
+                    "has_voice_of_merchant": {
+                        "description": "Status flags, pointers so the three states stay distinct: true, an\nexplicit false from Google, and absent because Google said nothing.\nA plain bool with omitempty collapses the last two, which would report a\nlocation as lacking a capability we were never actually told about.\n\nHasVoiceOfMerchant is the one that matters operationally: when it is\nfalse the merchant does not currently control the profile, and posting\nor replying fails until they resolve it in Google Business Profile.",
+                        "type": "boolean"
+                    },
+                    "is_particularly_personal_place": {
+                        "type": "boolean"
+                    },
+                    "labels": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "language_code": {
+                        "type": "string",
+                        "example": "en"
+                    },
+                    "latlng": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPLatLng"
+                    },
+                    "maps_uri": {
+                        "description": "MapsURI is the location's Google Maps page.",
+                        "type": "string",
+                        "example": "https://maps.google.com/?cid=123"
+                    },
+                    "more_hours": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMoreHours"
+                        }
+                    },
+                    "new_review_uri": {
+                        "description": "NewReviewURI is the short link that opens the review form for this\nlocation, for review-request campaigns.",
+                        "type": "string",
+                        "example": "https://g.page/r/abc/review"
+                    },
+                    "open_status": {
+                        "description": "OpenStatus is OPEN, CLOSED_PERMANENTLY or CLOSED_TEMPORARILY.",
+                        "type": "string",
+                        "example": "OPEN"
+                    },
+                    "opening_date": {
+                        "description": "OpeningDate is set on a location that has not opened yet.",
+                        "type": "string",
+                        "example": "2026-09-01"
+                    },
+                    "place_id": {
+                        "description": "PlaceID is the standard Google Places identifier, so a location can be\njoined to Places, Maps and Geocoding results.",
+                        "type": "string",
+                        "example": "ChIJabc"
+                    },
+                    "primary_category": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPCategory"
+                    },
+                    "primary_phone": {
+                        "type": "string",
+                        "example": "+33 1 23 45 67 89"
+                    },
+                    "regular_hours": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPTimePeriod"
+                        }
+                    },
+                    "relationship_data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPRelationshipData"
+                    },
+                    "service_area": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPServiceArea"
+                    },
+                    "service_items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPServiceItem"
+                        }
+                    },
+                    "special_hours": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPSpecialHourPeriod"
+                        }
+                    },
+                    "store_code": {
+                        "type": "string",
+                        "example": "JP-01"
+                    },
+                    "storefront_address": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPPostalAddress"
+                    },
+                    "website_uri": {
+                        "type": "string",
+                        "example": "https://joes.example"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.GBPMetricSeries": {
                 "type": "object",
                 "properties": {
@@ -15431,6 +15639,115 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.GBPMoney": {
+                "type": "object",
+                "properties": {
+                    "currency_code": {
+                        "type": "string",
+                        "example": "EUR"
+                    },
+                    "nanos": {
+                        "description": "Nanos is a pointer because zero is a real value: a price of exactly\n80.00 EUR has no fractional part, and omitempty would drop it.",
+                        "type": "integer"
+                    },
+                    "units": {
+                        "type": "string",
+                        "example": "80"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPMoreHours": {
+                "type": "object",
+                "properties": {
+                    "hours_type_id": {
+                        "type": "string",
+                        "example": "DRIVE_THROUGH"
+                    },
+                    "periods": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPTimePeriod"
+                        }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPPlaceInfo": {
+                "type": "object",
+                "properties": {
+                    "place_id": {
+                        "type": "string"
+                    },
+                    "place_name": {
+                        "type": "string",
+                        "example": "Paris"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPPostalAddress": {
+                "type": "object",
+                "properties": {
+                    "address_lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "administrative_area": {
+                        "type": "string",
+                        "example": "Île-de-France"
+                    },
+                    "locality": {
+                        "type": "string",
+                        "example": "Paris"
+                    },
+                    "organization": {
+                        "type": "string"
+                    },
+                    "postal_code": {
+                        "type": "string",
+                        "example": "75001"
+                    },
+                    "region_code": {
+                        "type": "string",
+                        "example": "FR"
+                    },
+                    "sorting_code": {
+                        "type": "string"
+                    },
+                    "sublocality": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPRelationshipData": {
+                "type": "object",
+                "properties": {
+                    "children_locations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPRelevantLocation"
+                        }
+                    },
+                    "parent_chain": {
+                        "type": "string"
+                    },
+                    "parent_location": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPRelevantLocation"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPRelevantLocation": {
+                "type": "object",
+                "properties": {
+                    "place_id": {
+                        "type": "string"
+                    },
+                    "relation_type": {
+                        "type": "string",
+                        "example": "DEPARTMENT_OF"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.GBPSearchKeyword": {
                 "type": "object",
                 "properties": {
@@ -15445,6 +15762,95 @@
                     },
                     "value": {
                         "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPServiceArea": {
+                "type": "object",
+                "properties": {
+                    "business_type": {
+                        "description": "BusinessType is CUSTOMER_LOCATION_ONLY or CUSTOMER_AND_BUSINESS_LOCATION.",
+                        "type": "string",
+                        "example": "CUSTOMER_LOCATION_ONLY"
+                    },
+                    "places": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPPlaceInfo"
+                        }
+                    },
+                    "region_code": {
+                        "type": "string",
+                        "example": "FR"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPServiceItem": {
+                "type": "object",
+                "properties": {
+                    "free_form_service_item": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPFreeFormService"
+                    },
+                    "price": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMoney"
+                    },
+                    "structured_service_item": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPStructuredService"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPSpecialHourPeriod": {
+                "type": "object",
+                "properties": {
+                    "close_time": {
+                        "type": "string"
+                    },
+                    "closed": {
+                        "description": "Closed marks the location shut for the whole period, in which case the\ntimes are absent. A pointer so \"Google did not say\" stays distinct from\nan explicit \"not closed\".",
+                        "type": "boolean"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "example": "2026-12-25"
+                    },
+                    "open_time": {
+                        "type": "string"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "example": "2026-12-25"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPStructuredService": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "service_type_id": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPTimePeriod": {
+                "type": "object",
+                "properties": {
+                    "close_day": {
+                        "type": "string",
+                        "example": "MONDAY"
+                    },
+                    "close_time": {
+                        "type": "string",
+                        "example": "17:30"
+                    },
+                    "open_day": {
+                        "type": "string",
+                        "example": "MONDAY"
+                    },
+                    "open_time": {
+                        "type": "string",
+                        "example": "09:00"
                     }
                 }
             },
