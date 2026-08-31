@@ -5464,6 +5464,112 @@
                 }
             }
         },
+        "/platforms/google/accounts/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Writes the location's public profile: name, description, phone numbers, address, website, categories, opening hours, service area. Only the fields you send are touched. A field you omit is left as it is, and a field you send with an empty value is CLEARED, which is how you remove a phone number or a website. Fields Google owns are not writable and are rejected: place_id, maps_uri, new_review_uri and the status flags are output-only, and language_code is fixed when the location is created. Google moderates these edits, so a 200 means the change was accepted for review rather than already live on Search and Maps; read the location back to see what is live and check has_pending_edits. Google allows 10 edits per minute per Business Profile and that limit cannot be raised. Pass validate_only=true to have Google check the change without applying it, which is the only way to test against a real profile since the API has no sandbox.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "Update a Google Business Profile location",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Validate the change without applying it",
+                        "name": "validate_only",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPLocationUpdate"
+                            }
+                        }
+                    },
+                    "description": "Fields to change",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.UpdateGoogleLocationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No updatable field set, or a value Google rejected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Google's 10 edits per minute per profile exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/google/accounts/{id}/insights": {
             "get": {
                 "security": [
@@ -14160,6 +14266,18 @@
                     }
                 }
             },
+            "api_endpoints.UpdateGoogleLocationResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPLocationDetails"
+                    },
+                    "validated": {
+                        "description": "Validated is true when the request ran with validate_only, meaning Google\naccepted the change as valid and wrote nothing. Data is empty in that case.",
+                        "type": "boolean"
+                    }
+                }
+            },
             "api_endpoints.UpdateKeyRequest": {
                 "type": "object",
                 "properties": {
@@ -15377,6 +15495,57 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.GBPAddressUpdate": {
+                "type": "object",
+                "properties": {
+                    "address_lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "administrative_area": {
+                        "type": "string"
+                    },
+                    "locality": {
+                        "type": "string",
+                        "example": "Paris"
+                    },
+                    "organization": {
+                        "type": "string"
+                    },
+                    "postal_code": {
+                        "type": "string",
+                        "example": "75001"
+                    },
+                    "region_code": {
+                        "type": "string",
+                        "example": "FR"
+                    },
+                    "sorting_code": {
+                        "type": "string"
+                    },
+                    "sublocality": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPCategoriesUpdate": {
+                "type": "object",
+                "properties": {
+                    "additional_categories": {
+                        "description": "AdditionalCategories replaces the whole list: Google has no way to add or\nremove a single category, so a partial list drops the rest.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "primary_category": {
+                        "type": "string",
+                        "example": "categories/gcid:pizza_restaurant"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.GBPCategory": {
                 "type": "object",
                 "properties": {
@@ -15398,6 +15567,17 @@
                     },
                     "label": {
                         "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPLabel"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPHoursUpdate": {
+                "type": "object",
+                "properties": {
+                    "periods": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPTimePeriod"
+                        }
                     }
                 }
             },
@@ -15622,6 +15802,69 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.GBPLocationUpdate": {
+                "type": "object",
+                "properties": {
+                    "ad_phone": {
+                        "description": "AdPhone is the alternate number shown on Google Ads extensions.",
+                        "type": "string"
+                    },
+                    "categories": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPCategoriesUpdate"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Wood-fired pizza since 1998"
+                    },
+                    "labels": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "latlng": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPLatLng"
+                    },
+                    "more_hours": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMoreHours"
+                        }
+                    },
+                    "open_status": {
+                        "description": "OpenStatus is OPEN, CLOSED_PERMANENTLY or CLOSED_TEMPORARILY.",
+                        "type": "string",
+                        "example": "OPEN"
+                    },
+                    "phone_numbers": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPPhoneNumbersUpdate"
+                    },
+                    "regular_hours": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPHoursUpdate"
+                    },
+                    "service_area": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPServiceAreaUpdate"
+                    },
+                    "special_hours": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPSpecialHoursUpdate"
+                    },
+                    "store_code": {
+                        "type": "string",
+                        "example": "JP-01"
+                    },
+                    "storefront_address": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPAddressUpdate"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Joe's Pizza (Downtown)"
+                    },
+                    "website_uri": {
+                        "type": "string",
+                        "example": "https://joes.example"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.GBPMetricSeries": {
                 "type": "object",
                 "properties": {
@@ -15668,6 +15911,22 @@
                         "items": {
                             "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPTimePeriod"
                         }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPPhoneNumbersUpdate": {
+                "type": "object",
+                "properties": {
+                    "additional_phones": {
+                        "description": "AdditionalPhones replaces the whole list; an empty list clears it.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "primary_phone": {
+                        "type": "string",
+                        "example": "+33 1 23 45 67 89"
                     }
                 }
             },
@@ -15785,6 +16044,23 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.GBPServiceAreaUpdate": {
+                "type": "object",
+                "properties": {
+                    "business_type": {
+                        "description": "BusinessType is CUSTOMER_LOCATION_ONLY or CUSTOMER_AND_BUSINESS_LOCATION.",
+                        "type": "string",
+                        "example": "CUSTOMER_LOCATION_ONLY"
+                    },
+                    "place_ids": {
+                        "description": "PlaceIDs replaces the covered areas, as Google place ids.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.GBPServiceItem": {
                 "type": "object",
                 "properties": {
@@ -15819,6 +16095,17 @@
                     "start_date": {
                         "type": "string",
                         "example": "2026-12-25"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPSpecialHoursUpdate": {
+                "type": "object",
+                "properties": {
+                    "periods": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPSpecialHourPeriod"
+                        }
                     }
                 }
             },

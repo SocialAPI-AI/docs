@@ -120,6 +120,50 @@ Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the 
   `has_voice_of_merchant` tells you whether the location is in good standing. When it is `false` the merchant does not currently have control of the profile, and posting or replying will fail until they resolve it in Google Business Profile. When the field is absent entirely, Google told us nothing either way: the boolean flags distinguish a real `false` from an unknown, so check for presence before treating one as a denial. `has_pending_edits` and `has_google_updated` flag edits awaiting review and Google-suggested updates respectively. The `can_*` flags say which surfaces the location supports, for example `can_operate_local_post` for publishing and `can_have_food_menus` for restaurants.
 </Note>
 
+## Updating a location
+
+`PUT /v1/platforms/google/accounts/{id}` writes the location's public profile. Send only the fields you want to change:
+
+```bash
+curl -X PUT "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "website_uri": "https://joes-pizza.example",
+    "phone_numbers": { "primary_phone": "+33 1 23 45 67 89" },
+    "regular_hours": {
+      "periods": [
+        { "open_day": "MONDAY", "open_time": "09:00", "close_day": "MONDAY", "close_time": "17:30" }
+      ]
+    }
+  }'
+```
+
+<Warning>
+  **A field you omit is left alone. A field you send with an empty value is cleared.** That is how you remove a website or a phone number (`"website_uri": ""`), and it is also how you delete data by accident. Send only the fields you mean to change, and never round-trip a location read back into an update: fields the read omitted would arrive as empty and wipe what is there.
+</Warning>
+
+Lists replace rather than merge. `regular_hours.periods`, `labels`, `additional_phones`, and `additional_categories` each overwrite the whole list, so include every entry you want to keep. Nested objects are the exception: inside `storefront_address` you can send only `postal_code` and the rest of the address is untouched.
+
+Not writable: `place_id`, `maps_uri`, `new_review_uri` and the status flags are output-only in Google Business Profile, and `language_code` is fixed when the location is created (changing it requires deleting and re-creating the location in Google).
+
+### Validating before you write
+
+Google has no sandbox, so every write hits a real Business Profile. Pass `validate_only=true` to have Google check the change and apply nothing:
+
+```bash
+curl -X PUT "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ.../?validate_only=true" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "title": "Joe'"'"'s Pizza (Downtown)" }'
+```
+
+The response carries `"validated": true` and an empty `data`, since nothing was written.
+
+<Note>
+  **Edits are moderated.** A `200` means Google accepted the change for review, not that it is live on Search and Maps. Read the location back to see what is live, and check `details.has_pending_edits` for edits still under review. Google also allows **10 edits per minute per Business Profile**, and states that limit cannot be raised, so pace bulk updates accordingly.
+</Note>
+
 ## Reading samples
 
 ### List posts
