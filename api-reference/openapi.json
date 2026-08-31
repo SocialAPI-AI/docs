@@ -5386,6 +5386,296 @@
                 }
             }
         },
+        "/platforms/google/accounts/{id}/media": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the photos and videos on a location's public profile: its logo, cover, interior shots, and so on. This is profile media, not the media attached to a post. Set contributed=true to read the separate, read-only gallery of photos customers submitted; those items carry an attribution block that Google requires you to display as provided, unaltered.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "List a Google Business Profile location's media",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Read the customer-contributed gallery instead of your own media",
+                        "name": "contributed",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Pagination cursor from a previous response",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleMediaListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Attaches one photo or video to a location's public profile under the given category. media takes exactly one item in the same form the publishing endpoints accept: a stored media library id (source_type media_id), a public URL (url), or a reference to bytes you uploaded to Google yourself (platform_attachment_id). SocialAPI resolves a library id and hands Google a URL to fetch, and derives the photo or video format from the stored file, so you never set Google's own upload fields. Google limits a location to 10 edits per minute, and that limit cannot be raised.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Add media to a Google Business Profile location",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.CreateGoogleMediaRequest"
+                            }
+                        }
+                    },
+                    "description": "Media item and category",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleMediaItem"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid media source or category",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/media/{mediaId}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns one photo or video from a location's profile. mediaId accepts either the bare id or the full Google resource name returned by the list endpoint.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Get one Google Business Profile media item",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Media item ID",
+                        "name": "mediaId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleMediaItem"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account or media item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes one photo or video you added to a location's profile. Photos contributed by customers cannot be deleted through the API and return a permission error; use the takedown_url on the item instead.",
+                "tags": [
+                    "Platforms"
+                ],
+                "summary": "Remove media from a Google Business Profile location",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Media item ID",
+                        "name": "mediaId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Deleted"
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Customer-contributed media cannot be deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account or media item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/google/logins/{loginId}/locations": {
             "get": {
                 "security": [
@@ -9953,84 +10243,6 @@
                     }
                 }
             }
-        },
-        "/inbox/media/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Returns the bytes of a mirrored inbound attachment. A pending fetch is waited on briefly; 504 means retry, not gone.",
-                "tags": [
-                    "Inbox"
-                ],
-                "summary": "Get inbox media",
-                "parameters": [
-                    {
-                        "description": "Inbox media ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/octet-stream": {
-                                "schema": {
-                                    "type": "string",
-                                    "format": "binary"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Unknown media, or not owned by the caller",
-                        "content": {
-                            "application/octet-stream": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "410": {
-                        "description": "Media expired or permanently unavailable",
-                        "content": {
-                            "application/octet-stream": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "503": {
-                        "description": "Too many concurrent waiters, retry shortly",
-                        "content": {
-                            "application/octet-stream": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "504": {
-                        "description": "Fetch still in progress, retry shortly",
-                        "content": {
-                            "application/octet-stream": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     },
     "servers": [
@@ -10628,6 +10840,40 @@
                     }
                 }
             },
+            "api_endpoints.CreateGoogleMediaRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "COVER",
+                            "PROFILE",
+                            "LOGO",
+                            "EXTERIOR",
+                            "INTERIOR",
+                            "PRODUCT",
+                            "AT_WORK",
+                            "FOOD_AND_DRINK",
+                            "MENU",
+                            "COMMON_AREA",
+                            "ROOMS",
+                            "TEAMS",
+                            "ADDITIONAL"
+                        ],
+                        "example": "INTERIOR"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Main dining room"
+                    },
+                    "media": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MediaInput"
+                        }
+                    }
+                }
+            },
             "api_endpoints.CreateInviteRequest": {
                 "type": "object",
                 "properties": {
@@ -10836,7 +11082,7 @@
                                 "dm.status.read",
                                 "dm.status.failed",
                                 "review.received",
-                                "review.reply_state_changed",
+                                "review.updated",
                                 "mention.received",
                                 "account.connected",
                                 "account.disconnected",
@@ -11504,6 +11750,84 @@
                     }
                 }
             },
+            "api_endpoints.GoogleMediaAttribution": {
+                "type": "object",
+                "properties": {
+                    "profile_name": {
+                        "type": "string",
+                        "example": "Jane S."
+                    },
+                    "profile_photo_url": {
+                        "type": "string"
+                    },
+                    "profile_url": {
+                        "type": "string"
+                    },
+                    "takedown_url": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.GoogleMediaItem": {
+                "type": "object",
+                "properties": {
+                    "attribution": {
+                        "$ref": "#/components/schemas/api_endpoints.GoogleMediaAttribution"
+                    },
+                    "category": {
+                        "type": "string",
+                        "example": "INTERIOR"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "example": "2026-03-01T12:00:00Z"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Main dining room"
+                    },
+                    "height_pixels": {
+                        "type": "integer",
+                        "example": 1200
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "accounts/123/locations/456/media/789"
+                    },
+                    "media": {
+                        "$ref": "#/components/schemas/api_endpoints.MediaRef"
+                    },
+                    "thumbnail_url": {
+                        "type": "string"
+                    },
+                    "width_pixels": {
+                        "type": "integer",
+                        "example": 1600
+                    }
+                }
+            },
+            "api_endpoints.GoogleMediaListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 12
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.GoogleMediaItem"
+                        }
+                    },
+                    "next_cursor": {
+                        "type": "string"
+                    },
+                    "total_count": {
+                        "type": "integer",
+                        "example": 42
+                    }
+                }
+            },
             "api_endpoints.ImportPostsResponse": {
                 "type": "object",
                 "properties": {
@@ -12002,6 +12326,23 @@
                     },
                     "next_cursor": {
                         "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.MediaRef": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "image",
+                            "video"
+                        ],
+                        "example": "image"
+                    },
+                    "url": {
+                        "type": "string",
+                        "example": "https://lh3.googleusercontent.com/p/abc"
                     }
                 }
             },
@@ -13612,7 +13953,7 @@
                                 "dm.status.read",
                                 "dm.status.failed",
                                 "review.received",
-                                "review.reply_state_changed",
+                                "review.updated",
                                 "mention.received",
                                 "account.connected",
                                 "account.disconnected",
