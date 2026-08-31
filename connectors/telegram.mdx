@@ -91,7 +91,7 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/
 
 ### Send a DM with an attachment
 
-Use `attachment_url` to send a file. SocialAPI picks the Telegram method based on the URL extension: image extensions (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`) call `sendPhoto`; all other extensions call `sendDocument`.
+Use the [`attachments` array](/guides/inbox#attachments) to send files. SocialAPI picks the Telegram method based on the URL extension: image extensions (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`) call `sendPhoto`; all other extensions call `sendDocument`. Telegram supports a `caption` per attachment.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
@@ -99,10 +99,13 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/
   -H "Content-Type: application/json" \
   -d '{
     "account_id": "{account_id}",
-    "text": "Here is the file you requested.",
-    "attachment_url": "https://example.com/report.pdf"
+    "attachments": [
+      { "source_type": "url", "source": "https://example.com/report.pdf", "caption": "Here is the file you requested." }
+    ]
   }'
 ```
+
+The single-attachment shorthand `attachment_url` still works, and with it the message `text` is used as the caption.
 
 ## Limitations and gotchas
 

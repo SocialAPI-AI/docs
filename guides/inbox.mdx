@@ -121,12 +121,46 @@ A message can carry text, an attachment, interactive content, or a combination. 
 |-------|----------|-------------|
 | `account_id` | Yes | Connected account that owns the conversation |
 | `text` | Conditional | Message body. Required unless `attachment_url` or interactive content is set |
-| `attachment_url` | Conditional | Publicly reachable URL of a media file to attach. Required unless `text` or interactive content is set |
+| `attachments` | Conditional | One or more media attachments. Required unless `text` or interactive content is set. See Attachments below |
+| `attachment_url` | Conditional | Single-attachment shorthand, superseded by `attachments`. Publicly reachable URL of a media file |
 | `quick_replies` | No | Tappable reply chips (Instagram, Facebook). See Interactive messages below |
 | `buttons` | No | Button template with 1 to 3 call-to-action buttons (Instagram, Facebook) |
 | `cards` | No | Carousel of cards, each with an image and buttons (Instagram, Facebook) |
 
 On Facebook and Instagram, `attachment_url` is delivered as a Messenger attachment. The attachment type (image, video, audio, or file) is inferred from the URL file extension, so use a direct media link with the correct extension (for example `.jpg`, `.mp4`, `.mp3`). URLs without a recognized media extension are sent as a generic file. The media must be hosted on a publicly reachable URL (max 25 MB); the platform fetches it directly.
+
+### Attachments
+
+Each entry in `attachments` names a media source and how to read it:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `source_type` | Yes | `url` (a publicly reachable media URL), `media_id` (a file in your media library), or `platform_attachment_id` (media already uploaded to the platform) |
+| `source` | Yes | The reference, as named by `source_type` |
+| `type` | Conditional | `image`, `video`, `audio`, or `file`. Inferred from the file for `url` and `media_id`; required for `platform_attachment_id` |
+| `caption` | No | Text shown with this attachment. WhatsApp and Telegram only |
+
+Text and attachments are delivered as separate messages, the text first, then each attachment in order. So text plus two images arrives as three messages.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_abc123",
+    "text": "Here is what we found",
+    "attachments": [
+      { "source_type": "media_id", "source": "{media_id}", "caption": "The damaged panel" },
+      { "source_type": "url", "source": "https://cdn.example.com/report.pdf" }
+    ]
+  }'
+```
+
+`caption` attaches text to the media message itself rather than sending it separately. Instagram, Facebook, and Zalo have no caption in their Send APIs and ignore it; on WhatsApp a caption on an audio attachment is rejected, since WhatsApp has no caption there.
+
+A `media_id` is resolved to a temporary signed URL before sending, so the platform can always fetch it. All media ids in a request are resolved before any message is sent: an unknown id fails the whole request rather than delivering some of the messages.
+
+If a message fails partway through a multi-attachment send, the earlier messages stay delivered. The error carries `sent_count` and `failed_index` so you can retry from where it stopped.
 
 ### Interactive messages
 

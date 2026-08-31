@@ -193,7 +193,29 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/
   }'
 ```
 
-`account_id` is required. The reply is sent as plain text and only succeeds while the 24-hour service window is open.
+`account_id` is required. The reply only succeeds while the 24-hour service window is open.
+
+### Sending media
+
+Attach media with the [`attachments` array](/guides/inbox#attachments), either a `url` WhatsApp can fetch or a `media_id` from your media library:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "{account_id}",
+    "attachments": [
+      { "source_type": "media_id", "source": "{media_id}", "caption": "The damaged panel" }
+    ]
+  }'
+```
+
+WhatsApp has no generic attachment type, so `file` and anything we cannot classify are sent as a document, with the filename taken from the URL's last path segment. A `caption` is supported on image, video, and document; on audio it is rejected, since WhatsApp has no caption there.
+
+A `url` attachment is fetched by WhatsApp's own servers, so it must be publicly reachable without authentication (a `media_id` always is). WhatsApp's limits apply: images 5 MB (JPEG, PNG), video 16 MB (MP4, 3GPP), audio 16 MB (AAC, AMR, MP3, M4A, OGG), documents 100 MB. A file it cannot fetch, or one over a limit, returns `whatsapp.media_download_failed`.
+
+`source_type: "platform_attachment_id"` is not supported on WhatsApp.
 
 ### Inbound media
 
@@ -206,6 +228,9 @@ When a customer sends a photo, voice note, or other attachment, WhatsApp's webho
 | 400 | `whatsapp.window_closed` | The 24-hour service window has closed. Free-form replies are no longer allowed; send an approved template with `send-template` instead. |
 | 404 | `whatsapp.template_not_found` | The named template does not exist on this account's WABA. |
 | 400 | `whatsapp.template_paused` | The template is paused for quality reasons and cannot be sent. |
+| 400 | `whatsapp.media_download_failed` | WhatsApp could not download the attachment. The URL is unreachable, the format is unsupported, or the file exceeds the size limit for its type. |
+| 400 | `whatsapp.media_upload_failed` | WhatsApp rejected the media file. |
+| 400 | `validation.caption_unsupported` | A caption was set on an audio attachment. WhatsApp audio messages have no caption. |
 | 400 | `whatsapp.undeliverable` | The recipient is not a WhatsApp user. |
 | 403 | `whatsapp.user_opted_out` | The recipient has opted out of messages from this business. |
 | 429 | `whatsapp.frequency_cap` | The recipient has hit their daily marketing-message limit. |
