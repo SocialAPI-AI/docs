@@ -1219,6 +1219,86 @@
                 }
             }
         },
+        "/accounts/{id}/sync": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Re-runs the post backfill for one connected account and refreshes stored engagement counts. Works for any platform whose connector can list posts. Runs synchronously and fetches one page (up to 100 posts).",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Re-sync a connected account's posts",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform cannot list posts (e.g. LinkedIn, WhatsApp)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream platform API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/announcements": {
             "get": {
                 "security": [
@@ -11604,6 +11684,11 @@
                             "file"
                         ],
                         "example": "image"
+                    },
+                    "voice": {
+                        "description": "Voice sends an audio attachment as a native voice note (waveform and\nplayback-speed controls) instead of a file bubble. WhatsApp only, and only\nfor audio whose file is Ogg encoded with the OPUS codec; WhatsApp rejects\nany other container or codec. Ignored on other platforms.",
+                        "type": "boolean",
+                        "example": true
                     }
                 }
             },
