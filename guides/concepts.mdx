@@ -107,6 +107,8 @@ Internally a post has two parts: the post itself (text, media, scheduled time) a
 
 Posts move through a state machine: `draft`, `scheduled`, `publishing`, then `published` (or `partial`, `failed`). See the [Posts tab](/posts/overview) for per-platform field references.
 
+Targets follow the same rule: `published` and `failed` are terminal, `publishing` is not. A target at `published` carries a `platform_post_id`, so treating "`published` and a non-empty `platform_post_id`" as your success condition is correct. The one exception is a TikTok draft sent to the creator's inbox (`platform_data.tiktok.post_mode: "inbox"`), which is terminal without an ID because it is not a post until the creator finishes it in the TikTok app. While a target is `publishing`, keep polling `GET /v1/posts/{post_id}` or wait for the `post.published` / `post.partial` / `post.failed` webhook. Do not republish it: some platforms (TikTok in particular) confirm an upload minutes before they expose its post ID, so a retry at that point can duplicate a post that is already live.
+
 ## Interaction
 
 An **Interaction** is anything inbound: a comment on one of your posts, a DM, a review, or a mention. Comments, reviews, and mentions are proxied from the platform; DM conversations and messages are stored in SocialAPI's database to support threading and pagination. The API mints stable IDs so your app can reference any interaction across calls.

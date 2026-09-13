@@ -86,7 +86,7 @@ Always check `status` first. On `success`, persist the `account_id` against your
 
 Some platforms cannot resolve a single account from an OAuth grant alone, so the connect flow pauses and asks you to choose before an account is created. Google takes this path only when a login manages more than one Business Profile. Facebook takes it on every connect, because one Facebook login can serve many brands and Pages must be assigned to a brand explicitly.
 
-When this happens, your `redirect_uri` (or the exchange response, in the proxy flow) receives `status: selection_required` and a `connection_id` instead of `status: success`. No account exists yet. Finish the connection with `POST /v1/accounts/pending/{connection_id}/select`, shaped differently per platform as shown below.
+When this happens, your `redirect_uri` (or the exchange response, in the proxy flow) receives `status: selection_required`, a `connection_id`, and the `platform` that is waiting on a choice, instead of `status: success`. No account exists yet. Finish the connection with `POST /v1/accounts/pending/{connection_id}/select`, shaped differently per platform as shown below.
 
 ### Google: connecting a login with multiple Business Profiles
 
@@ -100,6 +100,7 @@ Google accounts can manage several Business Profiles under one login (for exampl
 https://app.example.com/oauth/callback
   ?status=selection_required
   &connection_id=pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2
+  &platform=google
   &state=session_abc123
 ```
 
@@ -207,6 +208,7 @@ Every Facebook connect returns a pending connection, never `status: success` dir
 https://app.example.com/oauth/callback
   ?status=selection_required
   &connection_id=pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2
+  &platform=facebook
   &state=session_abc123
 ```
 

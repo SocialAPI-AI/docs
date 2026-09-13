@@ -138,7 +138,7 @@ curl -X POST https://api.social-api.ai/v1/posts/validate \
 3. For video: SocialAPI calls `POST /v2/post/publish/video/init/` (PULL\_FROM\_URL, single media URL).
 4. For photo: SocialAPI calls `POST /v2/post/publish/content/init/` (PULL\_FROM\_URL, array of image URLs).
 5. SocialAPI polls `POST /v2/post/publish/status/fetch/` every 3 seconds until `PUBLISH_COMPLETE` or `FAILED`, or until a 60-second timeout.
-6. On success, the published item ID is stored and returned.
+6. On success, the published item ID is stored and returned. TikTok populates that ID (`publicaly_available_post_id`) asynchronously and it can lag `PUBLISH_COMPLETE` by a few seconds, so SocialAPI keeps the target at `publishing` until the ID is in hand. See [Slow publishes and the publishing status](#slow-publishes-and-the-publishing-status).
 
 ---
 
@@ -208,9 +208,17 @@ When a creator has reached their daily TikTok posting limit, the creator info en
 
 TikTok access tokens expire. SocialAPI automatically refreshes them using the stored refresh token before each request. If the refresh token has also expired, the connector returns `401 invalid_token` and the account must be reconnected.
 
-### Publish timeout
+### Slow publishes and the `publishing` status
 
-SocialAPI polls the publish status for up to 60 seconds. If TikTok has not completed processing within that window, the post status is set to `failed` with error code `publish_timeout`. Retry via `POST /v1/posts/:pid/retry`.
+SocialAPI polls the publish status for up to 60 seconds. TikTok often needs longer, either because the video is still being processed or because it has finished but has not yet exposed the post ID. In both cases the target stays at `status: "publishing"` with `platform_post_id` and `permalink` absent, and SocialAPI keeps TikTok's publish handle so it can resolve the outcome later. A background pass re-queries TikTok every 15 minutes and writes the real result, so the target settles at `published` with its ID and permalink, or at `failed` if TikTok rejected it.
+
+`publishing` is not terminal, so treat it as "still working" rather than success or failure:
+
+- **Do not confirm success on it.** Only `published` is a completed publish, and a `published` TikTok target always carries a `platform_post_id`.
+- **Do not retry or republish it.** The upload may already be live on TikTok, so retrying risks a duplicate post. The reconcile pass is what resolves it.
+- **Keep polling `GET /v1/posts/{post_id}`, or wait for the webhook.** The `post.published`, `post.partial` and `post.failed` webhooks fire when the post reaches its terminal status, including when that happens during reconciliation.
+
+Typical settle time is a few seconds to a few minutes. A target that TikTok never resolves is failed after about 2 hours with error code `system.internal` and the detail `publish timed out: target stuck in publishing`. Check the TikTok profile before retrying such a target: the post can still have gone live.
 
 ### Error categories
 

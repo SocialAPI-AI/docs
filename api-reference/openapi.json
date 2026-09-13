@@ -16251,7 +16251,7 @@
                         ]
                     },
                     "conversation_id": {
-                        "description": "[optional] Internal conversation UUID; set by facebook/instagram inbound DM handlers when linked to a stored conversation",
+                        "description": "[optional] Internal conversation UUID; set by the facebook/instagram/whatsapp inbound DM handlers when linked to a stored conversation",
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
@@ -16281,7 +16281,7 @@
                         "example": "instagram"
                     },
                     "platform_id": {
-                        "description": "[optional] Platform-native message id, byte-identical to the platform_id of the matching row from GET /v1/inbox/conversations/{id}/messages. Set on Instagram and Facebook dm.received, dm.sent and dm.postback so a delivered event can be joined to a stored message: ID is a SocialAPI interaction id and the messages endpoint returns an internal row UUID, so without this the two carry no field in common. Empty for dm.referral, which has no platform message id.",
+                        "description": "[optional] Platform-native message id, byte-identical to the platform_id of the matching row from GET /v1/inbox/conversations/{id}/messages. Set on Instagram, Facebook and WhatsApp dm.received and dm.sent, and on Instagram and Facebook dm.postback, so a delivered event can be joined to a stored message: ID is a SocialAPI interaction id and the messages endpoint returns an internal row UUID, so without this the two carry no field in common. Empty for dm.referral, which has no platform message id.",
                         "type": "string",
                         "example": "m_AbCdEf123"
                     },
@@ -16301,10 +16301,18 @@
                         "example": "2026-02-15T14:30:00Z"
                     },
                     "recipient": {
-                        "description": "[platform: instagram] Non-nil for echo/sent DM events; nil for all other interaction types",
+                        "description": "[platform: instagram, facebook, whatsapp] Non-nil for echo/sent DM events; nil for all other interaction types",
                         "allOf": [
                             {
                                 "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Author"
+                            }
+                        ]
+                    },
+                    "story": {
+                        "description": "[platform: instagram] Set when the interaction is a reply to one of the account's stories",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Story"
                             }
                         ]
                     },
@@ -16452,6 +16460,36 @@
                     },
                     "unique_views": {
                         "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.Story": {
+                "type": "object",
+                "properties": {
+                    "expires_at": {
+                        "description": "when media_url stops working; omitted when the anchor timestamp isn't trustworthy enough to compute it",
+                        "type": "string",
+                        "example": "2026-09-12T14:03:00Z"
+                    },
+                    "id": {
+                        "description": "platform-native story id",
+                        "type": "string",
+                        "example": "17901"
+                    },
+                    "media_type": {
+                        "description": "[platform: facebook] photo or video",
+                        "type": "string",
+                        "example": "photo"
+                    },
+                    "media_url": {
+                        "description": "downloadable media link",
+                        "type": "string",
+                        "example": "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=17901"
+                    },
+                    "permalink": {
+                        "description": "[platform: facebook] story permalink",
+                        "type": "string",
+                        "example": "https://facebook.com/stories/1784"
                     }
                 }
             },
