@@ -1,0 +1,94 @@
+---
+title: Pinterest
+description: Connect a Pinterest account to create Pins and manage boards through SocialAPI.
+---
+
+Pinterest is a publishing surface rather than an inbox. The connector creates Pins and manages boards through the Pinterest API v5, and OAuth is provided by SocialAPI.ai: you don't register your own Pinterest app. Pinterest exposes no public endpoints for comments, direct messages, reviews, or mentions, so those calls return `501` for a Pinterest account rather than an empty list.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `pinterest` |
+| Auth type | OAuth 2.0 |
+| API | Pinterest API v5 |
+| Best for | Publishing Pins and managing boards from the same API you use everywhere else. |
+
+## Capabilities
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Create post (Pin) | Yes | Requires a destination board and one image |
+| Delete post | Yes | |
+| Schedule | Yes | Deferred publish via `scheduled_at` |
+| List posts | Yes | Fetched live from Pinterest on every call |
+| Board management | Yes | List, create, rename, delete |
+| Update post | No | Pinterest's `PATCH /pins` is still in their own beta, and Pin media is immutable regardless |
+| Comments | No | Pinterest has no public API for comments |
+| DMs | No | Pinterest has no public API for messaging |
+| Reviews | No | Pinterest has no reviews system |
+| Mentions | No | Pinterest has no public API for mentions |
+| Webhooks | No | Pinterest sends no webhooks; SocialAPI's own publish events still fire |
+
+Comments, DMs, reviews, and mentions aren't planned as "coming soon": Pinterest simply doesn't expose a public API for any of them, so SocialAPI has nothing to connect to.
+
+## Connecting
+
+Pinterest uses standard OAuth 2.0. Start the connection through the normal connect flow with `platform=pinterest`. The authorization screen is hosted at `https://www.pinterest.com/oauth/`, and SocialAPI completes the code exchange on the callback.
+
+### Token lifetime
+
+Access tokens expire after 30 days and refresh tokens after 60 days, though a refresh token's life is extended every time it is used. SocialAPI refreshes the access token in the background before it expires, so an account connected once keeps working without a reconnect prompt.
+
+A dead credential is reported by Pinterest with body code `2` ("Authentication failed"), and only that code marks an account as needing reconnection. Any other `401` is treated as transient and retried, because a proxy-issued or temporary `401` should not force your user through a manual reconnect.
+
+## Boards
+
+Every Pin needs a board. There is no default board and no fallback: each Pinterest publish target carries a `board_id`, and a draft without one is rejected before it reaches Pinterest.
+
+```bash
+curl https://api.social-api.ai/v1/accounts/<account-id>/boards \
+  -H "Authorization: Bearer <your-api-key>"
+```
+
+`POST`, `PATCH`, and `DELETE` on the same path create, rename, and delete boards.
+
+<Warning>
+Deleting a board deletes every Pin on it. Pinterest does not undo this.
+</Warning>
+
+### Boards are never stored
+
+Pinterest's Developer Terms of Service section 4.1.i prohibits storing information accessed through the API. SocialAPI does not store boards or Pins: every read goes live to Pinterest on every request, with no cache and no TTL. The board list you get back is the account's real board list, including a board created in the Pinterest app moments earlier.
+
+The practical consequence is that board reads cost a Pinterest API call. If Pinterest is unavailable, the call fails rather than degrading to stale stored rows.
+
+### Board privacy
+
+`POST /boards` accepts `PUBLIC`, `PROTECTED`, or `SECRET`. `PATCH /boards/{id}` accepts only `PUBLIC` and `SECRET`, so a board created as `PROTECTED` cannot change its privacy afterwards.
+
+## Publishing
+
+A Pin is created through the same `POST /v1/posts` call as every other platform. The post title becomes the Pin title and the text becomes its description.
+
+```json
+{
+  "title": "Weeknight roast chicken",
+  "text": "One pan, forty minutes, no marinade.",
+  "targets": [{
+    "account_id": "<account-id>",
+    "board_id": "<board-id>",
+    "media": [{ "source_type": "url", "source": "https://example.com/chicken.jpg", "type": "image" }]
+  }]
+}
+```
+
+Pass the board on the target as `board_id`. Supplying it inside `platform_data` is rejected with `validation.use_board_id`.
+
+See [Pinterest publishing](/posts/pinterest) for the full request and response shapes.
+
+## Related
+
+- [Pinterest publishing](/posts/pinterest)
+- [Platform support](/guides/platforms)
+- [Errors](/guides/errors)
