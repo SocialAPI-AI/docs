@@ -2717,7 +2717,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Likes a comment on the platform as the connected account. Supported on Facebook and LinkedIn Page only (the Instagram API does not expose comment likes). Check the can_like capability flag.",
+                "description": "Likes a comment on the platform as the connected account. Supported on Facebook, LinkedIn Pages, and Instagram accounts connected with Facebook Login. Instagram accounts connected with Instagram Login cannot like comments. Check the can_like capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -2819,7 +2819,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Removes a like from a comment on the platform. Supported on Facebook and LinkedIn Page only (the Instagram API does not expose comment likes).",
+                "description": "Removes a like from a comment on the platform. Supported on Facebook, LinkedIn Pages, and Instagram accounts connected with Facebook Login. Check the can_like capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -10040,7 +10040,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the authenticated user's profile. Supports setting onboarding=false to mark onboarding as complete, and optionally storing use_case and referral for onboarding analytics. The response reflects the current billing_blocked state, unaffected by this update.",
+                "description": "Updates the authenticated user's profile. Supports setting onboarding=false to mark onboarding as complete, and optionally storing use_case and referral for onboarding analytics. The response reflects the current billing_blocked state, unaffected by this update. The response includes the caller's team role: \"admin\", \"developer\", or \"\" for the account owner.",
                 "tags": [
                     "Users"
                 ],
@@ -14705,6 +14705,11 @@
                         "type": "string",
                         "example": "free"
                     },
+                    "role": {
+                        "description": "Role is the caller's team role: \"admin\", \"developer\", or \"\" for the\naccount Owner, who holds no Role (ADR 0020). An API key and an OAuth\ntoken both read \"\", since CheckRole never restricts them.",
+                        "type": "string",
+                        "example": "admin"
+                    },
                     "use_case": {
                         "type": "string",
                         "example": "Managing clients' accounts (agency)"
@@ -16862,6 +16867,14 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.MessageReply": {
+                "type": "object",
+                "properties": {
+                    "platform_id": {
+                        "type": "string"
+                    }
+                }
+            },
             "social-api_ai_core_api_service.MessageRow": {
                 "type": "object",
                 "properties": {
@@ -16885,6 +16898,14 @@
                     },
                     "platform_id": {
                         "type": "string"
+                    },
+                    "reply_to": {
+                        "description": "ReplyTo is the message this one replies to, or nil when it is not a reply.\nA struct rather than a bare string so the shape can grow (resolved message\nid, quoted excerpt) without breaking consumers, and so swag can see it.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.MessageReply"
+                            }
+                        ]
                     },
                     "sender_id": {
                         "type": "string"
