@@ -311,6 +311,107 @@
                 }
             }
         },
+        "/accounts/{id}/analytics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns stored daily history for a connected account: follower levels, reach, and the other metrics the platform publishes. This route never calls the platform, so it cannot fail or slow down because a token expired. For the account's current figures, use the live insights routes instead.\nEach series names its metric kind (gauge for a level you may diff, flow for a per-day count you may sum) and the timezone its days were cut on. Every point also carries how many subjects contributed to that day, always present and always at least 1, even for a single-subject account.",
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Get account analytics history",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-08-23",
+                        "description": "First day, YYYY-MM-DD. Defaults to 29 days before to.",
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-09-21",
+                        "description": "Last day, YYYY-MM-DD. Defaults to today (UTC).",
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Comma-separated metric names. Defaults to every stored metric.",
+                        "name": "metrics",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Narrow to one page of a multi-page account",
+                        "name": "page_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AnalyticsResponseWrapper"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed or inverted range, or a range wider than 400 days",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/accounts/{id}/boards": {
             "get": {
                 "security": [
@@ -1625,6 +1726,99 @@
                     },
                     "400": {
                         "description": "Invalid request body or missing name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Brand not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/brands/{id}/analytics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns stored daily history for every account and page in a brand, summed per metric per day. A brand total is computed at read time and never stored, so it always reflects the accounts the brand holds right now.\nRead subjects_counted before drawing a chart. A brand whose accounts did not all report on a given day produces a lower sum for that day, and without the count that reads as a decline instead of a gap.",
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Get brand analytics history",
+                "parameters": [
+                    {
+                        "description": "Brand ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-08-23",
+                        "description": "First day, YYYY-MM-DD. Defaults to 29 days before to.",
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-09-21",
+                        "description": "Last day, YYYY-MM-DD. Defaults to today (UTC).",
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Comma-separated metric names. Defaults to every stored metric.",
+                        "name": "metrics",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AnalyticsResponseWrapper"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed or inverted range, or a range wider than 400 days",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -9581,6 +9775,99 @@
                 }
             }
         },
+        "/posts/{pid}/analytics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns stored daily history for a published post: how its engagement counters accrued, one point per day. This is the history route. For the post's current figures fetched live from the platform, use GET /v1/posts/{pid}/metrics instead.\nHistory starts the day the post first appeared in a metrics sync, so a post published before this feature shipped has no earlier points.",
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Get post analytics history",
+                "parameters": [
+                    {
+                        "description": "SocialAPI post ID (UUID)",
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-08-23",
+                        "description": "First day, YYYY-MM-DD. Defaults to 29 days before to.",
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-09-21",
+                        "description": "Last day, YYYY-MM-DD. Defaults to today (UTC).",
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Comma-separated metric names. Defaults to every stored metric.",
+                        "name": "metrics",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AnalyticsResponseWrapper"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed or inverted range, or a range wider than 400 days",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Post not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/posts/{pid}/metrics": {
             "get": {
                 "security": [
@@ -10789,6 +11076,14 @@
                         "items": {
                             "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Account"
                         }
+                    }
+                }
+            },
+            "api_endpoints.AnalyticsResponseWrapper": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.AnalyticsResponse"
                     }
                 }
             },
@@ -14683,6 +14978,11 @@
                         "type": "string",
                         "example": "user@example.com"
                     },
+                    "experiment_variant": {
+                        "description": "ExperimentVariant is the caller's arm in the connector-paywall\nexperiment: \"control\" or \"treatment\". Computed per request and never\nstored, so disabling the flag restores everyone immediately without a\ndeploy. Always \"control\" for users who are not enrolled.",
+                        "type": "string",
+                        "example": "control"
+                    },
                     "facebook_page_selection": {
                         "description": "FacebookPageSelection, when true, enables the shared-credential Facebook\nconnect flow (page selection) in the dashboard. Read-only here.",
                         "type": "boolean",
@@ -16642,6 +16942,56 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.AnalyticsPoint": {
+                "type": "object",
+                "properties": {
+                    "change": {
+                        "description": "Change is the difference from the previous point in this series. Present\non gauges only, and absent on the first point of a range, which has no\npredecessor to diff against.",
+                        "type": "integer",
+                        "example": 18
+                    },
+                    "day": {
+                        "description": "Day is YYYY-MM-DD, cut on the boundary named by the series' day_tz.",
+                        "type": "string",
+                        "example": "2026-09-19"
+                    },
+                    "days_spanned": {
+                        "description": "DaysSpanned is how many days Change covers. It is 1 in the normal case\nand larger when capture missed a day. A chart must divide by it and style\nthe segment as interpolated: a Sampled platform that missed Tuesday draws\na Wednesday spike that never happened, and spreading the value silently\nacross the gap is worse, because it is undetectable.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "subjects_counted": {
+                        "description": "SubjectsCounted is how many Subjects contributed to this point's summed\nvalue. Present on every point, including a single-Subject series, where\nit is always 1: gating it off would silently deny the field to a Brand\nthat happens to have exactly one Account today, and make it appear only\nthe day a second one connects. Without it, one Account failing capture\non one day draws a Brand follower cliff that never happened, which is\nthe most damaging thing this feature can ship, because it looks\nplausible.",
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "value": {
+                        "description": "Value is the stored figure, verbatim from the platform for a Reported\npoint.",
+                        "type": "integer",
+                        "example": 12430
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.AnalyticsResponse": {
+                "type": "object",
+                "properties": {
+                    "from": {
+                        "description": "From and To are the resolved range, echoed so a caller that named neither\nknows what it got.",
+                        "type": "string",
+                        "example": "2026-08-21"
+                    },
+                    "series": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.MetricSeries"
+                        }
+                    },
+                    "to": {
+                        "type": "string",
+                        "example": "2026-09-19"
+                    }
+                }
+            },
             "social-api_ai_core_api_service.CarouselConstraints": {
                 "type": "object",
                 "properties": {
@@ -16921,6 +17271,38 @@
                     },
                     "text": {
                         "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.MetricSeries": {
+                "type": "object",
+                "properties": {
+                    "day_tz": {
+                        "description": "DayTZ names the boundary these days were cut on, or mixed when a rollup\ncombines platforms that cut differently. A Brand rollup genuinely mixes\nboundaries: up to eight hours of activity sits on the wrong side of a day\nedge for Meta platforms next to a UTC-cut platform in the same sum. The\nerror is bounded and does not compound, and this field is how a reader\ntells it from a real discrepancy.",
+                        "type": "string",
+                        "example": "America/Los_Angeles"
+                    },
+                    "kind": {
+                        "description": "Kind is gauge (a level, diff it) or flow (a per-day count, sum it).",
+                        "type": "string",
+                        "example": "gauge"
+                    },
+                    "metric": {
+                        "description": "Metric is the stored name, which is the platform's own name for a\nplatform Metric (ADR 0025).",
+                        "type": "string",
+                        "example": "page_follows"
+                    },
+                    "points": {
+                        "description": "Points are ordered oldest first.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.AnalyticsPoint"
+                        }
+                    },
+                    "source": {
+                        "description": "Source is reported, sampled, owned, or mixed when a rollup combines more\nthan one.",
+                        "type": "string",
+                        "example": "reported"
                     }
                 }
             },
