@@ -27,7 +27,7 @@ TikTok publishing uses the TikTok Content Posting API v2 (PULL\_FROM\_URL flow).
 | Single video | `platform_data.tiktok.media_type: "video"` or omit (default) | One `media` entry required. Accepted formats: MP4, MOV, WebM. |
 | Photo carousel | `platform_data.tiktok.media_type: "photo"` (or omit for 2+ images) | 2 to 35 images required. Accepted formats: JPEG and WebP only. `disable_duet` and `disable_stitch` are ignored. |
 
-Single images are not supported. Mixed media (video plus images) is not supported. A `media_id` source takes the ID of media you upload first via the [media upload flow](/posts/instagram#1-upload-media). SocialAPI resolves each ID to a presigned HTTPS URL that TikTok pulls directly, so the underlying files must remain accessible while the post is being published.
+Single images are not supported. Mixed media (video plus images) is not supported. A `media_id` source takes the ID of media you upload first via the [media upload flow](/posts/instagram#1-upload-media). TikTok pulls the media directly, so the underlying files must remain accessible while the post is being published.
 
 **Accepted formats.** TikTok is strict about formats, and a mismatch is rejected up front rather than failing silently mid-publish:
 
@@ -46,7 +46,7 @@ Single images are not supported. Mixed media (video plus images) is not supporte
 
 Use `POST /v1/posts` with `targets` targeting a TikTok account. The `text` field becomes the post title or description. `privacy_level` in `platform_data.tiktok` is required: TikTok's Direct Post guidelines prohibit a client-applied default, so SocialAPI enforces an explicit selection.
 
-Before publishing, SocialAPI calls the TikTok creator info endpoint to validate the privacy level, check posting availability, and apply creator-level disable flags for comment, duet, and stitch settings.
+Before publishing, the privacy level, posting availability, and creator-level comment, duet, and stitch settings are validated against the creator's current TikTok settings.
 
 ### Video post
 
@@ -113,7 +113,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Creator info and valid privacy levels
 
-Privacy level options differ per creator. Always call `POST /v1/posts/validate` before publishing to confirm the target privacy level is allowed for the specific account. SocialAPI fetches creator info from TikTok and caches it for 10 minutes.
+Privacy level options differ per creator. Always call `POST /v1/posts/validate` before publishing to confirm the target privacy level is allowed for the specific account. Creator info reflects the creator's current TikTok settings.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/validate \
@@ -133,12 +133,11 @@ curl -X POST https://api.social-api.ai/v1/posts/validate \
 
 ### Publish flow
 
-1. SocialAPI calls `POST /v2/post/publish/creator_info/query/` to get creator settings and allowed privacy levels.
-2. SocialAPI validates the draft (privacy level required, duet/stitch for video, brand content rules).
-3. For video: SocialAPI calls `POST /v2/post/publish/video/init/` (PULL\_FROM\_URL, single media URL).
-4. For photo: SocialAPI calls `POST /v2/post/publish/content/init/` (PULL\_FROM\_URL, array of image URLs).
-5. SocialAPI polls `POST /v2/post/publish/status/fetch/` every 3 seconds until `PUBLISH_COMPLETE` or `FAILED`, or until a 60-second timeout.
-6. On success, the published item ID is stored and returned. TikTok populates that ID (`publicaly_available_post_id`) asynchronously and it can lag `PUBLISH_COMPLETE` by a few seconds, so SocialAPI keeps the target at `publishing` until the ID is in hand. See [Slow publishes and the publishing status](#slow-publishes-and-the-publishing-status).
+1. The creator's current TikTok settings and allowed privacy levels are read.
+2. The draft is validated (privacy level required, duet/stitch for video, brand content rules).
+3. TikTok pulls the media directly from the URLs supplied.
+4. The target settles once TikTok reports the post complete or failed.
+5. TikTok populates the published post ID asynchronously and it can lag completion by a few seconds, so the target stays at `publishing` until the ID is in hand. See [Slow publishes and the publishing status](#slow-publishes-and-the-publishing-status).
 
 ---
 
@@ -156,13 +155,13 @@ TikTok does not expose a post deletion endpoint in its Content Posting API. `DEL
 
 ## 6. Retrieve posts
 
-`GET /v1/posts` returns TikTok posts stored in the SocialAPI database. SocialAPI fetches videos from TikTok via `POST /v2/video/list/` (up to 20 per page, paginated by cursor) during background sync. This sync requires the `video.list` scope, which is subject to TikTok app review and may not be active for all connected accounts.
+`GET /v1/posts` returns the TikTok posts SocialAPI knows about. Posts created natively on TikTok are imported automatically, which requires the `video.list` scope: that scope is subject to TikTok app review and may not be active for all connected accounts.
 
 **What this means in practice:**
 
-- Posts created through SocialAPI are stored immediately after a successful publish and are returned by `GET /v1/posts`.
-- Background sync pulls TikTok-native posts (created outside SocialAPI) once the `video.list` scope is approved for the app.
-- Engagement metrics (likes, comments, shares, views) are populated from the video list response during sync.
+- Posts created through SocialAPI are returned by `GET /v1/posts` as soon as they publish.
+- TikTok-native posts (created outside SocialAPI) appear once the `video.list` scope is approved for the app.
+- Engagement metrics (likes, comments, shares, views) are refreshed alongside them.
 
 **Analytics exports** (`POST /v1/accounts/:id/export`) do retrieve full TikTok video data including `like_count`, `comment_count`, `share_count`, `view_count`, `duration`, `width`, and `height`.
 
@@ -202,21 +201,21 @@ This field is sent only when `media_type` is `"video"`. It is not included in ph
 
 ### Creator daily posting limit
 
-When a creator has reached their daily TikTok posting limit, the creator info endpoint returns an empty `privacy_level_options` list. SocialAPI detects this and returns a `400` validation error with field `posting_limit`.
+When a creator has reached their daily TikTok posting limit, TikTok reports an empty `privacy_level_options` list, which surfaces as a `400` validation error with field `posting_limit`.
 
 ### Token auto-refresh
 
-TikTok access tokens expire. SocialAPI automatically refreshes them using the stored refresh token before each request. If the refresh token has also expired, the connector returns `401 invalid_token` and the account must be reconnected.
+TikTok access tokens expire. SocialAPI refreshes them automatically. If the refresh token has also expired, calls return `401 invalid_token` and the account must be reconnected.
 
 ### Slow publishes and the `publishing` status
 
-SocialAPI polls the publish status for up to 60 seconds. TikTok often needs longer, either because the video is still being processed or because it has finished but has not yet exposed the post ID. In both cases the target stays at `status: "publishing"` with `platform_post_id` and `permalink` absent, and SocialAPI keeps TikTok's publish handle so it can resolve the outcome later. A background pass re-queries TikTok every 15 minutes and writes the real result, so the target settles at `published` with its ID and permalink, or at `failed` if TikTok rejected it.
+TikTok often takes longer to settle than the publish request does, either because the video is still being processed or because it has finished but has not yet exposed the post ID. In both cases the target stays at `status: "publishing"` with `platform_post_id` and `permalink` absent, and the outcome is resolved automatically afterwards: the target settles at `published` with its ID and permalink, or at `failed` if TikTok rejected it.
 
 `publishing` is not terminal, so treat it as "still working" rather than success or failure:
 
 - **Do not confirm success on it.** Only `published` is a completed publish, and a `published` TikTok target always carries a `platform_post_id`.
-- **Do not retry or republish it.** The upload may already be live on TikTok, so retrying risks a duplicate post. The reconcile pass is what resolves it.
-- **Keep polling `GET /v1/posts/{post_id}`, or wait for the webhook.** The `post.published`, `post.partial` and `post.failed` webhooks fire when the post reaches its terminal status, including when that happens during reconciliation.
+- **Do not retry or republish it.** The upload may already be live on TikTok, so retrying risks a duplicate post. It resolves on its own.
+- **Keep polling `GET /v1/posts/{post_id}`, or wait for the webhook.** The `post.published`, `post.partial` and `post.failed` webhooks fire when the post reaches its terminal status, including when it happens after the original request returned.
 
 Typical settle time is a few seconds to a few minutes. A target that TikTok never resolves is failed after about 2 hours with error code `system.internal` and the detail `publish timed out: target stuck in publishing`. Check the TikTok profile before retrying such a target: the post can still have gone live.
 

@@ -5,7 +5,7 @@ description: Full reference for publishing Threads posts via SocialAPI, includin
 
 ## 1. Overview
 
-Threads publishing uses three distinct flows depending on content type. Text-only posts use a single atomic API call (no container polling). Image and video posts use a two-step flow: container creation then publish, with polling added for video containers until they reach `FINISHED`. Carousel posts use a three-step flow: one container per item, then a parent carousel container, then publish.
+Threads publishing behaves differently by content type. Text posts publish in one step. Image and carousel posts publish as soon as Threads accepts the media. Video posts publish once Threads has finished processing the file, which adds a delay.
 
 | Field | Value |
 |---|---|
@@ -29,7 +29,7 @@ Threads publishing uses three distinct flows depending on content type. Text-onl
 | Single video | One `media` entry pointing to a video (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Sent as `media_type: VIDEO`; container is polled until `FINISHED` |
 | Carousel | Two or more `media` entries | Up to 20 items; mix of images and videos allowed |
 
-SocialAPI auto-detects the media type from the URL file extension. Video detection inspects the URL path, ignoring query parameters (safe for presigned S3 URLs).
+SocialAPI auto-detects the media type from the URL file extension. The extension is read from the URL path, so query parameters (for example on a presigned upload URL) do not affect detection.
 
 **Text limit:** 500 characters.
 
@@ -145,17 +145,17 @@ Each post includes a `targets` array with per-platform status and engagement met
 
 **Metrics notes:**
 
-SocialAPI fetches likes and replies via the Threads `/insights` endpoint (requires the `threads_manage_insights` scope). However, that scope is not requested by default, so like and reply counts remain `0` for most connected accounts. Shares and saves are not available from the Threads API at all. To enable metric collection, contact us about the `threads_manage_insights` beta scope.
+Likes and replies come from Threads insights, which requires the `threads_manage_insights` scope. However, that scope is not requested by default, so like and reply counts remain `0` for most connected accounts. Shares and saves are not available from the Threads API at all. To enable metric collection, contact us about the `threads_manage_insights` beta scope.
 
 ---
 
 ## 7. Quirks, errors, and recovery
 
-### Container polling for video
+### Video processing delay
 
-After creating a video container, SocialAPI polls the container status (once per minute, up to 5 attempts) before publishing. If the container reaches `FINISHED` or `PUBLISHED`, the post is immediately sent to `threads_publish`. If the container returns `ERROR` or `EXPIRED`, the publish fails. If the container does not finish within 5 minutes, SocialAPI returns `504 Gateway Timeout` and marks the post target as `failed`.
+Threads processes video before it can be published. The post goes live as soon as processing finishes. If Threads rejects or expires the media, the publish fails. If processing does not finish within 5 minutes, the publish fails with `504 Gateway Timeout` and the post target is marked `failed`.
 
-Image posts proceed to publish directly after container creation, without polling. Text posts use a single atomic call and skip both container creation and polling entirely.
+Image and text posts publish without this delay.
 
 ### No post editing
 
@@ -171,7 +171,7 @@ If `reply_control` is not set in `platform_data.threads`, the Threads API defaul
 
 ### Token expiry
 
-Threads long-lived user access tokens expire after approximately 60 days. SocialAPI stores the token and its expiry. When a token expires, publish calls will fail with an `auth` error. Reconnect the account via the OAuth flow to obtain a fresh token.
+Threads long-lived user access tokens expire after approximately 60 days. When a token expires, publish calls will fail with an `auth` error. Reconnect the account via the OAuth flow to obtain a fresh token.
 
 ### Error shapes
 
@@ -215,7 +215,7 @@ Response:
 
 ```json
 {
-  "upload_url": "https://r2.example.com/media/clip.mp4?X-Amz-Signature=...",
+  "upload_url": "https://upload.example.com/media/clip.mp4?X-Amz-Signature=...",
   "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "public_url": "https://cdn.example.com/media/clip.mp4"
 }
@@ -247,7 +247,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-Response (container polling starts in background):
+Response (publishing continues in the background):
 
 ```json
 {

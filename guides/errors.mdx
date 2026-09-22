@@ -34,11 +34,11 @@ The first segment of the code tells you where the failure originated.
 | `billing.*` | Plan limit reached or feature gated by tier |
 | `brand.*`, `media.*`, `post.*`, `conversation.*`, `invite.*` | Resource-specific errors on those object types |
 | `byok.*` | Bring-your-own-key credentials (Twitter app, etc.) |
-| `publishing.delivery.*` | A platform delivery worker failed mid-publish |
+| `publishing.delivery.*` | Publishing to a platform failed mid-delivery |
 | `whatsapp.*` | WhatsApp Cloud API specific failures (window, frequency, template state) |
 | `telegram.*` | Telegram Bot API specific failures (e.g. the bot cannot message a user who has not started it) |
 | `system.internal` | Unexpected server error; safe to retry idempotent requests |
-| `http.<status>` | Fiber framework HTTP error (for example, `http.404` for an unknown route). Not returned by application logic. |
+| `http.<status>` | Transport-level HTTP error (for example, `http.404` for an unknown route). Not returned by application logic. |
 
 ## Authentication
 
@@ -168,7 +168,7 @@ When the upstream platform (Meta, TikTok, Google, etc.) rejects a call, the erro
 | 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: the 7-day window has expired, or the comment already received one |
 | 404 | `platform.facebook.no_pages`, `platform.linkedin.no_pages`, `platform.google.no_locations`, `platform.youtube.no_channels`, `platform.youtube.no_uploads_playlist` | The connected account exposes no usable target |
 | 403 | `platform.facebook.page_cap` | Brand already has the maximum of 5 Facebook Pages; this is a hard cap, not billed |
-| 403 | `platform.youtube.account_suspended` | YouTube has suspended or closed the account, or its channel. The stored token is still valid, so reconnecting does not restore access: the suspension has to be resolved with YouTube directly. SocialAPI stops background sync for the account and sets `reconnect_reason` to `youtube_account_suspended` |
+| 403 | `platform.youtube.account_suspended` | YouTube has suspended or closed the account, or its channel. The token is still valid, so reconnecting does not restore access: the suspension has to be resolved with YouTube directly. SocialAPI stops background sync for the account and sets `reconnect_reason` to `youtube_account_suspended` |
 
 ## BYOK (bring-your-own-key)
 
@@ -183,7 +183,7 @@ For platforms that require a customer-supplied OAuth app (currently Twitter / X)
 
 ## Publishing delivery
 
-These are emitted by the post delivery workers and surface in the inbox / events stream rather than as direct HTTP responses, but they appear in `event.error_code` for `post.failed` and `post.partial` events.
+These arise during post delivery and surface in the inbox / events stream rather than as direct HTTP responses, but they appear in `event.error_code` for `post.failed` and `post.partial` events.
 
 | Code | Meaning |
 |---|---|
@@ -223,7 +223,7 @@ Zalo uses the generic `platform.zalo.*` namespace (see the `platform.<name>.*` r
 |---|---|---|
 | 422 | `platform.zalo.not_deliverable` | Outside the customer service messaging window, or the recipient is not eligible |
 | 401 | `platform.zalo.auth` | Access token expired or revoked, or the Official Account is no longer authorized |
-| 202 | `platform.zalo.article_processing` | Article creation is still processing on Zalo after the verification poll budget is exhausted; the article may still publish, so check before retrying |
+| 202 | `platform.zalo.article_processing` | Article creation is still processing on Zalo when the request gave up waiting; the article may still publish, so check before retrying |
 | 429 | `platform.zalo.rate_limit` | Zalo per-app or per-OA quota exhausted |
 | 400 | `validation.platform_param` | Zalo rejected a parameter |
 | 404 | `resource.not_found` | The referenced Zalo object or account does not exist |

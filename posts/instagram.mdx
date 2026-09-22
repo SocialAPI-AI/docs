@@ -5,7 +5,7 @@ description: Full reference for publishing Instagram posts via SocialAPI, includ
 
 ## 1. Overview
 
-Instagram publishing uses the Meta Graph API two-step flow: SocialAPI creates a media container, polls until the container is ready, then publishes it. All post types (image, video, reel, carousel, story) go through this same pipeline.
+Instagram processes media before it can be published, so every post type (image, video, reel, carousel, story) goes live once Instagram reports the media ready.
 
 | Field | Value |
 |---|---|
@@ -179,11 +179,9 @@ Each post includes a `targets` array with per-platform status and engagement met
 
 ## 7. Quirks, errors, and recovery
 
-### Container polling
+### Media processing delay
 
-After creating a media container, SocialAPI polls the container status before publishing. Instagram processes images almost instantly, but videos and reels can take up to 5 minutes (60 attempts at 5-second intervals). If the container does not reach `FINISHED` within that window, the publish fails with `504 Gateway Timeout` and the post target is marked `failed`.
-
-Because presigned S3 URLs do not reliably expose file extensions in the path, SocialAPI polls all containers unconditionally, not only video ones.
+Instagram processes images almost instantly, but videos and reels can take up to 5 minutes before they are ready to publish. If a video is not ready within that window, the publish fails with `504 Gateway Timeout` and the post target is marked `failed`.
 
 ### Carousel captions
 
@@ -223,7 +221,7 @@ Codes of the form `platform.instagram.<number>` (for example `platform.instagram
 
 ### Container failures report no reason
 
-Instagram publishing is a two-step flow: SocialAPI creates a media container, then polls it until Instagram finishes processing. When Instagram rejects the media at that second step, its container-status endpoint returns only a status enum (`ERROR`), with no error code and no message. Meta exposes no field carrying the reason, so SocialAPI cannot forward one.
+When Instagram rejects media during processing, it reports only a status of `ERROR`, with no error code and no message. Meta exposes no field carrying the reason, so none can be forwarded.
 
 `platform.instagram.container_failed` therefore reports the fact of the failure plus the container ID, not a cause. In practice it almost always means the file does not meet Instagram's specs: for Reels, MOV or MP4 with H.264 or HEVC video, up to 300 MB and 15 minutes, 9:16 recommended. Re-encoding the video and retrying usually resolves it.
 
@@ -252,7 +250,7 @@ Response:
 
 ```json
 {
-  "upload_url": "https://r2.example.com/media/reel.mp4?X-Amz-Signature=...",
+  "upload_url": "https://upload.example.com/media/reel.mp4?X-Amz-Signature=...",
   "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "public_url": "https://cdn.example.com/media/reel.mp4"
 }

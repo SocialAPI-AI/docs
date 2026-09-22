@@ -35,11 +35,11 @@ Zalo builds the article body as a "normal" type article with status "show". `tex
 
 ### Asynchronous creation
 
-Article creation on Zalo is asynchronous. After SocialAPI submits the article, Zalo returns a processing token rather than a finished article, and SocialAPI polls Zalo's verification endpoint until the article is published and a final article ID is available. While the article is still processing, Zalo's verification check returns its own in-progress code, and SocialAPI keeps polling. If the article is still processing once the poll budget is exhausted, the target lands in a failed state carrying `platform.zalo.article_processing`. The article may still finish publishing on Zalo's side, so check the Official Account before retrying, otherwise you risk publishing a duplicate.
+Article creation on Zalo is asynchronous: Zalo does not return a finished article straight away. The target settles once Zalo publishes it and a final article ID is available. If the article is still processing by the time the request gives up, the target lands in a failed state carrying `platform.zalo.article_processing`. The article may still finish publishing on Zalo's side, so check the Official Account before retrying, otherwise you risk publishing a duplicate.
 
 ### Draft validation
 
-Before an article is created, SocialAPI validates the draft. Zalo requires a title: if both the title and text are empty, the draft is rejected with:
+Drafts are validated before the article is created. Zalo requires a title: if both the title and text are empty, the draft is rejected with:
 
 ```json
 {

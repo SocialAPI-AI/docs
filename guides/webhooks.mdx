@@ -285,12 +285,12 @@ Google Business Profile review events do not follow the full-interaction shape a
 The `review` object is the same shape as an item in `GET /v1/inbox/reviews/{account_id}`, so one parser handles both. On `review.updated` with `change: "reply_rejected"`, `review.reply.policy_violation` explains why the reply was refused.
 
 <Note>
-  `review` is best-effort and can be absent. We read it while handling the notification, and a review deleted between the notification and the read, or a token that has since been revoked, leaves us with nothing to send. The event is still delivered with `account_id`, `review_id`, and `change`, so treat `review` as optional and fall back to `GET /v1/inbox/reviews/{account_id}` when it is missing.
+  `review` is best-effort and can be absent. It is read while the notification is handled, so a review deleted in between, or an account whose access has since been revoked, leaves nothing to send. The event is still delivered with `account_id`, `review_id`, and `change`, so treat `review` as optional and fall back to `GET /v1/inbox/reviews/{account_id}` when it is missing.
 </Note>
 
 ### Post permalink
 
-Instagram `comment.received` events include a `permalink` field inside `data`: the public URL of the post the comment was left on. When we have not seen the post before, we fetch it from Instagram while handling the webhook, so the first comment on a newly published post normally carries the link too.
+Instagram `comment.received` events include a `permalink` field inside `data`: the public URL of the post the comment was left on. It is resolved while the webhook is being handled, so the first comment on a newly published post normally carries the link too.
 
 The field is best-effort. If the post cannot be fetched (it was deleted, or the fetch times out), the event is still delivered with `permalink` omitted. Other platforms do not set it: on Facebook, comment webhooks carry no permalink, and a post's URL must be read from the posts API.
 

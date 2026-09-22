@@ -7,7 +7,7 @@ The inbox is a unified social inbox API: a single endpoint that returns comments
 
 SocialAPI provides a unified inbox API for reading and responding to all inbound engagement across your connected accounts. Comments, DMs, reviews, and mentions are accessed through consistent endpoints with the same response shape regardless of platform.
 
-SocialAPI proxies comments, reviews, and mentions from the platform API, so you always see the latest state. DM conversations and messages are stored in SocialAPI's database to support threading and pagination.
+Comments, reviews, and mentions always reflect the latest state on the platform. DM conversations and messages are retained by SocialAPI to support threading and pagination.
 
 ## Comments
 
@@ -414,10 +414,10 @@ curl "https://api.social-api.ai/v1/inbox/media/7f3c1e2a-9b4d-4e5f-8a6b-1c2d3e4f5
 | `200` | The attachment bytes, with `Content-Type` set to the original media type |
 | `404` | Unknown media ID, or it belongs to a different account than your key |
 | `410` | Gone for good: expired, or the platform reported the source unrecoverable. Retrying will not help |
-| `503` | Too many concurrent fetches in progress on this server. Retry shortly |
+| `503` | Too many concurrent fetches in progress. Retry shortly |
 | `504` | The fetch from the platform is still in progress. Retry shortly, this is not a failure |
 
-A `410` and a `504` mean opposite things and are not interchangeable: `410` means stop retrying, `504` means keep retrying. The mirroring itself happens automatically when the inbound message arrives; there is nothing to trigger, this endpoint only reads back what SocialAPI already fetched or is in the middle of fetching.
+A `410` and a `504` mean opposite things and are not interchangeable: `410` means stop retrying, `504` means keep retrying. There is nothing to trigger: the attachment is made available automatically when the inbound message arrives, and this endpoint only reads it back.
 
 ## Interaction IDs
 

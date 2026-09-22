@@ -104,7 +104,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Multi-photo album
 
-Provide 2 to 10 image entries in `media` to publish a multi-photo album. SocialAPI handles the two-step Graph API flow internally: each photo is uploaded with `published=false` to obtain a `media_fbid`, then a single `/{page-id}/feed` call attaches all photo IDs via `attached_media[]` and sets the caption.
+Provide 2 to 10 image entries in `media` to publish a multi-photo album. The entries are published as a single album post with one caption.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -151,7 +151,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Video post
 
-Provide a single video entry in `media`. SocialAPI detects the video extension and routes to `/{page-id}/videos`. The `title` platform_data field is forwarded as the video title; all other `platform_data` keys are ignored for single-video posts.
+Provide a single video entry in `media`. It is published as a Page video. The `title` platform_data field is forwarded as the video title; all other `platform_data` keys are ignored for single-video posts.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -166,7 +166,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Reel
 
-Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media`. SocialAPI runs Facebook's Reels publishing flow (upload, processing, publish). The request blocks until the Reel is ready or published, polling for up to about 10 minutes (120 status checks at 5-second intervals). If the Reel does not finish processing within that window, the publish fails with `504 Gateway Timeout`.
+Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media`. Facebook processes Reels before they go live. The request waits up to about 10 minutes for that to finish; beyond that, the publish fails with `504 Gateway Timeout`.
 
 The `platform_data` object lives on the target (inside the `targets` array), and its keys are read directly (do not nest them under a `facebook` key).
 
@@ -272,7 +272,7 @@ curl -X PATCH https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
   }'
 ```
 
-SocialAPI calls `POST /{page-id}_{post-id}` with the new `message` value. Only the `text` field is forwarded; all other patch fields are ignored for Facebook targets.
+Only the `text` field is forwarded; all other patch fields are ignored for Facebook targets.
 
 **Limitation:** Only posts created by your app can be updated. Posts imported from the platform (via sync) may return a `400` from Facebook if the app does not own them.
 
@@ -336,7 +336,7 @@ Each post includes a `targets` array with per-platform status and engagement met
 - `shares` is populated for Facebook posts. Facebook is the only platform where SocialAPI reports a non-zero share count.
 - `saves` is not exposed by the Facebook Pages API and is always `0`.
 - `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Facebook.
-- Reels are included, and report a different set of counts than feed posts. A Reel is published through the Reels API and does not appear in the Page feed at all, so SocialAPI reads it directly by its video ID. A Reel returns `likes`, `comments`, and a view count under `metrics.extra.views`. `shares` stays `0` for a Reel: a share count for Reels exists only on the Graph API's video insights edge, which requires the `read_insights` permission that SocialAPI does not currently request, and it is reported there combined with comments rather than as a separate figure. We leave the field at `0` rather than report a number we cannot read.
+- Reels are included, and report a different set of counts than feed posts. A Reel does not appear in the Page feed at all. A Reel returns `likes`, `comments`, and a view count under `metrics.extra.views`. `shares` stays `0` for a Reel: a share count for Reels exists only on the Graph API's video insights edge, which requires the `read_insights` permission that is not available here, and it is reported there combined with comments rather than as a separate figure. We leave the field at `0` rather than report a number we cannot read.
 - A target whose metrics cannot be read is returned with a structured `error` object rather than omitted from the response. An absent target therefore means the post was never published to that platform, not that the refresh failed. Check `error.code` to tell the cases apart: `resource.not_found` means the platform did not return the post in its recent listing, and `resource.not_supported` means the platform does not expose metrics for it.
 
 ---

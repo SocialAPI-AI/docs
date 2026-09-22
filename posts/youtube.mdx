@@ -194,11 +194,11 @@ curl -X PATCH https://api.social-api.ai/v1/platforms/youtube/accounts/acc_01HZ9X
 
 `tags` sets Studio Tags, which are a separate field from any `#hashtags` written into the description. Editing the description does not change Studio Tags, and setting tags does not change the description.
 
-Partial edits are safe on both endpoints: fields you do not provide are preserved. SocialAPI fetches the current video and backfills any unspecified snippet field, so an omitted field is never wiped.
+Partial edits are safe on both endpoints: fields you do not provide are preserved. An omitted field is never wiped.
 
 **Notes:**
-- Updating the snippet always requires a title and a category. SocialAPI backfills both from the current video when you omit them.
-- Omit `tags` to leave the video's existing tags unchanged. Sending an empty array is a no-op rather than a clear, since the current tags are backfilled. Clearing tags is not supported through the API.
+- Updating the snippet always requires a title and a category. Both keep their current value when you omit them.
+- Omit `tags` to leave the video's existing tags unchanged. Sending an empty array is a no-op rather than a clear. Clearing tags is not supported through the API.
 - `publish_at` can only be set before the first publish. It cannot be changed once the video is public.
 
 ---
@@ -230,7 +230,7 @@ curl "https://api.social-api.ai/v1/posts?platform=youtube&account_ids=acc_01HZ9X
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Listing is a two-step process internally (the channel's uploads playlist is read, then each video is enriched with statistics), transparent to the caller. Each post includes a `targets` array with per-platform status and engagement metrics:
+Each post includes a `targets` array with per-platform status and engagement metrics:
 
 ```json
 {
@@ -319,7 +319,7 @@ Response:
 
 ```json
 {
-  "upload_url": "https://r2.example.com/media/walkthrough.mp4?X-Amz-Signature=...",
+  "upload_url": "https://upload.example.com/media/walkthrough.mp4?X-Amz-Signature=...",
   "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "public_url": "https://cdn.example.com/media/walkthrough.mp4"
 }

@@ -176,7 +176,7 @@ Listing, editing, and deleting templates, plus phone-number management (`request
 
 ## Receiving and replying
 
-WhatsApp has no message-history API, so we build the inbox from inbound webhook events from connect time onward. There is no backfill of messages sent before you connected.
+WhatsApp has no message-history API, so the inbox covers messages from connect time onward. There is no backfill of messages sent before you connected.
 
 ### List DM conversations
 
@@ -288,7 +288,7 @@ A tap is delivered as an ordinary `dm.received` event, not a separate event type
 
 ### Inbound media
 
-When a customer sends a photo, voice note, or other attachment, WhatsApp's webhook hands us a media id, not a URL, and that id is redeemable only with the connected account's own access token, not your API key. So for WhatsApp, and only WhatsApp, we fetch the bytes ourselves and mirror them into SocialAPI's storage: `messages.attachment_url` on a WhatsApp message is a SocialAPI URL (`/v1/inbox/media/{id}`) that you retrieve with your API key, unlike every other connector where `attachment_url` is the platform's own URL. See [Inbox media](/guides/inbox#media) for the endpoint and its response codes.
+WhatsApp exposes inbound media only to the connected account, never to an external caller, so it cannot be linked directly. For WhatsApp, and only WhatsApp, `messages.attachment_url` is a SocialAPI URL (`/v1/inbox/media/{id}`) that you retrieve with your API key, unlike every other connector where `attachment_url` is the platform's own URL. See [Inbox media](/guides/inbox#media) for the endpoint and its response codes.
 
 ## Errors
 

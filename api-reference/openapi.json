@@ -268,7 +268,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Soft-deletes a connected account. It will no longer appear in the accounts list\nand all API calls using this account will return 404.",
+                "description": "Disconnects a connected account. It will no longer appear in the accounts list\nand all API calls using this account will return 404.",
                 "tags": [
                     "Accounts"
                 ],
@@ -318,7 +318,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns stored daily history for a connected account: follower levels, reach, and the other metrics the platform publishes. This route never calls the platform, so it cannot fail or slow down because a token expired. For the account's current figures, use the live insights routes instead.\nEach series names its metric kind (gauge for a level you may diff, flow for a per-day count you may sum) and the timezone its days were cut on. Every point also carries how many subjects contributed to that day, always present and always at least 1, even for a single-subject account.",
+                "description": "Returns daily history for a connected account: follower levels, reach, and the other metrics the platform publishes. For the account's current figures, use the live insights routes instead.\nEach series names its metric kind (gauge for a level you may diff, flow for a per-day count you may sum) and the timezone its days were cut on. Every point also carries how many subjects contributed to that day, always present and always at least 1, even for a single-subject account.",
                 "tags": [
                     "Analytics"
                 ],
@@ -1327,7 +1327,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Re-runs the post backfill for one connected account and refreshes stored engagement counts. Works for any platform whose connector can list posts. Runs synchronously and fetches one page (up to 100 posts).",
+                "description": "Re-imports recent posts for one connected account and refreshes their engagement counts. Available on platforms that support listing posts. Returns once the refresh completes, covering up to 100 posts.",
                 "tags": [
                     "Accounts"
                 ],
@@ -1638,7 +1638,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes a brand and deactivates all its connected accounts (sets is_active=false).",
+                "description": "Deletes a brand and disconnects all its connected accounts.",
                 "tags": [
                     "Brands"
                 ],
@@ -1764,7 +1764,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns stored daily history for every account and page in a brand, summed per metric per day. A brand total is computed at read time and never stored, so it always reflects the accounts the brand holds right now.\nRead subjects_counted before drawing a chart. A brand whose accounts did not all report on a given day produces a lower sum for that day, and without the count that reads as a decline instead of a gap.",
+                "description": "Returns daily history for every account and page in a brand, summed per metric per day. A brand total always reflects the accounts the brand holds right now.\nRead subjects_counted before drawing a chart. A brand whose accounts did not all report on a given day produces a lower sum for that day, and without the count that reads as a decline instead of a gap.",
                 "tags": [
                     "Analytics"
                 ],
@@ -2142,7 +2142,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the cached video data for a completed export, including metrics and optional AI-enriched fields (transcript, vision summary).",
+                "description": "Returns the video data for a completed export, including metrics and optional AI-enriched fields (transcript, vision summary).",
                 "tags": [
                     "Exports"
                 ],
@@ -2199,7 +2199,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Submit feedback (bug report, feature request, or general comment). Stored for the team and forwarded to their notification channel.",
+                "description": "Submit feedback (bug report, feature request, or general comment). Routed to the SocialAPI team.",
                 "tags": [
                     "Feedback"
                 ],
@@ -2256,7 +2256,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns inbox posts that have comments, ordered by most-recently-commented. Supports filtering by account, platform, minimum comment count, and date range. Uses cursor-based pagination. YouTube has no webhooks, so YouTube commented posts are served live from the platform and only appear when the request is scoped with account_id (they are absent from the unfiltered aggregate); the live YouTube list returns a single page (no cursor).",
+                "description": "Returns inbox posts that have comments, ordered by most-recently-commented. Supports filtering by account, platform, minimum comment count, and date range. Uses cursor-based pagination. YouTube commented posts only appear when the request is scoped with account_id (they are absent from the unfiltered aggregate), and that list returns a single page (no cursor).",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -3111,7 +3111,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sends a direct message to the author of a comment. Only supported on Instagram and Facebook. Meta allows one private reply per comment, within 7 days of the comment; a second attempt or an expired window returns HTTP 400 with error code platform.instagram.private_reply_ineligible or platform.facebook.private_reply_ineligible. Once a comment has spent its one reply, or when we can already tell the comment is older than 7 days, further attempts are refused immediately without calling the platform and do not count against your outbound message rate; the error carries a reason of already_replied, platform_refused or window_expired. The 400 is terminal: retrying it will never succeed. Set buttons (1 to 3) to send the reply as a button template with text as its body; a tap on a postback button arrives as a dm.postback event. You cannot message the commenter again until they respond; once they do, the conversation continues within the standard 24-hour messaging window. Check the can_private_reply capability flag.",
+                "description": "Sends a direct message to the author of a comment. Only supported on Instagram and Facebook. Meta allows one private reply per comment, within 7 days of the comment; a second attempt or an expired window returns HTTP 400 with error code platform.instagram.private_reply_ineligible or platform.facebook.private_reply_ineligible. Once a comment has spent its one reply, or the comment is older than 7 days, further attempts are refused and do not count against your outbound message rate; the error carries a reason of already_replied, platform_refused or window_expired. The 400 is terminal: retrying it will never succeed. Set buttons (1 to 3) to send the reply as a button template with text as its body; a tap on a postback button arrives as a dm.postback event. You cannot message the commenter again until they respond; once they do, the conversation continues within the standard 24-hour messaging window. Check the can_private_reply capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -4017,7 +4017,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the bytes of a mirrored inbound attachment. A pending fetch is waited on briefly; 504 means retry, not gone.",
+                "description": "Returns the bytes of an inbound attachment. 504 means retry shortly, not gone.",
                 "tags": [
                     "Inbox"
                 ],
@@ -4142,7 +4142,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns one page of reviews for a single connected Account, newest first by default. Reviews are proxied live from the platform and not stored. Currently only Google Business Profile returns reviews.",
+                "description": "Returns one page of reviews for a single connected Account, newest first by default. Currently only Google Business Profile returns reviews.",
                 "tags": [
                     "Inbox Reviews"
                 ],
@@ -5167,7 +5167,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Upload a media file directly through the API server.",
+                "description": "Upload a media file directly through the API.",
                 "tags": [
                     "Media"
                 ],
@@ -5243,7 +5243,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a presigned S3 PUT URL for client-side media upload. Upload the file directly\nvia HTTP PUT to the returned URL, then call POST /v1/media/:id/verify to confirm.",
+                "description": "Returns a presigned PUT URL for client-side media upload. Upload the file directly\nvia HTTP PUT to the returned URL, then call POST /v1/media/:id/verify to confirm.",
                 "tags": [
                     "Media"
                 ],
@@ -5593,7 +5593,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists every Page the login's stored credential can manage, live from Meta, merged with assignment state. Pages granted after the last OAuth exchange appear here without re-authenticating. assignable reflects tenancy only; the 5-page-per-brand cap is enforced when assigning.",
+                "description": "Lists every Page this login can manage, live from Meta, merged with assignment state. Pages granted after the last OAuth exchange appear here without re-authenticating. assignable reflects ownership only; the 5-page-per-brand cap is enforced when assigning.",
                 "tags": [
                     "Facebook"
                 ],
@@ -6025,7 +6025,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Attaches one photo or video to a location's public profile under the given category. media takes exactly one item in the same form the publishing endpoints accept: a stored media library id (source_type media_id), a public URL (url), or a reference to bytes you uploaded to Google yourself (platform_attachment_id). SocialAPI resolves a library id and hands Google a URL to fetch, and derives the photo or video format from the stored file, so you never set Google's own upload fields. Google limits a location to 10 edits per minute, and that limit cannot be raised.",
+                "description": "Attaches one photo or video to a location's public profile under the given category. media takes exactly one item in the same form the publishing endpoints accept: a stored media library id (source_type media_id), a public URL (url), or a reference to bytes you uploaded to Google yourself (platform_attachment_id). The photo or video format is derived from the item you supply, so you never set Google's own upload fields. Google limits a location to 10 edits per minute, and that limit cannot be raised.",
                 "tags": [
                     "Google"
                 ],
@@ -6347,7 +6347,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists every Business Profile location the login's stored credential can manage, live from Google, merged with assignment state. Locations added in Google Business Profile after the last authorization appear here without re-authenticating. assignable reflects tenancy only. login_email identifies the Google account itself, and is empty for a login authorized before it was captured.",
+                "description": "Lists every Business Profile location this login can manage, live from Google, merged with assignment state. Locations added in Google Business Profile after the last authorization appear here without re-authenticating. assignable reflects ownership only. login_email identifies the Google account itself, and may be empty on older connections.",
                 "tags": [
                     "Google"
                 ],
@@ -6775,7 +6775,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the profile Instagram exposes for a messaging participant, including the follow relationship in both directions (is_user_follow_business, is_business_follow_user). Read live from Instagram on every call, never cached, because follow status changes the moment someone unfollows. Instagram only returns this data for users who have consented by messaging your account or tapping an icebreaker or the persistent menu; for anyone else this returns 403 platform.instagram.230, which means Instagram will not disclose the relationship and is NOT the same as \"does not follow\". Branch on that error rather than treating it as a negative. Fields name and profile_pic are absent for users who have set neither; the follow fields are still returned. profile_pic URLs expire after a few days, so do not store them.",
+                "description": "Returns the profile Instagram exposes for a messaging participant, including the follow relationship in both directions (is_user_follow_business, is_business_follow_user). The follow relationship is current as of the call; do not cache it, since it changes the moment someone unfollows. Instagram only returns this data for users who have consented by messaging your account or tapping an icebreaker or the persistent menu; for anyone else this returns 403 platform.instagram.230, which means Instagram will not disclose the relationship and is NOT the same as \"does not follow\". Branch on that error rather than treating it as a negative. Fields name and profile_pic are absent for users who have set neither; the follow fields are still returned. profile_pic URLs expire after a few days, so do not store them.",
                 "tags": [
                     "Instagram"
                 ],
@@ -8632,7 +8632,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a single message template by its WhatsApp template ID. Any active WhatsApp account on the caller's workspace is used to authorize the lookup; the template itself is scoped by its platform ID.",
+                "description": "Returns a single message template by its WhatsApp template ID. Requires an active WhatsApp account on your workspace. The template is identified by its WhatsApp template ID.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -9639,7 +9639,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes a draft/scheduled/failed post locally, or deletes a published post from every platform that supports it. Platforms that do not support deletion (or fail) keep their copy live and the post is kept (shrunk) rather than removed. Returns a per-platform result.",
+                "description": "Deletes a draft/scheduled/failed post locally, or deletes a published post from every platform that supports it. Platforms that do not support deletion (or fail) keep their copy live and the post is kept rather than removed. Returns a per-platform result.",
                 "tags": [
                     "Posts"
                 ],
@@ -9782,7 +9782,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns stored daily history for a published post: how its engagement counters accrued, one point per day. This is the history route. For the post's current figures fetched live from the platform, use GET /v1/posts/{pid}/metrics instead.\nHistory starts the day the post first appeared in a metrics sync, so a post published before this feature shipped has no earlier points.",
+                "description": "Returns daily history for a published post: how its engagement counters accrued, one point per day. This is the history route. For the post's current figures, use GET /v1/posts/{pid}/metrics instead.\nHistory does not extend back before the post was first tracked, so an older post may have no earlier points.",
                 "tags": [
                     "Analytics"
                 ],
@@ -10203,7 +10203,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns brands, posts, and interactions consumed during the current billing period alongside the plan limits. -1 means unlimited (all paid plans). Period boundaries come from Stripe subscription or rolling 30-day windows for free users.",
+                "description": "Returns brands, posts, and interactions consumed during the current billing period alongside the plan limits. -1 means unlimited (all paid plans). Period boundaries follow your subscription cycle, or a rolling 30-day window on the free plan.",
                 "tags": [
                     "Usage"
                 ],
@@ -11547,7 +11547,7 @@
                         "$ref": "#/components/schemas/api_endpoints.InboxPagination"
                     },
                     "sync_state": {
-                        "description": "SyncState is \"idle\", \"syncing\", or \"failed\" for this account's\nconversation-list sync. Additive: reading it never triggers a sync, and a\nclient that ignores it sees exactly the previous response.",
+                        "description": "SyncState is \"idle\", \"syncing\", or \"failed\" for this account's\nconversation-list sync. Reading it never triggers a sync, and a client\nthat ignores it sees exactly the previous response.",
                         "type": "string",
                         "enum": [
                             "idle",
@@ -11952,7 +11952,7 @@
                         "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
                     "source_type": {
-                        "description": "SourceType selects how Source is interpreted:\n  - \"url\": Source is a publicly reachable media URL the platform fetches directly.\n  - \"media_id\": Source is a file id in your SocialAPI media library\n    (GET /v1/media); the server resolves it to a temporary URL before sending.\n  - \"platform_attachment_id\": Source is an id of media already uploaded to the\n    target platform (for example a Meta attachment_id) to reuse without re-upload.",
+                        "description": "SourceType selects how Source is interpreted:\n  - \"url\": Source is a publicly reachable media URL the platform fetches directly.\n  - \"media_id\": Source is a file id in your SocialAPI media library\n    (GET /v1/media).\n  - \"platform_attachment_id\": Source is an id of media already uploaded to the\n    target platform (for example a Meta attachment_id) to reuse without re-upload.",
                         "type": "string",
                         "enum": [
                             "url",
@@ -12625,7 +12625,7 @@
                         "type": "string"
                     },
                     "total_count": {
-                        "description": "TotalCount carries no omitempty: zero is a real count (an empty gallery),\nnot an absent one.",
+                        "description": "TotalCount is the total number of media items on the location, across all\npages. Zero means an empty gallery.",
                         "type": "integer",
                         "example": 42
                     }
@@ -12741,7 +12741,7 @@
                         "type": "string"
                     },
                     "state": {
-                        "description": "State is \"idle\", \"syncing\", or \"failed\". A finished job is idle with a\nfresher LastSyncedAt; there is no terminal \"done\".",
+                        "description": "State is \"idle\", \"syncing\", or \"failed\". A finished sync is idle with a\nfresher LastSyncedAt; there is no terminal \"done\".",
                         "type": "string",
                         "enum": [
                             "idle",
@@ -12751,7 +12751,7 @@
                         "example": "syncing"
                     },
                     "synced": {
-                        "description": "Synced counts what the last completed job wrote. Display only.",
+                        "description": "Synced is how many items the last completed sync brought in. Display only.",
                         "type": "integer",
                         "example": 12
                     }
@@ -13424,7 +13424,7 @@
                         "example": "2026-07-04T12:30:00Z"
                     },
                     "login_id": {
-                        "description": "login_id identifies the stored login and is set for both Facebook and\nGoogle. pages and lost_access are Facebook page-selection only.",
+                        "description": "login_id identifies the login and is set for both Facebook and Google.\npages and lost_access are Facebook page-selection only.",
                         "type": "string"
                     },
                     "lost_access": {
@@ -13459,7 +13459,7 @@
                         "example": "pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
                     },
                     "login_id": {
-                        "description": "login_id identifies the stored login and is set for both Facebook and\nGoogle. pages and lost_access are Facebook page-selection only.",
+                        "description": "login_id identifies the login and is set for both Facebook and Google.\npages and lost_access are Facebook page-selection only.",
                         "type": "string"
                     },
                     "lost_access": {
@@ -14979,12 +14979,12 @@
                         "example": "user@example.com"
                     },
                     "experiment_variant": {
-                        "description": "ExperimentVariant is the caller's arm in the connector-paywall\nexperiment: \"control\" or \"treatment\". Computed per request and never\nstored, so disabling the flag restores everyone immediately without a\ndeploy. Always \"control\" for users who are not enrolled.",
+                        "description": "ExperimentVariant is the caller's variant for staged feature rollouts:\n\"control\" or \"treatment\". \"control\" unless the caller is enrolled.",
                         "type": "string",
                         "example": "control"
                     },
                     "facebook_page_selection": {
-                        "description": "FacebookPageSelection, when true, enables the shared-credential Facebook\nconnect flow (page selection) in the dashboard. Read-only here.",
+                        "description": "FacebookPageSelection, when true, enables the Facebook Page selection\nconnect flow in the dashboard. Read-only here.",
                         "type": "boolean",
                         "example": false
                     },
@@ -15006,7 +15006,7 @@
                         "example": "free"
                     },
                     "role": {
-                        "description": "Role is the caller's team role: \"admin\", \"developer\", or \"\" for the\naccount Owner, who holds no Role (ADR 0020). An API key and an OAuth\ntoken both read \"\", since CheckRole never restricts them.",
+                        "description": "Role is the caller's team role: \"admin\", \"developer\", or \"\" for the\naccount Owner, who holds no Role. An API key and an OAuth token both\nread \"\".",
                         "type": "string",
                         "example": "admin"
                     },
@@ -15796,7 +15796,7 @@
                         "type": "string"
                     },
                     "brand_id": {
-                        "description": "[always] Internal brand UUID this account belongs to",
+                        "description": "[always] SocialAPI brand ID this account belongs to",
                         "type": "string"
                     },
                     "id": {
@@ -15805,11 +15805,11 @@
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "login_id": {
-                        "description": "[optional] Shared credential (login) id; set for credential-backed platforms (e.g. facebook)",
+                        "description": "[optional] Login id shared by accounts connected in the same authorization (e.g. facebook)",
                         "type": "string"
                     },
                     "metadata": {
-                        "description": "[optional] Platform-specific keys stored at connect time",
+                        "description": "[optional] Platform-specific keys for this account",
                         "type": "object",
                         "additionalProperties": {}
                     },
@@ -16077,7 +16077,7 @@
                         }
                     },
                     "can_delete": {
-                        "description": "Capability flags, pointers for the same reason as the status flags above.",
+                        "description": "CanDelete reports whether the location can be deleted. Absent when Google\nsaid nothing.",
                         "type": "boolean"
                     },
                     "can_have_business_calls": {
@@ -16113,7 +16113,7 @@
                         "type": "boolean"
                     },
                     "has_voice_of_merchant": {
-                        "description": "Status flags, pointers so the three states stay distinct: true, an\nexplicit false from Google, and absent because Google said nothing.\nA plain bool with omitempty collapses the last two, which would report a\nlocation as lacking a capability we were never actually told about.\n\nHasVoiceOfMerchant is the one that matters operationally: when it is\nfalse the merchant does not currently control the profile, and posting\nor replying fails until they resolve it in Google Business Profile.",
+                        "description": "HasVoiceOfMerchant reports whether the merchant controls the profile.\nWhen false, posting and replying fail until they resolve it in Google\nBusiness Profile. Absent when Google said nothing.",
                         "type": "boolean"
                     },
                     "is_particularly_personal_place": {
@@ -16295,7 +16295,7 @@
                         "example": "EUR"
                     },
                     "nanos": {
-                        "description": "Nanos is a pointer because zero is a real value: a price of exactly\n80.00 EUR has no fractional part, and omitempty would drop it.",
+                        "description": "Nanos is the fractional part of the price, in billionths. Zero is a real\nvalue, not an absent one.",
                         "type": "integer"
                     },
                     "units": {
@@ -16487,7 +16487,7 @@
                         "type": "string"
                     },
                     "closed": {
-                        "description": "Closed marks the location shut for the whole period, in which case the\ntimes are absent. A pointer so \"Google did not say\" stays distinct from\nan explicit \"not closed\".",
+                        "description": "Closed marks the location shut for the whole period, in which case the\ntimes are absent. Absent when Google said nothing.",
                         "type": "boolean"
                     },
                     "end_date": {
@@ -16571,7 +16571,7 @@
                         ]
                     },
                     "conversation_id": {
-                        "description": "[optional] Internal conversation UUID; set by the facebook/instagram/whatsapp inbound DM handlers when linked to a stored conversation",
+                        "description": "[optional] SocialAPI conversation ID; set on Facebook, Instagram and WhatsApp DMs that belong to a conversation",
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
@@ -16586,7 +16586,7 @@
                         "additionalProperties": {}
                     },
                     "page_id": {
-                        "description": "[platform: facebook] Internal SocialAPI page ID (account_pages.id) identifying which Page received the event. Set for Facebook Page-scoped events; empty for platforms without a multi-page account model (e.g. Instagram), where account_id already identifies the account.",
+                        "description": "[platform: facebook] SocialAPI page ID identifying which Page received the event. Set for Facebook Page-scoped events; empty for platforms without a multi-page account model (e.g. Instagram), where account_id already identifies the account.",
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
@@ -16601,7 +16601,7 @@
                         "example": "instagram"
                     },
                     "platform_id": {
-                        "description": "[optional] Platform-native message id, byte-identical to the platform_id of the matching row from GET /v1/inbox/conversations/{id}/messages. Set on Instagram, Facebook and WhatsApp dm.received and dm.sent, and on Instagram and Facebook dm.postback, so a delivered event can be joined to a stored message: ID is a SocialAPI interaction id and the messages endpoint returns an internal row UUID, so without this the two carry no field in common. Empty for dm.referral, which has no platform message id.",
+                        "description": "[optional] Platform-native message id, byte-identical to the platform_id of the matching row from GET /v1/inbox/conversations/{id}/messages. Set on Instagram, Facebook and WhatsApp dm.received and dm.sent, and on Instagram and Facebook dm.postback, so a delivered event can be joined to a message from that endpoint: id is a SocialAPI interaction id, which the messages endpoint does not return, so without this the two carry no field in common. Empty for dm.referral, which has no platform message id.",
                         "type": "string",
                         "example": "m_AbCdEf123"
                     },
@@ -16611,7 +16611,7 @@
                         "example": "17895695668004550"
                     },
                     "post_id": {
-                        "description": "[optional] Internal post UUID; empty when the interaction is not linked to a stored post",
+                        "description": "[optional] SocialAPI post ID; empty when the interaction is not linked to a post",
                         "type": "string",
                         "example": "01HZ9X3Q4R5M6N7P8V2K0W1J42"
                     },
@@ -16787,7 +16787,7 @@
                 "type": "object",
                 "properties": {
                     "expires_at": {
-                        "description": "when media_url stops working; omitted when the anchor timestamp isn't trustworthy enough to compute it",
+                        "description": "when media_url stops working; omitted when it cannot be determined",
                         "type": "string",
                         "example": "2026-09-12T14:03:00Z"
                     },
@@ -16956,17 +16956,17 @@
                         "example": "2026-09-19"
                     },
                     "days_spanned": {
-                        "description": "DaysSpanned is how many days Change covers. It is 1 in the normal case\nand larger when capture missed a day. A chart must divide by it and style\nthe segment as interpolated: a Sampled platform that missed Tuesday draws\na Wednesday spike that never happened, and spreading the value silently\nacross the gap is worse, because it is undetectable.",
+                        "description": "DaysSpanned is how many days Change covers. It is 1 in the normal case\nand larger when a day is missing from the series. A chart must divide by\nit and style the segment as interpolated: otherwise a gap draws a spike\nthat never happened.",
                         "type": "integer",
                         "example": 1
                     },
                     "subjects_counted": {
-                        "description": "SubjectsCounted is how many Subjects contributed to this point's summed\nvalue. Present on every point, including a single-Subject series, where\nit is always 1: gating it off would silently deny the field to a Brand\nthat happens to have exactly one Account today, and make it appear only\nthe day a second one connects. Without it, one Account failing capture\non one day draws a Brand follower cliff that never happened, which is\nthe most damaging thing this feature can ship, because it looks\nplausible.",
+                        "description": "SubjectsCounted is how many Subjects contributed to this point's summed\nvalue. Always at least 1. Read it before charting: a day on which not\nevery Subject reported sums lower, and without the count that reads as a\ndecline instead of a gap.",
                         "type": "integer",
                         "example": 3
                     },
                     "value": {
-                        "description": "Value is the stored figure, verbatim from the platform for a Reported\npoint.",
+                        "description": "Value is the figure for that day, verbatim from the platform for a\nreported point.",
                         "type": "integer",
                         "example": 12430
                     }
@@ -17250,7 +17250,7 @@
                         "type": "string"
                     },
                     "reply_to": {
-                        "description": "ReplyTo is the message this one replies to, or nil when it is not a reply.\nA struct rather than a bare string so the shape can grow (resolved message\nid, quoted excerpt) without breaking consumers, and so swag can see it.",
+                        "description": "ReplyTo is the message this one replies to, or null when it is not a reply.",
                         "allOf": [
                             {
                                 "$ref": "#/components/schemas/social-api_ai_core_api_service.MessageReply"
@@ -17288,7 +17288,7 @@
                         "example": "gauge"
                     },
                     "metric": {
-                        "description": "Metric is the stored name, which is the platform's own name for a\nplatform Metric (ADR 0025).",
+                        "description": "Metric is the platform's own name for a platform Metric.",
                         "type": "string",
                         "example": "page_follows"
                     },
