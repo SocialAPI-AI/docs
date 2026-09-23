@@ -29,11 +29,11 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 |---|---|---|
 | Text only | No `media`; no `link` in `platform_data` | Publishes a plain text status update |
 | Link preview | No `media`; include `link` in the target's `platform_data` | Facebook generates an Open Graph preview card |
-| Single photo | One image entry in `media` | Routes to `/{page-id}/photos`; accepts `alt_text` and the targeting and place fields, see "Platform data fields" below |
-| Single video | One video entry in `media` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; accepts `title` and the video, targeting, and place fields, see "Platform data fields" below |
-| Reel | One vertical video entry in `media` plus `content_type: "reel"` in the target's `platform_data` | Routes to the Reels API (`/{page-id}/video_reels`); accepts `content_type`, `share_to_feed`, `title`, and `place` |
+| Single photo | One image entry in `media` | Publishes a Page photo; accepts `alt_text` and the targeting and place fields, see "Platform data fields" below |
+| Single video | One video entry in `media` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Publishes a Page video; accepts `title` and the video, targeting, and place fields, see "Platform data fields" below |
+| Reel | One vertical video entry in `media` plus `content_type: "reel"` in the target's `platform_data` | Publishes a Page Reel; accepts `content_type`, `share_to_feed`, `title`, and `place` |
 | Story | One photo or video entry in `media` plus `content_type: "stories"` in the target's `platform_data` | Publishes a Page Story that expires after 24 hours. Photos publish via `/{page-id}/photo_stories`; videos run the three-phase `/{page-id}/video_stories` flow. Captions, links, and audience targeting are ignored. |
-| Multi-photo album | 2 to 10 image entries in `media` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age and country targeting, `place`) are forwarded to the feed call. |
+| Multi-photo album | 2 to 10 image entries in `media` | Publishes one post containing every photo, with one caption. Accepts `link`, the CTA fields, age and country targeting, and `place`. |
 
 Route selection is mostly automatic, driven by how many `media` entries you pass:
 
@@ -96,11 +96,19 @@ Pass these inside the target's `platform_data` object (keys are read directly, n
 | `embeddable` | boolean | single video | Allows the video to be embedded on other sites. |
 | `secret` | boolean | single video | Hides the video from the Page's public video list and search. |
 | `social_actions` | boolean | single video | Enables like, comment, and share actions on embeds of the video. |
-| `child_attachments` | array of 2 to 10 `{link, name?, description?, picture?}` | text/link posts with no media attached | Cards of a link carousel. Each card needs a `link`; `name`, `description`, and `picture` are optional. See "Link carousel" below. |
+| `child_attachments` | array of 2 to 10 `{link, name?, description?, picture?}` | text/link posts with no media attached | Cards of a link carousel. Each card needs a `link`; `name`, `description`, and `picture` are optional. Returns an error when the post has media. See "Link carousel" below. |
 | `multi_share_optimized` | boolean | with `child_attachments` | When `true`, Facebook orders the cards for best performance instead of the order sent. |
 | `multi_share_end_card` | boolean | with `child_attachments` | When `true`, an end card promoting the Page appears after the last link card. |
 
-Keys that are not listed here are not sent to Facebook; the response lists each one as a validation warning naming the key. Facebook has no AI-generated label: `is_ai_generated` returns a warning and is not sent.
+Keys that are not listed here, or not listed for the post type you publish, are not sent to Facebook; the response lists each one as a validation warning naming the key. For example, `link` on a single photo returns a warning and the photo publishes without it. Facebook has no AI-generated label: `is_ai_generated` returns a warning and is not sent.
+
+<Note>
+  **Behaviour changes**
+
+  - `min_age`, `max_age`, and `countries` now also apply to single photo and single video posts.
+  - A key that the post type does not support now returns a validation warning naming it, instead of being dropped without notice.
+  - `child_attachments` on a post with media now returns a validation error.
+</Note>
 
 ### Photo post
 
@@ -136,7 +144,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-Unlike single-photo posts, the target's `platform_data` is honored for albums: `link`, `cta_type` plus `cta_link`, age and country targeting, and `place` are all forwarded to the feed call:
+Albums also accept `link`, `cta_type` plus `cta_link`, age and country targeting, and `place` in the target's `platform_data`:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -187,7 +195,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-Provide 2 to 10 cards. Don't set `media` or `link` together with `child_attachments`.
+Provide 2 to 10 cards. `child_attachments` on a post with `media` returns a validation error. `link` set together with `child_attachments` is not sent and returns a validation warning.
 
 ### Video post
 
@@ -235,7 +243,7 @@ Requirements: exactly one video, vertical orientation (9:16), and a duration of 
 
 Publish a 24-hour Page Story by setting `content_type: "stories"` in the target's `platform_data`. Provide exactly one photo or video entry in `media`, and SocialAPI picks the right flow from the media type: a photo is uploaded as an unpublished photo and then published to `/{page-id}/photo_stories`, while a video runs Facebook's three-phase `/{page-id}/video_stories` flow (upload, processing, publish). For a video, the request blocks until processing finishes, polling for up to about 10 minutes (120 status checks at 5-second intervals); if it does not finish in that window, the publish fails with `504 Gateway Timeout`.
 
-Stories carry no caption, link, call-to-action, or audience targeting, so any `text` or `platform_data` field other than `content_type` is ignored.
+Stories carry no caption, link, call-to-action, or audience targeting. `text` is ignored, and any `platform_data` key other than `content_type` is not sent and returns a validation warning.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -402,7 +410,7 @@ When a user completes the Facebook OAuth flow, SocialAPI connects all Facebook P
 
 ### platform_data forwarding rules
 
-Which `platform_data` keys reach the Graph API depends on the content type; see the table in "Create post". Text/link posts and multi-photo albums forward the widest set, since both go through the `/{page-id}/feed` endpoint. Single-photo posts, single-video posts, Reels, and Stories each forward a narrower set. A key outside that set for the content type you are posting is not sent.
+Which `platform_data` keys apply depends on the content type; see the table in "Create post". Text/link posts and multi-photo albums accept the widest set. Single-photo posts, single-video posts, and Reels each accept a narrower set, and Stories accept only `content_type`. A key outside that set for the content type you are posting is not sent, and the response lists it as a validation warning.
 
 ### Multi-photo album semantics
 

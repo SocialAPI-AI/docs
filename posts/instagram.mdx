@@ -85,15 +85,25 @@ Pass these inside `platform_data.instagram`:
 | `collaborators` | string or array, up to 3 | feed, reel, carousel (whole carousel, not per slide) | Instagram usernames invited as collaborators. Leading `@` is stripped automatically. Accepts a single string, a comma-separated string, or a JSON array. |
 | `cover_url` | string (URL) | reel | Custom cover image for the Reel. Takes priority over `video_cover_timestamp_ms` and `thumb_offset` when more than one is set. |
 | `video_cover_timestamp_ms` | number, 0 or more | reel | Millisecond offset into the video used as the cover frame, when `cover_url` is not set. |
-| `thumb_offset` | number, 0 or more | reel | Same as `video_cover_timestamp_ms`, kept as an alternate name. Ignored when `cover_url` is set. |
+| `thumb_offset` | number, 0 or more | reel | Same as `video_cover_timestamp_ms`, kept as an alternate name. When both are set, `thumb_offset` is used. `cover_url` overrides both. |
 | `is_ai_generated` | boolean | feed, reel, stories, carousel (whole carousel, not per slide) | Adds Instagram's AI info label. See "AI-generated content" below. |
-| `is_paid_partnership` | boolean | feed, reel, carousel (whole carousel, not per slide) | Marks the post as a paid partnership. Returns an error on stories. |
-| `branded_content_sponsor_ids` | array of 1 or 2 numeric Instagram account IDs | feed, reel, carousel (whole carousel, not per slide) | Sponsor accounts tagged on branded content. Returns an error on stories. |
+| `is_paid_partnership` | boolean | feed, reel, carousel (whole carousel, not per slide) | Facebook Login accounts only. Marks the post as a paid partnership. Returns an error on stories, and on accounts connected through Instagram Login. |
+| `branded_content_sponsor_ids` | array of 1 or 2 Instagram account IDs, each a string of digits | feed, reel, carousel (whole carousel, not per slide) | Facebook Login accounts only. Sponsor accounts tagged on branded content. Send each ID as a string, for example `["17841400000000000"]`. Returns an error on stories, and on accounts connected through Instagram Login. |
 | `user_tags` | array of `{username, x, y}` | feed (x and y required, 0 to 1), reel (username only) | Tags people in the post. Returns an error on carousels. |
 | `audio_name` | string | reel | Name of the audio track shown on the Reel. |
 | `trial_params` | `{graduation_strategy}` | reel | Sets how a trial Reel graduates to your full audience. `graduation_strategy` is `"MANUAL"` or `"SS_PERFORMANCE"`. |
 
-Keys that are not listed here are not sent to Instagram; the response lists each one as a validation warning naming the key.
+Keys that are not listed here, or not listed for the post type you publish, are not sent to Instagram; the response lists each one as a validation warning naming the key.
+
+<Note>
+  **Behaviour changes**
+
+  - Keys that are not Instagram publish options are no longer sent. Each returns a validation warning.
+  - `location_id` must be a string of digits.
+  - `share_to_feed` must be a boolean.
+  - `alt_text` on Reels and `product_tags` are not sent. Each returns a validation warning.
+  - `is_paid_partnership` and `branded_content_sponsor_ids` need an account connected through Facebook Login. On an Instagram Login account they return a validation error.
+</Note>
 
 ### AI-generated content
 
@@ -323,8 +333,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
         "content_type": "reel",
         "share_to_feed": true,
         "cover_url": "https://cdn.example.com/media/reel-cover.jpg",
-        "collaborators": "@partner_brand",
-        "alt_text": "Studio shoot behind the scenes"
+        "collaborators": "@partner_brand"
       }
     }
   }'
