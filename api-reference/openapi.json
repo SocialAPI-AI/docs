@@ -13894,6 +13894,14 @@
                         "type": "string",
                         "example": "2026-04-01T10:00:00Z"
                     },
+                    "settings": {
+                        "description": "Settings are the publish settings Instagram or Facebook reports for the published post, such as the AI info label, alt text, tagged place or audience targeting. Absent when the platform reported none.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostSettings"
+                            }
+                        ]
+                    },
                     "status": {
                         "type": "string",
                         "enum": [
@@ -14965,8 +14973,13 @@
                         "type": "boolean",
                         "example": false
                     },
+                    "billing_block_reason": {
+                        "description": "BillingBlockReason is why access is paused, empty when it is not.\n\"past_due\": a payment failed, and settling it restores access.\n\"ban\": the account was suspended for a Terms of Service violation.\nPaying does not lift it, and every route except this one returns\n403 auth.suspended. Contact support to appeal.",
+                        "type": "string",
+                        "example": "past_due"
+                    },
                     "billing_blocked": {
-                        "description": "BillingBlocked is true when the subscription is past due and API access\nplus webhook delivery are paused. Clears automatically once paid.",
+                        "description": "BillingBlocked is true when API access and webhook delivery are paused.\nRead BillingBlockReason to tell why and whether paying lifts it.",
                         "type": "boolean",
                         "example": false
                     },
@@ -16571,7 +16584,7 @@
                         ]
                     },
                     "conversation_id": {
-                        "description": "[optional] SocialAPI conversation ID; set on Facebook, Instagram and WhatsApp DMs that belong to a conversation",
+                        "description": "[optional] SocialAPI conversation ID; set on Facebook, Instagram, WhatsApp and Telegram DMs that belong to a conversation",
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
@@ -16601,7 +16614,7 @@
                         "example": "instagram"
                     },
                     "platform_id": {
-                        "description": "[optional] Platform-native message id, byte-identical to the platform_id of the matching row from GET /v1/inbox/conversations/{id}/messages. Set on Instagram, Facebook and WhatsApp dm.received and dm.sent, and on Instagram and Facebook dm.postback, so a delivered event can be joined to a message from that endpoint: id is a SocialAPI interaction id, which the messages endpoint does not return, so without this the two carry no field in common. Empty for dm.referral, which has no platform message id.",
+                        "description": "[optional] Platform-native message id, byte-identical to the platform_id of the matching row from GET /v1/inbox/conversations/{id}/messages. Set on Instagram, Facebook and WhatsApp dm.received and dm.sent, on Telegram dm.received, and on Instagram and Facebook dm.postback, so a delivered event can be joined to a message from that endpoint: id is a SocialAPI interaction id, which the messages endpoint does not return, so without this the two carry no field in common. Empty for dm.referral, which has no platform message id.",
                         "type": "string",
                         "example": "m_AbCdEf123"
                     },
@@ -16625,6 +16638,14 @@
                         "allOf": [
                             {
                                 "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Author"
+                            }
+                        ]
+                    },
+                    "reply_to": {
+                        "description": "[platform: telegram, instagram, facebook] The earlier message this DM replies to; same value as reply_to on the matching row from GET /v1/inbox/conversations/{id}/messages. Absent when the DM is not a reply",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.MessageRef"
                             }
                         ]
                     },
@@ -16670,6 +16691,16 @@
                     "url": {
                         "type": "string",
                         "example": "https://cdn.example.com/photo.jpg"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.MessageRef": {
+                "type": "object",
+                "properties": {
+                    "platform_id": {
+                        "description": "Platform-native id of the referenced message, as platform_id on GET /v1/inbox/conversations/{id}/messages",
+                        "type": "string",
+                        "example": "m_AbCdEf123"
                     }
                 }
             },
@@ -16731,6 +16762,14 @@
                         "description": "[always]",
                         "type": "string"
                     },
+                    "settings": {
+                        "description": "[platform: instagram, facebook] Settings the platform reports for the post",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostSettings"
+                            }
+                        ]
+                    },
                     "shares_count": {
                         "description": "[platform: facebook] Zero on other platforms",
                         "type": "integer"
@@ -16742,6 +16781,27 @@
                     "view_count": {
                         "description": "[platform: youtube, tiktok] Zero on other platforms",
                         "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.PostChildAttachment": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "description": "Description text of the card.",
+                        "type": "string"
+                    },
+                    "link": {
+                        "description": "Destination URL of the card.",
+                        "type": "string"
+                    },
+                    "name": {
+                        "description": "Title of the card.",
+                        "type": "string"
+                    },
+                    "picture": {
+                        "description": "Image URL of the card.",
+                        "type": "string"
                     }
                 }
             },
@@ -16780,6 +16840,111 @@
                     },
                     "unique_views": {
                         "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.PostPlace": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "description": "Platform id of the tagged place.",
+                        "type": "string"
+                    },
+                    "name": {
+                        "description": "Name of the tagged place.",
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.PostSettings": {
+                "type": "object",
+                "properties": {
+                    "alt_text": {
+                        "description": "Image description set on the Instagram post.",
+                        "type": "string"
+                    },
+                    "audio_type": {
+                        "description": "Kind of audio on an Instagram Reel.",
+                        "type": "string",
+                        "enum": [
+                            "MUSIC",
+                            "ORIGINAL_SOUND"
+                        ]
+                    },
+                    "child_attachments": {
+                        "description": "Cards of a Facebook multi-link post.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostChildAttachment"
+                        }
+                    },
+                    "comments_enabled": {
+                        "description": "True when comments are open on the Instagram post.",
+                        "type": "boolean"
+                    },
+                    "countries": {
+                        "description": "ISO 3166-1 alpha-2 countries the Facebook post is restricted to.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "FR",
+                            "BE"
+                        ]
+                    },
+                    "cta_link": {
+                        "description": "Call-to-action destination on the Facebook post.",
+                        "type": "string"
+                    },
+                    "cta_type": {
+                        "description": "Call-to-action button type on the Facebook post.",
+                        "type": "string",
+                        "example": "SHOP_NOW"
+                    },
+                    "is_ai_generated": {
+                        "description": "True when Instagram shows the AI info label on the post.",
+                        "type": "boolean"
+                    },
+                    "max_age": {
+                        "description": "Maximum audience age set on the Facebook post.",
+                        "type": "integer",
+                        "example": 65
+                    },
+                    "min_age": {
+                        "description": "Minimum audience age set on the Facebook post.",
+                        "type": "integer",
+                        "example": 18
+                    },
+                    "multi_share_end_card": {
+                        "description": "True when the multi-link post shows an end card.",
+                        "type": "boolean"
+                    },
+                    "multi_share_optimized": {
+                        "description": "True when Facebook picks the card order.",
+                        "type": "boolean"
+                    },
+                    "place": {
+                        "description": "Location tagged on the Facebook post.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostPlace"
+                            }
+                        ]
+                    },
+                    "product_type": {
+                        "description": "Instagram surface the post lives on.",
+                        "type": "string",
+                        "enum": [
+                            "FEED",
+                            "REELS",
+                            "STORY",
+                            "AD"
+                        ]
+                    },
+                    "share_to_feed": {
+                        "description": "True when an Instagram Reel also appears in the main profile feed.",
+                        "type": "boolean"
                     }
                 }
             },

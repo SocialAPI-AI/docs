@@ -29,11 +29,11 @@ Facebook publishing uses the Meta Graph API directly against your connected Face
 |---|---|---|
 | Text only | No `media`; no `link` in `platform_data` | Publishes a plain text status update |
 | Link preview | No `media`; include `link` in the target's `platform_data` | Facebook generates an Open Graph preview card |
-| Single photo | One image entry in `media` | Routes to `/{page-id}/photos`; `platform_data` is ignored |
-| Single video | One video entry in `media` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; only the `title` platform_data field is forwarded |
-| Reel | One vertical video entry in `media` plus `content_type: "reel"` in the target's `platform_data` | Routes to the Reels API (`/{page-id}/video_reels`). Unlike standard videos, `platform_data` IS honored (`content_type`, `share_to_feed`). |
+| Single photo | One image entry in `media` | Routes to `/{page-id}/photos`; accepts `alt_text` and the targeting and place fields, see "Platform data fields" below |
+| Single video | One video entry in `media` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Routes to `/{page-id}/videos`; accepts `title` and the video, targeting, and place fields, see "Platform data fields" below |
+| Reel | One vertical video entry in `media` plus `content_type: "reel"` in the target's `platform_data` | Routes to the Reels API (`/{page-id}/video_reels`); accepts `content_type`, `share_to_feed`, `title`, and `place` |
 | Story | One photo or video entry in `media` plus `content_type: "stories"` in the target's `platform_data` | Publishes a Page Story that expires after 24 hours. Photos publish via `/{page-id}/photo_stories`; videos run the three-phase `/{page-id}/video_stories` flow. Captions, links, and audience targeting are ignored. |
-| Multi-photo album | 2 to 10 image entries in `media` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age targeting) are forwarded to the feed call. |
+| Multi-photo album | 2 to 10 image entries in `media` | Each photo is uploaded with `published=false`, then a single `/{page-id}/feed` call attaches all `media_fbid` values via `attached_media[]`. The target's `platform_data` fields (`link`, CTA, age and country targeting, `place`) are forwarded to the feed call. |
 
 Route selection is mostly automatic, driven by how many `media` entries you pass:
 
@@ -75,21 +75,36 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Platform data fields
 
-Pass these inside the target's `platform_data` object (keys are read directly, not nested under a `facebook` key). These fields apply to text, link posts, and multi-photo albums. Single-photo posts honor `alt_text`; single-video posts honor `title`. Other `platform_data` keys are silently ignored for those post types.
+Pass these inside the target's `platform_data` object (keys are read directly, not nested under a `facebook` key). Which keys apply depends on the content type, shown in the "Applies to" column.
 
-| Field | Type | Description |
-|---|---|---|
-| `link` | string | URL to attach as a link preview card. Facebook generates the Open Graph preview automatically. |
-| `cta_type` | string | Call-to-action button type (for example, `SHOP_NOW`, `LEARN_MORE`). Must be provided together with `cta_link`. |
-| `cta_link` | string | Destination URL for the call-to-action button. Must be provided together with `cta_type`. |
-| `min_age` | number | Minimum age for audience targeting (13 to 65). |
-| `max_age` | number | Maximum age for audience targeting (13 to 65). Must be greater than or equal to `min_age`. |
+| Key | Type | Applies to | Notes |
+|---|---|---|---|
+| `content_type` | string | reel, stories | Set to `"reel"` or `"stories"` to publish those formats. Omit it for standard feed, photo, video, or album routing. Case-insensitive; any other value publishes a standard post and returns a warning naming it. |
+| `link` | string (URL) | text/link posts, multi-photo albums | Attaches a link preview card. Facebook generates the Open Graph preview. |
+| `cta_type` | string | text/link posts, multi-photo albums | Call-to-action button type, for example `SHOP_NOW` or `LEARN_MORE`. Must be set together with `cta_link`. |
+| `cta_link` | string (URL) | text/link posts, multi-photo albums | Destination URL for the call-to-action button. Must be set together with `cta_type`. |
+| `min_age` | number, 13 to 65 | text/link posts, photo, video, multi-photo albums | Minimum audience age. |
+| `max_age` | number, 13 to 65 | text/link posts, photo, video, multi-photo albums | Maximum audience age. Must be greater than or equal to `min_age`. |
+| `countries` | array of ISO 3166-1 alpha-2 codes | text/link posts, photo, video, multi-photo albums | Restricts the audience to these countries, for example `["FR", "BE"]`. |
+| `place` | string (numeric Page ID) | text/link posts, photo, video, multi-photo albums, reel | Tags a location on the post. |
+| `alt_text` | string | single photo | Accessibility text for the photo. |
+| `title` | string | single video, reel | Title shown with the video or Reel. |
+| `share_to_feed` | boolean | reel | When `true`, the Reel also appears in the Page feed, not just the Reels tab. |
+| `no_story` | boolean | single photo, single video | When `true`, the photo or video is added without posting a separate update to the Page feed. |
+| `content_category` | string | single video | One of Facebook's video categories: `BEAUTY_FASHION`, `BUSINESS`, `CARS_TRUCKS`, `COMEDY`, `CUTE_ANIMALS`, `ENTERTAINMENT`, `FAMILY`, `FOOD_HEALTH`, `HOME`, `LIFESTYLE`, `MUSIC`, `NEWS`, `POLITICS`, `SCIENCE`, `SPORTS`, `TECHNOLOGY`, `VIDEO_GAMING`, or `OTHER`. |
+| `content_tags` | array of numeric Facebook Page or profile IDs | single video | Tags Pages or profiles in the video. |
+| `embeddable` | boolean | single video | Allows the video to be embedded on other sites. |
+| `secret` | boolean | single video | Hides the video from the Page's public video list and search. |
+| `social_actions` | boolean | single video | Enables like, comment, and share actions on embeds of the video. |
+| `child_attachments` | array of 2 to 10 `{link, name?, description?, picture?}` | text/link posts with no media attached | Cards of a link carousel. Each card needs a `link`; `name`, `description`, and `picture` are optional. See "Link carousel" below. |
+| `multi_share_optimized` | boolean | with `child_attachments` | When `true`, Facebook orders the cards for best performance instead of the order sent. |
+| `multi_share_end_card` | boolean | with `child_attachments` | When `true`, an end card promoting the Page appears after the last link card. |
 
-Only the documented fields above are forwarded to the Graph API; any additional keys in `platform_data` are silently ignored.
+Keys that are not listed here are not sent to Facebook; the response lists each one as a validation warning naming the key. Facebook has no AI-generated label: `is_ai_generated` returns a warning and is not sent.
 
 ### Photo post
 
-Provide a single image entry in `media`. The `alt_text` platform_data field is forwarded as `alt_text_custom` on the photo; all other `platform_data` keys are ignored for single-photo posts.
+Provide a single image entry in `media`. Photo posts also accept `alt_text`, `min_age`, `max_age`, `countries`, `place`, and `no_story`; see the table above.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -121,7 +136,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-Unlike single-photo posts, the target's `platform_data` IS honored for albums. The `link`, `cta_type` plus `cta_link`, and age targeting fields are forwarded to the feed call:
+Unlike single-photo posts, the target's `platform_data` is honored for albums: `link`, `cta_type` plus `cta_link`, age and country targeting, and `place` are all forwarded to the feed call:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -149,9 +164,34 @@ curl -X POST https://api.social-api.ai/v1/posts \
 - Minimum 2, maximum 10 photos per album.
 - Images only. Including a video entry (any of `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) in a 2+ item `media` list returns a validation error before any upload to Facebook.
 
+### Link carousel
+
+Publish several link cards in one post by setting `child_attachments` instead of `media` or `link`. This is different from a multi-photo album: no media is uploaded, and each card carries its own link, title, and description.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Top picks this week.",
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "child_attachments": [
+          { "link": "https://example.com/product-1", "name": "Product one", "description": "Our best seller", "picture": "https://example.com/images/product-1.jpg" },
+          { "link": "https://example.com/product-2", "name": "Product two", "description": "New this week" }
+        ],
+        "multi_share_end_card": true
+      }
+    }]
+  }'
+```
+
+Provide 2 to 10 cards. Don't set `media` or `link` together with `child_attachments`.
+
 ### Video post
 
-Provide a single video entry in `media`. It is published as a Page video. The `title` platform_data field is forwarded as the video title; all other `platform_data` keys are ignored for single-video posts.
+Provide a single video entry in `media`. It is published as a Page video. Video posts also accept `min_age`, `max_age`, `countries`, `place`, `no_story`, `content_category`, `content_tags`, `embeddable`, `secret`, and `social_actions`; see the table above.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -187,12 +227,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-Reel fields (inside the target's `platform_data`):
-
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `content_type` | string | `"feed"` | Set to `"reel"` to publish a Reel. Any other value (or omitting it) publishes a standard post or feed video, and an unrecognized value also returns a validation warning. |
-| `share_to_feed` | boolean | `true` | When `true`, the Reel also appears in the Page feed, not just the Reels tab. |
+Reels also accept `title` and `place`; see the table above for every option.
 
 Requirements: exactly one video, vertical orientation (9:16), and a duration of 3 to 90 seconds. SocialAPI warns when the duration is outside that range; Facebook enforces the aspect ratio at publish time and rejects videos that do not comply.
 
@@ -217,11 +252,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-Story fields (inside the target's `platform_data`):
-
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `content_type` | string | `"feed"` | Set to `"stories"` to publish a Story. The value is plural: the singular `"story"` is not recognized and publishes a standard feed post instead, with a validation warning. |
+Set `content_type` to `"stories"`, plural, to publish a Story. The singular `"story"` is not recognized and publishes a standard feed post instead, with a validation warning. No other `platform_data` key applies to Stories.
 
 Requirements and limits:
 
@@ -339,6 +370,24 @@ Each post includes a `targets` array with per-platform status and engagement met
 - Reels are included, and report a different set of counts than feed posts. A Reel does not appear in the Page feed at all. A Reel returns `likes`, `comments`, and a view count under `metrics.extra.views`. `shares` stays `0` for a Reel: a share count for Reels exists only on the Graph API's video insights edge, which requires the `read_insights` permission that is not available here, and it is reported there combined with comments rather than as a separate figure. We leave the field at `0` rather than report a number we cannot read.
 - A target whose metrics cannot be read is returned with a structured `error` object rather than omitted from the response. An absent target therefore means the post was never published to that platform, not that the refresh failed. Check `error.code` to tell the cases apart: `resource.not_found` means the platform did not return the post in its recent listing, and `resource.not_supported` means the platform does not expose metrics for it.
 
+### Settings on published posts
+
+A Facebook target can include a `settings` object with the options Facebook reports back for the published post:
+
+| Field | Type | Description |
+|---|---|---|
+| `place` | object | The tagged location: `id` and `name`. |
+| `countries` | array of strings | ISO 3166-1 alpha-2 countries the post is restricted to. |
+| `min_age` | number | Minimum audience age set on the post. |
+| `max_age` | number | Maximum audience age set on the post. |
+| `cta_type` | string | Call-to-action button type on the post. |
+| `cta_link` | string | Call-to-action destination URL. |
+| `child_attachments` | array | Cards of a link carousel, each with `link`, `name`, `description`, and `picture`. |
+| `multi_share_optimized` | boolean | Whether Facebook picked the card order. |
+| `multi_share_end_card` | boolean | Whether the link carousel shows an end card. |
+
+`settings` is absent when Facebook reported none of these for the post. It is also returned for posts published outside SocialAPI, since it reflects what Facebook currently reports for the post rather than what was sent through this API.
+
 ---
 
 ## 7. Quirks, errors, and recovery
@@ -353,7 +402,7 @@ When a user completes the Facebook OAuth flow, SocialAPI connects all Facebook P
 
 ### platform_data forwarding rules
 
-The target's `platform_data` block is forwarded to the Graph API for text/link posts and for multi-photo albums (both go through the `/{page-id}/feed` endpoint). For single-photo and single-video posts, most `platform_data` keys are ignored: `alt_text` is honored for single-photo posts and `title` is honored for single-video posts. For Reels, `content_type` and `share_to_feed` apply; for Stories, only `content_type` applies (Stories take no caption, link, or targeting). All other keys are silently dropped for those post types.
+Which `platform_data` keys reach the Graph API depends on the content type; see the table in "Create post". Text/link posts and multi-photo albums forward the widest set, since both go through the `/{page-id}/feed` endpoint. Single-photo posts, single-video posts, Reels, and Stories each forward a narrower set. A key outside that set for the content type you are posting is not sent.
 
 ### Multi-photo album semantics
 

@@ -31,6 +31,8 @@ Instagram processes media before it can be published, so every post type (image,
 
 `content_type` is required when publishing or scheduling an Instagram post. Without it, validation returns an error. When saving a draft (without publishing), `content_type` can be omitted and SocialAPI auto-detects at publish time: multiple `media` entries produce a carousel, a single entry produces a feed image or reel depending on file extension.
 
+Instagram accounts connect through one of two login flows, both exposed as the same `instagram` platform and both supporting the fields on this page. The exception is content type: an account connected through Facebook Login publishes single images and Reels only. A draft asking for a carousel or a story on that kind of account gets a validation warning and publishes as a single image or Reel instead.
+
 <Note>
   For Instagram feed images, use JPEG. PNG uploads can be rejected by Meta at the container-creation step. This is a Meta-side constraint, so SocialAPI does not block a PNG in advance; if a feed image fails to publish, re-encode it as JPEG.
 </Note>
@@ -74,17 +76,44 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 Pass these inside `platform_data.instagram`:
 
-| Field | Type | Description |
-|---|---|---|
-| `content_type` | string | One of `"feed"`, `"reel"`, `"carousel"`, `"stories"`, case-insensitive. Overrides auto-detection. |
-| `alt_text` | string | Accessibility alt text applied to the image container. |
-| `location_id` | string | Facebook location page ID to geo-tag the post. |
-| `share_to_feed` | bool | For Reels, also share to the main profile feed. |
-| `cover_url` | string | Custom cover image URL for video or Reel posts. |
-| `collaborators` | string or array | Instagram usernames to tag as collaborators. Leading `@` is stripped automatically. Accepts a single string, a comma-separated string, or a JSON array. |
-| `video_cover_timestamp_ms` | number | Millisecond offset into the video to use as the cover frame. Ignored if `cover_url` is set. |
+| Key | Type | Applies to | Notes |
+|---|---|---|---|
+| `content_type` | string | feed, reel, carousel, stories | One of `"feed"`, `"reel"`, `"carousel"`, `"stories"`, case-insensitive. Overrides auto-detection. |
+| `alt_text` | string, up to 1000 characters | feed, carousel | Accessibility text describing the image. Not used on Reels or stories. |
+| `location_id` | numeric string | feed, reel, carousel (whole carousel, not per slide) | Geo-tags the post to a Facebook location page. Returns an error on stories. |
+| `share_to_feed` | boolean | reel | When `true`, the Reel also appears in the main profile feed. |
+| `collaborators` | string or array, up to 3 | feed, reel, carousel (whole carousel, not per slide) | Instagram usernames invited as collaborators. Leading `@` is stripped automatically. Accepts a single string, a comma-separated string, or a JSON array. |
+| `cover_url` | string (URL) | reel | Custom cover image for the Reel. Takes priority over `video_cover_timestamp_ms` and `thumb_offset` when more than one is set. |
+| `video_cover_timestamp_ms` | number, 0 or more | reel | Millisecond offset into the video used as the cover frame, when `cover_url` is not set. |
+| `thumb_offset` | number, 0 or more | reel | Same as `video_cover_timestamp_ms`, kept as an alternate name. Ignored when `cover_url` is set. |
+| `is_ai_generated` | boolean | feed, reel, stories, carousel (whole carousel, not per slide) | Adds Instagram's AI info label. See "AI-generated content" below. |
+| `is_paid_partnership` | boolean | feed, reel, carousel (whole carousel, not per slide) | Marks the post as a paid partnership. Returns an error on stories. |
+| `branded_content_sponsor_ids` | array of 1 or 2 numeric Instagram account IDs | feed, reel, carousel (whole carousel, not per slide) | Sponsor accounts tagged on branded content. Returns an error on stories. |
+| `user_tags` | array of `{username, x, y}` | feed (x and y required, 0 to 1), reel (username only) | Tags people in the post. Returns an error on carousels. |
+| `audio_name` | string | reel | Name of the audio track shown on the Reel. |
+| `trial_params` | `{graduation_strategy}` | reel | Sets how a trial Reel graduates to your full audience. `graduation_strategy` is `"MANUAL"` or `"SS_PERFORMANCE"`. |
 
-SocialAPI forwards any additional keys in `platform_data.instagram` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See [Instagram Publishing API reference](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/content-publishing) for the full list of supported parameters.
+Keys that are not listed here are not sent to Instagram; the response lists each one as a validation warning naming the key.
+
+### AI-generated content
+
+Set `is_ai_generated: true` to add Instagram's AI info label. It applies to feed posts, Reels, stories and carousels. On a carousel it labels the whole post: there is no per-slide option. Per Meta, the label is for AI-generated media, not AI-written captions.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "A little AI magic for our spring lookbook.",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "platform_data": {
+      "instagram": {
+        "is_ai_generated": true
+      }
+    }
+  }'
+```
 
 ### Scheduling
 
@@ -174,6 +203,21 @@ Each post includes a `targets` array with per-platform status and engagement met
 - `saves` is not available from the Instagram API and is always `0`.
 - `shares` is `0` because SocialAPI does not yet sync the `shares_count` field from the Graph API.
 - `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Instagram.
+
+### Settings on published posts
+
+An Instagram target can include a `settings` object with the options Instagram reports back for the published post:
+
+| Field | Type | Description |
+|---|---|---|
+| `is_ai_generated` | boolean | Whether the AI info label is on the post. |
+| `alt_text` | string | Alt text on the post. |
+| `share_to_feed` | boolean | Whether a Reel also appears in the main profile feed. |
+| `comments_enabled` | boolean | Whether comments are open on the post. |
+| `product_type` | string | Surface the post lives on: `FEED`, `REELS`, `STORY`, or `AD`. |
+| `audio_type` | string | Kind of audio on a Reel: `MUSIC` or `ORIGINAL_SOUND`. |
+
+`settings` is absent when Instagram reported none of these for the post. Instagram does not report paid partnership, sponsor, location, user tag, audio name, or trial settings back, so those never appear here even when you set them at publish time. `settings` is also returned for posts published outside SocialAPI, since it reflects what Instagram currently reports for the post rather than what was sent through this API.
 
 ---
 
