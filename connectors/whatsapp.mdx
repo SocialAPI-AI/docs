@@ -23,7 +23,7 @@ description: Connect a WhatsApp Business phone number to receive and reply to di
 | Free-form reply | Yes | Text, media, or interactive, and only inside the open 24-hour service window (see below) |
 | Template messages | Yes | Create, list, edit, delete, and validate templates via the API, and send approved templates (including outside the 24-hour window) |
 | Interactive messages | Yes | Up to 3 reply buttons, or a list of up to 10 rows. Taps arrive on your webhook as `dm.received` |
-| Conversation list / history | No | There is no history API; the inbox is built from webhooks received after you connect |
+| Conversation list / history | Partial | There is no history API, so the inbox is built from webhooks received after you connect. A number connected from the WhatsApp Business app also brings the chat history the business shares (see [Keep using the WhatsApp Business app](#keep-using-the-whatsapp-business-app)) |
 | Phone-number management | Yes | Request a code, verify, register, deregister, and check status of the business number |
 | Business profile | Yes | Read and update the WhatsApp business profile |
 | Publishing (posts) | No | WhatsApp has no posts concept |
@@ -31,7 +31,7 @@ description: Connect a WhatsApp Business phone number to receive and reply to di
 
 ## What you need
 
-- A **WhatsApp Business phone number** that is not currently registered on the consumer WhatsApp or WhatsApp Business apps. During Embedded Signup you can select an existing number or create one.
+- A **WhatsApp Business phone number** that is not registered on the consumer WhatsApp app. A number the business uses in the WhatsApp Business app can keep running there, see [Keep using the WhatsApp Business app](#keep-using-the-whatsapp-business-app). During Embedded Signup you can select an existing number or create one.
 - **Admin access to a Meta Business** (business.facebook.com).
 
 You do **not** need to submit your own Meta App Review or complete business verification to connect. We are the Tech Provider, so the app review and provider-side setup are handled on our side. The person connecting signs in with their Meta Business account, picks their WhatsApp Business Account and phone number, and the number is connected.
@@ -106,6 +106,29 @@ curl -X POST https://api.social-api.ai/v1/oauth/exchange \
 ```
 
 We validate `state` against the one we issued to your API key, exchange the `code` for the customer's token, store the account, and return HTTP 201 with the connected account. The number's messages now flow into your inbox.
+
+### Keep using the WhatsApp Business app
+
+To connect a number the business already uses in the WhatsApp Business app, and keep using it there, add `featureType` and `sessionInfoVersion` to `extras` in leg 2:
+
+```javascript
+extras: {
+  setup: { solutionID: SOLUTION_ID },
+  featureType: "whatsapp_business_app_onboarding",
+  sessionInfoVersion: "3",
+},
+```
+
+Without `featureType`, Meta rejects such a number at the phone-number step with error #2655115 ("this account type does not support partner sharing"). The phone needs WhatsApp Business app 2.24.17 or later, and Meta decides at that step whether the number is eligible.
+
+This flow ends with the `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` event, which carries `waba_id` but no `phone_number_id`. In leg 3, send `waba_id` and leave `phone_number_id` out. If the WhatsApp Business account holds more than one number, the exchange fails with `whatsapp.ambiguous_phone_number`, and you pass `phone_number_id` explicitly.
+
+Once the number is connected:
+
+- The chat history the business chooses to share in the app (up to six months) appears in its conversations as WhatsApp delivers it. Imported messages raise no webhook events, and their attachments carry `attachment_type` without an `attachment_url`.
+- Messages the business sends from the phone app appear in the conversation and raise `dm.sent`, like messages sent through the API.
+- Sending is capped at 20 messages per second, Meta's fixed limit for these numbers.
+- The `deregister` endpoint does not work for these numbers. The business disconnects the number from the WhatsApp Business app's settings.
 
 ### Registering your domain
 
