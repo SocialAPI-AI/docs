@@ -26,8 +26,8 @@ TikTok is supported for listing videos and publishing new posts via the TikTok C
 | Create post | Yes | Via TikTok Content Posting API |
 | Delete post | - | Not supported via TikTok API |
 | Comments | Yes | List comments and replies on your posts |
-| Reply to comment | Yes | Reply to a top-level comment or to a reply |
-| Moderate comment | Partial | Hide or unhide any comment; delete your own comments only |
+| Reply to comment | Yes | Reply to a comment |
+| Moderate comment | Partial | Hide or unhide comments other than your own; delete your own comments only |
 | Like/unlike comment | Yes | |
 | Toggle post comments | - | |
 | DMs | - | Not supported by platform API |
@@ -101,7 +101,7 @@ curl -X GET "https://api.social-api.ai/v1/posts?account_ids=acc_01HZ9X3Q4R5M6N7P
 
 ## Publishing
 
-Create a TikTok post. `media_type` is optional and defaults to `video`. Photo posts always require `privacy_level`; some accounts also require it on video posts, while others publish videos publicly only and accept just `PUBLIC_TO_EVERYONE`. Valid values depend on the creator's allowed options (returned by the TikTok creator info API); a common example is `PUBLIC_TO_EVERYONE`. Call `POST /v1/posts/validate` to confirm which rule applies to an account before publishing.
+Create a TikTok post. `media_type` is optional and defaults to `video`. Photo posts require `privacy_level` unless `post_mode` is `"inbox"`; some accounts also require it on video posts, while others publish videos publicly only and accept just `PUBLIC_TO_EVERYONE`. Valid values depend on the creator's allowed options (returned by the TikTok creator info API); a common example is `PUBLIC_TO_EVERYONE`. Call `POST /v1/posts/validate` to confirm which rule applies to an account before publishing.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -167,13 +167,13 @@ This endpoint uses TikTok's `video.list` scope and requires a reconnect for acco
 - **Publishing.** Post creation uses the TikTok Content Posting API. Videos are uploaded via media upload, then published.
 - **No DMs.** TikTok's API does not expose direct messaging. Posts, comments, and mentions are available.
 - **Token refresh.** TikTok OAuth tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "platform.tiktok.auth"`, reconnect the account.
-- **Privacy level.** Photo posts always require `privacy_level`. Some TikTok accounts publish videos publicly only: for those, `privacy_level` is optional on video posts, and any value other than `PUBLIC_TO_EVERYONE` is refused with `400 validation.privacy_level_unsupported`. Call `POST /v1/posts/validate` to learn which rule applies to an account before publishing.
+- **Privacy level.** Photo posts require `privacy_level` unless `post_mode` is `"inbox"`. Some TikTok accounts publish videos publicly only: for those, `privacy_level` is optional on video posts, and any value other than `PUBLIC_TO_EVERYONE` is refused with `400 validation.privacy_level_unsupported`. Call `POST /v1/posts/validate` to learn which rule applies to an account before publishing.
 - **Mentions.** Available for TikTok Business Accounts only, and a new mention can take up to 48 hours to appear. Replies are possible only to mentions made in comments; replying to a caption mention returns `400 validation.mention_reply_unsupported`.
 - **Exports.** For some TikTok accounts, exports include captions and metrics only: a request with `include_transcript` or `include_vision` answers `400 account.export_enrichment_not_supported`.
 
 ## Permissions
 
-SocialAPI's managed TikTok Developer App already requests these scopes on your behalf: `user.info.basic`, `user.info.profile`, `video.publish`, `video.upload`. You don't need to register with TikTok for Developers. See [Platform credentials](/guides/platform-credentials).
+SocialAPI's managed TikTok Developer App already requests these scopes on your behalf: `user.info.basic` and `user.info.profile` (account name, profile picture, bio, and verification status), `user.info.stats` (follower, following, like, and video counts), `video.publish` and `video.upload` (publishing videos and photo carousels), `video.list` (listing your videos), `comment.list` (reading comments and replies), `comment.list.manage` (replying to, hiding, unhiding, liking, and deleting comments), and `biz.brand.insights` (reading mentions of your account). You don't need to register with TikTok for Developers. See [Platform credentials](/guides/platform-credentials).
 
 ## Related
 
