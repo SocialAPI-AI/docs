@@ -813,7 +813,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Enqueue an async analytics export job for a connected account. Subject to plan limits (exports per month, cooldown hours, concurrent export cap).",
+                "description": "Enqueue an async analytics export job for a connected account. Subject to plan limits (exports per month, cooldown hours, concurrent export cap). For some TikTok accounts, include_transcript and include_vision are refused with 400 account.export_enrichment_not_supported; export again without them.",
                 "tags": [
                     "Exports"
                 ],
@@ -979,7 +979,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Fetches posts where your brand account was mentioned or tagged. Results are sorted newest-first. Returns 501 for platforms that do not support mention tracking. On Instagram this returns only media your account was tagged in: @mentions written inside a post caption or inside a comment are never included, because Meta exposes no endpoint to poll them, and they are not currently delivered as mention.received webhooks either. Threads support is beta and requires the threads_manage_mentions permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
+                "description": "Fetches posts where your brand account was mentioned or tagged. Results are sorted newest-first. Returns 501 for platforms that do not support mention tracking. On Instagram this returns only media your account was tagged in: @mentions written inside a post caption or inside a comment are never included, because Meta exposes no endpoint to poll them, and they are not currently delivered as mention.received webhooks either. Threads support is beta and requires the threads_manage_mentions permission, which is pending Meta App Review: a Threads account connected without it gets an authorization error, and until Meta approves it only mentions made by accounts on the app's tester list are returned, so mentions from other accounts are left out of an otherwise successful response. On TikTok, mentions are available for Business Accounts only, and a new mention can take up to 48 hours to appear.",
                 "tags": [
                     "Mentions"
                 ],
@@ -1093,7 +1093,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Replies, as a public comment, to a mention of the connected account, including on a third-party post where the normal comment-reply endpoint is not permitted. Provide media_id (the media/post the mention is on); set comment_id only when the mention was in a comment (omit it to reply to a mention in the post caption). Supported on Instagram and Facebook. Consumes 1 interaction credit.",
+                "description": "Replies, as a public comment, to a mention of the connected account, including on a third-party post where the normal comment-reply endpoint is not permitted. Provide media_id (the media/post the mention is on); set comment_id only when the mention was in a comment (omit it to reply to a mention in the post caption). Supported on Instagram, Facebook, Threads (beta), Bluesky and TikTok. On TikTok only a comment mention can be replied to: comment_id is required, and omitting it answers 400 validation.mention_reply_unsupported. Consumes 1 interaction credit.",
                 "tags": [
                     "Mentions"
                 ],
@@ -2711,7 +2711,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, Threads, and YouTube. Check the can_hide capability flag. Threads support is beta and requires the threads_manage_replies permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
+                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, Threads, YouTube, and TikTok (comments other than the account's own). Check the can_hide capability flag. Threads support is beta and requires the threads_manage_replies permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -2813,7 +2813,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, Threads, and YouTube. Threads support is beta and requires the threads_manage_replies permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
+                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, Threads, YouTube, and TikTok. Threads support is beta and requires the threads_manage_replies permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -2911,7 +2911,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Likes a comment on the platform as the connected account. Supported on Facebook, LinkedIn Pages, and Instagram accounts connected with Facebook Login. Instagram accounts connected with Instagram Login cannot like comments. Check the can_like capability flag.",
+                "description": "Likes a comment on the platform as the connected account. Supported on Facebook, LinkedIn Pages, TikTok, and Instagram accounts connected with Facebook Login. Instagram accounts connected with Instagram Login cannot like comments. Check the can_like capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -3013,7 +3013,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Removes a like from a comment on the platform. Supported on Facebook, LinkedIn Pages, and Instagram accounts connected with Facebook Login. Check the can_like capability flag.",
+                "description": "Removes a like from a comment on the platform. Supported on Facebook, LinkedIn Pages, TikTok, and Instagram accounts connected with Facebook Login. Check the can_like capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
