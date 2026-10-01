@@ -44,7 +44,7 @@ Single images are not supported. Mixed media (video plus images) is not supporte
 
 ## 3. Create post
 
-Use `POST /v1/posts` with `targets` targeting a TikTok account. The `text` field becomes the post title or description. `privacy_level` in `platform_data.tiktok` is required: TikTok's Direct Post guidelines prohibit a client-applied default, so SocialAPI enforces an explicit selection.
+Use `POST /v1/posts` with `targets` targeting a TikTok account. The `text` field becomes the post title or description. Photo posts require `privacy_level` in `platform_data.tiktok` unless `post_mode` is `"inbox"`. Some TikTok accounts publish videos publicly only: for those, `privacy_level` is optional on video posts and any value other than `PUBLIC_TO_EVERYONE` is refused. Call `POST /v1/posts/validate` to learn which rule applies to an account before publishing.
 
 Before publishing, the privacy level, posting availability, and creator-level comment, duet, and stitch settings are validated against the creator's current TikTok settings.
 
@@ -98,8 +98,9 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `privacy_level` | string | **Yes** | Audience setting. Must be one of the values returned by the creator info endpoint for this account. Common values: `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, `FOLLOWER_OF_CREATOR`, `SELF_ONLY`. Required; omitting produces a validation error (field `privacy_level`). |
+| `privacy_level` | string | See notes | Audience setting. Must be one of the values returned by the creator info endpoint for this account. Common values: `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, `FOLLOWER_OF_CREATOR`, `SELF_ONLY`. Required on photo posts unless `post_mode` is `"inbox"`. Some TikTok accounts publish videos publicly only: for those, `privacy_level` is optional on video posts, and any value other than `PUBLIC_TO_EVERYONE` is refused with `400 validation.privacy_level_unsupported`. Call `POST /v1/posts/validate` to learn which rule applies before publishing. |
 | `media_type` | string | No | `"video"` (default) or `"photo"`. Case-insensitive, so TikTok's own spelling `"PHOTO"` is accepted too. A value that names neither post type is rejected with a `400` on the `media_type` field, by `POST /v1/posts/validate` as well as by `POST /v1/posts`, rather than being published as a video. |
+| `post_mode` | string | No | `"direct"` (default) publishes immediately. `"inbox"` saves the post as a draft in the TikTok app instead of publishing it, for the creator to finish there. `"inbox"` works for both video and photo posts on some TikTok accounts; on others it is video only, and a photo draft is refused. |
 | `brand_content_toggle` | bool | No | Marks the post as branded or sponsored content. Cannot be combined with `SELF_ONLY` privacy. |
 | `brand_organic_toggle` | bool | No | Organic branded content disclosure flag. |
 | `_disclosure_on` | bool | No | SocialAPI-only disclosure gate. When `true`, at least one of `brand_content_toggle` or `brand_organic_toggle` must also be `true`; otherwise validation returns a `400` error on the `brand_content` field. |
@@ -169,9 +170,9 @@ TikTok does not expose a post deletion endpoint in its Content Posting API. `DEL
 
 ## 7. Quirks, errors, and recovery
 
-### privacy\_level is required
+### privacy\_level, required or restricted depending on the account
 
-`privacy_level` is required. Omitting it produces an error issue (field `privacy_level`) from `POST /v1/posts/validate` and blocks publishing. TikTok's Direct Post guidelines prohibit any client-applied default, so SocialAPI enforces an explicit selection.
+Some TikTok accounts publish videos publicly only. For those, `privacy_level` is optional on video posts, and any value other than `PUBLIC_TO_EVERYONE` is refused with `400 validation.privacy_level_unsupported`. Photo posts require `privacy_level` unless `post_mode` is `"inbox"`. Call `POST /v1/posts/validate` to learn which rule applies before publishing.
 
 The allowed values are not static: they are returned by the TikTok creator info endpoint and vary per account. Validate before publishing to confirm the chosen value is allowed for the target account.
 
