@@ -213,11 +213,11 @@ TikTok often takes longer to settle than the publish request does, either becaus
 
 `publishing` is not terminal, so treat it as "still working" rather than success or failure:
 
-- **Do not confirm success on it.** Only `published` is a completed publish, and a `published` TikTok target always carries a `platform_post_id`.
+- **Do not confirm success on it.** Only `published` is a completed publish. A `published` TikTok target carries a `platform_post_id`, except in the rare case described below where TikTok withholds it for hours.
 - **Do not retry or republish it.** The upload may already be live on TikTok, so retrying risks a duplicate post. It resolves on its own.
 - **Keep polling `GET /v1/posts/{post_id}`, or wait for the webhook.** The `post.published`, `post.partial` and `post.failed` webhooks fire when the post reaches its terminal status, including when it happens after the original request returned.
 
-Typical settle time is a few seconds to a few minutes. A target that TikTok never resolves is failed after about 2 hours with error code `system.internal` and the detail `publish timed out: target stuck in publishing`. Check the TikTok profile before retrying such a target: the post can still have gone live.
+Typical settle time is a few seconds to a few minutes. If TikTok reports the post live but still has not returned its ID after about 2 hours, the target settles at `published` without a `platform_post_id` or `permalink`. Both appear on `GET /v1/posts/{post_id}` once TikTok returns the ID, with no further webhook. A target TikTok is still processing after about 2 hours is failed with error code `system.internal` and the detail `publish timed out: target stuck in publishing`. Check the TikTok profile before retrying such a target: the post can still have gone live.
 
 ### Error categories
 

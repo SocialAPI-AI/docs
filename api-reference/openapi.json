@@ -979,7 +979,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Fetches posts where your brand account was mentioned or tagged. Results are sorted newest-first. Returns 501 for platforms that do not support mention tracking. On Instagram this returns only media your account was tagged in: @mentions written inside a post caption or inside a comment are never included, because Meta exposes no endpoint to poll them, and they are not currently delivered as mention.received webhooks either. Threads support is beta and requires the threads_manage_mentions permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
+                "description": "Fetches posts where your brand account was mentioned or tagged. Results are sorted newest-first. Returns 501 for platforms that do not support mention tracking. On Instagram this returns only media your account was tagged in: @mentions written inside a post caption or inside a comment are never included, because Meta exposes no endpoint to poll them, and they are not currently delivered as mention.received webhooks either. Threads support is beta and requires the threads_manage_mentions permission, which is pending Meta App Review: a Threads account connected without it gets an authorization error, and until Meta approves it only mentions made by accounts on the app's tester list are returned, so mentions from other accounts are left out of an otherwise successful response.",
                 "tags": [
                     "Mentions"
                 ],
@@ -1093,7 +1093,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Replies, as a public comment, to a mention of the connected account, including on a third-party post where the normal comment-reply endpoint is not permitted. Provide media_id (the media/post the mention is on); set comment_id only when the mention was in a comment (omit it to reply to a mention in the post caption). Supported on Instagram and Facebook. Consumes 1 interaction credit.",
+                "description": "Replies, as a public comment, to a mention of the connected account, including on a third-party post where the normal comment-reply endpoint is not permitted. Provide media_id (the media/post the mention is on); set comment_id only when the mention was in a comment (omit it to reply to a mention in the post caption). Supported on Instagram, Facebook, Threads (beta) and Bluesky. Consumes 1 interaction credit.",
                 "tags": [
                     "Mentions"
                 ],
@@ -1483,6 +1483,473 @@
                     },
                     "404": {
                         "description": "Announcement not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/automations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists your Automations, newest first. Filter to one account with account_id.",
+                "tags": [
+                    "Automations"
+                ],
+                "summary": "List Automations",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AutomationListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include automations:read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates an Automation on an Instagram or Facebook account. When a comment or DM on the account matches its filters, its actions are carried out within seconds, with no code on your side. Each action costs what the same API call costs: reply_comment and send_dm cost 1 credit, private_reply and hide_comment are free. The first step's actions depend on the trigger: a comment trigger allows hide_comment, reply_comment and private_reply; a dm trigger allows send_dm. Steps after start run when the person taps one of your postback buttons, and may only send DMs. An account holds at most 50 Automations. Comments and messages sent by the account itself never trigger it; on Facebook that is the Page, so a Page admin commenting from their personal profile does trigger it. A dm Automation answers the same person at most 5 times an hour. Besides automations:write, a scoped key needs the scope each action's own API call needs: inbox:write for hide_comment, reply_comment and private_reply, dms:send for send_dm. Send follow_gate instead of steps to build a Follow gate: the commenter gets a private reply with a button, and a tap sends the link if they follow the account, otherwise a follow-first message with a button to try again. Instagram only.",
+                "tags": [
+                    "Automations"
+                ],
+                "summary": "Create an Automation",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.CreateAutomationParams"
+                            }
+                        }
+                    },
+                    "description": "Automation definition",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/social-api_ai_core_api_service.Automation"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid definition (validation.*)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include automations:write or the scope an action needs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The account already has 50 Automations (automation.limit_reached)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The account is not on Instagram or Facebook (automation.platform_unsupported)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/automations/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns one Automation with its fired, sent and failed counts.",
+                "tags": [
+                    "Automations"
+                ],
+                "summary": "Get an Automation",
+                "parameters": [
+                    {
+                        "example": "aut_01J9Z8Y7X6W5V4T3S2R1Q0P9N8",
+                        "description": "Automation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/social-api_ai_core_api_service.Automation"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include automations:read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Automation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes an Automation and its run history. Buttons it already sent stop doing anything.",
+                "tags": [
+                    "Automations"
+                ],
+                "summary": "Delete an Automation",
+                "parameters": [
+                    {
+                        "example": "aut_01J9Z8Y7X6W5V4T3S2R1Q0P9N8",
+                        "description": "Automation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include automations:write",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Automation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the fields you send and keeps the rest. Set status to paused to stop the Automation and to active to resume it. steps replaces the whole list. Changed steps or post_ids must meet the same rules as creation. Renaming or pausing needs only automations:write; resuming, or changing steps, post_ids or once_per_person, also needs each action's own scope.",
+                "tags": [
+                    "Automations"
+                ],
+                "summary": "Update an Automation",
+                "parameters": [
+                    {
+                        "example": "aut_01J9Z8Y7X6W5V4T3S2R1Q0P9N8",
+                        "description": "Automation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.UpdateAutomationParams"
+                            }
+                        }
+                    },
+                    "description": "Fields to change",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/social-api_ai_core_api_service.Automation"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid definition (validation.*)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include automations:write or the scope an action needs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Automation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/automations/{id}/firings": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the Automation's runs from the last 30 days, newest first, with the outcome of each action. A failed action carries the error code the same API call would have returned.",
+                "tags": [
+                    "Automations"
+                ],
+                "summary": "List an Automation's runs",
+                "parameters": [
+                    {
+                        "example": "aut_01J9Z8Y7X6W5V4T3S2R1Q0P9N8",
+                        "description": "Automation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "next_cursor from the previous page",
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page size, 1 to 100, default 20",
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.FiringListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "limit is not a positive integer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include automations:read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Automation not found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2785,6 +3252,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "The key's scopes do not include inbox:write",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Account not found",
                         "content": {
@@ -2873,6 +3350,16 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include inbox:write",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3172,6 +3659,16 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include inbox:write",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5431,6 +5928,216 @@
                 }
             }
         },
+        "/migrations": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Starts a migration from another provider with an API key from your account there, and returns the first assessment of your accounts. Calling it again replaces the key. You must accept the current authorisation text: send its `version` from `GET /v1/migrations/{provider}`. Dashboard sessions only; API keys get 403.",
+                "tags": [
+                    "Migration"
+                ],
+                "summary": "Start a migration",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.StartMigrationRequest"
+                            }
+                        }
+                    },
+                    "description": "Provider, key and accepted authorisation version",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.MigrationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body, unknown provider, or authorisation not accepted (`migration.authorisation_required`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Dashboard session required, the feature is not available on your account yet (`auth.beta_only`), or your role cannot manage migrations; ask an Admin or the Owner (`auth.insufficient_role`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Another SocialAPI account is already migrating this provider account (`migration.already_claimed`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The provider rejected the key (`migration.key_invalid`), or it lacks read access to profiles or accounts (`migration.key_restricted`, `meta.required_group` names what is missing)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "The provider did not answer; retry (`migration.source_unavailable`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/migrations/{provider}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns your migration from a provider: the authorisation text to accept before starting, and once started, your accounts, the Brands and plan they need, and progress. If the provider cannot be read, the response is still 200 with `assessment` null and `assessment_error` set. The assessment can be up to 5 minutes old unless `refresh` is true. Dashboard sessions only; API keys get 403.",
+                "tags": [
+                    "Migration"
+                ],
+                "summary": "Get a migration",
+                "parameters": [
+                    {
+                        "description": "Provider identifier",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "true to read your accounts now",
+                        "name": "refresh",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.MigrationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Unknown provider",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Dashboard session required, or the feature is not available on your account yet (`auth.beta_only`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stops the migration from a provider. Requests sent through the base URL with that key stop working. Dashboard sessions only; API keys get 403.",
+                "tags": [
+                    "Migration"
+                ],
+                "summary": "Stop a migration",
+                "parameters": [
+                    {
+                        "description": "Provider identifier",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Unknown provider",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Dashboard session required, the feature is not available on your account yet (`auth.beta_only`), or your role cannot manage migrations; ask an Admin or the Owner (`auth.insufficient_role`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No migration from this provider",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/oauth/exchange": {
             "post": {
                 "security": [
@@ -5508,6 +6215,110 @@
                 }
             }
         },
+        "/platforms/facebook/accounts/{id}/insights/daily": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Beta. Returns one point per day for one Page of a connected Facebook account: followers at the end of the day, plus that day's views, reach and post engagements. Days with no data are omitted. Same beta and permission errors as the Page insights summary.",
+                "tags": [
+                    "Facebook"
+                ],
+                "summary": "Get daily Facebook Page insights (beta)",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page to report on, the id from GET /accounts/{id}/pages. Defaults to the account's default Page.",
+                        "name": "page_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Trailing days to return, 1 to 365. Defaults to 365.",
+                        "name": "days",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daily Page insights, oldest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.FacebookDailyInsightsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "days out of range",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Beta access required, or Page connected without the insights permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found, or page_id is not an active Page of this account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Facebook API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/platforms/facebook/accounts/{id}/summary": {
             "get": {
                 "security": [
@@ -5515,7 +6326,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Beta. Returns trailing-30-day Page insight aggregates (followers, views, reach, post engagements, net follower change) for a connected Facebook Page. Access is limited to beta testers while the read_insights permission is in Meta App Review, and non-beta keys receive 403 platform.facebook.beta_required. Pages connected without the permission return 403 platform.facebook.insights_scope_missing and must be reconnected. The response shape may change without notice while this endpoint is in beta.",
+                "description": "Beta. Returns trailing-30-day Page insight aggregates (followers, views, reach, post engagements, net follower change) for one Page of a connected Facebook account. Access is limited to beta testers while the read_insights permission is in Meta App Review, and non-beta keys receive 403 platform.facebook.beta_required. Pages connected without the permission return 403 platform.facebook.insights_scope_missing and must be reconnected. The response shape may change without notice while this endpoint is in beta.",
                 "tags": [
                     "Facebook"
                 ],
@@ -5527,6 +6338,14 @@
                         "name": "id",
                         "in": "path",
                         "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page to report on, the id from GET /accounts/{id}/pages. Defaults to the account's default Page.",
+                        "name": "page_id",
+                        "in": "query",
                         "schema": {
                             "type": "string"
                         }
@@ -5564,7 +6383,7 @@
                         }
                     },
                     "404": {
-                        "description": "Account not found",
+                        "description": "Account not found, or page_id is not an active Page of this account",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6775,7 +7594,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the profile Instagram exposes for a messaging participant, including the follow relationship in both directions (is_user_follow_business, is_business_follow_user). The follow relationship is current as of the call; do not cache it, since it changes the moment someone unfollows. Instagram only returns this data for users who have consented by messaging your account or tapping an icebreaker or the persistent menu; for anyone else this returns 403 platform.instagram.230, which means Instagram will not disclose the relationship and is NOT the same as \"does not follow\". Branch on that error rather than treating it as a negative. Fields name and profile_pic are absent for users who have set neither; the follow fields are still returned. profile_pic URLs expire after a few days, so do not store them.",
+                "description": "Returns the profile Instagram exposes for a messaging participant, including the follow relationship in both directions (is_user_follow_business, is_business_follow_user). Works for an Instagram account connected either directly or through a linked Facebook Page. The follow relationship is current as of the call; do not cache it, since it changes the moment someone unfollows. Instagram only returns this data for users who have consented by messaging your account or tapping an icebreaker or the persistent menu; for anyone else this returns 403 platform.instagram.230, which means Instagram will not disclose the relationship and is NOT the same as \"does not follow\". Branch on that error rather than treating it as a negative. Fields name and profile_pic are absent for users who have set neither; the follow fields are still returned. profile_pic URLs expire after a few days, so do not store them.",
                 "tags": [
                     "Instagram"
                 ],
@@ -7741,6 +8560,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "whatsapp.paid_plan_required: template sends need a paid plan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Account not found or not owned by caller",
                         "content": {
@@ -8251,7 +9080,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Registers a previously verified phone number with WhatsApp Business and sets the 6-digit two-step verification PIN. The phone number must be verified via verify-code first. The PIN must be retained by the caller: losing it triggers a mandatory 7-day wait before it can be reset.",
+                "description": "Registers a previously verified phone number with WhatsApp Business and sets the 6-digit two-step verification PIN. The phone number must be verified via verify-code first. The PIN must be retained by the caller: losing it triggers a mandatory 7-day wait before it can be reset. A number that stays on the WhatsApp Business app is already registered and is refused with 409 whatsapp.business_app_number.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -8314,7 +9143,7 @@
                         }
                     },
                     "409": {
-                        "description": "Phone number not verified or already registered with another BSP",
+                        "description": "Phone number not verified, already registered with another BSP, or in use in the WhatsApp Business app",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11191,6 +12020,20 @@
                     }
                 }
             },
+            "api_endpoints.AutomationListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Automation"
+                        }
+                    }
+                }
+            },
             "api_endpoints.BillingPlan": {
                 "type": "object",
                 "properties": {
@@ -11842,6 +12685,7 @@
                                 "dm.sent",
                                 "dm.referral",
                                 "dm.postback",
+                                "dm.deleted",
                                 "dm.status.sent",
                                 "dm.status.delivered",
                                 "dm.status.read",
@@ -12451,6 +13295,17 @@
                     }
                 }
             },
+            "api_endpoints.FacebookDailyInsightsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.DailyInsight"
+                        }
+                    }
+                }
+            },
             "api_endpoints.FacebookLoginPagesResponse": {
                 "type": "object",
                 "properties": {
@@ -12467,6 +13322,21 @@
                         "items": {
                             "$ref": "#/components/schemas/api_endpoints.PendingPage"
                         }
+                    }
+                }
+            },
+            "api_endpoints.FiringListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Firing"
+                        }
+                    },
+                    "next_cursor": {
+                        "description": "Pass as cursor to fetch the next page. Empty on the last page",
+                        "type": "string"
                     }
                 }
             },
@@ -13339,6 +14209,179 @@
                     }
                 }
             },
+            "api_endpoints.MigrationAssessment": {
+                "type": "object",
+                "properties": {
+                    "brands": {
+                        "description": "Brands needed across all profiles.",
+                        "type": "integer"
+                    },
+                    "pages_per_brand": {
+                        "description": "Most Pages any one Brand needs on a single platform.",
+                        "type": "integer"
+                    },
+                    "profiles": {
+                        "description": "One entry per profile at your provider.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MigrationProfile"
+                        }
+                    },
+                    "recommended_plan": {
+                        "description": "Cheapest plan that fits.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/api_endpoints.MigrationPlan"
+                            }
+                        ]
+                    },
+                    "servable_accounts": {
+                        "description": "Accounts SocialAPI can serve.",
+                        "type": "integer"
+                    },
+                    "stays_with_provider": {
+                        "description": "Accounts that stay with your provider, by platform.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.MigrationUnsupported"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.MigrationAuthorisation": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.MigrationPlan": {
+                "type": "object",
+                "properties": {
+                    "brands_limit": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "pages_per_brand": {
+                        "type": "integer"
+                    },
+                    "tier": {
+                        "type": "string",
+                        "example": "starter"
+                    }
+                }
+            },
+            "api_endpoints.MigrationProfile": {
+                "type": "object",
+                "properties": {
+                    "brands": {
+                        "type": "integer"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "pages_per_brand": {
+                        "type": "integer"
+                    },
+                    "servable_accounts": {
+                        "type": "integer"
+                    },
+                    "splits": {
+                        "description": "Why the profile needs more than one Brand, one line per reason.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.MigrationResponse": {
+                "type": "object",
+                "properties": {
+                    "assessed_at": {
+                        "description": "When the accounts were last read, RFC 3339. Null until the first read succeeds.",
+                        "type": "string"
+                    },
+                    "assessment": {
+                        "description": "Your accounts and how they map to SocialAPI. Null until started, or when your provider could not be read.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/api_endpoints.MigrationAssessment"
+                            }
+                        ]
+                    },
+                    "assessment_error": {
+                        "description": "Why `assessment` is null on a started migration: `migration.key_invalid`, `migration.key_restricted` or `migration.source_unavailable`.",
+                        "type": "string"
+                    },
+                    "authorisation": {
+                        "description": "Text to accept before starting, and its version.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/api_endpoints.MigrationAuthorisation"
+                            }
+                        ]
+                    },
+                    "authorisation_version": {
+                        "description": "Version of the authorisation text accepted. Null until started.",
+                        "type": "string"
+                    },
+                    "authorised_at": {
+                        "description": "When the authorisation was accepted, RFC 3339. Null until started.",
+                        "type": "string"
+                    },
+                    "base_url": {
+                        "description": "Base URL to set in your existing client. Null until started.",
+                        "type": "string",
+                        "example": "https://z.social-api.ai/api"
+                    },
+                    "created_at": {
+                        "description": "When the migration started, RFC 3339. Null until started.",
+                        "type": "string"
+                    },
+                    "cut_over": {
+                        "description": "Accounts already reconnected to SocialAPI.",
+                        "type": "integer"
+                    },
+                    "forwarded_calls": {
+                        "description": "Requests sent through the base URL since the migration started.",
+                        "type": "integer"
+                    },
+                    "key_hint": {
+                        "description": "Start and end of the key in use. Null until started.",
+                        "type": "string"
+                    },
+                    "started": {
+                        "description": "True once a migration has started.",
+                        "type": "boolean"
+                    }
+                }
+            },
+            "api_endpoints.MigrationUnsupported": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "platform": {
+                        "description": "Platform name as your provider reports it.",
+                        "type": "string"
+                    },
+                    "reason": {
+                        "description": "Why the accounts stay: \"unserved platform\", \"ads\", \"telephony\", \"commerce\", \"unknown platform\" or \"linked to another account\".",
+                        "type": "string"
+                    }
+                }
+            },
             "api_endpoints.ModerateYouTubeCommentRequest": {
                 "type": "object",
                 "properties": {
@@ -13894,6 +14937,14 @@
                         "type": "string",
                         "example": "2026-04-01T10:00:00Z"
                     },
+                    "settings": {
+                        "description": "Publish settings Instagram or Facebook reports for the published post, such as the AI info label, alt text, tagged place or audience targeting. Absent when the platform reported none.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostSettings"
+                            }
+                        ]
+                    },
                     "status": {
                         "type": "string",
                         "enum": [
@@ -14342,6 +15393,28 @@
                     "success": {
                         "type": "boolean",
                         "example": true
+                    }
+                }
+            },
+            "api_endpoints.StartMigrationRequest": {
+                "type": "object",
+                "required": [
+                    "authorisation_version",
+                    "key",
+                    "provider"
+                ],
+                "properties": {
+                    "authorisation_version": {
+                        "description": "Version of the authorisation text you accepted, as returned in `authorisation.version`.",
+                        "type": "string"
+                    },
+                    "key": {
+                        "description": "API key from your account with that provider. It needs read access to profiles and accounts.",
+                        "type": "string"
+                    },
+                    "provider": {
+                        "description": "Identifier of the provider you are moving from.",
+                        "type": "string"
                     }
                 }
             },
@@ -14838,6 +15911,7 @@
                                 "dm.sent",
                                 "dm.referral",
                                 "dm.postback",
+                                "dm.deleted",
                                 "dm.status.sent",
                                 "dm.status.delivered",
                                 "dm.status.read",
@@ -14965,8 +16039,13 @@
                         "type": "boolean",
                         "example": false
                     },
+                    "billing_block_reason": {
+                        "description": "BillingBlockReason is why access is paused, empty when it is not.\n\"past_due\": a payment failed, and settling it restores access.\n\"ban\": the account was suspended for a Terms of Service violation.\nPaying does not lift it, and every route except this one returns\n403 auth.suspended. Contact support to appeal.",
+                        "type": "string",
+                        "example": "past_due"
+                    },
                     "billing_blocked": {
-                        "description": "BillingBlocked is true when the subscription is past due and API access\nplus webhook delivery are paused. Clears automatically once paid.",
+                        "description": "BillingBlocked is true when API access and webhook delivery are paused.\nRead BillingBlockReason to tell why and whether paying lifts it.",
                         "type": "boolean",
                         "example": false
                     },
@@ -15900,6 +16979,28 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.DailyInsight": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "description": "Day in YYYY-MM-DD.",
+                        "type": "string",
+                        "example": "2026-09-27"
+                    },
+                    "followers": {
+                        "type": "integer"
+                    },
+                    "interactions": {
+                        "type": "integer"
+                    },
+                    "reach": {
+                        "type": "integer"
+                    },
+                    "views": {
+                        "type": "integer"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.GBPAddressUpdate": {
                 "type": "object",
                 "properties": {
@@ -16571,7 +17672,7 @@
                         ]
                     },
                     "conversation_id": {
-                        "description": "[optional] SocialAPI conversation ID; set on Facebook, Instagram and WhatsApp DMs that belong to a conversation",
+                        "description": "[optional] SocialAPI conversation ID; set on Facebook, Instagram, WhatsApp and Telegram DMs that belong to a conversation",
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
                     },
@@ -16601,7 +17702,7 @@
                         "example": "instagram"
                     },
                     "platform_id": {
-                        "description": "[optional] Platform-native message id, byte-identical to the platform_id of the matching row from GET /v1/inbox/conversations/{id}/messages. Set on Instagram, Facebook and WhatsApp dm.received and dm.sent, and on Instagram and Facebook dm.postback, so a delivered event can be joined to a message from that endpoint: id is a SocialAPI interaction id, which the messages endpoint does not return, so without this the two carry no field in common. Empty for dm.referral, which has no platform message id.",
+                        "description": "[optional] Platform-native message id, byte-identical to the platform_id of the matching row from GET /v1/inbox/conversations/{id}/messages. Set on Instagram, Facebook and WhatsApp dm.received and dm.sent, on Telegram dm.received, and on Instagram and Facebook dm.postback, so a delivered event can be joined to a message from that endpoint: id is a SocialAPI interaction id, which the messages endpoint does not return, so without this the two carry no field in common. Empty for dm.referral, which has no platform message id.",
                         "type": "string",
                         "example": "m_AbCdEf123"
                     },
@@ -16625,6 +17726,14 @@
                         "allOf": [
                             {
                                 "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Author"
+                            }
+                        ]
+                    },
+                    "reply_to": {
+                        "description": "[platform: telegram, instagram, facebook] The earlier message this DM replies to; same value as reply_to on the matching row from GET /v1/inbox/conversations/{id}/messages. Absent when the DM is not a reply",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.MessageRef"
                             }
                         ]
                     },
@@ -16670,6 +17779,16 @@
                     "url": {
                         "type": "string",
                         "example": "https://cdn.example.com/photo.jpg"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.MessageRef": {
+                "type": "object",
+                "properties": {
+                    "platform_id": {
+                        "description": "Platform-native id of the referenced message, as platform_id on GET /v1/inbox/conversations/{id}/messages",
+                        "type": "string",
+                        "example": "m_AbCdEf123"
                     }
                 }
             },
@@ -16731,6 +17850,14 @@
                         "description": "[always]",
                         "type": "string"
                     },
+                    "settings": {
+                        "description": "[platform: instagram, facebook] Settings the platform reports for the post",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostSettings"
+                            }
+                        ]
+                    },
                     "shares_count": {
                         "description": "[platform: facebook] Zero on other platforms",
                         "type": "integer"
@@ -16742,6 +17869,27 @@
                     "view_count": {
                         "description": "[platform: youtube, tiktok] Zero on other platforms",
                         "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.PostChildAttachment": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "description": "Description text of the card.",
+                        "type": "string"
+                    },
+                    "link": {
+                        "description": "Destination URL of the card.",
+                        "type": "string"
+                    },
+                    "name": {
+                        "description": "Title of the card.",
+                        "type": "string"
+                    },
+                    "picture": {
+                        "description": "Image URL of the card.",
+                        "type": "string"
                     }
                 }
             },
@@ -16783,6 +17931,111 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.PostPlace": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "description": "Platform id of the tagged place.",
+                        "type": "string"
+                    },
+                    "name": {
+                        "description": "Name of the tagged place.",
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.PostSettings": {
+                "type": "object",
+                "properties": {
+                    "alt_text": {
+                        "description": "Image description set on the Instagram post.",
+                        "type": "string"
+                    },
+                    "audio_type": {
+                        "description": "Kind of audio on an Instagram Reel.",
+                        "type": "string",
+                        "enum": [
+                            "MUSIC",
+                            "ORIGINAL_SOUND"
+                        ]
+                    },
+                    "child_attachments": {
+                        "description": "Cards of a Facebook multi-link post.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostChildAttachment"
+                        }
+                    },
+                    "comments_enabled": {
+                        "description": "True when comments are open on the Instagram post.",
+                        "type": "boolean"
+                    },
+                    "countries": {
+                        "description": "ISO 3166-1 alpha-2 countries the Facebook post is restricted to.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "FR",
+                            "BE"
+                        ]
+                    },
+                    "cta_link": {
+                        "description": "Call-to-action destination on the Facebook post.",
+                        "type": "string"
+                    },
+                    "cta_type": {
+                        "description": "Call-to-action button type on the Facebook post.",
+                        "type": "string",
+                        "example": "SHOP_NOW"
+                    },
+                    "is_ai_generated": {
+                        "description": "True when Instagram shows the AI info label on the post.",
+                        "type": "boolean"
+                    },
+                    "max_age": {
+                        "description": "Maximum audience age set on the Facebook post.",
+                        "type": "integer",
+                        "example": 65
+                    },
+                    "min_age": {
+                        "description": "Minimum audience age set on the Facebook post.",
+                        "type": "integer",
+                        "example": 18
+                    },
+                    "multi_share_end_card": {
+                        "description": "True when the multi-link post shows an end card.",
+                        "type": "boolean"
+                    },
+                    "multi_share_optimized": {
+                        "description": "True when Facebook picks the card order.",
+                        "type": "boolean"
+                    },
+                    "place": {
+                        "description": "Location tagged on the Facebook post.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PostPlace"
+                            }
+                        ]
+                    },
+                    "product_type": {
+                        "description": "Instagram surface the post lives on.",
+                        "type": "string",
+                        "enum": [
+                            "FEED",
+                            "REELS",
+                            "STORY",
+                            "AD"
+                        ]
+                    },
+                    "share_to_feed": {
+                        "description": "True when an Instagram Reel also appears in the main profile feed.",
+                        "type": "boolean"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.Story": {
                 "type": "object",
                 "properties": {
@@ -16813,6 +18066,18 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.ThreadsBreakdownResult": {
+                "type": "object",
+                "properties": {
+                    "dimension": {
+                        "description": "Dimension is the breakdown value, such as a country code, a city, an age range or a gender.",
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "integer"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.ThreadsInsights": {
                 "type": "object",
                 "properties": {
@@ -16827,6 +18092,13 @@
             "social-api_ai_core_api_connectors_base.ThreadsMetricValue": {
                 "type": "object",
                 "properties": {
+                    "breakdown": {
+                        "description": "Breakdown is set only for follower_demographics.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.ThreadsBreakdownResult"
+                        }
+                    },
                     "value": {
                         "type": "integer"
                     },
@@ -16942,6 +18214,67 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.Action": {
+                "type": "object",
+                "properties": {
+                    "private_reply": {
+                        "description": "DM to the comment's author. Free",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.TextAction"
+                            }
+                        ]
+                    },
+                    "reply_comment": {
+                        "description": "Public reply to the comment. Costs 1 credit",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.TextAction"
+                            }
+                        ]
+                    },
+                    "send_dm": {
+                        "description": "DM in the conversation. Costs 1 credit",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.TextAction"
+                            }
+                        ]
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "hide_comment",
+                            "reply_comment",
+                            "private_reply",
+                            "send_dm"
+                        ],
+                        "example": "private_reply"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.ActionOutcome": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "example": "private_reply"
+                    },
+                    "error_code": {
+                        "description": "The error code the same API call would have returned",
+                        "type": "string",
+                        "example": "platform.instagram.private_reply_ineligible"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "sent",
+                            "failed"
+                        ],
+                        "example": "sent"
+                    }
+                }
+            },
             "social-api_ai_core_api_service.AnalyticsPoint": {
                 "type": "object",
                 "properties": {
@@ -16989,6 +18322,76 @@
                     "to": {
                         "type": "string",
                         "example": "2026-09-19"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.Automation": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "failed_count": {
+                        "description": "Actions that failed",
+                        "type": "integer"
+                    },
+                    "fired_count": {
+                        "description": "Events the Automation ran against",
+                        "type": "integer"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "aut_01J9Z8Y7X6W5V4T3S2R1Q0P9N8"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Send the link"
+                    },
+                    "once_per_person": {
+                        "description": "Reach each person at most once. A run in which every action failed does not count",
+                        "type": "boolean"
+                    },
+                    "post_ids": {
+                        "description": "Up to 100 platform post ids, each 1 to 100 characters, a comment must be on. Omitted means every post. Comment trigger only",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "sent_count": {
+                        "description": "Actions carried out successfully",
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "paused"
+                        ],
+                        "example": "active"
+                    },
+                    "steps": {
+                        "description": "Up to 10 Steps forming a graph. One must have the key \"start\"",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Step"
+                        }
+                    },
+                    "trigger": {
+                        "description": "The kind of inbound event that fires the Automation",
+                        "type": "string",
+                        "enum": [
+                            "comment",
+                            "dm"
+                        ],
+                        "example": "comment"
+                    },
+                    "updated_at": {
+                        "type": "string"
                     }
                 }
             },
@@ -17068,6 +18471,53 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.CreateAutomationParams": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "follow_gate": {
+                        "description": "Builds the three-step Follow gate. Instagram, comment trigger only. Send instead of steps",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.FollowGate"
+                            }
+                        ]
+                    },
+                    "name": {
+                        "description": "1 to 100 characters",
+                        "type": "string",
+                        "example": "Send the link"
+                    },
+                    "once_per_person": {
+                        "description": "Reach each person at most once. A run in which every action failed does not count. Defaults to false",
+                        "type": "boolean"
+                    },
+                    "post_ids": {
+                        "description": "Up to 100 platform post ids, each 1 to 100 characters, a comment must be on. Omitted means every post. Comment trigger only",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Step"
+                        }
+                    },
+                    "trigger": {
+                        "type": "string",
+                        "enum": [
+                            "comment",
+                            "dm"
+                        ],
+                        "example": "comment"
+                    }
+                }
+            },
             "social-api_ai_core_api_service.DeliveryAttempt": {
                 "type": "object",
                 "properties": {
@@ -17131,6 +18581,116 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.Filter": {
+                "type": "object",
+                "properties": {
+                    "keyword": {
+                        "description": "Required when type is keyword",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.KeywordFilter"
+                            }
+                        ]
+                    },
+                    "type": {
+                        "description": "follows_account is available on Instagram only and not on the start step",
+                        "type": "string",
+                        "enum": [
+                            "keyword",
+                            "follows_account"
+                        ],
+                        "example": "keyword"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.Firing": {
+                "type": "object",
+                "properties": {
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "event_id": {
+                        "description": "Platform id of the comment or message",
+                        "type": "string",
+                        "example": "17858893269577012"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "afr_01J9Z8Y7X6W5V4T3S2R1Q0P9N8"
+                    },
+                    "outcomes": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.ActionOutcome"
+                        }
+                    },
+                    "person_id": {
+                        "description": "Platform id of the person who commented or messaged",
+                        "type": "string",
+                        "example": "17841400000000000"
+                    },
+                    "step_key": {
+                        "description": "Key of the step whose actions ran, or the step the event entered at when no step's filters passed",
+                        "type": "string",
+                        "example": "start"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.FollowGate": {
+                "type": "object",
+                "properties": {
+                    "button_title": {
+                        "description": "Up to 20 characters",
+                        "type": "string",
+                        "example": "Get the link"
+                    },
+                    "keywords": {
+                        "description": "Comment keywords that open the gate",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "link"
+                        ]
+                    },
+                    "link_texts": {
+                        "description": "Sent once the person follows",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "Here you go: https://example.com"
+                        ]
+                    },
+                    "not_following_texts": {
+                        "description": "Sent when the person does not follow the account yet",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "Follow us first and tap again"
+                        ]
+                    },
+                    "opening_texts": {
+                        "description": "Private reply sent to the commenter",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "Tap below to get the link"
+                        ]
+                    },
+                    "retry_button_title": {
+                        "description": "Up to 20 characters",
+                        "type": "string",
+                        "example": "I followed"
+                    }
+                }
+            },
             "social-api_ai_core_api_service.InboxPostRow": {
                 "type": "object",
                 "properties": {
@@ -17175,6 +18735,31 @@
                     },
                     "user_id": {
                         "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.KeywordFilter": {
+                "type": "object",
+                "properties": {
+                    "keywords": {
+                        "description": "1 to 50, each 1 to 100 characters",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "link",
+                            "price"
+                        ]
+                    },
+                    "match": {
+                        "description": "contains: a keyword appears as a whole word or phrase. exact: the whole text equals a keyword",
+                        "type": "string",
+                        "enum": [
+                            "contains",
+                            "exact"
+                        ],
+                        "example": "contains"
                     }
                 }
             },
@@ -17343,6 +18928,84 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.Step": {
+                "type": "object",
+                "properties": {
+                    "actions": {
+                        "description": "At most one of each type",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Action"
+                        }
+                    },
+                    "buttons": {
+                        "description": "Up to 3, shown under the private_reply or send_dm message. With buttons, each of that message's texts is at most 640 characters",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.StepButton"
+                        }
+                    },
+                    "fallthrough_step": {
+                        "description": "Key of the Step to run when this Step's filters fail. Not allowed on start",
+                        "type": "string"
+                    },
+                    "filters": {
+                        "description": "Up to 10. All must pass. None means every event passes",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Filter"
+                        }
+                    },
+                    "key": {
+                        "description": "Unique within the Automation. The entry step is \"start\"",
+                        "type": "string",
+                        "example": "start"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.StepButton": {
+                "type": "object",
+                "properties": {
+                    "next_step": {
+                        "description": "Key of the Step to run when this button is tapped. Required when type is postback",
+                        "type": "string",
+                        "example": "check"
+                    },
+                    "title": {
+                        "description": "Up to 20 characters",
+                        "type": "string",
+                        "example": "Open"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "url",
+                            "postback"
+                        ],
+                        "example": "url"
+                    },
+                    "url": {
+                        "description": "An http or https URL. Required when type is url",
+                        "type": "string",
+                        "example": "https://example.com"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.TextAction": {
+                "type": "object",
+                "properties": {
+                    "texts": {
+                        "description": "1 to 10 variants, each 1 to 1000 characters, or at most 640 for a private_reply or send_dm whose step has buttons; one is picked at random each time",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "Here is the link: https://example.com"
+                        ]
+                    }
+                }
+            },
             "social-api_ai_core_api_service.TextConstraints": {
                 "type": "object",
                 "properties": {
@@ -17365,6 +19028,38 @@
                     "photo_max_length": {
                         "description": "platform-specific stricter cap for photo-mode captions (e.g. TikTok); 0 = use MaxLength",
                         "type": "integer"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.UpdateAutomationParams": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "1 to 100 characters",
+                        "type": "string"
+                    },
+                    "once_per_person": {
+                        "type": "boolean"
+                    },
+                    "post_ids": {
+                        "description": "Up to 100 platform post ids, each 1 to 100 characters, a comment must be on. An empty list means every post. Comment trigger only",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "paused"
+                        ]
+                    },
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Step"
+                        }
                     }
                 }
             },

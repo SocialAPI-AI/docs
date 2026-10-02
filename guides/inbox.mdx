@@ -374,6 +374,8 @@ post caption. A reply consumes 1 interaction credit.
 |----------|----------|----------|
 | Instagram | Tagged media only | Yes |
 | Facebook | Yes | Yes |
+| Threads | Beta | Beta |
+| Bluesky | Yes | Yes |
 | X / Twitter | Yes | No |
 | All others | No | No |
 
@@ -393,13 +395,13 @@ curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/
 
 ## Media
 
-Some inbound messages carry an attachment. For most platforms `messages.attachment_url` is the platform's own URL and you fetch it directly (subject to whatever expiry the platform applies). WhatsApp is the exception: Meta's webhook hands you a short-lived media id, not a URL, and that id can only be redeemed with the connected account's own access token, which your API key cannot present. SocialAPI fetches the bytes on your behalf and mirrors them into its own storage, and `attachment_url` for a WhatsApp message is a SocialAPI URL you retrieve with your API key instead.
+Some inbound messages carry an attachment. For most platforms `messages.attachment_url` is the platform's own URL and you fetch it directly (subject to whatever expiry the platform applies). WhatsApp and Telegram are the exceptions: their files can only be downloaded with the connected account's own credentials, which your API key cannot present. For those two, `attachment_url` on the message and `content.media[].url` on the `dm.received` webhook are a SocialAPI URL that you retrieve with your API key. It stays available for 30 days after the message arrives, then returns `410`.
 
 ### Endpoint
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/v1/inbox/media/:id` | Retrieve a mirrored inbound attachment |
+| `GET` | `/v1/inbox/media/:id` | Retrieve an inbound attachment |
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/media/7f3c1e2a-9b4d-4e5f-8a6b-1c2d3e4f5a6b" \

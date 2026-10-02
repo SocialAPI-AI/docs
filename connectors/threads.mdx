@@ -30,7 +30,7 @@ Threads is fully supported for posts, comments, moderation, and publishing.
 | Toggle post comments | No | Not supported by Threads API |
 | DMs | No | Not supported by platform |
 | Reviews | No | Not applicable |
-| Mentions | Beta | Polling via `GET /v1/accounts/{id}/mentions` plus an inbound webhook (field: `mentions`). Requires the `threads_manage_mentions` scope, pending Meta App Review. |
+| Mentions | Beta | List, reply, and the `mention.received` webhook. Requires the `threads_manage_mentions` scope, pending Meta App Review. |
 | Insights | Beta | Post-level and account-level metrics. Requires the `threads_manage_insights` scope, pending Meta App Review. |
 | Profile discovery | Beta | Public profile lookup by exact username. Requires the `threads_profile_discovery` scope, pending Meta App Review. |
 | Create post | Yes | Text, images, videos, carousels |
@@ -157,12 +157,20 @@ A `404` means the username is not discoverable. Meta returns the same response w
 
 ### Mentions
 
-Mentions use the standard mentions routes, which now cover Threads:
+Mentions use the standard mentions routes:
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/{id}/mentions?limit=20" \
   -H "Authorization: Bearer $SOCAPI_KEY"
+
+# Reply to a mention: media_id is the id from the list response
+curl -X POST "https://api.social-api.ai/v1/accounts/{id}/mentions/reply" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"media_id": "sapi_mnt_...", "text": "Thanks for the mention!"}'
 ```
+
+Until Meta approves the `threads_manage_mentions` scope, only mentions made by accounts on the app's tester list are returned or delivered. Mentions from any other account are left out, and the list comes back empty rather than as an error.
 
 ## Publishing
 
@@ -192,7 +200,7 @@ For the full field reference, media constraints, and error recovery, see [Thread
 - **Moderation.** Hide, unhide, and delete are supported. Unsupported moderation actions return `501`.
 - **No post updates.** Threads does not support editing published posts. Use delete and re-create if needed.
 - **Publishing.** Supports text posts, single images, single videos, and carousel posts.
-- **Mentions have two paths.** The webhook delivers mentions in near real time but carries no message text: Meta's payload has only the post id, the mentioning username, and the media id. The polling endpoint returns the text. Use polling where the text matters, and the webhook to know when to poll.
+- **Mentions have two paths.** The `mention.received` webhook delivers a mention in near real time, and `GET /mentions` returns the same mention with the same `id`, so the two can be matched.
 - **Insight metric sets differ by level.** Post-level metrics are `views`, `likes`, `replies`, `reposts`, `quotes`, and `shares`. Account-level metrics are those five minus `shares`, plus `clicks`, `followers_count`, and `follower_demographics`. `shares` is post-only and `clicks` is account-only.
 - **`follower_demographics` is fussy.** It needs exactly one `breakdown` (`country`, `city`, `age`, or `gender`), it rejects `since` and `until`, and Meta returns nothing unless the account has 100 or more followers.
 - **Insights lag publishing.** Metrics for a new post can take a few minutes to appear, and deleted posts return nothing. Both come back as an empty result rather than an error.
