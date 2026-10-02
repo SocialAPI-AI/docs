@@ -32,6 +32,10 @@ List comments across all connected accounts, reply, and moderate.
 
 Comment likes are supported on Facebook and LinkedIn Page only (see the matrix below); other platforms return `501` with code `resource.not_supported`. Private replies (Instagram and Facebook) are limited by Meta to one per comment, within 7 days of the comment. Add `buttons` (1 to 3, same shape as when sending a DM) to send the reply as a button template, for example a "continue" button that starts a comment-to-DM flow; a postback tap arrives as a `dm.postback` event. You cannot message the commenter again until they respond; once they do, the conversation continues within the standard 24-hour messaging window.
 
+<Tip>
+  To run a comment-to-DM flow without hosting any code, use [Automations](/guides/automations): SocialAPI matches the comment's keywords, sends the private reply with its buttons, and handles each tap itself, including a [Follow gate](/guides/automations#the-follow-gate) on Instagram.
+</Tip>
+
 ### Platform capabilities
 
 | Platform | Reply | Hide | Like | Delete | Private reply |
@@ -172,7 +176,7 @@ If a message fails partway through a multi-attachment send, the earlier messages
 
 ### Interactive messages
 
-On Instagram and Facebook you can send structured, tappable content alongside or instead of plain text. Set at most one of `quick_replies`, `buttons`, or `cards` per message. When the recipient taps a quick reply or a `postback` button, you receive a [`dm.postback` webhook](/guides/webhooks#event-types) carrying the `payload` you defined, so you can drive automated flows.
+On Instagram and Facebook you can send structured, tappable content alongside or instead of plain text. Set at most one of `quick_replies`, `buttons`, or `cards` per message. When the recipient taps a quick reply or a `postback` button, you receive a [`dm.postback` webhook](/guides/webhooks#event-types) carrying the `payload` you defined, so you can drive automated flows from your own code. For flows that only answer with set messages, an [Automation](/guides/automations#buttons-and-multi-step-flows) sends the buttons and answers each tap for you.
 
 These features require the recipient to be inside the 24 hour messaging window, the same as any other message.
 
@@ -438,8 +442,11 @@ The suffix encodes the platform and the platform-native ID, so you can route act
 
 SocialAPI can notify your server when new inbound interactions arrive (new comment, new DM, new review). Register a webhook endpoint and subscribe to the event types you care about. See [Webhooks](/guides/webhooks) for setup and event reference.
 
+To answer Instagram and Facebook comments and DMs that match keywords without running a webhook handler, configure an [Automation](/guides/automations) instead.
+
 ## Related
 
+- [Automations](/guides/automations) for keyword replies and comment-to-DM flows with no code on your side
 - [Platform support](/guides/platforms) for the full capability matrix
 - [Interaction IDs](/guides/interaction-ids) for the ID encoding scheme
 - [Webhooks](/guides/webhooks) for real-time event delivery

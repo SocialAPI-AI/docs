@@ -33,6 +33,7 @@ Facebook Pages are fully supported. The connector uses the Meta Graph API for po
 | Send DM | Yes | Text and/or media attachment (`attachment_url`) |
 | Send DM attachment | Yes | Image, video, audio, or file via `attachment_url` (type inferred from URL extension, max 25 MB), or by `attachment_id` (requires `attachment_type`) |
 | Get DM thread by user | Yes | |
+| Automations | Yes | Keyword replies to comments and DMs, postback buttons and multi-step flows. No `follows_account` filter or Follow gate: Facebook does not tell apps whether a person follows a Page. See [Automations](/guides/automations) |
 | Reviews | No | Deprecated in Graph API v22.0 |
 | Mentions | Yes | Posts where the Page is tagged |
 | Reply to mention | Yes | Posts a public comment reply on a mention (post or comment mention) |
@@ -233,6 +234,8 @@ For the full field reference, media constraints, and error recovery, see [Facebo
 - **Shared login, one Page per brand**: a single OAuth flow surfaces every Page the login can manage, but each Page belongs to exactly one brand's `account_id`, assigned explicitly during the pending-connection step or later. See [One login, many brands](#one-login-many-brands).
 - **Page tokens never expire**: unlike Instagram, Facebook Page tokens derived from long-lived user tokens do not expire. No reconnection needed unless the user revokes access.
 - **Private replies**: replying to a comment with `"private": true` sends a one-time DM to the commenter. Can only be sent once per comment, within 7 days of the comment.
+- **Automations and Page admins**: an [Automation](/guides/automations) skips comments and messages from the account itself, and on Facebook that is the Page. A Page admin commenting from their personal profile is a commenter like any other, so their comment does trigger it.
+- **Edited comments**: Facebook sends an edited comment again, as another `comment.received` event. Automations ignore edits and answer new comments only.
 - **24-hour messaging window**: Pages can send any message within 24 hours of the user's last message. After that, only approved message tags are allowed. If you get an error sending a DM, the window may have closed.
 - **Reviews deprecated**: Facebook deprecated Page Recommendations/Reviews in Graph API v22.0 (January 2025). The API returns `501` for review endpoints.
 
