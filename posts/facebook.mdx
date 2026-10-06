@@ -357,6 +357,9 @@ Each post includes a `targets` array with per-platform status and engagement met
       "platform_post_id": "123456789012345_987654321098765",
       "status": "published",
       "permalink": "https://www.facebook.com/permalink/123456789012345",
+      "platform_media": [
+        { "type": "image", "url": "https://scontent.xx.fbcdn.net/v/t39.30808-6/123_n.jpg" }
+      ],
       "metrics": {
         "likes": 15,
         "comments": 3,
@@ -395,6 +398,26 @@ A Facebook target can include a `settings` object with the options Facebook repo
 | `multi_share_end_card` | boolean | Whether the link carousel shows an end card. |
 
 `settings` is absent when Facebook reported none of these for the post. It is also returned for posts published outside SocialAPI, since it reflects what Facebook currently reports for the post rather than what was sent through this API.
+
+### Media on published posts
+
+A Facebook target includes `platform_media`: every photo and video on the published post, album photos in order. It is returned for posts published outside SocialAPI too, so you can read the photos and videos of a Page's existing posts.
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | string | `image` or `video`. |
+| `url` | string | Link to the file, hosted by Facebook. |
+| `thumbnail_url` | string | Link to a video's cover image. Absent on images. |
+
+Link and share posts have no `platform_media`: their image is a preview of the linked site, not media the Page posted. A Reel has none either, since Reels do not appear in the Page feed.
+
+The links expire after a few days. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{id}/sync`, then read the post again.
+
+`url` is absent when Facebook does not expose a video's file. The cover image is still included.
+
+`POST /v1/accounts/{id}/sync` covers up to the 500 most recent posts on each Page of the account. Facebook itself returns about 600 posts per Page per year at most. Each account can be synced once every 5 minutes; an earlier call returns `429` with a `Retry-After` header.
+
+`platform_media` is separate from `media`, which lists what you sent when publishing through SocialAPI and is empty for posts published elsewhere.
 
 ---
 

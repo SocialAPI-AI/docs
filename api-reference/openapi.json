@@ -1327,7 +1327,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Refreshes one connected account's posts: new posts appear, engagement counts update, and Instagram media links in platform_media are renewed. Instagram covers up to the 500 most recent posts; other platforms cover up to the 25 most recent. Available on platforms that support listing posts. Returns once the refresh completes. Each account can be synced once every 5 minutes.",
+                "description": "Refreshes one connected account's posts: new posts appear, engagement counts update, and Instagram and Facebook media links in platform_media are renewed. Instagram covers up to the 500 most recent posts, Facebook up to the 500 most recent per Page; other platforms cover up to the 25 most recent. Available on platforms that support listing posts. Returns once the refresh completes. Each account can be synced once every 5 minutes.",
                 "tags": [
                     "Accounts"
                 ],
@@ -11166,7 +11166,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the authenticated user's profile. Supports setting onboarding=false to mark onboarding as complete, and optionally storing use_case and referral for onboarding analytics. The response reflects the current billing_blocked state, unaffected by this update. The response includes the caller's team role: \"admin\", \"developer\", or \"\" for the account owner.",
+                "description": "Updates the authenticated user's profile. Supports setting onboarding=false to mark onboarding as complete, and optionally recording use_case, referral and job_role. The response reflects the current billing_blocked state, unaffected by this update. The response includes the caller's team role: \"admin\", \"developer\", or \"\" for the account owner.",
                 "tags": [
                     "Users"
                 ],
@@ -14447,6 +14447,11 @@
             "api_endpoints.PatchMeRequest": {
                 "type": "object",
                 "properties": {
+                    "job_role": {
+                        "description": "JobRole records what best describes the user. Surrounding whitespace is\ntrimmed, an empty value leaves the current one unchanged, and values\nlonger than 120 characters are truncated.",
+                        "type": "string",
+                        "example": "Founder / CEO"
+                    },
                     "lock_accounts_to_brand": {
                         "description": "LockAccountsToBrand toggles whether a social account already connected to\none brand may be re-connected (moved) to a different brand. When true, such\na connect attempt is rejected with 409 account.already_linked.",
                         "type": "boolean",
@@ -14936,7 +14941,7 @@
                         "example": "instagram"
                     },
                     "platform_media": {
-                        "description": "Every image and video Instagram reports on the published post, carousel slides in order, with a cover image for each video. The links are temporary: download the files rather than keeping the links, and call POST /v1/accounts/{id}/sync to get fresh ones. Absent on other platforms.",
+                        "description": "Every image and video Instagram or Facebook reports on the published post: carousel slides or album photos in order, with a cover image for each video. The links are temporary: download the files rather than keeping the links, and call POST /v1/accounts/{id}/sync to get fresh ones. Absent on Facebook link and share posts and on other platforms.",
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PlatformMediaItem"
@@ -16092,6 +16097,11 @@
                     "id": {
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000"
+                    },
+                    "job_role": {
+                        "description": "JobRole is what best describes the user, as answered during\nonboarding. Null until answered.",
+                        "type": "string",
+                        "example": "Founder / CEO"
                     },
                     "lock_accounts_to_brand": {
                         "description": "LockAccountsToBrand, when true, rejects connecting a social account that is\nalready connected to another of your brands (409 account.already_linked)\ninstead of moving it. Default false.",
@@ -17897,7 +17907,7 @@
                         "type": "string"
                     },
                     "platform_media": {
-                        "description": "[platform: instagram] Every image and video on the post, carousel slides in order",
+                        "description": "[platform: instagram, facebook] Every image and video on the post, carousel slides or album photos in order",
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PlatformMediaItem"
