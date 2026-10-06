@@ -1,9 +1,9 @@
 ---
 title: Use cases
-description: "Common ways developers and AI agents use the SocialAPI.ai unified social media API: unified inbox, management, publishing, and AI agents."
+description: "Common ways developers and AI agents use the SocialAPI.ai unified social media API: unified inbox, comment-to-DM automations, management, publishing, and AI agents."
 ---
 
-SocialAPI.ai is one REST API and MCP server across every social network. Here are the four most common ways teams use it.
+SocialAPI.ai is one REST API and MCP server across every social network. Here are the five most common ways teams use it.
 
 ## Unified inbox
 
@@ -15,6 +15,28 @@ curl https://api.social-api.ai/v1/inbox/conversations \
 ```
 
 See the [Unified Inbox API](https://social-api.ai/solutions/unified-inbox-api) overview.
+
+## Comment-to-DM automations
+
+Answer Instagram and Facebook comments and DMs that match keywords within seconds, with no server of your own: a private reply with a link, a public reply, a hidden comment, or a button menu. On Instagram, a Follow gate sends the link only to people who follow the account.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/automations \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "name": "Send the link",
+    "trigger": "comment",
+    "steps": [{
+      "key": "start",
+      "filters": [{ "type": "keyword", "keyword": { "keywords": ["link"], "match": "contains" } }],
+      "actions": [{ "type": "private_reply", "private_reply": { "texts": ["Here is the link: https://example.com"] } }]
+    }]
+  }'
+```
+
+See [Automations](/guides/automations).
 
 ## Social media management
 

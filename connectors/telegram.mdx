@@ -66,7 +66,7 @@ The whole process takes about two minutes. There is no developer account, busine
 
 ## Reading and sending DMs
 
-Telegram has no message-history API: a bot only sees messages that arrive after it is connected. SocialAPI builds the inbox from inbound webhook events from connect time onward.
+Telegram has no message-history API: a bot only sees messages that arrive after it is connected. The inbox covers messages received from connect time onward.
 
 ### List DM conversations
 
@@ -107,10 +107,22 @@ curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/
 
 The single-attachment shorthand `attachment_url` still works, and with it the message `text` is used as the caption.
 
+### Receiving messages
+
+Each inbound message fires a `dm.received` webhook. Reply to it by passing `data.conversation_id` to `POST /v1/inbox/conversations/{conversation_id}/messages`. `data.platform_id` is Telegram's message id, the same value as `platform_id` on the matching row from `GET /v1/inbox/conversations/{id}/messages`.
+
+A message that replies to an earlier one has `reply_to.platform_id` set, both on `dm.received` (`data.reply_to`) and on its message row, holding the replied-to message's `platform_id`.
+
+### Inbound media
+
+Photos, documents, voice notes, audio, video, video notes, animations and stickers arrive in `data.content.media` as `{ "url", "type" }`, and a caption arrives as `data.content.text`. `type` is one of `image`, `audio`, `video`, `document` or `sticker`. The same URL is the message row's `attachment_url`.
+
+Telegram files can only be downloaded with the bot's token, so `url` is a SocialAPI URL (`/v1/inbox/media/{id}`) that you retrieve with your API key. It stays available for 30 days. A `504` right after the webhook means the file is still being fetched: retry shortly. Telegram does not let bots download files over 20 MB, and those return `410`. See [Inbox media](/guides/inbox#media) for every response code.
+
 ## Limitations and gotchas
 
 - **The bot cannot start a conversation.** Telegram forbids a bot from messaging a user who has never messaged it. Sending to such a user returns `telegram.cannot_message` (HTTP 403). The user must send `/start` or any message to the bot first. There is no 24-hour window once started.
-- **No message history backfill.** There is no list or history endpoint in the Bot API. The inbox is populated only by webhooks received after you connect.
+- **No message history backfill.** There is no list or history endpoint in the Bot API. The inbox covers messages received after you connect.
 - **DM-only.** Posts, channels, and comments are not supported through this connector.
 - **No token expiry.** A bot token never expires. It is revoked only via @BotFather (`/revoke`). If a token is revoked, reconnect with a fresh token.
 
@@ -119,8 +131,9 @@ The single-attachment shorthand `attachment_url` still works, and with it the me
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 401 | `platform.telegram.auth` | The bot token is invalid or has been revoked via @BotFather. Reconnect the account with a fresh token. |
+| 400 | `validation.telegram_bad_request` | Telegram rejected the request as invalid, for example text over 4,096 characters or an attachment URL Telegram could not fetch. The message carries Telegram's own description. Fix the request before retrying. |
 | 403 | `telegram.cannot_message` | The bot cannot message this chat: the user has not started the bot, or blocked or removed it. |
-| 429 | `platform.telegram.rate_limit` | Telegram rate-limited the bot. The `retry_after` metadata field contains the number of seconds to wait before retrying. |
+| 429 | `platform.telegram.rate_limit` | Telegram rate-limited the bot. Wait the number of seconds in the `Retry-After` header (also `error.meta.retry_after_seconds`) before retrying. |
 
 See [Errors](/guides/errors) for the full catalog.
 

@@ -180,7 +180,7 @@ curl -X DELETE "https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J?pl
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-SocialAPI calls `DELETE` on the full post resource name (for example, `accounts/123/locations/456/localPosts/789`). If the post no longer exists on GBP, the call returns `404` with code `resource.not_found`.
+If the post no longer exists on GBP, the call returns `404` with code `resource.not_found`.
 
 **Retry not supported:** The GBP connector does not support `POST /v1/posts/:pid/retry`. If a post fails, delete it and create a new one.
 
@@ -249,11 +249,11 @@ Each connected GBP location has an account ID in the format `accounts/{accountId
 
 ### Token auto-refresh
 
-Google OAuth 2.0 access tokens expire after one hour. SocialAPI automatically refreshes the token using the stored refresh token before each API call when the token is within five minutes of expiry. The refreshed token is written back to the database. No action is required from your application.
+Google OAuth 2.0 access tokens are short-lived. SocialAPI keeps the connection valid automatically. No action is required from your application.
 
 ### Rate limits
 
-The GBP API enforces a 300 QPM (queries per minute) quota on SocialAPI's managed Google Cloud project, shared across all locations. SocialAPI applies an internal throttle at 240 QPM (80% of the limit) to leave headroom for bursts. When the throttle is active, requests return `429 Too Many Requests`. Retry after a short delay.
+Google Business Profile enforces a per-minute quota on API traffic. When it is reached, requests return `429 Too Many Requests`. Retry after a short delay.
 
 ### Error shapes
 

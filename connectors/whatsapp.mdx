@@ -23,7 +23,7 @@ description: Connect a WhatsApp Business phone number to receive and reply to di
 | Free-form reply | Yes | Text, media, or interactive, and only inside the open 24-hour service window (see below) |
 | Template messages | Yes | Create, list, edit, delete, and validate templates via the API, and send approved templates (including outside the 24-hour window) |
 | Interactive messages | Yes | Up to 3 reply buttons, or a list of up to 10 rows. Taps arrive on your webhook as `dm.received` |
-| Conversation list / history | No | There is no history API; the inbox is built from webhooks received after you connect |
+| Conversation list / history | Partial | There is no history API, so the inbox is built from webhooks received after you connect. A number connected from the WhatsApp Business app also brings the chat history the business shares (see [Keep using the WhatsApp Business app](#keep-using-the-whatsapp-business-app)) |
 | Phone-number management | Yes | Request a code, verify, register, deregister, and check status of the business number |
 | Business profile | Yes | Read and update the WhatsApp business profile |
 | Publishing (posts) | No | WhatsApp has no posts concept |
@@ -31,7 +31,7 @@ description: Connect a WhatsApp Business phone number to receive and reply to di
 
 ## What you need
 
-- A **WhatsApp Business phone number** that is not currently registered on the consumer WhatsApp or WhatsApp Business apps. During Embedded Signup you can select an existing number or create one.
+- A **WhatsApp Business phone number** that is not registered on the consumer WhatsApp app. A number the business uses in the WhatsApp Business app can keep running there, see [Keep using the WhatsApp Business app](#keep-using-the-whatsapp-business-app). During Embedded Signup you can select an existing number or create one.
 - **Admin access to a Meta Business** (business.facebook.com).
 
 You do **not** need to submit your own Meta App Review or complete business verification to connect. We are the Tech Provider, so the app review and provider-side setup are handled on our side. The person connecting signs in with their Meta Business account, picks their WhatsApp Business Account and phone number, and the number is connected.
@@ -107,6 +107,30 @@ curl -X POST https://api.social-api.ai/v1/oauth/exchange \
 
 We validate `state` against the one we issued to your API key, exchange the `code` for the customer's token, store the account, and return HTTP 201 with the connected account. The number's messages now flow into your inbox.
 
+### Keep using the WhatsApp Business app
+
+To connect a number the business already uses in the WhatsApp Business app, and keep using it there, add `featureType` and `sessionInfoVersion` to `extras` in leg 2:
+
+```javascript
+extras: {
+  setup: { solutionID: SOLUTION_ID },
+  featureType: "whatsapp_business_app_onboarding",
+  sessionInfoVersion: "3",
+},
+```
+
+Without `featureType`, Meta rejects such a number at the phone-number step with error #2655115 ("this account type does not support partner sharing"). The phone needs WhatsApp Business app 2.24.17 or later, and Meta decides at that step whether the number is eligible.
+
+This flow ends with the `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` event, which carries `waba_id` but no `phone_number_id`. In leg 3, send `waba_id` and leave `phone_number_id` out. If the WhatsApp Business account holds more than one number, the exchange fails with `whatsapp.ambiguous_phone_number`, and you pass `phone_number_id` explicitly.
+
+Once the number is connected:
+
+- The chat history the business chooses to share in the app (up to six months) appears in its conversations as WhatsApp delivers it. Imported messages raise no webhook events, and their attachments carry `attachment_type` without an `attachment_url`.
+- Messages the business sends from the phone app appear in the conversation and raise `dm.sent`, like messages sent through the API.
+- Sending is capped at 20 messages per second, Meta's fixed limit for these numbers.
+- The number is already registered, so you never call `register` for it. `status` reports it as registered, and `register` refuses it with `409 whatsapp.business_app_number`.
+- The `deregister` endpoint does not work for these numbers. The business disconnects the number from the WhatsApp Business app's settings.
+
 ### Registering your domain
 
 The popup runs against our Meta app, and Meta's Login-for-Business SDK enforces an allowlist of domains that are permitted to launch it. To run `FB.login` from your own domain (for example, `app.yourcompany.com`), we have to register that domain in our Meta app first, so contact us to add it.
@@ -176,7 +200,7 @@ Listing, editing, and deleting templates, plus phone-number management (`request
 
 ## Receiving and replying
 
-WhatsApp has no message-history API, so we build the inbox from inbound webhook events from connect time onward. There is no backfill of messages sent before you connected.
+WhatsApp has no message-history API, so the inbox covers messages from connect time onward. The exception is a number connected from the WhatsApp Business app, which also brings the chat history the business chooses to share (see [Keep using the WhatsApp Business app](#keep-using-the-whatsapp-business-app)).
 
 ### List DM conversations
 
@@ -288,7 +312,7 @@ A tap is delivered as an ordinary `dm.received` event, not a separate event type
 
 ### Inbound media
 
-When a customer sends a photo, voice note, or other attachment, WhatsApp's webhook hands us a media id, not a URL, and that id is redeemable only with the connected account's own access token, not your API key. So for WhatsApp, and only WhatsApp, we fetch the bytes ourselves and mirror them into SocialAPI's storage: `messages.attachment_url` on a WhatsApp message is a SocialAPI URL (`/v1/inbox/media/{id}`) that you retrieve with your API key, unlike every other connector where `attachment_url` is the platform's own URL. See [Inbox media](/guides/inbox#media) for the endpoint and its response codes.
+WhatsApp exposes inbound media only to the connected account, never to an external caller, so it cannot be linked directly. For WhatsApp (and Telegram), `messages.attachment_url` is a SocialAPI URL (`/v1/inbox/media/{id}`) that you retrieve with your API key, unlike the other connectors where `attachment_url` is the platform's own URL. See [Inbox media](/guides/inbox#media) for the endpoint and its response codes.
 
 ## Errors
 
@@ -302,6 +326,7 @@ When a customer sends a photo, voice note, or other attachment, WhatsApp's webho
 | 400 | `validation.caption_unsupported` | A caption was set on an audio attachment. WhatsApp audio messages have no caption. |
 | 400 | `whatsapp.undeliverable` | The recipient is not a WhatsApp user. |
 | 403 | `whatsapp.user_opted_out` | The recipient has opted out of messages from this business. |
+| 409 | `whatsapp.business_app_number` | `register` was called for a number that stays on the WhatsApp Business app. It is already registered: do not retry. |
 | 429 | `whatsapp.frequency_cap` | The recipient has hit their daily marketing-message limit. |
 | 429 | `whatsapp.pair_rate_limit` | Too many messages sent to this same recipient. |
 | 429 | `whatsapp.throughput_exceeded` | The number's messaging throughput limit was exceeded. |

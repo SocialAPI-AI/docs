@@ -7,7 +7,7 @@ The inbox is a unified social inbox API: a single endpoint that returns comments
 
 SocialAPI provides a unified inbox API for reading and responding to all inbound engagement across your connected accounts. Comments, DMs, reviews, and mentions are accessed through consistent endpoints with the same response shape regardless of platform.
 
-SocialAPI proxies comments, reviews, and mentions from the platform API, so you always see the latest state. DM conversations and messages are stored in SocialAPI's database to support threading and pagination.
+Comments, reviews, and mentions always reflect the latest state on the platform. DM conversations and messages are retained by SocialAPI to support threading and pagination.
 
 ## Comments
 
@@ -31,6 +31,10 @@ List comments across all connected accounts, reply, and moderate.
 `:postId` accepts a platform post ID (e.g., `17895695668004550`). `:commentId` accepts a SocialAPI interaction ID (`sapi_cmt_...`). See [Interaction IDs](/guides/interaction-ids) for the encoding.
 
 Comment likes are supported on Facebook and LinkedIn Page only (see the matrix below); other platforms return `501` with code `resource.not_supported`. Private replies (Instagram and Facebook) are limited by Meta to one per comment, within 7 days of the comment. Add `buttons` (1 to 3, same shape as when sending a DM) to send the reply as a button template, for example a "continue" button that starts a comment-to-DM flow; a postback tap arrives as a `dm.postback` event. You cannot message the commenter again until they respond; once they do, the conversation continues within the standard 24-hour messaging window.
+
+<Tip>
+  To run a comment-to-DM flow without hosting any code, use [Automations](/guides/automations): SocialAPI matches the comment's keywords, sends the private reply with its buttons, and handles each tap itself, including a [Follow gate](/guides/automations#the-follow-gate) on Instagram.
+</Tip>
 
 ### Platform capabilities
 
@@ -172,7 +176,7 @@ If a message fails partway through a multi-attachment send, the earlier messages
 
 ### Interactive messages
 
-On Instagram and Facebook you can send structured, tappable content alongside or instead of plain text. Set at most one of `quick_replies`, `buttons`, or `cards` per message. When the recipient taps a quick reply or a `postback` button, you receive a [`dm.postback` webhook](/guides/webhooks#event-types) carrying the `payload` you defined, so you can drive automated flows.
+On Instagram and Facebook you can send structured, tappable content alongside or instead of plain text. Set at most one of `quick_replies`, `buttons`, or `cards` per message. When the recipient taps a quick reply or a `postback` button, you receive a [`dm.postback` webhook](/guides/webhooks#event-types) carrying the `payload` you defined, so you can drive automated flows from your own code. For flows that only answer with set messages, an [Automation](/guides/automations#buttons-and-multi-step-flows) sends the buttons and answers each tap for you.
 
 These features require the recipient to be inside the 24 hour messaging window, the same as any other message.
 
@@ -374,6 +378,8 @@ post caption. A reply consumes 1 interaction credit.
 |----------|----------|----------|
 | Instagram | Tagged media only | Yes |
 | Facebook | Yes | Yes |
+| Threads | Beta | Beta |
+| Bluesky | Yes | Yes |
 | X / Twitter | Yes | No |
 | All others | No | No |
 
@@ -393,13 +399,13 @@ curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/
 
 ## Media
 
-Some inbound messages carry an attachment. For most platforms `messages.attachment_url` is the platform's own URL and you fetch it directly (subject to whatever expiry the platform applies). WhatsApp is the exception: Meta's webhook hands you a short-lived media id, not a URL, and that id can only be redeemed with the connected account's own access token, which your API key cannot present. SocialAPI fetches the bytes on your behalf and mirrors them into its own storage, and `attachment_url` for a WhatsApp message is a SocialAPI URL you retrieve with your API key instead.
+Some inbound messages carry an attachment. For most platforms `messages.attachment_url` is the platform's own URL and you fetch it directly (subject to whatever expiry the platform applies). WhatsApp and Telegram are the exceptions: their files can only be downloaded with the connected account's own credentials, which your API key cannot present. For those two, `attachment_url` on the message and `content.media[].url` on the `dm.received` webhook are a SocialAPI URL that you retrieve with your API key. It stays available for 30 days after the message arrives, then returns `410`.
 
 ### Endpoint
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/v1/inbox/media/:id` | Retrieve a mirrored inbound attachment |
+| `GET` | `/v1/inbox/media/:id` | Retrieve an inbound attachment |
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/media/7f3c1e2a-9b4d-4e5f-8a6b-1c2d3e4f5a6b" \
@@ -414,10 +420,10 @@ curl "https://api.social-api.ai/v1/inbox/media/7f3c1e2a-9b4d-4e5f-8a6b-1c2d3e4f5
 | `200` | The attachment bytes, with `Content-Type` set to the original media type |
 | `404` | Unknown media ID, or it belongs to a different account than your key |
 | `410` | Gone for good: expired, or the platform reported the source unrecoverable. Retrying will not help |
-| `503` | Too many concurrent fetches in progress on this server. Retry shortly |
+| `503` | Too many concurrent fetches in progress. Retry shortly |
 | `504` | The fetch from the platform is still in progress. Retry shortly, this is not a failure |
 
-A `410` and a `504` mean opposite things and are not interchangeable: `410` means stop retrying, `504` means keep retrying. The mirroring itself happens automatically when the inbound message arrives; there is nothing to trigger, this endpoint only reads back what SocialAPI already fetched or is in the middle of fetching.
+A `410` and a `504` mean opposite things and are not interchangeable: `410` means stop retrying, `504` means keep retrying. There is nothing to trigger: the attachment is made available automatically when the inbound message arrives, and this endpoint only reads it back.
 
 ## Interaction IDs
 
@@ -436,8 +442,11 @@ The suffix encodes the platform and the platform-native ID, so you can route act
 
 SocialAPI can notify your server when new inbound interactions arrive (new comment, new DM, new review). Register a webhook endpoint and subscribe to the event types you care about. See [Webhooks](/guides/webhooks) for setup and event reference.
 
+To answer Instagram and Facebook comments and DMs that match keywords without running a webhook handler, configure an [Automation](/guides/automations) instead.
+
 ## Related
 
+- [Automations](/guides/automations) for keyword replies and comment-to-DM flows with no code on your side
 - [Platform support](/guides/platforms) for the full capability matrix
 - [Interaction IDs](/guides/interaction-ids) for the ID encoding scheme
 - [Webhooks](/guides/webhooks) for real-time event delivery

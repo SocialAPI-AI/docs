@@ -26,13 +26,14 @@ description: Connect and interact with Instagram accounts via the Meta Graph API
 | Reply to comment | Yes | |
 | Private reply | Yes | Sends a DM to the commenter |
 | Comment replies (thread) | Yes | |
-| Like comment | No | Instagram Graph API does not expose comment likes |
+| Like comment | Conditional | Accounts connected with Facebook Login only. Instagram Login accounts return `501 resource.not_supported`: read `can_like` on each comment rather than assuming. Instagram does not report who liked a comment, so `liked_by_viewer` reflects likes made through SocialAPI and not likes made in the Instagram app. |
 | Moderate comment (hide/unhide/delete) | Yes | |
 | Toggle post comments | No | No route exists; planned for a future release |
 | DMs | Yes | |
 | Send DM | Yes | Text and/or media attachment (`attachment_url`) |
 | Send DM attachment | Yes | Image, video, audio, or file via `attachment_url` (type inferred from URL extension, max 25 MB) |
 | Get DM thread by user | Yes | |
+| Automations | Yes | Keyword replies to comments and DMs, postback buttons and multi-step flows, the `follows_account` filter and the Follow gate. See [Automations](/guides/automations) |
 | Reviews | No | Instagram has no review feature |
 | Mentions | Partial | `GET /mentions` returns only media your account was tagged in. @mentions written inside a caption or a comment are not returned, and do not currently fire `mention.received`. See [Mentions](/guides/inbox#mentions) |
 | Create post | Yes | Images, videos, reels, carousels |
@@ -344,7 +345,9 @@ Two limits come from Instagram, not from [SocialAPI](https://social-api.ai): acc
 
 ## Limitations and gotchas
 
-- **Private replies.** Replying to a comment with `"private": true` sends a DM to the commenter. This is Instagram's native "Send Private Reply" feature, not a [SocialAPI](https://social-api.ai) workaround. Meta allows one private reply per comment, within 7 days of the comment, and the user must respond before you can send another message. The private-reply endpoint also accepts `buttons` (1 to 3), sent as a button template, which gives the commenter something to tap to continue the conversation.
+- **Private replies.** Replying to a comment with `"private": true` sends a DM to the commenter. This is Instagram's native "Send Private Reply" feature, not a [SocialAPI](https://social-api.ai) workaround. Meta allows one private reply per comment, within 7 days of the comment, and the user must respond before you can send another message. The private-reply endpoint also accepts `buttons` (1 to 3), sent as a button template, which gives the commenter something to tap to continue the conversation. An [Automation](/guides/automations) can send that private reply for you whenever a comment matches its keywords.
+- **Follow gate.** Instagram tells apps whether a person follows the account only after the person taps a button or messages it, never from a comment alone. So an Automation's `follows_account` filter, and the [Follow gate](/guides/automations#the-follow-gate) built on it, checks the follow after a tap on the private reply's button.
+- **Unsending messages.** Instagram does not let apps unsend or delete a DM once it is sent; only the Instagram app can. When the other person unsends a message they sent you, you receive a [`dm.deleted` webhook](/guides/webhooks#event-types) and the message is removed from the conversation.
 - **Token expiry.** Instagram access tokens can expire. If you receive `401` with `code: "invalid_token"`, reconnect the account using the OAuth flow.
 - **Account fields.** See the shared [account object](/connectors/overview#account-object) reference for the fields returned by `/v1/accounts`.
 - **Per-post insights.** `GET /v1/posts/{id}/metrics` returns an `insights` object for Instagram targets carrying reach, views, saves, shares, total interactions, profile visits, and (for reels) watch time in milliseconds. A metric Instagram has not reported is absent rather than zero. A carousel's parent post has no insights of its own: Instagram only reports them for the individual child items.
