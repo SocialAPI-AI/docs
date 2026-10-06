@@ -195,6 +195,10 @@ Each post includes a `targets` array with per-platform status and engagement met
       "platform_post_id": "17895695668004550",
       "status": "published",
       "permalink": "https://www.instagram.com/p/ABC123/",
+      "platform_media": [
+        { "type": "image", "url": "https://scontent.cdninstagram.com/v/t51.29350-15/123_n.jpg" },
+        { "type": "video", "url": "https://scontent.cdninstagram.com/o1/v/t16/456.mp4", "thumbnail_url": "https://scontent.cdninstagram.com/v/t51.29350-15/456_n.jpg" }
+      ],
       "metrics": {
         "likes": 42,
         "comments": 5,
@@ -228,6 +232,24 @@ An Instagram target can include a `settings` object with the options Instagram r
 | `audio_type` | string | Kind of audio on a Reel: `MUSIC` or `ORIGINAL_SOUND`. |
 
 `settings` is absent when Instagram reported none of these for the post. Instagram does not report paid partnership, sponsor, location, user tag, audio name, or trial settings back, so those never appear here even when you set them at publish time. `settings` is also returned for posts published outside SocialAPI, since it reflects what Instagram currently reports for the post rather than what was sent through this API.
+
+### Media on published posts
+
+An Instagram target includes `platform_media`: every image and video on the published post, carousel slides in order. It is returned for posts published outside SocialAPI too, so you can read the photos and videos of an account's existing posts.
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | string | `image` or `video`. |
+| `url` | string | Link to the file, hosted by Instagram. |
+| `thumbnail_url` | string | Link to a video's cover image. Absent on images. |
+
+The links expire after a few days. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{id}/sync`, then read the post again.
+
+`url` is absent when Instagram withholds the file, for example a video with licensed audio. The cover image is still included.
+
+`POST /v1/accounts/{id}/sync` covers up to the 500 most recent posts on an Instagram account. Each account can be synced once every 5 minutes; an earlier call returns `429` with a `Retry-After` header.
+
+`platform_media` is separate from `media`, which lists what you sent when publishing through SocialAPI and is empty for posts published elsewhere.
 
 ---
 
