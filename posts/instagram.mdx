@@ -159,9 +159,17 @@ Each post includes a `targets` array with per-platform status and engagement met
       "metrics": {
         "likes": 42,
         "comments": 5,
-        "shares": 0,
-        "saves": 0,
-        "extra": null,
+        "shares": 8,
+        "saves": 31,
+        "insights": {
+          "reach": 1820,
+          "views": 4300,
+          "saves": 31,
+          "shares": 8,
+          "total_interactions": 86,
+          "profile_visits": 12
+        },
+        "extra": { "views": 4300 },
         "metrics_synced_at": "2026-04-10T12:00:00Z"
       }
     }
@@ -170,9 +178,12 @@ Each post includes a `targets` array with per-platform status and engagement met
 ```
 
 **Metrics notes:**
-- `likes`, `comments`, and `shares` are synced periodically from the Meta Graph API.
-- `saves` is not available from the Instagram API and is always `0`.
-- `shares` is `0` because SocialAPI does not yet sync the `shares_count` field from the Graph API.
+- `likes` and `comments` come from the media object itself.
+- `shares` and `saves` come from Instagram's per-post insights, which need the `instagram_business_manage_insights` permission.
+- `insights` carries the metrics Instagram reports separately from the post: `reach`, `views`, `saves`, `shares`, `total_interactions`, `profile_visits`, and, for reels, `reels_avg_watch_time_ms` and `reels_total_watch_time_ms`. A metric Instagram has not reported is absent from the object rather than returned as `0`, so a missing key means "not reported", not "zero".
+- A carousel's parent post has no insights of its own. Instagram only reports them for the individual child items, so `insights` is absent for the parent.
+- `insights` is also absent when the account was connected before the insights permission was added. Reconnect the account to enable it.
+- Instagram's insight data can lag by up to 48 hours.
 - `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Instagram.
 
 ---
@@ -311,9 +322,18 @@ Response once published:
       "metrics": {
         "likes": 42,
         "comments": 5,
-        "shares": 0,
-        "saves": 0,
-        "extra": null,
+        "shares": 8,
+        "saves": 31,
+        "insights": {
+          "reach": 1820,
+          "views": 4300,
+          "saves": 31,
+          "shares": 8,
+          "total_interactions": 86,
+          "reels_avg_watch_time_ms": 3400,
+          "reels_total_watch_time_ms": 14620000
+        },
+        "extra": { "views": 4300 },
         "metrics_synced_at": "2026-04-10T12:00:00Z"
       }
     }
@@ -335,5 +355,6 @@ SocialAPI's managed Meta App requests the following scopes on your behalf during
 | `instagram_business_manage_comments` | Post and manage comments (required for first comment) |
 | `instagram_business_manage_messages` | Send and receive DMs |
 | `instagram_business_content_publish` | Create and publish media containers |
+| `instagram_business_manage_insights` | Read per-post insights, account insights, and audience demographics |
 
 To verify which scopes your connected account has granted, call `GET /v1/accounts/:id/limits`.
