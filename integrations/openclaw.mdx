@@ -1,0 +1,119 @@
+---
+title: OpenClaw
+description: Connect SocialAPI to OpenClaw with one openclaw mcp add, so the agent behind every routed channel can publish and reply.
+---
+
+**MCP Server URL:** `https://api.social-api.ai/mcp`
+
+[OpenClaw](https://docs.openclaw.ai) keeps its MCP servers in `~/.openclaw/openclaw.json` under `mcp.servers`. Add SocialAPI once and the agents behind every channel you route through the OpenClaw gateway get the tools.
+
+## Prerequisites
+
+- OpenClaw installed (`npm i -g openclaw`)
+- A [SocialAPI](https://social-api.ai) account with at least one connected social account
+
+## 1. Add the server
+
+```bash
+openclaw mcp add socialapi \
+  --url https://api.social-api.ai/mcp \
+  --transport streamable-http \
+  --auth oauth
+```
+
+This saves the entry to `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "socialapi": {
+        "url": "https://api.social-api.ai/mcp",
+        "transport": "streamable-http",
+        "auth": "oauth"
+      }
+    }
+  }
+}
+```
+
+<Note>
+  Set `transport` to `streamable-http`. When it is omitted, OpenClaw falls back to SSE.
+</Note>
+
+## 2. Sign in
+
+```bash
+openclaw mcp login socialapi
+```
+
+OpenClaw prints an authorization URL and waits for the browser on `127.0.0.1:8989`. Open the URL, log in to SocialAPI and click **Authorize**. The terminal prints `MCP OAuth credentials saved for "socialapi"`.
+
+If the gateway runs on another machine and the callback cannot reach it, authorize in your browser, copy the `code` from the redirect URL, and finish with:
+
+```bash
+openclaw mcp login socialapi --code <code>
+```
+
+## 3. Verify
+
+```bash
+openclaw mcp probe socialapi
+```
+
+It connects and reports `socialapi: 88 tools`. If the gateway is already running, `openclaw mcp reload` picks up the new server without a restart.
+
+## Shared or per-sender accounts
+
+By default the credentials from `openclaw mcp login` are shared: every channel acts on the one SocialAPI account you authorized. That is what you want for a personal assistant or a team bot.
+
+If each person who messages the agent should connect their own SocialAPI account, set `oauth.identity` to `per-requester` and give the gateway a public HTTPS origin for the callback:
+
+```json
+{
+  "gateway": {
+    "publicOrigin": "https://gateway.example.com"
+  },
+  "mcp": {
+    "servers": {
+      "socialapi": {
+        "url": "https://api.social-api.ai/mcp",
+        "transport": "streamable-http",
+        "auth": "oauth",
+        "oauth": { "identity": "per-requester" }
+      }
+    }
+  }
+}
+```
+
+The first time a sender calls a SocialAPI tool, OpenClaw replies with a sign-in link for that sender.
+
+## Headless: use an API key
+
+To skip OAuth, authenticate with an [API key](/integrations/custom). OpenClaw ignores static `Authorization` headers while `auth` is `oauth`, so save the server without it:
+
+```bash
+export SOCIALAPI_API_KEY=sapi_key_xxxxxxxxxxxxxxxx
+openclaw mcp set socialapi '{"url":"https://api.social-api.ai/mcp","transport":"streamable-http","headers":{"Authorization":"Bearer ${SOCIALAPI_API_KEY}"}}'
+```
+
+The `${SOCIALAPI_API_KEY}` reference is resolved from the environment the gateway runs in, so the key never sits in `openclaw.json`.
+
+## Limit the tools
+
+SocialAPI exposes 88 tools. Hide the ones a channel agent should never call:
+
+```bash
+openclaw mcp tools socialapi --exclude 'social_api_delete_*,social_api_disconnect_account,social_api_revoke_key'
+```
+
+Use `--include` to keep only a subset instead, and `--clear` to remove the filter.
+
+## Troubleshooting
+
+**`listen EADDRINUSE: address already in use 127.0.0.1:8989`** - Another `openclaw mcp login` is still waiting. Stop it, or finish with `--code <code>` as above.
+
+**`requires OAuth authorization`** - The server is saved but not signed in. Run `openclaw mcp login socialapi`.
+
+**`Streamable HTTP error` with an API key** - The key is wrong, revoked, or the variable is not set where the gateway runs. Check it in the [dashboard](https://app.social-api.ai/settings/keys).

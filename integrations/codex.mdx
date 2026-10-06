@@ -1,0 +1,89 @@
+---
+title: Codex
+description: Connect SocialAPI to OpenAI Codex (CLI, IDE extension and ChatGPT desktop app) with one entry in ~/.codex/config.toml.
+---
+
+**MCP Server URL:** `https://api.social-api.ai/mcp`
+
+Codex reads MCP servers from `~/.codex/config.toml`. The Codex CLI, the Codex IDE extension and the ChatGPT desktop app share that file, so one entry gives every Codex session the SocialAPI tools.
+
+## Prerequisites
+
+- [Codex](https://developers.openai.com/codex) installed (CLI, IDE extension or desktop app)
+- A [SocialAPI](https://social-api.ai) account with at least one connected social account
+
+## Add with the CLI
+
+```bash
+codex mcp add socialapi --url https://api.social-api.ai/mcp
+```
+
+Codex saves the server, sees that it uses OAuth, and opens your browser on the SocialAPI authorization page. Log in and click **Authorize**. The terminal prints `Successfully logged in to MCP server 'socialapi'` when it is done.
+
+To sign in again later (a new machine, a revoked session):
+
+```bash
+codex mcp login socialapi
+```
+
+<Note>
+  This is OAuth 2.1 with PKCE and Dynamic Client Registration. No API key is stored in your config, and Codex refreshes the token on its own.
+</Note>
+
+## Config file
+
+`codex mcp add` writes this entry to `~/.codex/config.toml`. You can also add it by hand, globally or in a trusted project's `.codex/config.toml`, then run `codex mcp login socialapi`:
+
+```toml
+[mcp_servers.socialapi]
+url = "https://api.social-api.ai/mcp"
+```
+
+## Headless: use an API key
+
+For CI jobs, containers or any machine without a browser, skip OAuth and authenticate with an [API key](/integrations/custom). Codex reads the token from an environment variable and sends it as `Authorization: Bearer`:
+
+```toml
+[mcp_servers.socialapi]
+url = "https://api.social-api.ai/mcp"
+bearer_token_env_var = "SOCIALAPI_API_KEY"
+```
+
+```bash
+export SOCIALAPI_API_KEY=sapi_key_xxxxxxxxxxxxxxxx
+```
+
+<Warning>
+  Keep the key in the environment or a secret manager. Never paste it into `config.toml` or commit it.
+</Warning>
+
+## Limit the tools
+
+SocialAPI exposes 88 tools. To give Codex a narrower surface, list the tools to keep with `enabled_tools`, or the ones to hide with `disabled_tools` (applied after `enabled_tools`):
+
+```toml
+[mcp_servers.socialapi]
+url = "https://api.social-api.ai/mcp"
+disabled_tools = [
+  "social_api_delete_post",
+  "social_api_delete_comment",
+  "social_api_disconnect_account",
+  "social_api_revoke_key",
+]
+```
+
+## Verify
+
+```bash
+codex mcp list
+```
+
+`socialapi` is listed as `enabled` with its auth method. Inside the Codex TUI, type `/mcp` to see the connected servers and their tools. Then ask in plain language, for example "List my connected social accounts".
+
+## Troubleshooting
+
+**The browser does not open** - Codex prints the authorization URL (`Authorize socialapi by opening this URL in your browser`). Open it yourself on the same machine; the callback goes to a local port Codex is listening on.
+
+**`401` with an API key** - The variable named in `bearer_token_env_var` is not set in the shell that launched Codex, or the key is revoked. Check it in the [dashboard](https://app.social-api.ai/settings/keys).
+
+**Tools are missing in the IDE or desktop app** - They read the same `~/.codex/config.toml`. Restart the app after editing the file.
