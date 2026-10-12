@@ -202,17 +202,8 @@ Each post includes a `targets` array with per-platform status and engagement met
       "metrics": {
         "likes": 42,
         "comments": 5,
-        "shares": 8,
-        "saves": 31,
-        "insights": {
-          "reach": 1820,
-          "views": 4300,
-          "saves": 31,
-          "shares": 8,
-          "total_interactions": 86,
-          "profile_visits": 12
-        },
-        "extra": { "views": 4300 },
+        "shares": 0,
+        "saves": 0,
         "metrics_synced_at": "2026-04-10T12:00:00Z"
       }
     }
@@ -221,13 +212,60 @@ Each post includes a `targets` array with per-platform status and engagement met
 ```
 
 **Metrics notes:**
-- `likes` and `comments` come from the media object itself.
-- `shares` and `saves` come from Instagram's per-post insights, which need the `instagram_business_manage_insights` permission.
-- `insights` carries the metrics Instagram reports separately from the post: `reach`, `views`, `saves`, `shares`, `total_interactions`, `profile_visits`, and, for reels, `reels_avg_watch_time_ms` and `reels_total_watch_time_ms`. A metric Instagram has not reported is absent from the object rather than returned as `0`, so a missing key means "not reported", not "zero".
-- A carousel's parent post has no insights of its own. Instagram only reports them for the individual child items, so `insights` is absent for the parent.
-- `insights` is also absent when the account was connected before the insights permission was added. Reconnect the account to enable it.
-- Instagram's insight data can lag by up to 48 hours.
+- `likes` and `comments` come from the media object itself. `shares`, `saves` and the insight metrics below are read live from `GET /v1/posts/{pid}/metrics`.
 - `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Instagram.
+
+### Live metrics and insights
+
+`GET /v1/posts/{pid}/metrics` reads the post's current counts and insights from Instagram:
+
+```bash
+curl "https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J/metrics" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+```json
+{
+  "data": {
+    "post_id": "p_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "targets": [
+      {
+        "platform": "instagram",
+        "metrics": {
+          "likes": 42,
+          "comments": 5,
+          "shares": 8,
+          "saves": 31,
+          "views": 4300,
+          "reach": 1820,
+          "interactions": 86,
+          "reposts": 2,
+          "avg_watch_time_ms": 3400,
+          "total_watch_time_ms": 14620000,
+          "skip_rate": 41.2,
+          "crossposted_views": 310,
+          "metrics_synced_at": "2026-04-10T12:00:00Z"
+        }
+      }
+    ]
+  }
+}
+```
+
+The metric names are the same on every platform, so code written against them does not change per platform. Which metrics Instagram reports depends on the media type:
+
+| Metric | Feed posts and carousels | Reels |
+|---|---|---|
+| `views`, `reach`, `interactions`, `saves`, `shares`, `reposts` | yes | yes |
+| `follows`, `profile_visits` | yes | no |
+| `profile_actions`, broken down into `website_clicks`, `calls`, `directions`, `emails`, `texts` | yes | no |
+| `avg_watch_time_ms`, `total_watch_time_ms`, `skip_rate` | no | yes |
+| `crossposted_views` | when shared to Facebook | when shared to Facebook |
+
+- A metric Instagram has not reported is absent rather than returned as `0`, so a missing key means "not reported", not "zero".
+- `interactions` is Instagram's own total of likes, comments, saves and shares. `skip_rate` is a percentage.
+- If an Instagram target returns `likes` and `comments` but none of the insight metrics, the account was connected before the insights permission was added. Reconnect the account to enable them.
+- Instagram's insight data can lag by up to 48 hours.
 
 ### Settings on published posts
 
@@ -395,18 +433,8 @@ Response once published:
       "metrics": {
         "likes": 42,
         "comments": 5,
-        "shares": 8,
-        "saves": 31,
-        "insights": {
-          "reach": 1820,
-          "views": 4300,
-          "saves": 31,
-          "shares": 8,
-          "total_interactions": 86,
-          "reels_avg_watch_time_ms": 3400,
-          "reels_total_watch_time_ms": 14620000
-        },
-        "extra": { "views": 4300 },
+        "shares": 0,
+        "saves": 0,
         "metrics_synced_at": "2026-04-10T12:00:00Z"
       }
     }
