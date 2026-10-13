@@ -36,7 +36,7 @@ A 429 from SocialAPI's own limits uses the standard error envelope. `error.meta.
 | `accounts.sync_rate_limited` | Repeated `POST /v1/accounts/{id}/sync` for the same connected account. See [Analytics](/guides/analytics) | Yes |
 | `validation.post_limit_exhausted`, `validation.interaction_limit_exhausted`, `billing.post_limit`, `billing.export_limit`, `billing.export_cooldown`, `billing.export_concurrent` | Plan allowances. See [Plans and usage](/guides/plans) | No |
 
-A request refused by `publishing.velocity_limit` or `messaging.velocity_limit` never reaches the platform. `messaging.velocity_limit` spends no credit.
+A request refused by `publishing.velocity_limit` or `messaging.velocity_limit` never reaches the platform and spends no credit.
 
 ## Posting velocity caps
 
@@ -60,7 +60,7 @@ TikTok also limits publishing to 6 posts per minute per account. SocialAPI does 
 
 ### What happens at a cap
 
-- **Immediate publish** (`POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`): the request returns `429 publishing.velocity_limit` and creates nothing. `meta.window` is `hour` or `day`, `meta.limit` is the cap reached, and `meta.account_id` is the connected account. `POST /v1/posts` spends no post credit when refused. `POST /v1/posts/{pid}/publish` and `POST /v1/posts/{pid}/retry` keep the credit when refused.
+- **Immediate publish** (`POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`): the request returns `429 publishing.velocity_limit` and creates nothing. `meta.window` is `hour` or `day`, `meta.limit` is the cap reached, and `meta.account_id` is the connected account. A refused request spends no post credit.
 - **More than one target in one request:** the request is all or nothing. If one target is at a cap, the whole request is refused and no target's counter moves.
 - **Scheduled post:** a scheduled post is never failed by a velocity cap. SocialAPI holds the target and publishes it once the window clears, so it goes out late. The wait does not count as a failed delivery.
 
