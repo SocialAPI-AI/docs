@@ -56,7 +56,7 @@ Which platforms emit an event is stated under each event as **Emitted for**. The
 
 - **Instagram, Facebook, Threads, WhatsApp, Telegram, Zalo, and Google Business Profile** send comments, direct messages, mentions, or reviews to SocialAPI as they happen, so those events arrive as webhook events. Each platform's page has a Capabilities table, and [Supported platforms](/platforms/overview) compares them.
 - **X / Twitter, YouTube, Bluesky, Pinterest, and LinkedIn** push nothing to SocialAPI. They emit no comment, DM, mention, or review events: read those with the inbox endpoints.
-- **TikTok** has no comments, DMs, mentions, or reviews in SocialAPI, so it emits none of those events. TikTok accounts still emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect an account, and `account.disconnected` when SocialAPI flags the account for reconnection.
+- **TikTok** sends new comments to SocialAPI, so it emits `comment.received`. It has no DM events, mention events, or review events. TikTok accounts also emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect an account, and `account.disconnected` when SocialAPI flags the account for reconnection.
 - **Trustpilot** is not available, so it emits no events.
 
 ## Posts
@@ -211,7 +211,7 @@ Fires when a failed or partial post is retried with `POST /v1/posts/{pid}/retry`
 
 Fires when a person comments on a post of a connected account. Facebook sends the event again when the person edits the comment.
 
-**Emitted for:** Instagram, Facebook, Threads (replies to the account's posts).
+**Emitted for:** Instagram, Facebook, Threads (replies to the account's posts), and TikTok.
 
 The example is the Instagram comment shown in the [envelope](#event-envelope). The `data` object is the shared shape in [Interaction payload](#interaction-payload): nested `author` and `content` objects. It is not the flat shape (`author_id`, `text`) that `GET /v1/inbox/comments/{postId}` returns. Per platform:
 
@@ -220,6 +220,7 @@ The example is the Instagram comment shown in the [envelope](#event-envelope). T
 | Instagram | `author.id` and `author.name` (the person's username), and `author.avatar_url` when SocialAPI can read it. `platform_post_id` is the media ID. `metadata` is `null` |
 | Facebook | `author.id`, `author.name`, and `page_id` (the SocialAPI page that received the comment). `platform_post_id` is the Facebook post ID |
 | Threads | `author.username` only. `platform_post_id` is the root post's ID, `permalink` is the reply's URL, and `metadata` holds `parent_id` (the post or reply being answered) and `is_verified`. `account_id` is the Threads user ID, not an `acc_` ID. `raw_payload` is the `values` object of the Threads event |
+| TikTok | `author.id` (TikTok's unique identifier for the person), `author.name`, `author.username`, and `author.avatar_url`. `platform_post_id` is the TikTok video ID. A reply under a comment is also `comment.received`. `post_id` and `permalink` are not set, and `metadata` is `null`. Comments written by the connected account are not sent. `raw_payload` is TikTok's notification: see [TikTok](/platforms/tiktok#webhook-events) |
 
 `post_id` is set on Instagram and Facebook when the post was published through SocialAPI.
 
@@ -626,7 +627,7 @@ Fires when a connected account is removed or needs reconnecting. It has 2 forms.
 }
 ```
 
-**Emitted for:** Instagram, Facebook, Threads, and TikTok, when the person removes the app in the platform's settings.
+**Emitted for:** Instagram, Facebook, and Threads, when the person removes the app in the platform's settings. TikTok sends no notice of a removal: see [When TikTok authorization ends](/platforms/tiktok#when-tiktok-authorization-ends).
 
 **SocialAPI flagged the account for reconnection.** The account still exists. Its `status` changes so that calls on it signal that it needs reconnecting (see [Connect accounts](/guides/connect-accounts)). The payload has `reconnect_required: true` and a `reason`.
 
@@ -722,7 +723,7 @@ Comments, direct messages, and mentions share one `data` shape. Fields marked op
 | `received_at` | When the interaction happened in ISO 8601 UTC. On Instagram comments and on Instagram and Facebook mentions it is the time SocialAPI received the event |
 | `post_id` | Optional. The SocialAPI post ID, when the post was published through SocialAPI |
 | `platform_post_id` | Optional. The platform's ID of the post the interaction belongs to |
-| `permalink` | Optional. Threads only: the URL of the reply or mention |
+| `permalink` | Optional. Threads replies and mentions, and TikTok mentions: the URL of the reply or mention |
 | `conversation_id` | Optional. The SocialAPI conversation ID of a DM on Instagram, Facebook, WhatsApp, and Telegram |
 | `platform_id` | Optional. The platform's message ID of a DM. Not set on `dm.referral` and on Zalo |
 | `story` | Optional. Instagram only: the story a message replies to, with `id`, `media_url`, and `expires_at` |

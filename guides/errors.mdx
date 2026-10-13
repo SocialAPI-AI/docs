@@ -330,7 +330,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 |---|---|---|
 | 413 | `billing.storage_quota` | The upload would exceed your plan's storage. Check `GET /v1/media/storage`, delete unused media, or change plan |
 | 400 | `account.exports_not_supported` | The account is a Pinterest account. Pinterest data is read live and cannot be exported |
-| 400 | `account.export_enrichment_not_supported` | `include_transcript` or `include_vision` on a TikTok account that does not support them. Export again without those options |
+| 400 | `account.export_enrichment_not_supported` | `include_transcript` or `include_vision` on a TikTok account. TikTok exports hold captions and metrics only. Export again without those options |
 | 400 | `validation.field_invalid` | The export is not completed yet, so its videos cannot be read |
 | 429 | `billing.export_limit`, `billing.export_cooldown`, `billing.export_concurrent` | See [Billing and plan allowances](#billing-and-plan-allowances) |
 
@@ -415,13 +415,22 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 400 | `validation.media_type_mismatch` | An image was sent as a video. Set `media_type` to `photo` and attach 2 or more JPEG or WebP images |
 | 400 | `validation.unsupported_photo_format` | A photo post includes an image that is not JPEG or WebP |
 | 400 | `validation.unsupported_media_type` | `media_type` is not `video` or `photo` |
-| 400 | `validation.post_mode` | `post_mode` is not `direct` or `inbox`, or `post_mode: "inbox"` was used with a photo carousel. A draft in the creator's TikTok inbox takes a video only |
-| 400 | `validation.privacy_level_required` | The post has no `privacy_level` chosen |
-| 400 | `validation.privacy_level_unsupported`, `validation.invalid_privacy_level` | The `privacy_level` is not allowed for this account or this post type. `meta.privacy_level` is the value you sent |
-| 400 | `validation.branded_content_private` | Branded content cannot be private |
-| 400 | `validation.posting_limit` | The TikTok creator reached the daily posting limit |
-| 429 | `platform.tiktok.spam_risk_too_many_posts` | The creator reached TikTok's own limit on posts for the account. It is not a SocialAPI cap. Wait, then retry |
-| 403 | `platform.tiktok.spam_risk_user_banned_from_posting` | TikTok bars this creator from posting. A retry fails the same way. The creator resolves it with TikTok |
+| 400 | `validation.post_mode` | `post_mode` is neither `direct` nor `inbox` |
+| 400 | `validation.privacy_level_required` | A photo carousel has no `privacy_level` |
+| 400 | `validation.privacy_level_unsupported` | A video post sets a `privacy_level` other than `PUBLIC_TO_EVERYONE`, or a `privacy_level` that is not a string. `meta.privacy_level` is the value you sent |
+| 400 | `validation.invalid_privacy_level` | A photo carousel sets a `privacy_level` the account does not allow. `meta.privacy_level` is the value you sent |
+| 400 | `validation.branded_content_private` | A photo carousel sets `brand_content_toggle: true` with `privacy_level: "SELF_ONLY"` |
+| 400 | `validation.comment_id_invalid` | A comment ID is a bare TikTok comment ID. Hide, unhide, reply, and list replies need the `id` or `platform_id` returned by the comments endpoint. `meta.comment_id` is the value you sent |
+| 400 | `validation.mention_reply_unsupported` | A reply to a TikTok mention names no comment. TikTok replies only to mentions made in a comment |
+| 400 | `platform.tiktok.40000`, `platform.tiktok.40002`, `platform.tiktok.40011`, `platform.tiktok.40904`, `platform.tiktok.40905`, `platform.tiktok.40906`, `platform.tiktok.40907`, `platform.tiktok.40908`, `platform.tiktok.40914`, `platform.tiktok.40915` | TikTok refused a parameter or a media file. `error.message` carries TikTok's reason. Fix the field it names |
+| 403 | `platform.tiktok.40001`, `platform.tiktok.40118`, `platform.tiktok.40125` | The account's authorization lacks a permission the call needs. Reconnect the account to grant it |
+| 422 | `platform.tiktok.publish_failed` | TikTok rejected the post while processing it, or could not report its outcome. `error.message` carries TikTok's reason. Check the account in the TikTok app before retrying |
+| 401 | `platform.tiktok.auth` | TikTok's authorization for the account ended. Later calls return `403 account.reconnection_required` until you reconnect |
+| 401 | `platform.tiktok.unauthorized` | TikTok refused the call as unauthorized without saying the authorization ended. The account stays usable. Reconnect if it repeats |
+| 429 | `platform.tiktok.rate_limit` | TikTok's own request limit of 40 requests per minute for each account and each TikTok call. It costs no SocialAPI credit. Wait 1 minute, then retry |
+| 502 | `platform.tiktok.api_error` | TikTok returned no usable answer, or accepted a post without returning its publish ID. Check the account in the TikTok app before retrying a post |
+
+A TikTok code that this table does not list returns `502` with the code after `platform.tiktok.`.
 
 ### X, LinkedIn, YouTube, and Zalo
 
