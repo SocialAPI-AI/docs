@@ -121,14 +121,14 @@ If 2 or more Automations match the same event, each one runs. There is no priori
 | Trigger | Fires on | Actions allowed on the start step |
 |---|---|---|
 | `comment` | A new comment on any post of the account, or on the posts listed in `post_ids` | `hide_comment`, `reply_comment`, `private_reply` |
-| `dm` | A new DM to the account, the same messages your webhooks receive as [`dm.received`](/guides/webhook-events#dmreceived) | `send_dm` |
+| `dm` | A new DM to the account, the same messages your webhooks receive as [`dm.received`](/guides/webhook-events#dm-received) | `send_dm` |
 
 Fields that shape the trigger:
 
 | Field | Description |
 |---|---|
 | `trigger` | `comment` or `dm`. Fixed at creation |
-| `post_ids` | Comment trigger only. Up to 100 platform post IDs, each 1 to 100 characters, the same value as `platform_post_id` on a [`comment.received`](/guides/webhook-events#commentreceived) event. Omit it to cover every post. On update, an empty list means every post |
+| `post_ids` | Comment trigger only. Up to 100 platform post IDs, each 1 to 100 characters, the same value as `platform_post_id` on a [`comment.received`](/guides/webhook-events#comment-received) event. Omit it to cover every post. On update, an empty list means every post |
 | `once_per_person` | Reach each person at most once. Defaults to `false`. A run in which every action failed does not count, so that person can trigger it again. Turning it on later also covers the people the Automation already reached |
 
 A `dm` trigger fires on every `dm.received`, which can include story replies and story mentions on Instagram. Add a keyword filter to the `start` step when you only want to answer certain messages.
@@ -210,7 +210,7 @@ Set the field named by `type` with the texts to send. `hide_comment` takes no fi
 ]
 ```
 
-`texts` holds 1 to 10 variants, each 1 to 1,000 characters, and one is picked at random each time the action runs. When the step has buttons, each `private_reply` and `send_dm` text is at most 640 characters.
+`texts` holds 1 to 10 variants, each 1 to 1,000 characters, and one is picked at random each time the action runs. On Instagram, a private reply or DM text above 1,000 bytes of UTF-8 is refused by Instagram, and the failure is recorded on the Firing. When the step has buttons, each `private_reply` and `send_dm` text is at most 640 characters.
 
 Steps after `start` run after a button tap, which opens the messaging window but has no comment to act on, so they can use only `send_dm`.
 
@@ -350,7 +350,7 @@ What keeps an Automation from misbehaving:
 
 ## Firings
 
-A Firing is one run of an Automation against one event: a comment, a DM, or a button tap. It records the step that ran and the outcome of each action. Firings are kept for 30 days. The record of who a `once_per_person` Automation already reached is kept beyond that, so pruning old Firings never makes it answer someone twice.
+A Firing is one run of an Automation against one event: a comment, a DM, or a button tap. It records the step that ran and the outcome of each action. Firings are kept for 30 days. A `once_per_person` Automation keeps its record of who it reached after the Firings expire, so it never answers the same person twice.
 
 ```bash
 curl "https://api.social-api.ai/v1/automations/aut_01J9Z8Y7X6W5V4T3S2R1Q0P9N8/firings?limit=20" \
@@ -433,9 +433,9 @@ A [brand-restricted key](/guides/scoped-keys#brand-restrictions) sees only the A
 
 Automations do not change what your [webhooks](/guides/webhooks) receive. Every event goes to your webhook endpoints and to your Automations alike:
 
-- **Triggers are still delivered.** A comment or DM an Automation answers still arrives as [`comment.received`](/guides/webhook-events#commentreceived) or [`dm.received`](/guides/webhook-events#dmreceived). If your own handler also replies to those events, the person gets both replies, so let one or the other answer each kind of event.
-- **Button taps arrive as [`dm.postback`](/guides/webhook-events#dmpostback).** A tap on an Automation's postback button reaches your endpoint like any other tap, with an opaque `metadata.payload` that starts with `sa1.`. The Automation handles the tap, so ignore those payloads, and do not start your own payloads with `sa1.`.
-- **Sent DMs echo as [`dm.sent`](/guides/webhook-events#dmsent).** DMs an Automation sends are messages the account sent through SocialAPI, so on Instagram and Facebook they produce the same `dm.sent` echo as a DM you send through the API. Nothing in the event tells the two apart.
+- **Triggers are still delivered.** A comment or DM an Automation answers still arrives as [`comment.received`](/guides/webhook-events#comment-received) or [`dm.received`](/guides/webhook-events#dm-received). If your own handler also replies to those events, the person gets both replies, so let one or the other answer each kind of event.
+- **Button taps arrive as [`dm.postback`](/guides/webhook-events#dm-postback).** A tap on an Automation's postback button reaches your endpoint like any other tap, with an opaque `metadata.payload` that starts with `sa1.`. The Automation handles the tap, so ignore those payloads, and do not start your own payloads with `sa1.`.
+- **Sent DMs echo as [`dm.sent`](/guides/webhook-events#dm-sent).** DMs an Automation sends are messages the account sent through SocialAPI, so on Instagram and Facebook they produce the same `dm.sent` echo as a DM you send through the API. Nothing in the event tells the two apart.
 - **There are no Automation events.** To see what an Automation did, read its [Firings](#firings).
 
 ## Use from an AI agent
