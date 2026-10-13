@@ -7,7 +7,7 @@ description: Connect and interact with TikTok accounts via the TikTok API.
 
 **Managed connector** - [SocialAPI](https://social-api.ai) handles the TikTok Developer App and platform app review for you. No customer-side TikTok for Developers registration required. See [Platform credentials](/guides/platform-credentials).
 
-TikTok is supported for listing videos and publishing new posts via the TikTok Content Posting API.
+TikTok is supported for listing videos, publishing new posts, and managing comments and mentions. Since October 13, 2026, every new TikTok connection and every reconnection authorizes through TikTok API for Business. Accounts connected before that date keep working for publishing and post listing until they are reconnected.
 
 ## At a glance
 
@@ -15,7 +15,7 @@ TikTok is supported for listing videos and publishing new posts via the TikTok C
 |---|---|
 | Platform slug | `tiktok` |
 | Auth type | OAuth 2.0 (TikTok) |
-| API | TikTok Content Posting API |
+| API | TikTok API for Business (accounts connected before October 13, 2026: TikTok Content Posting API) |
 | Best for | Short-form video publishing to TikTok. |
 
 ## Capabilities
@@ -24,14 +24,14 @@ TikTok is supported for listing videos and publishing new posts via the TikTok C
 |---|---|---|
 | List posts | Yes | Returns published videos |
 | Create post | Yes | Via TikTok Content Posting API |
-| Delete post | - | Not supported via TikTok API |
-| Comments | - | Not supported via TikTok API |
-| Reply to comment | - | |
-| Moderate comment | - | |
+| Delete post | - | Not supported by TikTok |
+| Comments | Yes | List comments and replies on a post, and comment on a post. Accounts connected before October 13, 2026 must be reconnected |
+| Reply to comment | Yes | |
+| Moderate comment | Yes | Hide and unhide a comment, delete the account's own comment, like and unlike a comment |
 | Toggle post comments | - | |
-| DMs | - | Not supported by platform API |
+| DMs | - | Not supported by TikTok |
 | Reviews | - | Not applicable |
-| Mentions | - | Not supported via TikTok API |
+| Mentions | Yes | TikTok Business Accounts only. List mentions and reply to a comment mention. Accounts connected before October 13, 2026 must be reconnected |
 
 ## Connecting
 
@@ -55,7 +55,7 @@ Response:
 }
 ```
 
-Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the code with TikTok and redirects the user to your `redirect_uri` with the connection result. See [OAuth flows](/guides/oauth#step-3-receive-the-result-at-your-redirect_uri) for the redirect parameters.
+Redirect your user to `auth_url`. The consent screen is TikTok for Business. Reconnecting an existing TikTok account keeps its `acc_*` ID, brand, and post history. If the TikTok username changed since the account was first connected, the reconnect is refused with `409`: disconnect the account and connect it again, which creates a new account ID. After they authorize, SocialAPI exchanges the code with TikTok and redirects the user to your `redirect_uri` with the connection result. See [OAuth flows](/guides/oauth#step-3-receive-the-result-at-your-redirect_uri) for the redirect parameters.
 
 TikTok accounts include a `metadata` object with profile data:
 
@@ -92,9 +92,19 @@ curl -X GET "https://api.social-api.ai/v1/posts?account_ids=acc_01HZ9X3Q4R5M6N7P
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
+## Comments and mentions
+
+For accounts connected or reconnected since October 13, 2026, TikTok comments and mentions appear in the [inbox](/guides/inbox) like other platforms. You can list comments on a post, list replies, reply to a comment, comment on a post, hide or unhide a comment, delete the account's own comment, and like or unlike a comment. Private replies to comments are not supported.
+
+Mentions work only for TikTok Business Accounts, not personal creator accounts. A mention appears 24 to 48 hours after it happens, so list mentions at most once a day per account. You can reply to a comment mention.
+
+`comment.received` webhooks are delivered for these accounts. The account's own replies do not produce one.
+
+Accounts connected before October 13, 2026 do not have these features until the end user reconnects the account.
+
 ## Publishing
 
-Create a TikTok post. `media_type` is optional and defaults to `video`. `privacy_level` must be supplied explicitly: omitting it returns a 400 validation error (`privacy_level_required`). Valid values depend on the creator's allowed options (returned by the TikTok creator info API); a common example is `PUBLIC_TO_EVERYONE`.
+Create a TikTok post. `media_type` is optional and defaults to `video`. For accounts connected or reconnected since October 13, 2026, a video is always published publicly: `privacy_level` may be omitted or set to `PUBLIC_TO_EVERYONE`, and any other value returns `400` with code `validation.privacy_level_unsupported`. Photo carousels still require an explicit `privacy_level` from the account's creator info. Accounts connected before that date and not yet reconnected must supply `privacy_level` explicitly: omitting it returns a 400 validation error (`privacy_level_required`), and valid values depend on the creator's allowed options (returned by the creator info endpoint).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -158,13 +168,14 @@ This endpoint uses TikTok's `video.list` scope and requires a reconnect for acco
 ## Limitations and gotchas
 
 - **Publishing.** Post creation uses the TikTok Content Posting API. Videos are uploaded via media upload, then published.
-- **Read-only interactions.** TikTok's API does not expose comment management or DM access. Only post listing and publishing are available.
+- **Interactions.** Comments and mentions are available on accounts connected or reconnected since October 13, 2026. TikTok does not provide DMs, private replies to comments, post deletion, or post editing.
+- **Exports.** For accounts connected or reconnected since October 13, 2026, `POST /v1/accounts/{id}/export` refuses `include_transcript` and `include_vision` with `400` and code `account.export_enrichment_not_supported`, because TikTok's terms forbid downloading the videos. Export again without them.
 - **Token refresh.** TikTok OAuth tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "platform.tiktok.auth"`, reconnect the account.
-- **Privacy level.** `privacy_level` is required and must be set explicitly for every post. Omitting it returns a 400 error (`privacy_level_required`). Use the value the TikTok creator info API returns for the account (for example, `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, or `SELF_ONLY`); any other value is rejected.
+- **Privacy level.** For accounts connected or reconnected since October 13, 2026, video posts are always public: omit `privacy_level` or send `PUBLIC_TO_EVERYONE`. `GET /v1/accounts/{id}/creator-info` returns only `PUBLIC_TO_EVERYONE` in `privacy_level_options` for these accounts. Accounts connected before that date and not yet reconnected must send `privacy_level` explicitly, using a value the creator info endpoint returns (for example `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, or `SELF_ONLY`). Photo carousels always require an explicit value.
 
 ## Permissions
 
-SocialAPI's managed TikTok Developer App already requests these scopes on your behalf: `user.info.basic`, `user.info.profile`, `video.publish`, `video.upload`. You don't need to register with TikTok for Developers. See [Platform credentials](/guides/platform-credentials).
+SocialAPI's managed TikTok app requests the permissions it needs on your behalf during the connect flow. You don't need to register with TikTok for Developers or configure scopes. See [Platform credentials](/guides/platform-credentials).
 
 ## Related
 
