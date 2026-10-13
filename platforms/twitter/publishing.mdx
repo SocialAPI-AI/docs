@@ -37,7 +37,7 @@ A post holds up to 4 images, or exactly one video, or exactly one GIF, never a m
 **File limits for media you upload to SocialAPI** (`source_type: "media_id"`): the limits in the table apply, and a file outside them fails validation with `400 publishing.validation_failed`. SocialAPI uploads the media to X before it creates the post. If an upload fails, the whole post fails: SocialAPI never publishes the text without its media.
 
 <Warning>
-  Attach media through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, `url` for a public `http(s)` URL SocialAPI fetches at publish time, or `platform_attachment_id` for a media ID you created through X yourself. To upload first, see [Media](/guides/media). Uploading needs the `media.write` permission: an account connected without it fails with `403 platform.twitter.insufficient_scope` until the person reconnects.
+  Attach media through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, `url` for a public `http(s)` URL SocialAPI fetches at publish time, or `platform_attachment_id` for a media ID you created through X yourself. To upload first, see [Media](/guides/media). Uploading needs the `media.write` scope: an account connected without it fails with `403 platform.twitter.insufficient_scope` until the person reconnects.
 </Warning>
 
 ---
@@ -198,7 +198,7 @@ X charges more for a post that contains a URL than for a post without one. The c
 A publish that fails after the request returned puts a structured error on the target, in `targets[].error`, with its `code`. Every code is in [Errors](/guides/errors).
 
 - `401 platform.twitter.auth`: the access token is no longer valid and renewal failed. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
-- `403 platform.twitter.insufficient_scope`: the token lacks a permission, for example `media.write`. Reconnect the account.
+- `403 platform.twitter.insufficient_scope`: the account's access lacks a scope, for example `media.write`. Reconnect the account.
 - `402 platform.twitter.usage_capped`: your X app is out of credits or reached its spending limit. Add credits or raise the limit in the X Developer Console, then retry.
 - `429 platform.twitter.rate_limit`: X's own limit. Wait, then retry.
 
@@ -284,7 +284,7 @@ Response (HTTP 200) once published:
 
 ## 9. Required OAuth scopes
 
-SocialAPI requests these scopes when the person connects the account, through your own X app. The full list is in [X permissions](/platforms/twitter#permissions).
+SocialAPI requests these scopes when the person connects the account, through your own X app. The full list is in [X scopes](/platforms/twitter#scopes).
 
 | Scope | Purpose |
 |---|---|

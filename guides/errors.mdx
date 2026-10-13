@@ -67,7 +67,7 @@ Every `/v1` request needs `Authorization: Bearer <API key>`. See [Authentication
 | 403 | `auth.insufficient_scope` | A [scoped API key](/guides/scoped-keys) lacks the scope the request needs, or a scoped key called an admin operation (managing keys, brands, invites, or `PATCH /v1/users/me`). `meta.required_scope` names the scope when one applies |
 | 402 | `billing.past_due` | Your subscription payment failed twice. Every endpoint returns it except every method of `/v1/users/me` and every `/v1/billing/*` endpoint. See [Past-due accounts](/guides/plans#past-due-accounts) for how access returns |
 | 403 | `auth.state_mismatch` | The `state` you passed to a connect step belongs to a different API key |
-| 403 | `account.permission_missing` | The connected account does not have the [permission](/guides/permissions) the call needs. `meta.permission` names it. Add it with `PATCH /v1/accounts/{id}`, or reconnect the account when the platform has not granted it |
+| 403 | `account.permission_missing` | The connected account does not have the [permission](/guides/permissions) the call needs. `meta.permission` names it. Add it with `PATCH /v1/accounts/{id}`, or reconnect the account when the platform has not granted it. Publishing, post removal, live post metrics, and the stored inbox lists answer differently: see [Account permissions](/guides/permissions#what-an-account-can-do-right-now) |
 | 400 | `auth.oauth.invalid_client` | The MCP client's `client_id` is unknown. See [OAuth for MCP clients](/integrations/oauth) |
 | 400 | `auth.oauth.invalid_redirect` | The MCP client's `redirect_uri` is not registered for its `client_id` |
 
@@ -252,7 +252,7 @@ See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [R
 | 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: it is older than 7 days, or already received one |
 | 422 | `platform.instagram.thread_unavailable`, `platform.facebook.thread_unavailable` | The platform refused to deliver to this conversation. It can be restricted or unavailable |
 | 422 | `platform.instagram.invalid_parameter` | Instagram rejected a parameter. Retrying unchanged will not help |
-| 403 | `platform.instagram.permission_denied`, `platform.facebook.permission_denied`, `platform.whatsapp.permission_denied` | The connected account's granted permissions do not cover the action |
+| 403 | `platform.instagram.permission_denied`, `platform.facebook.permission_denied`, `platform.whatsapp.permission_denied` | The scopes granted to the connected account do not cover the action |
 | 400 | `platform.whatsapp.invalid_parameter` | WhatsApp rejected a parameter. `error.message` carries WhatsApp's reason |
 | 400 | `validation.field_required` | The message has no `text`, attachment, or interactive content. A review ID or a comment path parameter is missing |
 | 400 | `validation.field_invalid` | `status` is not `active` or `archived`, `moderation_status` is not an allowed value, or `order` is not `newest`, `rating_asc`, or `rating_desc` |
@@ -391,12 +391,12 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 422 | `platform.instagram.container_expired` | The media container expired before publishing. Create the post again |
 | 504 | `platform.instagram.container_timeout` | The media was still processing after about 5 minutes |
 | 503 | `platform.instagram.1`, `platform.instagram.2` | Instagram reported a temporary failure. Retry the request |
-| 403 | `platform.instagram.200` | Instagram says the connected account has not granted a permission the call needs. Reconnect the account to grant it |
+| 403 | `platform.instagram.200` | Instagram says the connected account has not granted a scope the call needs. Reconnect the account to grant it |
 | 404 | `platform.instagram.100` | Instagram says the object does not exist, or does not accept the request. Check the ID |
 | 404 | `platform.instagram.9010` | Instagram has no account for the participant ID, for example because the person deleted or deactivated the account |
 | 409 | `platform.instagram.9007` | Instagram is not ready to publish the media yet. Retry the publish |
 | 403 | `platform.instagram.230` | Instagram withholds the participant profile: the person has not messaged the account or tapped an icebreaker or the persistent menu |
-| 404 | `platform.facebook.100` | Facebook says the object does not exist, or the Page lacks a permission the call needs. Check the ID and the Page permissions |
+| 404 | `platform.facebook.100` | Facebook says the object does not exist, or the Page lacks a scope the call needs. Check the ID and the Page scopes |
 | 403 | `platform.facebook.230` | Facebook requires the user's consent to access the resource. Reconnect the account |
 | 504 | `platform.facebook.reel_timeout`, `platform.facebook.story_timeout` | Facebook did not finish processing the Reel or Story video within the time allowed |
 | 422 | `platform.facebook.reel_processing_failed`, `platform.facebook.story_processing_failed` | Facebook could not process the Reel or Story video |
@@ -413,7 +413,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 504 | `platform.threads.container_timeout` | Threads did not finish processing the media after about 4 minutes |
 | 422 | `platform.threads.801` | `follower_demographics` was requested for an account with fewer than 100 followers |
 | 429 | `platform.threads.rate_limit` | Threads' own rate limit. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
-| 403 | `platform.threads.<code>` | A call needs a Threads permission that the account lacks, such as hiding a reply without `threads_manage_replies`. `<code>` is Meta's error code |
+| 403 | `platform.threads.<code>` | A call needs a Threads scope that the account lacks, such as hiding a reply without `threads_manage_replies`. `<code>` is Meta's error code |
 | 404 | `resource.not_found` | The post, reply, or profile does not exist, or a profile is not discoverable |
 
 ### TikTok
@@ -433,7 +433,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 400 | `validation.comment_id_invalid` | A comment ID is a bare TikTok comment ID. Hide, unhide, reply, and list replies need the `id` or `platform_id` returned by the comments endpoint. `meta.comment_id` is the value you sent |
 | 400 | `validation.mention_reply_unsupported` | A reply to a TikTok mention names no comment. TikTok replies only to mentions made in a comment |
 | 400 | `platform.tiktok.40000`, `platform.tiktok.40002`, `platform.tiktok.40011`, `platform.tiktok.40904`, `platform.tiktok.40905`, `platform.tiktok.40906`, `platform.tiktok.40907`, `platform.tiktok.40908`, `platform.tiktok.40914`, `platform.tiktok.40915` | TikTok refused a parameter or a media file. `error.message` carries TikTok's reason. Fix the field it names |
-| 403 | `platform.tiktok.40001`, `platform.tiktok.40118`, `platform.tiktok.40125` | The account's authorization lacks a permission the call needs. Reconnect the account to grant it |
+| 403 | `platform.tiktok.40001`, `platform.tiktok.40118`, `platform.tiktok.40125` | The account's authorization lacks a scope the call needs. Reconnect the account to grant it |
 | 422 | `platform.tiktok.publish_failed` | TikTok rejected the post while processing it, or could not report its outcome. `error.message` carries TikTok's reason. Check the account in the TikTok app before retrying |
 | 401 | `platform.tiktok.auth` | TikTok's authorization for the account ended. Later calls return `403 account.reconnection_required` until you reconnect |
 | 401 | `platform.tiktok.unauthorized` | TikTok refused the call as unauthorized without saying the authorization ended. The account stays usable. Reconnect if it repeats |
@@ -455,7 +455,7 @@ A TikTok code that this table does not list returns `502` with the code after `p
 | 403 | `platform.linkedin.access_denied` | LinkedIn denied access |
 | 400 | `validation.video_url` | A YouTube video URL is not accessible |
 | 400 | `validation.video_size` | The size of the YouTube video file could not be determined |
-| 403 | `platform.youtube.insufficientPermissions` | The connection lacks a permission the call needs. Reconnect the account to grant it |
+| 403 | `platform.youtube.insufficientPermissions` | The connection lacks a scope the call needs. Reconnect the account to grant it |
 | 403 | `platform.youtube.account_suspended` | YouTube suspended or closed the account or its channel. Reconnecting does not restore access. Resolve the suspension with YouTube. SocialAPI stops background sync for the account |
 | 422 | `platform.youtube.processing_failure` | YouTube refused to delete the comment: only comments your channel wrote can be deleted |
 
@@ -538,7 +538,7 @@ When a platform refuses a call, the code is `platform.<name>.<reason>`, where `<
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 401 | `platform.<name>.auth` | The platform rejected the saved token. Reconnect the account |
-| 403 | `platform.<name>.insufficient_scope` | The platform refused the call because the account's access lacks a scope. `meta.scope` names the scope when the platform does. The account does not become `token_expired`. Reconnect the account to grant it |
+| 403 | `platform.twitter.insufficient_scope` | X refused the call because the account's access lacks a scope. `meta.scope` names it for a media upload. The account does not become `token_expired`. Reconnect the account to grant it |
 | 401 | `platform.<name>.unauthorized` | The platform answered 401 without saying the token is bad. A healthy account keeps working. Reconnect if it persists |
 | 429 | `platform.<name>.rate_limit` | The platform's own limit. See [Rate limits](#rate-limits) |
 | 422 | `platform.<name>.publish_failed` | A publish failed with an error SocialAPI does not map. Appears in [Delivery failures](#delivery-failures) |

@@ -329,7 +329,7 @@ Check these in order when a send fails:
 4. **`400 validation.*`.** The body is wrong. `error.meta.field` names the field. The codes are in [Send a message](#send-a-message) and [Interactive messages](#interactive-messages).
 5. **`400 platform.instagram.window_closed`, `400 platform.facebook.window_closed`, `400 whatsapp.window_closed`, `422 platform.zalo.not_deliverable`, `403 telegram.cannot_message`.** The messaging window is closed: see [The messaging window](#the-messaging-window).
 6. **`422 platform.instagram.thread_unavailable`, `422 platform.facebook.thread_unavailable`.** The platform refused to deliver to this conversation, which can be restricted or unavailable.
-7. **`403 platform.instagram.permission_denied`, `403 platform.facebook.permission_denied`.** The connected account's granted permissions do not cover the action. Reconnect and grant them.
+7. **`403 platform.instagram.permission_denied`, `403 platform.facebook.permission_denied`.** The platform scopes granted at connect do not cover the action. Reconnect the account and approve every scope.
 8. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.{platform}.rate_limit`.** Your allowance, the sender's messages per minute, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
 9. **`501 resource.not_supported`.** The platform has no DMs, or no reactions.
 
@@ -344,7 +344,7 @@ When a conversation or a message is missing from a list, force a refresh with [`
 
 ## Events
 
-SocialAPI sends DM events to your [webhook endpoint](/guides/webhooks): [`dm.received`](/guides/webhook-events#dm-received), `dm.sent`, `dm.postback`, `dm.referral`, `dm.deleted`, and `dm.status.*`. Each is described, with the platforms that emit it, on [Webhook events](/guides/webhook-events#direct-messages). An account without the `messages.read` [permission](/guides/permissions) receives none of the `dm.*` events, except that `dm.status.*` events for messages you sent still arrive on Instagram, Facebook, and WhatsApp with `messages.write` alone.
+SocialAPI sends DM events to your [webhook endpoint](/guides/webhooks): [`dm.received`](/guides/webhook-events#dm-received), `dm.sent`, `dm.postback`, `dm.referral`, `dm.deleted`, and `dm.status.*`. Each is described, with the platforms that emit it, on [Webhook events](/guides/webhook-events#direct-messages). An account without the `messages.read` [permission](/guides/permissions) receives none of the `dm.*` events, except that, with `messages.write` alone, the account still receives `dm.status.read` on Instagram, `dm.status.delivered` and `dm.status.read` on Facebook, and every `dm.status.*` event on WhatsApp. It receives no `dm.sent` and no `dm.status.sent` on Instagram or Facebook.
 
 ## Use from an AI agent
 

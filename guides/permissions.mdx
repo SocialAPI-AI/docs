@@ -3,7 +3,7 @@ title: Account permissions
 description: Connect an account with only the permissions your integration uses, so the person connecting it is never asked for more.
 ---
 
-Account permissions limit what one connected account can do. By default an account gets every permission its platform supports. Send `permissions` when you connect an account to ask for less: the person connecting sees a shorter consent screen where the platform allows it, and the account can do only what you selected.
+Account permissions limit what one connected account can do. A brand's first account on a platform gets every permission the platform supports unless you send `permissions`. Send `permissions` when you connect an account to ask for less: the person connecting sees a shorter consent screen where the platform allows it, and the account can do only what you selected.
 
 Permissions are not [API key scopes](/guides/scoped-keys). A permission limits what a connected account can do on its platform and is written `resource.action`. A key scope limits what an API key can do in SocialAPI and is written `resource:action`. Connecting an account and changing its permissions cost no credits.
 
@@ -33,7 +33,7 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   }'
 ```
 
-Response (HTTP 202): the usual connect response, described in [Connect accounts](/guides/connect-accounts#response-fields). After the person approves, `GET /v1/accounts` returns the account with both lists:
+Response (HTTP 202): the usual connect response, described in [Connect accounts](/guides/connect-accounts#response-fields). After the person approves, `GET /v1/accounts` returns the account in `data` with both lists (other fields omitted):
 
 ```json
 {
@@ -58,7 +58,7 @@ Response (HTTP 202): the usual connect response, described in [Connect accounts]
 | Permission | Covers |
 |---|---|
 | `posts.read` | Reading the account's posts from the platform, including posts published outside SocialAPI: `POST /v1/accounts/{id}/sync`, stories, collaborators, and exports |
-| `posts.write` | Publishing, editing, and deleting posts, and the platform's posting options, such as TikTok creator info |
+| `posts.write` | Publishing, editing, and deleting posts, the platform's posting options, such as TikTok creator info, and accepting or declining collaborator invites |
 | `comments.read` | Reading comments and mentions, and the `comment.received` and `mention.received` webhooks |
 | `comments.write` | Replying to, hiding, deleting, and liking comments, and replying to mentions |
 | `messages.read` | Reading conversations, messages, participant profiles, and follow status, and the `dm.*` webhooks |
@@ -82,16 +82,16 @@ An account can use a permission only on a platform that supports it. The other n
 | X / Twitter | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, `messages.write`, `analytics.read` | Follows the selection |
 | YouTube | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `analytics.read` | The same for every selection |
 | Pinterest | `posts.read`, `posts.write`, `analytics.read` | Follows the selection |
-| WhatsApp | `messages.read`, `messages.write` | No selection step |
+| WhatsApp | `messages.read`, `messages.write` | The same for every selection |
 | Telegram | `messages.read`, `messages.write` | No selection step |
-| Zalo | `posts.read`, `posts.write`, `messages.read`, `messages.write` | No selection step |
+| Zalo | `posts.read`, `posts.write`, `messages.read`, `messages.write` | The same for every selection |
 | Bluesky | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, `messages.write` | No selection step |
 
-- **Follows the selection.** The consent screen asks for the platform scopes of the permissions you selected. A platform scope that serves more than one permission can make the screen show more than you selected: Instagram asks for comments and for messages as 1 scope each, covering reading and writing, and Facebook asks for messages as 1 scope. The account stays limited to your selection: an Instagram account connected with `comments.read` alone cannot reply to comments.
-- **The same for every selection.** The platform shows its fixed list of permissions. Google Business Profile and YouTube ask for 1 scope that covers everything. The account is still limited to your selection, and an account connected with `reviews.read` alone cannot reply to reviews.
-- **No selection step.** The platform has no consent screen that lists permissions, so SocialAPI alone enforces your selection.
+- **Follows the selection.** The consent screen asks for the platform scopes of the permissions you selected. A platform scope that serves more than one permission can make the screen show more than you selected: Instagram asks for comments and for messages as 1 scope each, covering reading and writing, and Facebook asks for messages as 1 scope. Threads asks for publishing and deleting as 1 pair of scopes shared by `posts.write` and `comments.write`. X asks for `tweet.write` once for `posts.write` and `comments.write`. The account stays limited to your selection: an Instagram account connected with `comments.read` alone cannot reply to comments.
+- **The same for every selection.** The platform shows its fixed list of permissions. Google Business Profile asks for 3 identity scopes and 1 scope, `business.manage`, that covers all of its permissions. YouTube asks for 1 scope that covers everything. TikTok, WhatsApp, and Zalo ask for no scope that depends on your selection. The account is still limited to your selection, and an account connected with `reviews.read` alone cannot reply to reviews.
+- **No selection step.** Telegram and Bluesky connect without a consent screen, so SocialAPI alone enforces your selection.
 
-Each platform's page lists the scopes it requests, under Permissions.
+Each platform's page lists the scopes it requests, under Scopes.
 
 ## What an account can do right now
 
@@ -104,17 +104,30 @@ Every account has two lists:
 
 `effective_permissions` is `permissions` limited to what the platform supports and what the person connecting granted. The person can decline part of the consent screen, and a platform can withdraw access later.
 
-A call that needs a permission outside `effective_permissions` fails with `403 account.permission_missing`, and `error.meta.permission` names it. The refusal comes before the call reaches the platform. A platform's unsupported operation keeps its usual answer, `501 resource.not_supported`, whatever the permissions.
+A call that needs a permission outside `effective_permissions` fails with `403 account.permission_missing`, and `error.meta.permission` names it. The refusal comes before the call reaches the platform. A platform's unsupported operation keeps its usual answer, `501 resource.not_supported`, whatever the permissions. These calls answer differently:
+
+- **Publishing** (`POST /v1/posts`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`, and a scheduled post when it is delivered) reports `account.permission_missing` on the target and returns no `403`.
+- **Removing a published post from a platform.** `DELETE /v1/posts/{pid}` reports the target as `failed` in `results` and leaves it `published`. `POST /v1/posts/{pid}/unpublish` returns `500 system.internal`, and the target stays `published`.
+- **Live post metrics** (`GET /v1/posts/{pid}/metrics`) report `resource.not_found` on the target.
+- **Stored lists.** `GET /v1/inbox/comments`, `GET /v1/inbox/conversations`, and `GET /v1/inbox/conversations/{id}/messages` return what SocialAPI stored and never return `account.permission_missing`.
+- **Review accounts.** `GET /v1/inbox/reviews` does not check `reviews.read`.
+
+A refused call costs what its path charges:
+
+- A comment reply, a DM, and a review reply cost no credit, because the check comes before the charge.
+- A reply to a mention is charged 1 interaction credit before the check, and the refusal does not return it.
+- A post follows the post credit rules in [Plans and usage](/guides/plans#when-a-credit-comes-back).
+- Every other call is free.
 
 An account without a permission also stops receiving what it covers:
 
-- **Webhooks and Automations.** Comments, mentions, messages, and reviews for a permission the account lacks are dropped: they do not reach your webhook endpoints, your Automations, or the inbox. On Instagram, Facebook, and WhatsApp, the `dm.status.*` events for messages you sent still arrive with `messages.write` alone.
-- **Scheduled posts.** A scheduled post fails at publish time with `account.permission_missing` on its target when the account no longer has `posts.write`.
+- **Webhooks and Automations.** Comments, mentions, messages, and reviews for a permission the account lacks are dropped: they do not reach your webhook endpoints, your Automations, or the inbox. With `messages.write` alone, the account still receives `dm.status.read` on Instagram, `dm.status.delivered` and `dm.status.read` on Facebook, and every `dm.status.*` event on WhatsApp. It receives no `dm.sent` and no `dm.status.sent` on Instagram or Facebook.
+- **Posts.** A post to an account without `posts.write` fails on its target with `account.permission_missing`, whether you publish it now or schedule it. For a scheduled post, the failure appears when the delivery runs.
 - **Analytics.** The account adds no new points to its stored analytics history.
 
 When an account loses a permission you did not remove yourself, you receive an [`account.updated` webhook](/guides/webhook-events#account-updated) with `change` set to `permissions_reduced`. Reconnect the account to ask for the permission again.
 
-When the platform refuses a call because the account's access lacks a scope, the call returns `403 platform.<name>.insufficient_scope`, with the scope in `error.meta.scope` when the platform names it. The account does not become `token_expired`. The permissions that need the scope leave `effective_permissions` until you reconnect the account.
+On X, when X refuses a call because the account's access lacks a scope, the call returns `403 platform.twitter.insufficient_scope`. `error.meta.scope` names the scope when it is known (`media.write` for a media upload). The account does not become `token_expired`. When the scope is named, the permissions that need it leave `effective_permissions` until you reconnect the account: `posts.write` for `media.write`. Other platforms return their own `platform.<name>.*` code for the same refusal and do not change `effective_permissions`.
 
 ## Invite links
 
@@ -187,7 +200,7 @@ A request with no `permissions` field returns `400 validation.field_required`. A
 | `messages.read` | The account's conversations and messages, with their attachments |
 | `posts.read` | Posts SocialAPI read from the platform, including their analytics history. Posts you published through SocialAPI are kept |
 | `analytics.read` | The account's stored analytics history |
-| `posts.write`, `comments.write`, `messages.write`, `reviews.read`, `reviews.write` | Nothing. Calls that need the permission fail with `403 account.permission_missing` |
+| `posts.write`, `comments.write`, `messages.write`, `reviews.read`, `reviews.write` | Nothing. A post to the account fails on its target with `account.permission_missing`, and the other calls that need the permission fail with `403 account.permission_missing` |
 
 If the deletion fails, the call fails and the permissions stay unchanged. Connecting the account again with a narrower `permissions` list deletes the same data.
 
@@ -217,7 +230,7 @@ An update is checked only when it changes `steps` or sets `status` to `active`. 
 - `400 validation.permission_unknown`: a value in `permissions` is not a permission. `error.meta.permission` names it.
 - `400 validation.permissions_empty`: `permissions` is an empty list.
 - `400 validation.permission_missing`: an Automation needs a permission the account does not have. `error.meta.permission` names it.
-- `403 platform.<name>.insufficient_scope`: the platform refused the call because the account's access lacks a scope.
+- `403 platform.twitter.insufficient_scope`: X refused the call because the account's access lacks a scope.
 
 Every code is described in [Errors](/guides/errors).
 

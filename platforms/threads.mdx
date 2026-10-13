@@ -18,7 +18,7 @@ The Threads API in SocialAPI connects Threads accounts. It publishes text, image
 
 ## Capabilities
 
-An unsupported call returns `501 resource.not_supported`. A Beta row depends on a Threads permission that Meta has not granted to SocialAPI's app for every account: see [Beta permissions](#beta-permissions).
+An unsupported call returns `501 resource.not_supported`. A Beta row depends on a Threads scope that Meta has not granted to SocialAPI's app for every account: see [Beta scopes](#beta-scopes).
 
 | Feature | Status | Condition |
 |---|---|---|
@@ -32,7 +32,7 @@ An unsupported call returns `501 resource.not_supported`. A Beta row depends on 
 | List replies | Yes | Replies to a post, and replies to a reply |
 | Reply to a reply | Yes | |
 | Delete a reply | Conditional | Only replies your account wrote. `can_delete` is `false` on a reply from another account |
-| Hide, unhide a reply | Beta | Only replies from other accounts (`can_hide` is `false` on your own replies). Needs the `threads_manage_replies` permission. Without it the call returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code |
+| Hide, unhide a reply | Beta | Only replies from other accounts (`can_hide` is `false` on your own replies). Needs the `threads_manage_replies` scope. Without it the call returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code |
 | Like a reply | No | `501 resource.not_supported` |
 | Private reply | No | `501 resource.not_supported` |
 | DMs | No | Threads has no messaging API. `501 resource.not_supported` |
@@ -76,8 +76,8 @@ A Threads access token lasts about 60 days. SocialAPI refreshes it. If a call re
 
 List the replies to a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID. Reply and delete work as described in [Comments](/guides/comments). Threads calls a comment a reply.
 
-- **Hide and unhide:** only replies from other accounts. They need the beta permission `threads_manage_replies`.
-- **Delete:** only replies your account wrote, and it works without the beta permission. A reply from another account cannot be deleted: hide it instead.
+- **Hide and unhide:** only replies from other accounts. They need the beta scope `threads_manage_replies`.
+- **Delete:** only replies your account wrote, and it works without the beta scope. A reply from another account cannot be deleted: hide it instead.
 - A like and a private reply return `501 resource.not_supported`.
 
 ## Mentions
@@ -126,7 +126,7 @@ curl -X POST "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J
   -d '{"media_id": "sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I", "text": "Thanks for the mention!"}'
 ```
 
-`media_id` is the `id` from the list response. An account connected without `threads_manage_mentions` gets `403` with a `platform.threads.<code>` error code on the list, where `<code>` is Meta's error code. On an account that has the permission, until Meta grants it for every account, the list and the `mention.received` event include only mentions made by accounts enrolled in the beta. Mentions from other accounts are left out, and the list can come back empty with no error.
+`media_id` is the `id` from the list response. An account connected without `threads_manage_mentions` gets `403` with a `platform.threads.<code>` error code on the list, where `<code>` is Meta's error code. On an account that has the scope, until Meta grants it for every account, the list and the `mention.received` event include only mentions made by accounts enrolled in the beta. Mentions from other accounts are left out, and the list can come back empty with no error.
 
 ## Insights
 
@@ -252,7 +252,7 @@ Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitte
 
 `GET /v1/accounts/{id}/limits` returns `posts_remaining`, `posts_total`, `replies_remaining`, and `replies_total`.
 
-## Permissions
+## Scopes
 
 SocialAPI's Meta Threads app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected. `threads_basic` is always requested.
 
@@ -265,7 +265,7 @@ SocialAPI's Meta Threads app requests these scopes at connect. You apply for no 
 
 Threads asks for publishing and deleting as 1 pair of scopes shared by `posts.write` and `comments.write`, so the consent screen can show more than you selected. The account stays limited to the permissions you selected.
 
-### Beta permissions
+### Beta scopes
 
 These further scopes are requested only for accounts enrolled in the beta:
 
@@ -279,7 +279,7 @@ These further scopes are requested only for accounts enrolled in the beta:
 | `threads_share_to_instagram` | `crossreshare_to_ig` on a post | `posts.write` |
 | `threads_keyword_search` | Requested with `threads_profile_discovery`. No SocialAPI endpoint uses it | Every account |
 
-Until Meta grants a scope for every account, a call that needs it from an account without it returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. A beta permission is added when the account connects: reconnect the account to add one granted later.
+Until Meta grants a scope for every account, a call that needs it from an account without it returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. A beta scope is added when the account connects: reconnect the account to add one granted later.
 
 ## Related
 
