@@ -1,91 +1,109 @@
 ---
-title: Interaction IDs
-description: How SocialAPI IDs encode type and platform.
+title: "IDs"
+description: "Look up the ID format of every SocialAPI object, learn which IDs stay stable, and which create requests are not idempotent."
 ---
 
-Every comment, DM, review, and mention returned by the API has a stable, opaque `id` field. These IDs are designed to be stored and reused across calls.
+Every object SocialAPI returns has an `id` string. Treat every ID as an opaque string: store it as text, send it back unchanged, and never parse it or depend on its length, characters, or format. The formats below tell you how to recognize an ID, not how to read one.
 
-## Format
+## ID formats
 
-```
-sapi_{type}_{32 character payload}
-```
+| Object | ID format | Example |
+|---|---|---|
+| Connected account | `acc_` prefix | `acc_01HZ9X3Q4R5M6N7P8V2K0W1J` |
+| Facebook Page or other page-level destination of an account | `sapi_page_` prefix | `sapi_page_01HZ9X3Q4R5M6N7P8V2K0W1J` |
+| Pinterest board | `sapi_board_` prefix | `sapi_board_01HZ9X3Q4R5M6N7P8V2K0W1J` |
+| Login (the `login_id` of a Facebook or Google connection) | `cred_` prefix | `cred_01HZ9X3Q4R5M6N7P8V2K0W1J` |
+| Automation | `aut_` prefix | `aut_01HZ9X3Q4R5M6N7P8V2K0W1J` |
+| Automation Firing | `afr_` prefix | `afr_01HZ9X3Q4R5M6N7P8V2K0W1J` |
+| Comment | `sapi_cmt_` prefix | `sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
+| Review | `sapi_rev_` prefix | `sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
+| Direct message | `sapi_dm_` prefix | `sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
+| Mention | `sapi_mnt_` prefix | `sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
+| Post, brand, invite, API key, webhook endpoint, webhook delivery, media file, conversation, message, event, export, announcement | UUID, no prefix | `7c9e6679-7425-40de-944b-e07fc1f90ae7` |
 
-The 32-character payload encodes `platform:platformID` using a SocialAPI custom base-33 alphabet. It is reversible: given the ID, the API recovers the original platform and the platform's native ID without a database lookup.
+The `sapi_cmt_`, `sapi_rev_`, `sapi_dm_`, and `sapi_mnt_` IDs are interaction IDs: the `id` of each item returned by the comment, review, direct message, and mention endpoints. An API key's secret starts with `sapi_key_`, which is not an ID: the `id` of a key is a UUID, and the secret is shown once when you create the key.
 
-The prefix tells you the interaction type:
+Fields named `platform_id` hold the platform's own ID for the same object, such as an Instagram comment ID. They are different values from `id`.
 
-| Prefix | Type |
-|---|---|
-| `sapi_cmt_` | Comment |
-| `sapi_rev_` | Review |
-| `sapi_dm_` | Direct message |
-| `sapi_mnt_` | Mention |
+## What each endpoint accepts
 
-Examples:
+- **Connected account:** every endpoint that takes an account uses `acc_` IDs.
+- **Post targets:** `page_id` and `board_id` accept the SocialAPI ID (`sapi_page_`, `sapi_board_`) or the platform's own ID.
+- **Comment routes:** `:postId` takes the platform's post ID. `:commentId` and `comment_id` take a `sapi_cmt_` ID or the platform's comment ID.
+- **Review routes:** `:id` takes a `sapi_rev_` ID or the platform's review ID.
+- **Conversation routes:** `:id` takes the conversation `id` returned by `GET /v1/inbox/conversations`. It is a UUID, not a `sapi_dm_` ID.
+- **Mention replies:** `media_id` takes a `sapi_mnt_` ID or the platform's media ID.
+- **Post metrics:** `GET /v1/posts/{pid}/metrics` takes the SocialAPI post ID or a platform post ID.
 
-- `sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U` — a comment
-- `sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U` — a review
-- `sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U` — a DM
+A SocialAPI interaction ID of the wrong type returns `400 validation.id_invalid`: for example a `sapi_rev_` ID in a comment route. An interaction ID created for a different platform than the account returns `400 validation.id_platform_mismatch`.
 
-The payload alphabet uses `A-Z` and `1-9` (excluding `0`, `O`, and `8`) in a shuffled, non-standard order, so do not assume the payload is base64url or hex.
+## Use IDs in requests
 
-## Why this matters
-
-The prefix lets handlers route requests without a lookup. Each inbox endpoint accepts the appropriate prefix in its path parameter:
-
-- Comment routes (`POST /v1/inbox/comments/:postId`, `POST /v1/inbox/comments/:postId/:commentId/hide`, etc.) accept a platform post ID in `:postId` and a `sapi_cmt_` interaction ID in `:commentId`.
-- Review routes (`POST /v1/inbox/reviews/:id/reply`) accept `sapi_rev_` IDs in `:id`.
-- Conversation routes (`POST /v1/inbox/conversations/:id/messages`) take the conversation `id` returned by `GET /v1/inbox/conversations` in `:id`, not a `sapi_dm_` ID.
-
-REST routes do not enforce a prefix type check: passing a mismatched prefix ID (for example, a `sapi_rev_` ID on a comment route) decodes silently and the raw platform ID is forwarded to the connector. MCP tools, by contrast, validate the prefix and return an error if the type does not match the operation.
-
-## Stability
-
-IDs are deterministic. The same `(type, platform, platform_id)` tuple always produces the same SocialAPI ID, so you can safely store IDs in your own database and join against them across calls.
-
-## Using IDs
-
-List comments on a connected account, then reply to one using the comment's `id`:
+List commented posts, then reply to one comment using its `id`:
 
 ```bash
-# 1. List commented posts for the account
-curl "https://api.social-api.ai/v1/inbox/comments" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-
-# 2. Reply to a specific comment on a post (postId is the platform post ID)
-curl -X POST \
-  "https://api.social-api.ai/v1/inbox/comments/17895695668004550" \
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/17895695668004550" \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "comment_id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U",
+    "comment_id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
     "text": "Thank you!"
   }'
 ```
 
-Hide a comment:
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "comment_id": "sapi_cmt_7Q2KDWZ9SFN4RAHB6GXEM3YLTPV1C5UJ"
+}
+```
+
+`comment_id` in the response is the ID of your new reply. In this request, `17895695668004550` is the platform's post ID.
+
+Hide a comment, with the same `sapi_cmt_` ID in the path:
 
 ```bash
-curl -X POST \
-  "https://api.social-api.ai/v1/inbox/comments/{postId}/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/hide" \
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/17895695668004550/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I/hide" \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
 ```
 
-Reply to a review:
+See [Comments](/guides/comments), [Reviews](/guides/reviews), and [Mentions](/guides/mentions) for every route that takes an interaction ID.
 
-```bash
-curl -X POST \
-  "https://api.social-api.ai/v1/inbox/reviews/sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/reply" \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "text": "Thanks for the feedback!"
-  }'
-```
+## What stays stable
 
-See the [Inbox guide](/guides/inbox) for the full list of routes that take interaction IDs.
+- **Interaction IDs:** the same comment, review, direct message, or mention always has the same `id`, in every response and every webhook event. Store it and join on it.
+- **Connected accounts:** an `acc_` ID stays the same for the life of the connection. Reconnecting the same platform account to your SocialAPI account keeps its `acc_` ID. Disconnecting an account with `DELETE /v1/accounts/{id}` deletes it, and connecting it again creates a new `acc_` ID.
+- **Every other object:** an ID never changes for the life of the object.
+
+Store IDs as text, not as a typed `uuid` column: formats differ per object type, so never assume one format across objects.
+
+## Create requests are not idempotent
+
+No create endpoint accepts an idempotency key. When a request times out and you repeat it, check first whether the first request succeeded.
+
+| Request | What a repeat does |
+|---|---|
+| `POST /v1/brands` | Creates another brand. Brand names are not unique |
+| `POST /v1/keys` | Creates another API key |
+| `POST /v1/webhooks` | Creates another webhook endpoint, even for the same URL |
+| `POST /v1/automations` | Creates another Automation, up to the limit of 50 Automations per account |
+| `POST /v1/invites` | Returns `409 resource.conflict` while an active invite exists for the same brand and platform |
+| `POST /v1/posts` | Returns `409 resource.conflict` when the same account already has a published or scheduled post with the same title and text from the last 24 hours. Send `skip_duplicate_check: true` to publish the same content again. Drafts and posts still `publishing` are not compared |
+| Replies and direct messages | Send another reply or message and cost another interaction credit |
+
+After a timeout, persist the ID from the first response when you have it. Otherwise list the object (`GET /v1/brands`, `GET /v1/posts`) and look for it before you create another.
+
+For webhook endpoints, `X-SocialAPI-Delivery` is the same value on every retry of one delivery. Use it to ignore a duplicate. See [Webhooks](/guides/webhooks).
+
+## Related
+
+- [Pagination](/guides/pagination): cursors are opaque strings too
+- [Comments](/guides/comments): routes that take `sapi_cmt_` IDs
+- [Reviews](/guides/reviews): routes that take `sapi_rev_` IDs
+- [Track post delivery](/guides/delivery): post and target fields in post responses
+- [Webhooks](/guides/webhooks): `X-SocialAPI-Delivery` and duplicate events

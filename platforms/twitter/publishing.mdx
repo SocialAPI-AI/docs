@@ -1,0 +1,295 @@
+---
+title: X / Twitter publishing
+sidebarTitle: "Publishing"
+description: Full reference for publishing X posts via SocialAPI, including images, video, GIFs, threads, replies, reply settings, and platform-specific parameters.
+---
+
+## 1. Overview
+
+X posts publish through your own X app, so X bills each write to your X developer account. A post carries text and up to 4 images, 1 video, or 1 GIF. A thread chains text-only posts after the first one.
+
+| Field | Value |
+|---|---|
+| Platform slug | `twitter` (`x` is accepted as the same slug) |
+| Auth type | OAuth 2.0 with PKCE, through your own X app |
+| API | X API v2 |
+| Create post | Yes |
+| Update post | No (`409 post.state_invalid` on a published post) |
+| Delete post | Yes |
+| Schedule | Yes (deferred publish via `scheduled_at`) |
+| First comment | No (`first_comment` is ignored) |
+| Posting caps | 25 posts per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Text only | No `media` | Up to 280 characters |
+| Images | 1 to 4 image entries in `media` | JPEG, PNG, GIF, or WebP, at most 5 MB each |
+| Video | One MP4 entry in `media` | At most 512 MB and 140 seconds. A video takes the whole post |
+| GIF | One GIF entry in `media` | A GIF takes the whole post |
+| Thread | `segments` on the post | Each continuation post is text only |
+
+A post holds up to 4 images, or exactly one video, or exactly one GIF, never a mix. More than 4 items fails with `400 validation.media_count`. A file type X does not accept fails with `400 validation.media_type`, and a file too large to upload fails with `400 validation.media_size`.
+
+**File limits for media you upload to SocialAPI** (`source_type: "media_id"`): the limits in the table apply, and a file outside them fails validation with `400 publishing.validation_failed`. SocialAPI uploads the media to X before it creates the post. If an upload fails, the whole post fails: SocialAPI never publishes the text without its media.
+
+<Warning>
+  Attach media through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, `url` for a public `http(s)` URL SocialAPI fetches at publish time, or `platform_attachment_id` for a media ID you created through X yourself. To upload first, see [Media](/guides/media). Uploading needs the `media.write` permission: an account connected without it fails with `403 platform.twitter.insufficient_scope` until the person reconnects.
+</Warning>
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `targets` pointing at an X account and `publish_now: true`. The `text` field becomes the post text.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "Spring collection is live.",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
+    "platform_data": {
+      "twitter": {
+        "reply_settings": "following",
+        "made_with_ai": false
+      }
+    }
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "Spring collection is live.",
+  "status": "publishing",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "twitter",
+      "status": "publishing"
+    }
+  ]
+}
+```
+
+### Platform data fields
+
+Send these keys in `platform_data.twitter` on the post, which applies them to every X target. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `twitter` key). When both set the same key, the target's value wins. All keys are optional.
+
+| Key | Type | Notes |
+|---|---|---|
+| `reply_settings` | string | Who can reply. One of `following`, `mentionedUsers`, `subscribers`, `verified`. Omit it to let everyone reply |
+| `geo_place_id` | string | Attaches a location by X place ID |
+| `community_id` | string | Posts into an X Community |
+| `for_super_followers_only` | boolean | Restricts the post to Super Followers |
+| `nullcast` | boolean | Publishes a promoted-only post that does not appear in the timeline |
+| `made_with_ai` | boolean | Labels the post as AI-generated |
+| `paid_partnership` | boolean | Discloses branded content |
+| `in_reply_to_tweet_id` | string | Publishes the post as a reply to this post |
+| `auto_populate_reply_metadata` | boolean | Adds the @mentions of the post you reply to. Needs `in_reply_to_tweet_id` |
+| `exclude_reply_user_ids` | array of strings | User IDs to leave out of the auto-added @mentions. Needs `in_reply_to_tweet_id` |
+| `thread` | array of objects | Continuation posts as `{"text": "..."}` objects. Equivalent to `segments`: send one of the two |
+
+SocialAPI forwards any additional keys in `platform_data.twitter` only when the table above lists them. X has no other publish options that SocialAPI passes through: an unlisted key is not sent, and validation returns a warning naming the key. A value of the wrong type, an unlisted `reply_settings` value, or a thread entry that is empty or longer than 280 characters fails validation on that field, and `POST /v1/posts/validate` reports it before anything is published. `auto_populate_reply_metadata` or `exclude_reply_user_ids` without `in_reply_to_tweet_id` returns a warning, because it has no effect.
+
+### Threads
+
+Set `segments` to publish a thread. The post's `text` is the first post, and each segment is posted as a reply to the one before it. A thread holds up to 25 continuation posts, each up to 280 characters.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "1/ A thread about our launch.",
+    "segments": [
+      { "text": "2/ First, the backstory." },
+      { "text": "3/ And here is what is next." }
+    ],
+    "publish_now": true
+  }'
+```
+
+Continuation posts are text only: media on a segment is dropped, with a validation warning. The `platform_data.twitter` settings apply to the first post only. The target's `platform_post_id` is the first post's ID. Each post in a thread is a separate X write that X bills to you.
+
+### Reply to a post
+
+Set `platform_data.twitter.in_reply_to_tweet_id` to publish a reply:
+
+```json
+{
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "text": "Thanks for asking: yes, it ships worldwide.",
+  "publish_now": true,
+  "platform_data": {
+    "twitter": {
+      "in_reply_to_tweet_id": "1846123456789012345"
+    }
+  }
+}
+```
+
+### Scheduling
+
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) instead of `publish_now`. SocialAPI holds the post and publishes it at that time.
+
+```json
+{
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "text": "Scheduled post",
+  "scheduled_at": "2026-11-15T10:00:00Z"
+}
+```
+
+---
+
+## 4. Update post
+
+SocialAPI offers no edit of a published X post. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post. To correct a published post, delete it and publish a new one.
+
+---
+
+## 5. Delete post
+
+`DELETE /v1/posts/{pid}` deletes the post from X when its X target is `published`. For a thread it deletes the first post only: the continuation posts stay on X until you delete them there. See [Delete a post](/guides/delivery#delete-a-post).
+
+---
+
+## 6. Retrieve posts
+
+`GET /v1/posts?platform=twitter&account_ids={id}` lists the account's posts and replies, without reposts. Each published target carries `platform_post_id`, `permalink`, and `metrics` with `likes` and `comments` (the reply count). `GET /v1/posts/{pid}/metrics` reads the current counts from X. X reports no other counts through SocialAPI.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### Text limit
+
+Text holds 280 characters, counted as Unicode characters. A longer text fails with `400 publishing.validation_failed`, and the issue names the field `text`.
+
+### A thread can stop partway
+
+If a continuation post fails, publishing stops and the target fails. The posts already published stay on X, because X has no batch rollback. Check the account's X timeline before you retry: `POST /v1/posts/{pid}/retry` publishes the whole thread again.
+
+### Media must finish processing
+
+X processes a video or GIF after upload. SocialAPI waits for X to finish before it creates the post, and a post with a large video takes longer to reach `published`.
+
+### X bills links at a higher rate
+
+X charges more for a post that contains a URL than for a post without one. The charge is on your X developer account, not on SocialAPI.
+
+### Errors on a failed target
+
+A publish that fails after the request returned puts a structured error on the target, in `targets[].error`, with its `code`. Every code is in [Errors](/guides/errors).
+
+- `401 platform.twitter.auth`: the access token is no longer valid and renewal failed. Reconnect the account.
+- `403 platform.twitter.insufficient_scope`: the token lacks a permission, for example `media.write`. Reconnect the account.
+- `402 platform.twitter.usage_capped`: your X app is out of credits or reached its spending limit. Add credits or raise the limit in the X Developer Console, then retry.
+- `429 platform.twitter.rate_limit`: X's own limit. Wait, then retry.
+
+### Recovery
+
+- **Rate limit.** Wait, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Auth or scope error.** Reconnect the X account through the OAuth flow.
+- **Usage cap.** Add X credits, then send `POST /v1/posts/{pid}/retry`.
+
+---
+
+## 8. Full worked example
+
+This example publishes a post with an image and a 2-post thread, then reads the result.
+
+**Step 1: Upload media**
+
+```bash
+curl "https://api.social-api.ai/v1/media/upload-url?filename=launch.jpg&media_type=image/jpeg" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Upload the file to the returned `upload_url`, then call `POST /v1/media/{media_id}/verify`. The steps and the response are in [Media](/guides/media). The result is a `media_id`, here `f47ac10b-58cc-4372-a567-0e02b2c3d479`.
+
+**Step 2: Publish the post**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "1/ Our spring launch is here.",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "segments": [
+      { "text": "2/ Every piece is made to order." },
+      { "text": "3/ Shop the collection: https://example.com/spring" }
+    ],
+    "publish_now": true,
+    "platform_data": {
+      "twitter": {
+        "reply_settings": "following"
+      }
+    }
+  }'
+```
+
+Response (HTTP 201): the post with `status: "publishing"`, as in [Create post](#3-create-post).
+
+**Step 3: Check the status**
+
+```bash
+curl https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200) once published:
+
+```json
+{
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "1/ Our spring launch is here.",
+  "status": "published",
+  "hidden": false,
+  "retry_count": 0,
+  "published_at": "2026-10-13T09:00:09Z",
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:09Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "twitter",
+      "status": "published",
+      "platform_post_id": "1846123456789012345",
+      "permalink": "https://x.com/i/status/1846123456789012345",
+      "published_at": "2026-10-13T09:00:09Z"
+    }
+  ]
+}
+```
+
+---
+
+## 9. Required OAuth scopes
+
+SocialAPI requests these scopes when the person connects the account, through your own X app. The full list is in [X permissions](/platforms/twitter#permissions).
+
+| Scope | Purpose |
+|---|---|
+| `tweet.write` | Publish and delete posts |
+| `media.write` | Upload images, video, and GIFs |
+| `tweet.read` | Read the published post back |
+| `users.read` | Identify the account |
+| `offline.access` | Renew the access token |

@@ -1,101 +1,84 @@
 ---
-title: "API Reference"
-description: "Complete reference for all SocialAPI endpoints."
+title: "API reference"
+description: "Look up the SocialAPI REST API base URL, authentication, request and response format, and error envelope before you open an endpoint."
 ---
+
+The SocialAPI REST API reads and writes your connected accounts' comments, direct messages (DMs), reviews, mentions, posts, and analytics over HTTPS with JSON. This page covers what every endpoint shares. The endpoint pages in the reference below list each operation's parameters, request body, and responses.
 
 ## Base URL
 
-```
+Every endpoint lives under one base URL:
+
+```text
 https://api.social-api.ai/v1
 ```
 
 ## Authentication
 
-All endpoints require a Bearer token. The API accepts three token types:
-
-| Token type | Format | Use case |
-|---|---|---|
-| API key | `sapi_key_...` | External API clients |
-| Auth service JWT | EdDSA signed JWT | Dashboard frontend |
-| OAuth 2.1 access token | EdDSA signed JWT | MCP / AI assistant clients |
+Every request carries a token on the `Authorization` header. SocialAPI accepts two token types: an API key (`sapi_key_...`) that you create and keep on your server, and an OAuth 2.1 access token that an app receives after a SocialAPI user approves it. A [scoped API key](/guides/scoped-keys) limits a key to some scopes and brands.
 
 ```bash
-Authorization: Bearer sapi_key_your_key_here
+curl https://api.social-api.ai/v1/accounts \
+  -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-See the [Authentication guide](/guides/authentication) for how to create and manage keys.
+See [Authentication](/guides/authentication) to create and rotate keys, and [OAuth for MCP clients](/integrations/oauth) for the OAuth flow.
 
 ## Request format
 
-- All request bodies must be JSON with `Content-Type: application/json`
-- All timestamps are RFC 3339 (e.g. `2026-02-15T14:30:00Z`)
-- Paginated endpoints accept `limit` (1-100, default varies by endpoint, 20 or 25), `cursor`, and filtering parameters. The previous response's `next_cursor` field is what you pass back as `cursor`.
+- Send a JSON body with `Content-Type: application/json`. Two endpoints take a multipart form instead: `POST /v1/media/upload` and `POST /v1/posts/import`.
+- Write every timestamp in ISO 8601 UTC, for example `2026-10-02T09:00:00Z`.
+- Send `X-Request-ID` to set your own request ID: see [Debugging](/guides/debugging).
 
 ## Response format
 
-All successful responses are JSON. All errors use:
+A successful response is JSON with an HTTP `2xx` status. List endpoints return a page of results and a cursor: see [Pagination](/guides/pagination). Every object has an `id` that you store and send back unchanged: see [IDs](/guides/ids).
+
+A failed request returns a non-`2xx` status and this body:
 
 ```json
 {
   "error": {
-    "code": "namespace.specific_code",
-    "message": "human-readable message",
-    "meta": { "field": "..." }
-  }
+    "code": "validation.field_required",
+    "message": "Required field is missing: platform",
+    "meta": { "field": "platform" }
+  },
+  "request_id": "a1b2c3d4"
 }
 ```
 
-See [Errors](/guides/errors) for the full code catalog. Notable status codes:
-
-| HTTP status | Meaning |
-|---|---|
-| `400` | Invalid request parameters |
-| `401` | Invalid or missing API key |
-| `403` | Feature not available on your plan |
-| `404` | Account or resource not found |
-| `409` | Account already linked |
-| `410` | Resource gone (expired invite, closed reply window) |
-| `412` | BYOK credentials missing |
-| `413` | Storage quota exceeded |
-| `429` | Monthly resource limit or upstream platform rate limit hit |
-| `501` | Platform does not support this operation |
+Branch on `error.code`, never on `error.message`. `request_id` equals the `X-Request-ID` response header: quote it when you report a failed request. [Errors](/guides/errors) lists every code with its HTTP status, and [Debugging](/guides/debugging) explains `request_id`.
 
 ## Endpoint groups
 
-| Group | Endpoints | Description |
-|---|---|---|
-| Accounts | `GET /accounts`, `POST /accounts/connect`, `DELETE /accounts/:id`, `GET /accounts/:id/creator-info`, `GET /accounts/:id/pages`, `PATCH /accounts/:id/pages/:pageId`, `GET /accounts/:id/limits` | Connect, list, and disconnect social accounts; manage pages and per-account creator info |
-| Brands | `GET /brands`, `POST /brands`, `PATCH /brands/:id`, `DELETE /brands/:id` | Manage workspaces (brands) |
-| Invites | `GET /invites`, `POST /invites`, `DELETE /invites/:id` | Brand invite tokens |
-| Inbox - Comments | `GET /inbox/comments`, `GET /inbox/comments/:postId`, `GET /inbox/comments/:postId/:commentId/replies`, `POST /inbox/comments/:postId`, `DELETE /inbox/comments/:postId/:commentId`, `POST .../hide`, `DELETE .../hide`, `POST .../like`, `DELETE .../like`, `POST .../private-reply` | List commented posts and replies, reply, moderate (hide, like, delete, private reply) |
-| Inbox - Conversations | `GET /inbox/conversations`, `GET /inbox/conversations/:id`, `PATCH /inbox/conversations/:id`, `GET .../messages`, `POST .../messages`, `POST .../read` | List conversations, read and send DMs, mark as read |
-| Inbox - Reviews | `GET /inbox/reviews`, `POST /inbox/reviews/:id/reply` | Read reviews and reply |
-| Mentions | `GET /accounts/:id/mentions` | Read mentions for a connected account |
-| Automations | `GET /automations`, `POST /automations`, `GET /automations/:id`, `PATCH /automations/:id`, `DELETE /automations/:id`, `GET /automations/:id/firings` | Configure keyword replies to Instagram and Facebook comments and DMs, and read their runs. See [Automations](/guides/automations) |
-| Publishing | `POST /posts`, `GET /posts`, `GET /posts/:pid`, `PATCH /posts/:pid`, `DELETE /posts/:pid`, `POST /posts/:pid/retry`, `POST /posts/:pid/unpublish`, `GET /posts/:pid/metrics`, `POST /posts/import`, `GET /posts/validate`, `POST /posts/validate` | Create, schedule, update, delete, retry, and monitor posts |
-| Media Library | `GET /media`, `DELETE /media/:id`, `GET /media/storage`, `GET /media/upload-url`, `POST /media/upload`, `POST /media/:id/verify` | Upload, list, delete media files and check storage |
-| Exports | `POST /accounts/:id/export`, `GET /exports`, `GET /exports/:id`, `GET /exports/:id/videos` | Run and read analytics exports |
-| Events | `GET /events`, `GET /events/summary` | Unified events log |
-| Usage | `GET /usage` | Check workspace plan usage |
-| API Keys | `GET /keys`, `POST /keys`, `DELETE /keys/:id` | Manage API keys |
-| Webhooks | `GET /webhooks`, `POST /webhooks`, `GET /webhooks/:id`, `PATCH /webhooks/:id`, `DELETE /webhooks/:id`, `POST /webhooks/:id/test`, `GET /webhooks/:id/deliveries`, `GET /webhooks/:id/deliveries/:did`, `POST /webhooks/:id/deliveries/:did/retry`, `GET /webhooks/events` | Manage outbound webhook endpoints, inspect deliveries, list event catalog |
-| OAuth redirect URIs | `GET /oauth/redirect-uris`, `POST /oauth/redirect-uris`, `DELETE /oauth/redirect-uris/:id` | Manage the OAuth redirect URI whitelist (dashboard only) |
-| Twitter BYOK | `GET /platforms/twitter/credentials`, `PUT /platforms/twitter/credentials`, `PUT /platforms/twitter/credentials/brand/:brand_id`, `DELETE /platforms/twitter/credentials`, `DELETE /platforms/twitter/credentials/brand/:brand_id`, `POST /platforms/twitter/credentials/test` | Manage your Twitter / X developer app credentials |
-| WhatsApp | `POST /platforms/whatsapp/phone-numbers/:id/request-code`, `POST .../verify-code`, `POST .../register`, `POST .../deregister`, `GET .../status`, `GET .../business-profile`, `PUT .../business-profile`, `GET /platforms/whatsapp/accounts/:id/templates`, `POST .../templates`, `DELETE .../templates`, `GET /platforms/whatsapp/templates/:id`, `PUT /platforms/whatsapp/templates/:id`, `POST /platforms/whatsapp/accounts/:id/send-template` | Manage WhatsApp Cloud API phone numbers and templates |
-| Users | `GET /users/me`, `PATCH /users/me`, `DELETE /users/me` | User profile |
-| Billing | `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/checkout/status` | Subscription billing (handled outside the OpenAPI spec) |
+The API reference tab groups the generated endpoint pages by tag:
+
+| Group | What it covers |
+|---|---|
+| Accounts | Connect, list, reconnect, and disconnect accounts, and manage Pages and locations |
+| Brands and Invites | Group accounts by brand and invite clients to connect theirs |
+| Inbox | Comments, DMs, and reviews across platforms |
+| Mentions | Mentions of a connected account |
+| Automations | Rules that reply to Instagram and Facebook comments and DMs |
+| Posts | Publish, schedule, update, retry, and delete posts, and read post metrics |
+| Media | Upload and manage media files |
+| Analytics and Exports | Stored account, brand, and post history, and exports |
+| Webhooks | Webhook endpoints and their deliveries |
+| Events, Usage, and Announcements | The events log, plan usage, and product announcements |
+| API Keys and Users | API keys and your SocialAPI profile |
+| Platform groups | Endpoints under `/v1/platforms/` for one platform, such as WhatsApp, Google, Instagram, TikTok, and YouTube |
 
 <CardGroup cols={2}>
-  <Card title="Inbox" icon="inbox" href="/guides/platforms">
+  <Card title="Inbox" icon="inbox" href="/guides/inbox">
     Comments, DMs, and reviews across platforms.
   </Card>
-  <Card title="Publishing" icon="paper-plane" href="/quickstart">
+  <Card title="Publishing" icon="paper-plane" href="/guides/publishing">
     Create, schedule, and manage posts.
   </Card>
   <Card title="Webhooks" icon="bolt" href="/guides/webhooks">
     Get notified of events in real time.
   </Card>
-  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/errors">
-    All error codes and how to handle them.
+  <Card title="Errors" icon="triangle-exclamation" href="/guides/errors">
+    Every error code and how to handle it.
   </Card>
 </CardGroup>

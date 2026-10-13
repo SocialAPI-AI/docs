@@ -1,315 +1,13 @@
 ---
-title: Plans & Limits
-description: Request rate limits, resource limits, billing periods, export quotas, and how to monitor your usage.
+title: "Rate limits"
+description: "Stay within SocialAPI's posting and messaging velocity caps and each platform's own limits, and handle HTTP 429 with Retry-After."
 ---
 
-## How plans work
+SocialAPI applies rate limits of its own: a posting velocity cap per publish target and a messaging velocity cap per sender. Each platform also applies its own limits. All of them answer HTTP 429. Read the `Retry-After` header when it is present and wait that many seconds before you send the request again.
 
-[SocialAPI](https://social-api.ai) uses **resource-based** limits. Every plan gives you a fixed number of brands, posts per month, interactions per month, media storage, and export quotas. A brand groups all social accounts for one business, client, or project. Connect Instagram, TikTok, LinkedIn, and more under one brand, and it counts as one unit. All plans have access to all platforms, DMs, and features. Plans differ only by resource limits.
+These limits are the same on every plan, and upgrading does not raise them. Post and interaction allowances per billing period are on [Plans and usage](/guides/plans).
 
-Upgrade at [app.social-api.ai](https://app.social-api.ai) &rarr; **Billing**. Compare every tier on the [plans and pricing](https://social-api.ai/pricing) page.
-
-<Note>
-  **All plans include managed platform apps** for Meta (Instagram, Facebook, Threads), Google, TikTok, LinkedIn, and YouTube - no developer registration or app review on your side. Twitter is BYOK on every plan ([setup guide](/platforms/twitter/own-app)). See [Platform credentials](/guides/platform-credentials) for details.
-</Note>
-
-## Plan catalog endpoint
-
-To read the full plan catalog programmatically instead of hardcoding the table below, call:
-
-```bash
-curl https://api.social-api.ai/v1/billing/plans \
-  -H "Authorization: Bearer $SOCIALAPI_KEY"
-```
-
-The response lists every tier, ordered cheapest to most expensive, with its display metadata, prices, and resource limits (trimmed to two plans here):
-
-```json
-{
-  "plans": [
-    {
-      "tier": "free",
-      "name": "Hobby",
-      "tagline": "Kick the tires, no card required",
-      "monthly_price_usd": 0,
-      "annual_price_usd": 0,
-      "popular": false,
-      "limits": {
-        "profiles": 2,
-        "posts_per_month": 10,
-        "interactions_per_month": 50,
-        "storage_bytes": 104857600,
-        "event_retention_days": 1,
-        "exports_per_month": 2
-      }
-    },
-    {
-      "tier": "pro",
-      "name": "Full Send",
-      "tagline": "For growing teams and products",
-      "monthly_price_usd": 109,
-      "annual_price_usd": 1044,
-      "popular": true,
-      "limits": {
-        "profiles": 50,
-        "posts_per_month": -1,
-        "interactions_per_month": -1,
-        "storage_bytes": -1,
-        "event_retention_days": 30,
-        "exports_per_month": 20
-      }
-    }
-  ]
-}
-```
-
-`profiles` is the count of social profiles (brands) the plan allows. Prices are in USD. A value of `-1` means unlimited for any field under `limits`, and custom pricing for `monthly_price_usd` / `annual_price_usd` (shown on the Enterprise tier). `popular` flags the tier highlighted by default on pricing surfaces.
-
-## Plan limits
-
-| Plan | Display Name | Brands | Posts / month | Interactions / month | Storage | Price |
-|---|---|---|---|---|---|---|
-| Free | Hobby | 2 | 10 | 50 | 100 MB | $0 |
-| Starter | Side Hustle | 10 | Unlimited | Unlimited | Unlimited | $29 |
-| Pro | Full Send | 50 | Unlimited | Unlimited | Unlimited | $109 |
-| Enterprise | Enterprise | Unlimited | Unlimited | Unlimited | Unlimited | Custom |
-
-Full Send scales automatically in Profile packs of 50 profiles: when usage reaches your Scale threshold (90% by default) a pack is added, within the Pack budget you set in the dashboard, and unneeded packs are released at the end of the billing period.
-
-## Export and analytics limits
-
-Each plan includes different export quotas for analytics reports.
-
-| Feature | Free | Starter | Pro | Business | Enterprise |
-|---|---|---|---|---|---|
-| Exports per month | 2 | 10 | 20 | Unlimited | Unlimited |
-| Max videos per export | 30 | 200 | 500 | Unlimited | Unlimited |
-| Max transcripts per export | 10 | Unlimited | Unlimited | Unlimited | Unlimited |
-| Vision analysis | No | Yes | Yes | Yes | Yes |
-| Event retention (days) | 1 | 7 | 30 | 90 | 90 |
-| Report expiry (days) | 7 | 30 | 30 | 90 | 90 |
-| Export cooldown | 7 days | 24 hours | 1 hour | 1 hour | None |
-
-<Note>
-  "Unlimited" in the table above means the feature is not capped. In the API response, unlimited values are represented as `-1`.
-</Note>
-
-## What counts as a post or interaction
-
-**Post operations** (each consumes 1 post from your monthly allowance):
-- `create_post` - publishing or scheduling a new post (saving a **draft** is free; the credit is charged when you publish it)
-- `publish_post` - publishing an existing draft or scheduled post (`POST /v1/posts/{pid}/publish`)
-- `retry_post` - retrying a failed post
-
-**Interaction operations** (each consumes 1 interaction from your monthly allowance):
-- `reply` - replying to a comment, review, or mention
-- `send_dm` - sending a direct message
-
-**All other operations are free.** Listing accounts, fetching comments, reading DMs, checking usage, managing API keys, and similar read operations do not consume any quota.
-
-<Note>
-  Only the Free plan enforces post and interaction limits. All paid plans have unlimited posts and interactions. The counters are tracked but never block requests.
-</Note>
-
-## Billing periods
-
-- **Paid plans:** Aligned with your subscription cycle. `period_start` and `period_end` follow your billing anniversary.
-- **Free plan:** Rolling 30-day window from your account creation anniversary date.
-
-Counters reset to zero at the start of each new period.
-
-## When you hit a limit
-
-When you exceed your monthly post or interaction allowance, the API returns HTTP `429`:
-
-```json
-{
-  "error": {
-    "code": "validation.post_limit_exhausted",
-    "message": "Monthly post limit exhausted"
-  },
-  "request_id": "a1b2c3d4"
-}
-```
-
-The interaction-limit response uses the same shape with `error.code` set to `validation.interaction_limit_exhausted`. Your counters reset at the start of your next billing period. To get more capacity immediately, upgrade your plan.
-
-<Note>
-  The `billing.post_limit` code is emitted by the bulk-import endpoint (`POST /v1/posts/import`) when the batch size exceeds your remaining post allowance.
-</Note>
-
-When you exceed your storage quota, the API returns HTTP `413`:
-
-```json
-{
-  "error": {
-    "code": "billing.storage_quota",
-    "message": "Storage quota exceeded. Free plan is limited to 100MB. Upgrade your plan for more storage."
-  },
-  "request_id": "a1b2c3d4"
-}
-```
-
-## Checking your usage
-
-```bash
-curl https://api.social-api.ai/v1/usage \
-  -H "Authorization: Bearer $SOCIALAPI_KEY"
-```
-
-```json
-{
-  "brands_used": 2,
-  "brands_limit": 10,
-  "posts_used": 7,
-  "posts_limit": -1,
-  "interactions_used": 23,
-  "interactions_limit": -1,
-  "period_start": "2026-02-15T00:00:00Z",
-  "period_end": "2026-03-15T00:00:00Z"
-}
-```
-
-A limit value of `-1` means unlimited (all paid plans).
-
-### Checking storage usage
-
-```bash
-curl https://api.social-api.ai/v1/media/storage \
-  -H "Authorization: Bearer $SOCIALAPI_KEY"
-```
-
-```json
-{
-  "used_bytes": 52428800,
-  "limit_bytes": 104857600,
-  "count": 12
-}
-```
-
-A `limit_bytes` value of `-1` means unlimited storage.
-
-### Response headers
-
-Post and interaction operations include usage headers in the response:
-
-| Header | Description |
-|---|---|
-| `X-Posts-Limit` | Monthly post limit for your plan |
-| `X-Posts-Remaining` | Posts remaining this period |
-| `X-Interactions-Limit` | Monthly interaction limit for your plan |
-| `X-Interactions-Remaining` | Interactions remaining this period |
-| `X-Storage-Used` | Current storage usage in bytes |
-| `X-Storage-Limit` | Storage limit in bytes for your plan |
-
-<Tip>
-  These headers are only set for Free plan post/interaction operations. Paid plans with unlimited resources omit them.
-</Tip>
-
-## Request rate limits
-
-One API key is enough for your whole integration. Rate limits are based on your team's total connected accounts, so your request budget grows automatically as you onboard customers:
-
-| Connected accounts | Requests per minute |
-|---|---|
-| 0-2 | 60 |
-| 3-2,000 | 600 |
-| 2,001+ | 1,200 |
-
-The budget belongs to your team, not to a credential. Every API key, dashboard session, and MCP token you hold draws on the same per-minute pool, so splitting traffic across more keys does not buy more capacity, and you never need to shard an integration across several keys to go faster. A newly connected account widens the budget within about five minutes.
-
-Every authenticated response tells you where you stand in the current minute:
-
-| Header | Description |
-|---|---|
-| `X-RateLimit-Limit` | Requests per minute for your current connected-account count |
-| `X-RateLimit-Remaining` | Requests left in the current window |
-| `X-RateLimit-Reset` | Seconds until the window resets |
-
-Over the budget, the API returns HTTP `429` with `Retry-After` set to the same number of seconds as `X-RateLimit-Reset`:
-
-```json
-{
-  "error": {
-    "code": "ratelimit.exceeded",
-    "message": "rate limit exceeded: this account is limited to 600 requests per minute, retry in 34s",
-    "meta": {
-      "limit": 600,
-      "retry_after_seconds": 34
-    }
-  },
-  "request_id": "a1b2c3d4"
-}
-```
-
-Nothing reaches the platform on a refused request and no post or interaction credit is spent, so retrying after the window is a clean first attempt.
-
-Windows are fixed one-minute buckets rather than a sliding average, so a burst that straddles a boundary can briefly send close to twice the budget. Pace your requests instead of relying on that.
-
-<Note>
-  If your integration already runs above these numbers, tell us before you start seeing `429`s. We would rather raise your budget than break a working integration.
-</Note>
-
-## Platform rate limits
-
-Platforms (Instagram, Facebook, etc.) have their own rate limits independent of your plan limits. When a platform rejects a request due to its own throttling, you receive:
-
-```json
-{
-  "error": {
-    "code": "platform.instagram.rate_limit",
-    "message": "Platform rate limit exceeded"
-  },
-  "request_id": "a1b2c3d4"
-}
-```
-
-The `instagram` segment is replaced with the actual platform name (`facebook`, `tiktok`, etc.). Match on the `platform.*.rate_limit` shape to handle all platforms.
-
-This does **not** consume your post or interaction quota. Retry after a short wait (typically a few minutes).
-
-### Live inbox reads
-
-Comments, reviews, and mentions are proxied from the platform. If you poll to detect new comments, subscribe to comment webhooks instead: they arrive sooner and cost nothing. Each page of comments for one post costs at most one platform call (`limit` accepts up to 100, so a few hundred comments is a handful of calls), and listing commented posts is served from SocialAPI's database without touching the platform. Read operations consume no SocialAPI quota and are not throttled by us, so the only ceiling is the platform's own limit, which for Meta scales with your account's reach and is far above operator-paced browsing. If your UI re-fetches the same view often (tab switches, refreshes), cache pages client-side for 30 to 60 seconds and back off for a few minutes on any `platform.*.rate_limit` response.
-
-### Platform publishing ceilings
-
-Each platform sets its own publishing limits, which apply in addition to your plan quota. These are the platforms' own published figures:
-
-| Platform | Publishing ceiling (set by the platform) |
-|---|---|
-| Instagram | 50 posts per 24 hours (the `content_publishing_limit` endpoint is authoritative; some Meta guide prose still says 100) |
-| Threads | 250 posts and 1,000 replies per 24 hours |
-| YouTube | A daily upload quota (Google's default is 10,000 quota units per day, roughly 100 video uploads per day), reset at midnight Pacific time |
-| Google Business Profile | 300 requests per minute per API, and about 10 edits per location per minute |
-| Facebook, X | Enforced per app and per user through limits the platform reports in response headers; there is no single fixed number |
-
-We monitor each platform's reported usage and pace requests to stay within the platform's ceiling. Read operations (inbox, reviews, comments) are not throttled on our side. If you run scheduled, unattended publishing across many accounts, design against the platform ceilings above and the posting velocity caps below.
-
-## Posting velocity limits
-
-Independent of your plan quota and of the platform rate limits above, SocialAPI caps how fast one account can publish. Bursts are what get accounts throttled, shadow-limited, or locked by the platforms, and a runaway automation loop is a far more likely source of 200 posts in an hour than a real content calendar.
-
-| Limit | Value |
-|---|---|
-| Velocity cap | 25 posts per hour, per account |
-| Daily cap: Instagram | 45 posts per 24 hours |
-| Daily cap: Facebook | 100 posts per 24 hours |
-| Daily cap: Threads | 250 posts per 24 hours |
-| Daily cap: X / Twitter | 50 posts per 24 hours |
-| Daily cap: Pinterest | 25 posts per 24 hours |
-| Daily cap: TikTok | 18 posts per 24 hours |
-| Daily cap: every other platform | 50 posts per 24 hours |
-
-Counters are per publish target, not per connection. One Facebook connection driving five Pages gets its own 25 per hour for each Page, which is how Facebook meters it too. The same holds for LinkedIn organizations, Pinterest boards, and Google Business Profile locations.
-
-<Note>
-  Where a platform publishes a hard limit, ours sits just under it: 45 against Instagram's 50 posts per rolling 24 hours, 18 against TikTok's 20 per day. Hitting ours gives you a clear error and a `Retry-After`; hitting the platform's gives you an opaque rejection.
-</Note>
-
-### What happens when you hit a cap
-
-Publishing now (`POST /v1/posts` with `publish_now`, `POST /v1/posts/{pid}/publish`, and `POST /v1/posts/{pid}/retry`) returns HTTP `429` and creates nothing:
+A 429 from SocialAPI's own limits uses the standard error envelope. `error.meta.retry_after_seconds` holds the same number of seconds as the `Retry-After` header:
 
 ```json
 {
@@ -317,7 +15,7 @@ Publishing now (`POST /v1/posts` with `publish_now`, `POST /v1/posts/{pid}/publi
     "code": "publishing.velocity_limit",
     "message": "publishing too fast: this instagram account is limited to 25 posts per hour, retry in 1841s",
     "meta": {
-      "account_id": "acc_01H...",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
       "window": "hour",
       "limit": 25,
       "retry_after_seconds": 1841
@@ -327,28 +25,141 @@ Publishing now (`POST /v1/posts` with `publish_now`, `POST /v1/posts/{pid}/publi
 }
 ```
 
-The `Retry-After` response header carries the same number of seconds. No post is created and no post credit is consumed, so a retry after the window is a clean first attempt.
+## Every 429 code
 
-Scheduled posts are never failed for a velocity cap. A scheduled post that lands in a full window is held and published automatically once capacity frees, without spending one of its publish attempts. It goes out late rather than not at all, so a burst elsewhere on the account cannot lose it.
+| Code | What it limits | Retry-After |
+|---|---|---|
+| `publishing.velocity_limit` | [Posts per hour and per 24 hours](#posting-velocity-caps) for one publish target | Yes |
+| `messaging.velocity_limit` | [Messages per minute](#messaging-velocity-cap) from one Instagram account, Facebook Page, or WhatsApp phone number | Yes |
+| `platform.{platform}.rate_limit` | The [platform's own limit](#platform-limits) | When the platform reports a wait |
+| `inbox.sync_rate_limited` | Repeated `POST /v1/inbox/sync` for the same target. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually) | Yes |
+| `accounts.sync_rate_limited` | Repeated `POST /v1/accounts/{id}/sync` for the same connected account. See [Analytics](/guides/analytics) | Yes |
+| `validation.post_limit_exhausted`, `validation.interaction_limit_exhausted`, `billing.post_limit`, `billing.export_limit`, `billing.export_cooldown`, `billing.export_concurrent` | Plan allowances. See [Plans and usage](/guides/plans) | No |
 
-A post targeting several accounts is all or nothing. If one target is over its cap, the request is refused whole and no target's budget is spent.
+A request refused by `publishing.velocity_limit` or `messaging.velocity_limit` never reaches the platform. `messaging.velocity_limit` spends no credit.
 
-<Note>
-  These caps are fixed. Upgrading your plan does not raise them, since they protect your social accounts rather than our capacity. If a contract needs different numbers, contact support.
-</Note>
+## Posting velocity caps
 
-## Handling 429s
+SocialAPI caps how fast one publish target can publish, on top of your plan's post allowance. A publish target is one connected account, or one Facebook Page or Pinterest board when the account publishes to more than one Page or board. Each Facebook Page of a connection has its own counters.
 
-```python
-import time
-import requests
+| Platform | Per hour | Per 24 hours |
+|---|---|---|
+| Instagram | 25 | 45 |
+| Facebook | 25 | 100 |
+| Threads | 25 | 250 |
+| X / Twitter | 25 | 50 |
+| TikTok | 25 | 18 |
+| Pinterest | No hourly cap | 1,000 |
+| Every other platform | 25 | 50 |
 
-def call_with_retry(url, headers, max_retries=3):
-    for attempt in range(max_retries):
-        resp = requests.get(url, headers=headers)
-        if resp.status_code == 429:
-            time.sleep(2 ** attempt)  # exponential backoff
-            continue
-        return resp
-    raise Exception("rate limit exceeded after retries")
+The hourly window opens with the first publish counted in it and lasts 1 hour. The 24-hour window opens the same way and lasts 24 hours. On TikTok, the 24-hour cap of 18 binds before the hourly cap.
+
+Where the platform publishes a hard limit, SocialAPI's cap sits below it: 45 against Instagram's 50 posts per rolling 24 hours, and 18 against TikTok's 20 posts per day. Reaching SocialAPI's cap gives you `publishing.velocity_limit` and a `Retry-After`, instead of a platform rejection after the attempt.
+
+### What happens at a cap
+
+- **Immediate publish** (`POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`): the request returns `429 publishing.velocity_limit` and creates nothing. `meta.window` is `hour` or `day`, `meta.limit` is the cap reached, and `meta.account_id` is the connected account. `POST /v1/posts` spends no post credit when refused.
+- **More than one target in one request:** the request is all or nothing. If one target is at a cap, the whole request is refused and no target's counter moves.
+- **Scheduled post:** a scheduled post is never failed by a velocity cap. SocialAPI holds the target and publishes it once the window clears, so it goes out late. The wait does not use one of its publish attempts.
+
+## Messaging velocity cap
+
+Each sender can send 10 messages per clock minute on Instagram, Facebook, and WhatsApp. The sender is the Instagram account, Facebook Page, or WhatsApp phone number the message goes out from. DMs, public replies to comments, private replies, and WhatsApp template messages all count, including the ones an [Automation](/guides/automations) sends. Each message counts: a DM request that sends 3 messages counts 3.
+
+A request that takes the sender past 10 messages in the current minute returns `429 messaging.velocity_limit`, with `Retry-After` set to the seconds left in the minute. Nothing in that request is sent and no interaction credit is spent.
+
+## Platform limits
+
+Each platform limits what an app can do for an account. When the platform refuses a request for its own rate limit, SocialAPI returns `429 platform.{platform}.rate_limit`, for example `platform.instagram.rate_limit`. Match on the `platform.*.rate_limit` pattern to handle every platform. When the platform reports how long to wait, SocialAPI passes it on as `Retry-After` and `error.meta.retry_after_seconds`. Without them, wait at least 60 seconds, then retry with exponential backoff.
+
+| Platform | Limit |
+|---|---|
+| Instagram | 50 posts per rolling 24 hours per account |
+| Threads | 250 posts and 1,000 replies per rolling 24 hours per account |
+| TikTok | 20 posts per day per account |
+| YouTube | A daily quota per Google Cloud project: 100 video uploads and 10,000 units for other calls, reset at midnight Pacific Time |
+| Google Business Profile | 10 edits per location per minute |
+| Facebook, X / Twitter | No single fixed number: the platform limits each app and each account, and reports usage in its response headers |
+
+### Read a platform's remaining quota
+
+`GET /v1/accounts/{id}/limits` returns the quota the platform reports for one connected account, as an object of numbers. It needs the `accounts:read` scope and costs no credits.
+
+```bash
+curl https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/limits \
+  -H "Authorization: Bearer $SOCAPI_KEY"
 ```
+
+Response (HTTP 200) for an Instagram account:
+
+```json
+{
+  "posts_remaining": 47
+}
+```
+
+| Platform | Keys |
+|---|---|
+| Instagram | `posts_remaining`: posts left in Instagram's rolling 24 hours |
+| Threads | `posts_remaining`, `posts_total`, `replies_remaining`, `replies_total` |
+| YouTube | `daily_quota_units`, `daily_upload_quota_calls`, and the unit cost of each operation (keys ending in `_cost` or `_cost_per_page`) |
+| WhatsApp | `quality_rating`: `3` high, `2` medium, `1` low, `0` unknown. `messaging_tier_cap`: unique recipients allowed per 24 hours, `-1` for unlimited |
+| Bluesky | `write_points_per_hour` (5,000) and `write_points_per_day` (35,000) |
+| Zalo | `remain` and `total`: Zalo's message quota for the Official Account |
+| X / Twitter | An empty object |
+
+Every other platform returns `501 resource.not_supported`.
+
+### Reads and platform limits
+
+Reading comments, reviews, mentions, and posts costs no credits, and SocialAPI applies no rate limit of its own to ordinary reads. The two sync endpoints in the table above have their own cooldowns. Reads still count against the platform's limit for the account. To detect new comments and messages, subscribe to [webhook events](/guides/webhook-events) instead of polling. If your interface fetches the same page of results repeatedly, cache it on your side.
+
+## Handling 429
+
+<Steps>
+  <Step title="Read Retry-After">
+    When the response has a `Retry-After` header, wait that many seconds. The same value is in `error.meta.retry_after_seconds`.
+  </Step>
+  <Step title="Back off when there is no Retry-After">
+    For `platform.*.rate_limit` without `Retry-After`, wait 60 seconds, then double the wait on each further 429.
+  </Step>
+  <Step title="Do not retry allowances and daily caps">
+    `validation.post_limit_exhausted`, `validation.interaction_limit_exhausted`, and the `billing.*` codes do not clear within minutes. Check `GET /v1/usage` and wait for `period_end`, or change your plan.
+  </Step>
+</Steps>
+
+```javascript
+async function callWithRetry(url, options, maxAttempts = 4) {
+  let waitSeconds = 60;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const resp = await fetch(url, options);
+    if (resp.status !== 429) return resp;
+
+    const body = await resp.json();
+    const code = body.error.code;
+    if (code.startsWith("validation.") || code.startsWith("billing.")) {
+      return resp; // an allowance or daily cap: retrying does not help
+    }
+
+    const retryAfter = Number(resp.headers.get("Retry-After"));
+    const delay = retryAfter > 0 ? retryAfter : waitSeconds;
+    await new Promise((resolve) => setTimeout(resolve, delay * 1000));
+    waitSeconds *= 2;
+  }
+  throw new Error("Still rate limited after " + maxAttempts + " attempts");
+}
+```
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_get_account_limits` | Returns the same keys as `GET /v1/accounts/{id}/limits` |
+
+## Related
+
+- [Plans and usage](/guides/plans): post, interaction, storage, and export allowances per plan
+- [Errors](/guides/errors): every error code with its HTTP status
+- [Track post delivery](/guides/delivery): what a refused or held publish looks like on the post
+- [Scheduling](/guides/scheduling): how scheduled posts go out
+- [Webhook events](/guides/webhook-events): receive new comments and messages instead of polling

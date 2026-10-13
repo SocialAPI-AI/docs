@@ -1,73 +1,119 @@
 ---
 title: Pinterest publishing
 sidebarTitle: "Publishing"
-description: Full reference for publishing Pins via SocialAPI, plus board management (create, update, delete).
+description: Full reference for publishing Pins via SocialAPI, including the board target, Pin title, description, link, alt text, scheduling, and quirks.
 ---
 
 ## 1. Overview
 
-Pinterest publishing uses the Pinterest API v5 against your connected Pinterest account. Every Pin needs a destination board and an image, there is no text-only or link-only post type. SocialAPI also exposes board management endpoints so you can create, rename, or remove boards without leaving the API.
-
-Pinterest's Developer Terms of Service prohibit storing information accessed through the API. Boards and Pins are never persisted: every read hits Pinterest live, on every request, with no cache and no TTL.
+A Pin needs a destination board and one image. Pinterest has no text-only or link-only post, and no default board: every Pinterest target sets `board_id`.
 
 | Field | Value |
 |---|---|
 | Platform slug | `pinterest` |
 | Auth type | OAuth 2.0 |
 | API | Pinterest API v5 |
-| Create post | Yes (Pin) |
-| Update post | No (Pinterest's PATCH /pins is still beta) |
+| Create post | Yes (a Pin) |
+| Update post | No (`409 post.state_invalid` on a published post) |
 | Delete post | Yes |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
-| Board management | Yes (create, update, delete) |
+| First comment | No (`first_comment` is ignored) |
+| Posting caps | 1,000 posts per 24 hours for each board, with no hourly cap: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 
 ---
 
-## 2. Create a Pin
+## 2. Supported media
 
-Use `POST /v1/posts` with a target pointing at a Pinterest account. `media` must contain exactly one image, Pinterest has no text-only Pin type.
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Image Pin | One image in `media` | The only Pin type SocialAPI publishes |
+
+SocialAPI sends the first `media` item to Pinterest as the Pin's image and ignores the rest. A Pin with no image fails validation on the field `media`. SocialAPI does not check the image's type or size in advance: Pinterest rejects a file it does not accept, and the target fails. A video is not supported.
+
+**Field limits:** title 100 characters, description 800 characters, alt text 500 characters, and link 2,048 characters. A longer value fails validation with `400 publishing.validation_failed`, and the issue names the field.
+
+<Warning>
+  Attach the image through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, or `url` for a public `http(s)` URL Pinterest can fetch. To upload first, see [Media](/guides/media).
+</Warning>
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with a target that sets `account_id` and `board_id`, and `publish_now: true`. Get `board_id` from [Pinterest boards](/platforms/pinterest/boards#list-boards).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "text": "Weeknight dinner idea: sheet-pan salmon.",
+    "text": "One pan, forty minutes, no marinade.",
     "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
     "targets": [{
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-      "board_id": "8828",
-      "platform_data": {
-        "title": "Sheet-pan salmon",
-        "link": "https://example.com/recipes/salmon"
+      "board_id": "8828"
+    }],
+    "platform_data": {
+      "pinterest": {
+        "title": "Weeknight roast chicken",
+        "link": "https://example.com/recipes/chicken",
+        "alt_text": "A roast chicken on a sheet pan with lemons"
       }
-    }]
+    }
   }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "One pan, forty minutes, no marinade.",
+  "status": "publishing",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "page_id": "sapi_board_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "pinterest",
+      "status": "publishing"
+    }
+  ]
+}
 ```
 
 ### Target field
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `board_id` | string | Yes | The board to Pin to, as a top-level field on the target. Use a board id returned by [List boards](#4-list-boards) or [Create board](#5-create-board). `page_id` is accepted as an alias, but sending both is an error. |
+| `board_id` | string | Yes | The board to Pin to. Use the `id` or the `board_id` that [List boards](/platforms/pinterest/boards#list-boards) returns. `page_id` is accepted as an alias, but sending both fails with `400 validation.duplicate_board_id` |
 
-`board_id` must be a top-level field on the target, not inside `platform_data`: Pinterest has no default board, so a target with neither `board_id` nor `page_id` set returns `400 validation.board_id_required`, and setting `board_id` inside `platform_data` returns `400 validation.use_board_id`.
+A target with neither `board_id` nor `page_id` fails with `400 validation.board_id_required`. A `board_id` inside `platform_data` fails with `400 validation.use_board_id`: set it on the target.
+
+### Pin text
+
+The post's `text` is the Pin's description. Set the Pin's title in `platform_data.pinterest.title`: the post's top-level `title` field is not used for a Pin.
 
 ### Platform data fields
 
-| Field | Type | Required | Description |
+Send these keys in `platform_data.pinterest` on the post, which applies them to every Pinterest target. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `pinterest` key). When both set the same key, the target's value wins.
+
+| Key | Type | Required | Notes |
 |---|---|---|---|
-| `title` | string | No | Pin title, up to 100 characters. |
-| `description` | string | No | Overrides `text` as the Pin description, up to 800 characters. |
-| `link` | string | No | Destination URL the Pin links to, up to 2,048 characters. |
-| `alt_text` | string | No | Accessibility alt text for the image, up to 500 characters. |
+| `title` | string, up to 100 characters | No | The Pin title |
+| `description` | string, up to 800 characters | No | Replaces `text` as the Pin description |
+| `link` | string, up to 2,048 characters | No | The destination URL. An absolute `http` or `https` URL |
+| `alt_text` | string, up to 500 characters | No | Alt text for the image |
 
-### Limits
-
-- Exactly one image in `media`. Pinterest Pins are image-only through this endpoint.
-- Title: 100 characters. Description: 800 characters. Alt text: 500 characters. Link: 2,048 characters, and must be a valid `http` or `https` URL.
+SocialAPI forwards any additional keys in `platform_data.pinterest` only when the table above lists them. Pinterest has no other publish options that SocialAPI passes through: an unlisted key is ignored without a warning.
 
 ### Scheduling
+
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) instead of `publish_now`. SocialAPI holds the post and publishes it at that time.
 
 ```json
 {
@@ -76,31 +122,76 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
     "board_id": "8828"
   }],
-  "scheduled_at": "2026-04-15T10:00:00Z"
+  "scheduled_at": "2026-11-15T10:00:00Z"
 }
 ```
 
 ---
 
-## 3. Update and delete a Pin
+## 4. Update post
 
-**Update is not supported.** Pinterest's `PATCH /pins` endpoint is still in beta and not available to every app, so `PATCH /v1/posts/:pid` returns a `not_supported` error for Pinterest targets. Pin media is also immutable once created: even with beta access, only title, description, link, and board placement could change. To change the image, delete the Pin and create a new one.
+SocialAPI offers no edit of a published Pin. Pinterest's edit call is in beta and not open to every app, and a Pin's image never changes. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post. To change a Pin, delete it and publish a new one: the new Pin has a new ID.
+
+---
+
+## 5. Delete post
+
+`DELETE /v1/posts/{pid}` deletes the Pin from Pinterest when its Pinterest target is `published`. See [Delete a post](/guides/delivery#delete-a-post). Deleting a board deletes every Pin on it: see [Pinterest boards](/platforms/pinterest/boards#delete-a-board).
 
 ```bash
-curl -X DELETE https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
+curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
 ---
 
-## 4. List boards
+## 6. Retrieve posts
+
+`GET /v1/platforms/pinterest/accounts/{id}/pins` returns the account's Pins, read from Pinterest on every call. The response and its fields are in [List Pins](/platforms/pinterest#list-pins). Each published target of a post you created carries `platform_post_id` and `permalink`.
+
+Pinterest reports no engagement counts on the Pin list, so a Pin has no metrics. `GET /v1/posts/{pid}/metrics` returns `501 resource.not_supported` for the Pinterest target. Account-level counts are in [Analytics](/guides/analytics).
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### A Pin needs a board
+
+There is no default board, and a target without `board_id` is refused. When the connected account does not own the board, Pinterest refuses the Pin and the target fails with `403 platform.pinterest.403`.
+
+### Boards and Pins are read live
+
+SocialAPI stores no board or Pin. A board you just created appears at once. If Pinterest is unavailable, a call fails.
+
+### Errors on a failed target
+
+A publish that fails after the request returned puts a structured error on the target, in `targets[].error`, with its `code`. Every code is in [Errors](/guides/errors).
+
+- `401 platform.pinterest.auth`: Pinterest reported that authentication failed. Reconnect the account.
+- `401 platform.pinterest.unauthorized`: Pinterest answered 401 without naming the token. The account keeps working. Reconnect if it persists.
+- `403 platform.pinterest.403`: Pinterest refused the action for this account or board. Read `message`.
+- `429 platform.pinterest.rate_limit`: Pinterest's own limit. Wait, then retry.
+
+### Recovery
+
+- **Rate limit.** Wait, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Auth error.** Reconnect the Pinterest account through the OAuth flow.
+- **Wrong board.** Delete the Pin, then publish it to the right board.
+
+---
+
+## 8. Full worked example
+
+This example finds a board, publishes a Pin to it, and reads the result.
+
+**Step 1: List boards**
 
 ```bash
-curl "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards" \
+curl https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Response:
+Response (HTTP 200):
 
 ```json
 {
@@ -115,111 +206,76 @@ Response:
 }
 ```
 
-Boards are fetched live from Pinterest on every call. SocialAPI stores neither the board name nor its privacy setting, so there is no cache and no lag: a name change on Pinterest shows up on the next request.
+**Step 2: Upload media**
 
----
+Upload the image and verify it as described in [Media](/guides/media). The result is a `media_id`, here `f47ac10b-58cc-4372-a567-0e02b2c3d479`.
 
-## 5. Create board
+**Step 3: Publish the Pin**
 
 ```bash
-curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards \
+curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Recipes",
-    "description": "Weeknight dinners",
-    "privacy": "PUBLIC"
+    "text": "Weeknight dinner idea: sheet-pan salmon.",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "board_id": "8828"
+    }],
+    "platform_data": {
+      "pinterest": {
+        "title": "Sheet-pan salmon",
+        "link": "https://example.com/recipes/salmon"
+      }
+    }
   }'
 ```
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `name` | string | Yes | Board name. |
-| `description` | string | No | Board description. |
-| `privacy` | string | No | `PUBLIC`, `PROTECTED`, or `SECRET`. Defaults to `PUBLIC` if omitted. |
+Response (HTTP 201): the post with `status: "publishing"`, as in [Create post](#3-create-post).
 
-Returns `201` with the created board. There is no default board: every publish target must set `board_id` explicitly.
-
----
-
-## 6. Update board
+**Step 4: Check the status**
 
 ```bash
-curl -X PATCH https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards/8828 \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Weeknight Recipes",
-    "privacy": "SECRET"
-  }'
-```
-
-`name`, `description`, and `privacy` are pushed to Pinterest. `boardId` accepts either the SocialAPI board handle or the raw Pinterest board id.
-
-**Privacy cannot be set to PROTECTED via update.** Pinterest's update schema only accepts `PUBLIC` or `SECRET` on `PATCH /boards/{id}`, unlike create, which also accepts `PROTECTED`. If a board is already `PROTECTED`, its privacy cannot be changed at all through this endpoint: recreate the board instead.
-
----
-
-## 7. Delete board
-
-```bash
-curl -X DELETE https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards/8828 \
+curl https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-**Deleting a board permanently deletes every Pin saved to it, and this cannot be undone.** There is no soft-delete or recovery path on Pinterest's side.
-
-Returns `204` on success.
-
----
-
-## 8. Get account summary
-
-```bash
-curl "https://api.social-api.ai/v1/platforms/pinterest/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-Returns the connected account's public profile counts (username, profile image, followers, pins, boards, monthly views), fetched live from Pinterest on every call.
-
----
-
-## 9. List pins
-
-```bash
-curl "https://api.social-api.ai/v1/platforms/pinterest/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/pins?limit=50" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-Response:
+Response (HTTP 200) once published:
 
 ```json
 {
-  "data": [
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "Weeknight dinner idea: sheet-pan salmon.",
+  "status": "published",
+  "hidden": false,
+  "retry_count": 0,
+  "published_at": "2026-10-13T09:00:04Z",
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:04Z",
+  "targets": [
     {
-      "id": "813744",
-      "title": "Roast chicken",
-      "board_id": "8828",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "page_id": "sapi_board_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "pinterest",
+      "status": "published",
+      "platform_post_id": "813744",
       "permalink": "https://www.pinterest.com/pin/813744/",
-      "media_url": "https://i.pinimg.com/x.jpg",
-      "created_at": "2026-08-01T12:00:00Z"
+      "published_at": "2026-10-13T09:00:04Z"
     }
   ]
 }
 ```
 
-Pins are fetched live from Pinterest on every request and are never stored by SocialAPI. `limit` is optional, defaults to 50, and caps at 50. If Pinterest cannot be reached, the request fails rather than returning a stale or empty list.
-
 ---
 
-## 10. Required OAuth scopes
+## 9. Required OAuth scopes
+
+SocialAPI's Pinterest app requests these scopes during the OAuth flow. You configure nothing. The full list is in [Pinterest permissions](/platforms/pinterest#permissions).
 
 | Scope | Purpose |
 |---|---|
-| `boards:read` | List boards |
-| `boards:write` | Create, rename, or delete boards |
-| `pins:read` | List Pins |
+| `boards:read` | List boards to choose `board_id` |
+| `boards:write` | Required by Pinterest to create and delete Pins |
 | `pins:write` | Create and delete Pins |
-| `user_accounts:read` | Read account profile summary |
-
-Add `boards:read_secret` and `pins:read_secret` if the user's secret boards and Pins should be accessible. To verify which scopes your connected account has granted, call `GET /v1/accounts/:id/limits`.

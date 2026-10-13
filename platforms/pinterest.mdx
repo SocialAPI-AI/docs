@@ -1,94 +1,169 @@
 ---
-title: Pinterest
-description: Connect a Pinterest account to create Pins and manage boards through SocialAPI.
+title: Pinterest API
+sidebarTitle: "Overview"
+description: Connect Pinterest accounts to publish Pins to boards, manage boards, list Pins, and read profile counts through one API.
+icon: "pinterest"
 ---
 
-Pinterest is a publishing surface rather than an inbox. The connector creates Pins and manages boards through the Pinterest API v5, and OAuth is provided by SocialAPI.ai: you don't register your own Pinterest app. Pinterest exposes no public endpoints for comments, direct messages, reviews, or mentions, so those calls return `501` for a Pinterest account rather than an empty list.
+The Pinterest API in SocialAPI connects a Pinterest account through Pinterest's authorization screen. It publishes Pins to boards, creates, renames, and deletes boards, lists Pins, and reads profile counts. Pinterest is a publishing surface: it exposes no comments, DMs, mentions, or reviews to apps. SocialAPI's own Pinterest app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `pinterest` |
-| Auth type | OAuth 2.0 |
-| API | Pinterest API v5 |
-| Best for | Publishing Pins and managing boards from the same API you use everywhere else. |
+| Auth | OAuth 2.0 |
+| Platform API | Pinterest API v5 |
+| Status | Available |
 
 ## Capabilities
 
-| Feature | Supported | Notes |
+An unsupported call returns `501 resource.not_supported`.
+
+| Feature | Status | Condition |
 |---|---|---|
-| Create post (Pin) | Yes | Requires a destination board and one image |
-| Delete post | Yes | |
-| Schedule | Yes | Deferred publish via `scheduled_at` |
-| List posts | Yes | Fetched live from Pinterest on every call |
-| Board management | Yes | List, create, rename, delete |
-| Update post | No | Pinterest's `PATCH /pins` is still in their own beta, and Pin media is immutable regardless |
-| Comments | No | Pinterest has no public API for comments |
-| DMs | No | Pinterest has no public API for messaging |
-| Reviews | No | Pinterest has no reviews system |
-| Mentions | No | Pinterest has no public API for mentions |
-| Webhooks | No | Pinterest sends no webhooks; SocialAPI's own publish events still fire |
+| Publish a Pin | Yes | One image and a `board_id` on the target. See [Pinterest publishing](/platforms/pinterest/publishing) |
+| Schedule a Pin | Yes | `scheduled_at` on the post |
+| First comment on a Pin | No | `first_comment` is ignored |
+| Update a published Pin | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Pinterest's edit call is in beta and Pin media never changes |
+| Delete a Pin | Yes | |
+| List Pins | Yes | Read from Pinterest on every call. See [List Pins](#list-pins) |
+| Boards: list, create, rename, delete | Yes | See [Pinterest boards](/platforms/pinterest/boards) |
+| Account summary | Yes | See [Account summary](#account-summary) |
+| Post metrics | No | Pinterest reports no engagement counts on the Pin list. `GET /v1/posts/{pid}/metrics` returns `501 resource.not_supported` for the Pinterest target |
+| Comments, DMs, mentions | No | Pinterest has no public API for them. `501 resource.not_supported` |
+| Reviews | No | Pinterest has no reviews. `501 resource.not_supported` |
+| Automations | No | `422 automation.platform_unsupported` |
+| Analytics | Partial | Live account summary only; SocialAPI stores no account history, and Pins have no post metrics. See [Analytics](/guides/analytics) |
+| Webhook events | Partial | `account.connected`, `account.disconnected`, and the `post.*` events. Pinterest sends no events of its own |
 
-Comments, DMs, reviews, and mentions aren't planned as "coming soon": Pinterest simply doesn't expose a public API for any of them, so SocialAPI has nothing to connect to.
+The cross-platform matrix is on [Platforms](/platforms/overview).
 
-## Connecting
+## Connect an account
 
-Pinterest uses standard OAuth 2.0. Start the connection through the normal connect flow with `platform=pinterest`. The authorization screen is hosted at `https://www.pinterest.com/oauth/`, and SocialAPI completes the code exchange on the callback.
-
-### Token lifetime
-
-Access tokens expire after 30 days and refresh tokens after 60 days, though a refresh token's life is extended every time it is used. SocialAPI refreshes the access token in the background before it expires, so an account connected once keeps working without a reconnect prompt.
-
-A dead credential is reported by Pinterest with body code `2` ("Authentication failed"), and only that code marks an account as needing reconnection. Any other `401` is treated as transient, because a proxy-issued or temporary `401` should not force your user through a manual reconnect.
-
-## Boards
-
-Every Pin needs a board. There is no default board and no fallback: each Pinterest publish target carries a `board_id`, and a draft without one is rejected before it reaches Pinterest.
+Connect with `POST /v1/accounts/connect` and `"platform": "pinterest"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
 
 ```bash
-curl https://api.social-api.ai/v1/accounts/<account-id>/boards \
-  -H "Authorization: Bearer <your-api-key>"
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "pinterest",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
+  }'
 ```
 
-`POST`, `PATCH`, and `DELETE` on the same path create, rename, and delete boards.
-
-<Warning>
-Deleting a board deletes every Pin on it. Pinterest does not undo this.
-</Warning>
-
-### Boards are never stored
-
-Pinterest's Developer Terms of Service section 4.1.i prohibits storing information accessed through the API. SocialAPI does not store boards or Pins: every read goes live to Pinterest on every request, with no cache and no TTL. The board list you get back is the account's real board list, including a board created in the Pinterest app moments earlier.
-
-The practical consequence is that board reads cost a Pinterest API call. If Pinterest is unavailable, the call fails rather than degrading to stale stored rows.
-
-### Board privacy
-
-`POST /boards` accepts `PUBLIC`, `PROTECTED`, or `SECRET`. `PATCH /boards/{id}` accepts only `PUBLIC` and `SECRET`, so a board created as `PROTECTED` cannot change its privacy afterwards.
-
-## Publishing
-
-A Pin is created through the same `POST /v1/posts` call as every other platform. The post title becomes the Pin title and the text becomes its description.
+Response (HTTP 200):
 
 ```json
 {
-  "title": "Weeknight roast chicken",
-  "text": "One pan, forty minutes, no marinade.",
-  "targets": [{
-    "account_id": "<account-id>",
-    "board_id": "<board-id>",
-    "media": [{ "source_type": "url", "source": "https://example.com/chicken.jpg", "type": "image" }]
-  }]
+  "auth_url": "https://www.pinterest.com/oauth/?client_id=1234567&response_type=code&state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
 }
 ```
 
-Pass the board on the target as `board_id`. Supplying it inside `platform_data` is rejected with `validation.use_board_id`.
+Pinterest-specific rules:
 
-See [Pinterest publishing](/platforms/pinterest/publishing) for the full request and response shapes.
+- **Token lifetime.** Pinterest access tokens last 30 days and refresh tokens last 60 days, and each use of a refresh token extends it. SocialAPI renews the access token before it expires, so a connected account keeps working without a reconnect.
+- **Reconnect.** When Pinterest reports that authentication failed, calls return `401 platform.pinterest.auth` and the account needs reconnecting. Any other `401` from Pinterest returns `401 platform.pinterest.unauthorized` and leaves the account working: reconnect only if it persists. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **Disconnect.** Pinterest offers apps no way to end an authorization. Disconnecting an account removes it from SocialAPI, and the person removes SocialAPI's app in their Pinterest settings.
+
+## Boards and Pins are read live
+
+SocialAPI reads boards and Pins from Pinterest on every request and stores neither, because Pinterest's developer terms forbid storing information read through its API. A board created in the Pinterest app a moment ago appears on the next call, and a call fails when Pinterest is unavailable instead of returning an older list.
+
+## List Pins
+
+`GET /v1/platforms/pinterest/accounts/{id}/pins` returns the account's Pins in the order Pinterest returns them. `limit` is optional, defaults to 50, and is at most 50. It needs the `accounts:read` scope.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/pinterest/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/pins?limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "813744",
+      "title": "One pan, forty minutes, no marinade.",
+      "board_id": "8828",
+      "permalink": "https://www.pinterest.com/pin/813744/",
+      "media_url": "https://i.pinimg.com/600x/ab/cd/ef.jpg",
+      "created_at": "2026-08-01T12:00:00Z"
+    }
+  ]
+}
+```
+
+`title` carries the Pin's description, not its separate Pinterest title.
+
+## Account summary
+
+`GET /v1/platforms/pinterest/accounts/{id}/summary` reads the account's public profile counts from Pinterest at the time of the call. It needs the `accounts:read` scope. A count Pinterest does not report is `0`.
+
+```bash
+curl https://api.social-api.ai/v1/platforms/pinterest/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "username": "boardandco",
+  "profile_image": "https://i.pinimg.com/280x280_RS/ab/cd/ef.jpg",
+  "follower_count": 12400,
+  "pin_count": 847,
+  "board_count": 23,
+  "monthly_views": 1200000
+}
+```
+
+## Webhook events
+
+Pinterest sends SocialAPI no events. These SocialAPI events still fire for a Pinterest account:
+
+| Event | When it fires |
+|---|---|
+| `account.connected` | The account was connected |
+| `account.disconnected` | SocialAPI flagged the account for reconnection. The event carries `reconnect_required: true` and a `reason` |
+| `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
+
+Every event is described in [Webhook events](/guides/webhook-events).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Image per Pin | 1 |
+| Pin title | 100 characters |
+| Pin description | 800 characters |
+| Alt text | 500 characters |
+| Destination link | 2,048 characters |
+| Posts | 1,000 per 24 hours for each board, with no hourly cap: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Pins per list call | 50 |
+| Pinterest's own rate limit | `429 platform.pinterest.rate_limit`. It costs no SocialAPI credit |
+
+## Permissions
+
+SocialAPI's Pinterest app requests these scopes at connect. You apply for no app review. SocialAPI does not request `boards:read_secret` or `pins:read_secret`.
+
+| Scope | Used for |
+|---|---|
+| `boards:read` | List boards |
+| `boards:write` | Create, rename, and delete boards. Pinterest also requires it to create and delete Pins |
+| `pins:read` | List Pins |
+| `pins:write` | Create and delete Pins |
+| `user_accounts:read` | Account summary and the account's identity |
 
 ## Related
 
-- [Pinterest publishing](/platforms/pinterest/publishing)
-- [Platform support](/guides/platforms)
-- [Errors](/guides/errors)
+- [Pinterest publishing](/platforms/pinterest/publishing): fields, media rules, and quirks for publishing Pins
+- [Pinterest boards](/platforms/pinterest/boards): list, create, rename, and delete boards
+- [Connect accounts](/guides/connect-accounts): the shared connect flow
+- [Platforms](/platforms/overview): the capability matrix
+- [Errors](/guides/errors): every error code

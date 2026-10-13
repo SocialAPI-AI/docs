@@ -6,18 +6,20 @@ description: Full reference for publishing Threads posts via SocialAPI, includin
 
 ## 1. Overview
 
-Threads publishing behaves differently by content type. Text posts publish in one step. Image and carousel posts publish as soon as Threads accepts the media. Video posts publish once Threads has finished processing the file, which adds a delay.
+A Threads post goes live once Threads has accepted it. A text post needs no media. A post with media waits for Threads to process the file, which takes seconds for an image and longer for a video.
 
 | Field | Value |
 |---|---|
 | Platform slug | `threads` |
 | Auth type | OAuth 2.0 (Meta Threads) |
-| API | Threads Graph API (`graph.threads.net`) |
+| Platform API | Threads API (Meta) |
 | Create post | Yes |
-| Update post | No (not supported by platform) |
+| Update post | Not after publishing (`409 post.state_invalid`). `draft`, `scheduled`, and `failed` posts can be edited |
 | Delete post | Yes |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
-| First comment | No |
+| First comment | No (`first_comment` is not published on Threads) |
+| Reply chains | No (`segments` are ignored: only the first post publishes) |
+| Posting caps | 250 posts per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 
 ---
 
@@ -25,16 +27,20 @@ Threads publishing behaves differently by content type. Text posts publish in on
 
 | Content type | How to trigger | Notes |
 |---|---|---|
-| Text only | Omit `media` | Supported natively; unlike Instagram, text-only posts work without any media |
-| Single image | One `media` entry pointing to an image | Sent as `media_type: IMAGE` |
-| Single video | One `media` entry pointing to a video (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Sent as `media_type: VIDEO`; container is polled until `FINISHED` |
-| Carousel | Two or more `media` entries | Up to 20 items; mix of images and videos allowed |
+| Text only | Omit `media` | Unlike Instagram, a text post needs no media |
+| Single image | One `media` entry that is an image | JPEG, PNG, GIF, or WebP, at most 8 MB |
+| Single video | One `media` entry that is a video | MP4 or QuickTime, at most 1 GB. SocialAPI does not check the duration |
+| Carousel | 2 to 20 `media` entries | Images and videos mixed |
 
-SocialAPI auto-detects the media type from the URL file extension. The extension is read from the URL path, so query parameters (for example on a presigned upload URL) do not affect detection.
+SocialAPI reads the media type from the file extension in the URL path, so query parameters (for example on a presigned upload URL) do not affect it.
 
-**Text limit:** 500 characters.
+**Text limit:** 500 characters and 1 hashtag. More returns `400 publishing.validation_failed`.
 
-**Carousel limit:** Maximum 20 items per post.
+**Carousel limit:** 2 to 20 items. A `media` list of 2 or more entries is a carousel.
+
+**File limits** apply to media you upload to SocialAPI (`source_type: "media_id"`). A file outside them fails validation with `400 publishing.validation_failed`. A `url` item is not checked in advance.
+
+Threads accepts a pre-built container only as the single `media` item (`source_type: "platform_attachment_id"`). Combining it with other media returns `422 publishing.media.mixing_unsupported`.
 
 ---
 
@@ -47,12 +53,13 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
+    "publish_now": true,
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Shipping updates for April. Full details on our site.",
     "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "platform_data": {
       "threads": {
-        "reply_control": "accounts_you_follow"
+        "topic_tag": "productupdates"
       }
     }
   }'
@@ -60,14 +67,27 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Platform data fields
 
-Pass these inside `platform_data.threads`:
+Send these keys in `platform_data.threads` on the post, which applies them to every Threads target. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `threads` key). When both set the same key, the target's value wins.
 
-| Field | Type | Description |
+| Key | Type | Notes |
 |---|---|---|
-| `reply_control` | string | Who can reply. One of `"everyone"` (default), `"accounts_you_follow"`, or `"mentioned_only"`. |
-| `link_attachment` | string | A URL to attach as a link preview. Must be a valid URL string. |
+| `link_attachment` | string (URL) | Attaches a link preview. A post holds at most 5 unique links: more returns a `422` error |
+| `poll_attachment` | object | Text-only posts. 2 to 4 options `option_a` to `option_d`, each 1 to 25 characters |
+| `alt_text` | string | Accessibility text for an image or video, up to 1,000 characters |
+| `topic_tag` | string | 1 to 50 characters, with no periods or ampersands |
+| `quote_post_id` | string | Publishes a quote of this Threads post |
+| `allowlisted_country_codes` | array of ISO 3166-1 alpha-2 codes | Restricts the post to these countries |
+| `is_spoiler_media` | boolean | Marks the image, video, or carousel as a spoiler |
+| `text_entities` | object | Spoiler regions in the text |
+| `gif_attachment` | `{gif_id, provider}` | `provider` must be `"GIPHY"`. Any other provider is not sent |
+| `is_ghost_post` | boolean | Text-only posts. The post archives itself after 24 hours. Not valid together with `enable_reply_approvals` |
+| `enable_reply_approvals` | boolean | Replies need your approval before they appear publicly |
+| `location_id` | string | Needs the beta scope `threads_location_tagging` |
+| `crossreshare_to_ig` | boolean | Shares the post to the linked Instagram account as a Story. Needs the beta scope `threads_share_to_instagram`. `crossreshare_to_ig_dark_mode` sets the dark variant |
 
-SocialAPI forwards any additional keys in `platform_data.threads` directly to the underlying platform API. These fields are not validated by SocialAPI and may break if the platform changes its API. See [Threads API reference](https://developers.facebook.com/docs/threads/posts) for the full list of supported parameters.
+SocialAPI forwards any additional keys in `platform_data.threads` only when the table above lists them. Threads answers an unknown key with an empty server error, so SocialAPI sends no other key: an unlisted key is not sent, and the response lists it as a validation warning naming the key.
+
+`reply_control` is not sent. Setting who can reply needs the `threads_manage_replies` permission, which Meta has not granted to every account. A post that includes `reply_control` publishes with Threads' default, where everyone can reply, and the response carries a validation warning that names the permission.
 
 ### Scheduling
 
@@ -85,27 +105,29 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
 
 ## 4. Update post
 
-Threads does not support editing a published post via the API. `PATCH /v1/posts/:pid` for a Threads target returns `501 Not Implemented`.
+A published Threads post cannot be edited through SocialAPI. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for any post whose status is not `draft`, `scheduled`, or `failed`, with the message "Only draft, scheduled, or failed posts can be edited".
 
-If you need to correct a post, delete it and recreate it.
+A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{pid}` before it publishes.
+
+To correct a published post, delete it with `DELETE /v1/posts/{pid}` and publish a new post.
 
 ---
 
 ## 5. Delete post
 
 ```bash
-curl -X DELETE https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J \
+curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
 Or, to delete only the Threads target of a cross-platform post:
 
 ```bash
-curl -X DELETE "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J?platform=threads" \
+curl -X DELETE "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d?platform=threads" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Deletion calls `DELETE /{media-id}` on the Threads Graph API. If the media ID no longer exists on Threads, the API returns success.
+See [Delete a post](/guides/delivery#delete-a-post) for how a cross-platform post is handled.
 
 ---
 
@@ -122,7 +144,7 @@ Each post includes a `targets` array with per-platform status and engagement met
 
 ```json
 {
-  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
   "text": "Shipping updates for April.",
   "status": "published",
   "targets": [
@@ -146,37 +168,43 @@ Each post includes a `targets` array with per-platform status and engagement met
 
 **Metrics notes:**
 
-Likes and replies come from Threads insights, which requires the `threads_manage_insights` scope. However, that scope is not requested by default, so like and reply counts remain `0` for most connected accounts. Shares and saves are not available from the Threads API at all. To enable metric collection, contact us about the `threads_manage_insights` beta scope.
+Likes and replies come from Threads insights, which need the `threads_manage_insights` permission. That permission is a beta scope, so `likes` and `comments` stay `0` for an account outside the beta. Threads does not report shares or saves, so those stay `0`. Account and post insights are in [Threads insights](/platforms/threads#insights).
 
 ---
 
 ## 7. Quirks, errors, and recovery
 
-### Video processing delay
+### Media processing delay
 
-Threads processes video before it can be published. The post goes live as soon as processing finishes. If Threads rejects or expires the media, the publish fails. If processing does not finish within 5 minutes, the publish fails with `504 Gateway Timeout` and the post target is marked `failed`.
-
-Image and text posts publish without this delay.
+A post with media waits for Threads to process the file. SocialAPI checks once a minute for up to 5 minutes. If Threads has not finished by then, the target fails with `504` and the post target is `failed`. If Threads rejects or expires the media, the target fails with `422`. A text post has no delay.
 
 ### No post editing
 
-Threads has no API for editing a post's text or media after publication. Attempting `PATCH /v1/posts/:pid` targeting Threads always returns `501 Not Implemented`. Delete and recreate the post if a correction is needed.
+A published Threads post cannot be edited. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid`. Delete the post and publish a new one: see [4. Update post](#4-update-post).
 
 ### Text-only posts
 
-Unlike Instagram, Threads supports text-only posts natively. Omit `media` entirely to create a post with just a text body. The container is created with `media_type: TEXT`.
+Omit `media` to publish a post with a text body only.
 
-### reply_control defaults to "everyone"
+### Reply chains are not published
 
-If `reply_control` is not set in `platform_data.threads`, the Threads API defaults to `"everyone"`. You must explicitly pass `"accounts_you_follow"` or `"mentioned_only"` to restrict who can reply.
+`segments` on a post are ignored for Threads targets. Only the first post publishes.
+
+### Who can reply
+
+Everyone can reply to a post. SocialAPI does not send `reply_control`: see "Platform data fields".
 
 ### Token expiry
 
-Threads long-lived user access tokens expire after approximately 60 days. When a token expires, publish calls will fail with an `auth` error. Reconnect the account via the OAuth flow to obtain a fresh token.
+A Threads access token lasts about 60 days. SocialAPI refreshes it. When a call returns `401 platform.threads.auth`, reconnect the account through the OAuth flow.
 
-### Error shapes
+### Posting caps
 
-When a publish fails, the post target's `error` field contains a structured error:
+SocialAPI refuses a publish that would pass 25 posts in an hour or 250 posts in 24 hours for one account, with `429 publishing.velocity_limit`. A scheduled post is held and published when the window clears. When Threads refuses first, the target fails with `429 platform.threads.rate_limit`. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+
+### Errors on a failed target
+
+A publish that fails after the request returned puts a structured error on the target, in `targets[].error`:
 
 ```json
 {
@@ -187,22 +215,23 @@ When a publish fails, the post target's `error` field contains a structured erro
 }
 ```
 
-| Error code | Category | Caused by | Meaning |
-|---|---|---|---|
-| `platform.threads.api_error` | `platform` | `platform` | Threads Graph API rejected the request. Check `message` for details. |
-| `platform.threads.auth` | `auth` | `platform` | Access token expired or revoked. Reconnect the account. |
+- `401 platform.threads.auth`: the access token expired or was revoked. Reconnect the account.
+- `429 platform.threads.rate_limit`: Threads' own limit. Wait, then retry.
+- `502 platform.threads.api_error`: Threads refused the request or returned no usable error. Read `message`.
+
+Every code is in [Errors](/guides/errors).
 
 ### Recovery
 
-- **Auth error:** Disconnect and reconnect the Threads account through the OAuth flow to obtain a fresh token.
-- **Container timeout:** Usually caused by a large video file or a slow upstream URL. Re-upload the media and retry.
-- **API error:** Retry the post via `POST /v1/posts/:pid/retry` after reviewing the `message` field for platform guidance.
+- **Auth error.** Reconnect the Threads account through the OAuth flow to get a fresh token.
+- **Media timeout.** A large video or a slow media URL causes it. Upload the media again and retry.
+- **API error.** Read `message`, fix the cause, and send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
 
 ---
 
 ## 8. Full worked example
 
-The following example publishes a video post with restricted reply control, then checks its status.
+The following example publishes a video post with a topic tag, then checks its status.
 
 **Step 1: Upload media**
 
@@ -217,8 +246,7 @@ Response:
 ```json
 {
   "upload_url": "https://upload.example.com/media/clip.mp4?X-Amz-Signature=...",
-  "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "public_url": "https://cdn.example.com/media/clip.mp4"
+  "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 }
 ```
 
@@ -236,13 +264,13 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
+    "publish_now": true,
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Our April product update is live. Check the link in bio for full details.",
     "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
     "platform_data": {
       "threads": {
-        "reply_control": "accounts_you_follow",
-        "link_attachment": "https://example.com/updates/april"
+        "topic_tag": "productupdates"
       }
     }
   }'
@@ -252,7 +280,7 @@ Response (publishing continues in the background):
 
 ```json
 {
-  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
   "status": "publishing",
   "targets": [
     {
@@ -266,7 +294,7 @@ Response (publishing continues in the background):
 **Step 3: Check status**
 
 ```bash
-curl "https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+curl "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
@@ -274,7 +302,7 @@ Response once published:
 
 ```json
 {
-  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
   "text": "Our April product update is live. Check the link in bio for full details.",
   "status": "published",
   "targets": [
@@ -302,7 +330,7 @@ Response once published:
 
 ## 9. Required OAuth scopes
 
-SocialAPI's managed Meta Threads App requests the following scopes on your behalf during the OAuth flow. This is informational — you do not need to configure anything.
+SocialAPI's Meta Threads app requests these scopes during the OAuth flow. You configure nothing. The beta scopes are in [Threads permissions](/platforms/threads#beta-permissions).
 
 | Scope | Purpose |
 |---|---|
@@ -310,6 +338,4 @@ SocialAPI's managed Meta Threads App requests the following scopes on your behal
 | `threads_content_publish` | Create and publish media containers |
 | `threads_read_replies` | Read replies on posts |
 | `threads_delete` | Delete published posts |
-| `threads_manage_insights` | Fetch engagement metrics (likes, replies) via the insights endpoint. Not requested by default; contact us to enable. |
-
-To verify which scopes your connected account has granted, call `GET /v1/accounts/:id/limits`.
+| `threads_manage_insights` | Beta scope. Like and reply counts on posts. Requested only for accounts enrolled in the beta |

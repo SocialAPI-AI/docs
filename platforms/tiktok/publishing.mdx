@@ -1,23 +1,24 @@
 ---
 title: TikTok publishing
 sidebarTitle: "Publishing"
-description: Full reference for publishing TikTok videos and photo carousels via SocialAPI, including platform-specific parameters, creator validation, and polling behavior.
+description: Full reference for publishing TikTok videos and photo carousels via SocialAPI, including creator settings, privacy levels, drafts, and the publishing status.
 ---
 
 ## 1. Overview
 
-TikTok publishing uses the TikTok Content Posting API v2 (PULL\_FROM\_URL flow). SocialAPI queries creator info to validate settings, submits a publish job, then polls the status endpoint until the post reaches `PUBLISH_COMPLETE` or `FAILED`. Both video and photo carousel formats are supported.
+TikTok accepts a post as a job and finishes it later, so a TikTok target stays `publishing` until TikTok reports the post complete or failed. Publishing needs a `privacy_level` on every post, chosen from the values TikTok allows for that creator.
 
 | Field | Value |
 |---|---|
 | Platform slug | `tiktok` |
 | Auth type | OAuth 2.0 (TikTok) |
 | API | TikTok Content Posting API v2 |
-| Create post | Yes |
-| Update post | No (not supported by platform) |
-| Delete post | No (not supported by platform) |
-| Schedule | Yes (server-side; SocialAPI holds and publishes at the scheduled time) |
-| First comment | No |
+| Create post | Yes (video, photo carousel, or a draft in the TikTok app) |
+| Update post | No (`409 post.state_invalid` on a published post) |
+| Delete post | No (`501 resource.not_supported`) |
+| Schedule | Yes (deferred publish via `scheduled_at`) |
+| First comment | No (`first_comment` is ignored) |
+| Posting caps | 18 posts per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 
 ---
 
@@ -25,31 +26,25 @@ TikTok publishing uses the TikTok Content Posting API v2 (PULL\_FROM\_URL flow).
 
 | Content type | How to trigger | Notes |
 |---|---|---|
-| Single video | `platform_data.tiktok.media_type: "video"` or omit (default) | One `media` entry required. Accepted formats: MP4, MOV, WebM. |
-| Photo carousel | `platform_data.tiktok.media_type: "photo"` (or omit for 2+ images) | 2 to 35 images required. Accepted formats: JPEG and WebP only. `disable_duet` and `disable_stitch` are ignored. |
+| Single video | `media_type: "video"`, or omit it for one video | One `media` entry. MP4, MOV, or WebM |
+| Photo carousel | `media_type: "photo"`, or omit it for 2 or more images | 2 to 35 images. JPEG or WebP only |
+| Draft in the TikTok app | `post_mode: "inbox"` | Video only. The creator writes the caption and picks the audience in the TikTok app |
 
-Single images are not supported. Mixed media (video plus images) is not supported. A `media_id` source takes the ID of media you upload first via the [media upload flow](/platforms/instagram/publishing#1-upload-media). TikTok pulls the media directly, so the underlying files must remain accessible while the post is being published.
+Single images are not supported, and a post cannot mix a video with images. When you omit `media_type`, 2 or more images with no video publish as a photo carousel, and anything else publishes as a video.
 
-**Accepted formats.** TikTok is strict about formats, and a mismatch is rejected up front rather than failing silently mid-publish:
+**File limits for media you upload to SocialAPI** (`source_type: "media_id"`): videos must be MP4, MOV, or WebM, at most 4 GB, and at least 3 seconds long. Images must be JPEG or WebP and at most 20 MB each. A file outside these limits fails validation with `400 publishing.validation_failed`. The longest video depends on the creator: read `max_video_duration_sec` from [Creator info](/platforms/tiktok#creator-info).
 
-- **Video posts** accept MP4, MOV, or WebM.
-- **Photo posts** accept **JPEG and WebP only**. PNG, AVIF, GIF, and other image formats are rejected by TikTok; convert them to JPEG or WebP before uploading.
+**Caption limits:** 2,200 UTF-16 characters on a video. A photo carousel caption holds 90 UTF-16 characters.
 
-**Media type is resolved for you when omitted.** If you do not set `media_type`, SocialAPI infers it: 2 or more images with no video is treated as a photo carousel, and anything else is treated as a video. Attaching an image to a video post (for example, a single image with no `media_type`) is rejected with a clear `400` error, not accepted and then silently dropped. See [Media type must match the file](#media-type-must-match-the-file).
-
-**Video duration:** The maximum video duration is per-creator and returned by the TikTok creator info endpoint. SocialAPI validates duration during `POST /v1/posts/validate` when the media item includes a `duration_seconds` field.
-
-**Photo carousel count:** Exactly 2 to 35 images. Fewer than 2 or more than 35 will produce a validation error.
+<Warning>
+  Attach media through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, or `url` for a public `http(s)` URL. TikTok pulls the file while the post publishes, so keep the file reachable until the target is `published`. To upload first, see [Media](/guides/media).
+</Warning>
 
 ---
 
 ## 3. Create post
 
-Use `POST /v1/posts` with `targets` targeting a TikTok account. The `text` field becomes the post title or description. `privacy_level` in `platform_data.tiktok` is required: TikTok's Direct Post guidelines prohibit a client-applied default, so SocialAPI enforces an explicit selection.
-
-Before publishing, the privacy level, posting availability, and creator-level comment, duet, and stitch settings are validated against the creator's current TikTok settings.
-
-### Video post
+Use `POST /v1/posts` with `targets` pointing at a TikTok account and `publish_now: true`. The `text` field becomes the caption.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -59,6 +54,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "My latest video #fyp",
     "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
     "platform_data": {
       "tiktok": {
         "privacy_level": "PUBLIC_TO_EVERYONE",
@@ -71,7 +67,30 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-### Photo carousel post
+Response (HTTP 201):
+
+```json
+{
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "My latest video #fyp",
+  "status": "publishing",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "tiktok",
+      "status": "publishing"
+    }
+  ]
+}
+```
+
+The target settles later: see [Slow publishes and the `publishing` status](#slow-publishes-and-the-publishing-status).
+
+### Photo carousel
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -85,36 +104,60 @@ curl -X POST https://api.social-api.ai/v1/posts \
       { "source_type": "media_id", "source": "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b" },
       { "source_type": "media_id", "source": "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17" }
     ],
+    "publish_now": true,
     "platform_data": {
       "tiktok": {
         "media_type": "photo",
-        "privacy_level": "FRIENDS_ONLY",
-        "disable_comment": true
+        "privacy_level": "MUTUAL_FOLLOW_FRIENDS",
+        "disable_comment": true,
+        "photo_cover_index": 1
       }
     }
   }'
 ```
 
-### platform\_data.tiktok fields
+### Draft in the TikTok app
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `privacy_level` | string | **Yes** | Audience setting. Must be one of the values returned by the creator info endpoint for this account. Common values: `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, `FOLLOWER_OF_CREATOR`, `SELF_ONLY`. Required; omitting produces a validation error (field `privacy_level`). |
-| `media_type` | string | No | `"video"` (default) or `"photo"`. Case-insensitive, so TikTok's own spelling `"PHOTO"` is accepted too. A value that names neither post type is rejected with a `400` on the `media_type` field, by `POST /v1/posts/validate` as well as by `POST /v1/posts`, rather than being published as a video. |
-| `brand_content_toggle` | bool | No | Marks the post as branded or sponsored content. Cannot be combined with `SELF_ONLY` privacy. |
-| `brand_organic_toggle` | bool | No | Organic branded content disclosure flag. |
-| `_disclosure_on` | bool | No | SocialAPI-only disclosure gate. When `true`, at least one of `brand_content_toggle` or `brand_organic_toggle` must also be `true`; otherwise validation returns a `400` error on the `brand_content` field. |
-| `disable_comment` | bool | No | Disables comments on the post. Defaults to `true` (disabled) when omitted. Creator-level disable forces this to `true` and cannot be overridden. |
-| `disable_duet` | bool | No | Disables duet. Only applies to video posts; ignored for photo carousels. Defaults to `true` (disabled) when omitted. Creator-level disable forces this to `true`. |
-| `disable_stitch` | bool | No | Disables stitch. Only applies to video posts; ignored for photo carousels. Defaults to `true` (disabled) when omitted. Creator-level disable forces this to `true`. |
-| `is_aigc` | bool | No | Discloses the post as AI-generated content. |
-| `video_cover_timestamp_ms` | number | No | Timestamp in milliseconds for the video cover frame. Only applies to video posts. |
-| `photo_cover_index` | number | No | 0-based index of the photo to use as the cover. Only applies to photo posts. Defaults to `0`. |
-| `auto_add_music` | bool | No | Automatically adds TikTok-recommended music to the photo post. Only applies to photo posts. |
+Set `post_mode` to `"inbox"` to upload a video to the creator's TikTok drafts. TikTok then asks the creator for the caption, audience, interaction settings, and disclosures in the app, so SocialAPI ignores `privacy_level`, the `disable_*` fields, and the disclosure fields on a draft. A draft returns no public post ID and no permalink. A photo carousel cannot be a draft and fails with `400 validation.post_mode`.
+
+```json
+{
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+  "publish_now": true,
+  "platform_data": {
+    "tiktok": {
+      "post_mode": "inbox"
+    }
+  }
+}
+```
+
+### Platform data fields
+
+Send these keys in `platform_data.tiktok` on the post, which applies them to every TikTok target. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `tiktok` key). When both set the same key, the target's value wins.
+
+| Key | Type | Required | Applies to | Notes |
+|---|---|---|---|---|
+| `privacy_level` | string | Yes, except for a draft | video, photo | One of the values in `privacy_level_options` from [Creator info](/platforms/tiktok#creator-info). TikTok's values are `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, `FOLLOWER_OF_CREATOR`, and `SELF_ONLY`. SocialAPI sends no default |
+| `media_type` | string | No | video, photo | `"video"` or `"photo"`, case-insensitive. Any other value fails validation on the `media_type` field |
+| `post_mode` | string | No | video | `"direct"` (default) publishes the post. `"inbox"` uploads a draft |
+| `brand_content_toggle` | boolean | No | video, photo | Marks the post as paid partnership content. Cannot be combined with `SELF_ONLY` |
+| `brand_organic_toggle` | boolean | No | video, photo | Marks the post as promoting the creator's own brand |
+| `_disclosure_on` | boolean | No | video, photo | When `true`, `brand_content_toggle` or `brand_organic_toggle` must also be `true`. Otherwise validation fails on the `brand_content` field |
+| `disable_comment` | boolean | No | video, photo | Turns comments off. Defaults to `true` (off) when omitted. A creator who turned comments off in TikTok forces `true` |
+| `disable_duet` | boolean | No | video | Turns Duet off. Defaults to `true` when omitted. A creator who turned Duet off forces `true`. Ignored on a photo carousel |
+| `disable_stitch` | boolean | No | video | Turns Stitch off. Defaults to `true` when omitted. A creator who turned Stitch off forces `true`. Ignored on a photo carousel |
+| `is_aigc` | boolean | No | video | Labels the video as AI-generated content. Ignored on a photo carousel |
+| `video_cover_timestamp_ms` | number, 0 or more | No | video | Millisecond offset of the cover frame |
+| `photo_cover_index` | number, 0 or more | No | photo | 0-based index of the cover image. Defaults to `0` |
+| `auto_add_music` | boolean | No | photo | Adds music TikTok recommends |
+
+SocialAPI forwards any additional keys in `platform_data.tiktok` only when the table above lists them. TikTok has no other publish options that SocialAPI passes through: an unlisted key is ignored without a warning.
 
 ### Creator info and valid privacy levels
 
-Privacy level options differ per creator. Always call `POST /v1/posts/validate` before publishing to confirm the target privacy level is allowed for the specific account. Creator info reflects the creator's current TikTok settings.
+Privacy levels, the longest video, and the interaction locks differ per creator. Call `GET /v1/accounts/{id}/creator-info` first ([Creator info](/platforms/tiktok#creator-info)), then dry-run the post with `POST /v1/posts/validate`:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/validate \
@@ -132,109 +175,161 @@ curl -X POST https://api.social-api.ai/v1/posts/validate \
   }'
 ```
 
-### Publish flow
+Response (HTTP 200):
 
-1. The creator's current TikTok settings and allowed privacy levels are read.
-2. The draft is validated (privacy level required, duet/stitch for video, brand content rules).
-3. TikTok pulls the media directly from the URLs supplied.
-4. The target settles once TikTok reports the post complete or failed.
-5. TikTok populates the published post ID asynchronously and it can lag completion by a few seconds, so the target stays at `publishing` until the ID is in hand. See [Slow publishes and the publishing status](#slow-publishes-and-the-publishing-status).
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": []
+}
+```
+
+When TikTok cannot be reached for the check, `warnings` holds one entry on the field `creator_info`, and the privacy level, daily limit, and duration checks are skipped. The media rules still run.
+
+### Scheduling
+
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) instead of `publish_now`. SocialAPI holds the post and publishes it at that time. `privacy_level` is still required.
+
+```json
+{
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "text": "Scheduled video",
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+  "scheduled_at": "2026-11-15T10:00:00Z",
+  "platform_data": {
+    "tiktok": {
+      "privacy_level": "PUBLIC_TO_EVERYONE"
+    }
+  }
+}
+```
 
 ---
 
 ## 4. Update post
 
-TikTok does not support editing posts after publication. `PATCH /v1/posts/:pid` returns `501 Not Supported` for TikTok post platforms.
+TikTok gives apps no edit call. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, so a published TikTok post returns `409 post.state_invalid`. Delete the post in the TikTok app and publish a new one.
 
 ---
 
 ## 5. Delete post
 
-TikTok does not expose a post deletion endpoint in its Content Posting API. `DELETE /v1/posts/:pid` returns `501 Not Supported` for TikTok post platforms.
+TikTok gives apps no deletion call. `DELETE /v1/posts/{pid}` and `POST /v1/posts/{pid}/unpublish` return `501 resource.not_supported` for a TikTok target, and the video stays on TikTok. Delete it in the TikTok app.
+
+For a cross-platform post, the other platforms are still deleted or unpublished. See [Delete a post](/guides/delivery#delete-a-post).
 
 ---
 
 ## 6. Retrieve posts
 
-`GET /v1/posts` returns the TikTok posts SocialAPI knows about. Posts created natively on TikTok are imported automatically, which requires the `video.list` scope: that scope is subject to TikTok app review and may not be active for all connected accounts.
+`GET /v1/posts?platform=tiktok&account_ids={id}` returns the videos SocialAPI has synced for the account, including videos published outside SocialAPI. A video published through SocialAPI appears when its target is `published`. `POST /v1/platforms/tiktok/accounts/{id}/sync` pulls the 20 most recent videos immediately: see [Sync videos](/platforms/tiktok#sync-videos).
 
-**What this means in practice:**
+Each published target carries `platform_post_id`, `permalink`, and `metrics`. `GET /v1/posts/{pid}/metrics` reads the current counts from TikTok:
 
-- Posts created through SocialAPI are returned by `GET /v1/posts` as soon as they publish.
-- TikTok-native posts (created outside SocialAPI) appear once the `video.list` scope is approved for the app.
-- Engagement metrics (likes, comments, shares, views) are refreshed alongside them.
+```json
+{
+  "data": {
+    "post_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "targets": [
+      {
+        "platform": "tiktok",
+        "metrics": {
+          "views": 5120,
+          "likes": 342,
+          "comments": 18,
+          "shares": 27,
+          "metrics_synced_at": "2026-10-13T12:00:00Z"
+        }
+      }
+    ]
+  }
+}
+```
 
-**Analytics exports** (`POST /v1/accounts/:id/export`) do retrieve full TikTok video data including `like_count`, `comment_count`, `share_count`, `view_count`, `duration`, `width`, and `height`.
+TikTok reports views, likes, comments, and shares. Reach, saves, and watch time are not available.
 
 ---
 
 ## 7. Quirks, errors, and recovery
 
-### privacy\_level is required
+### privacy_level is required
 
-`privacy_level` is required. Omitting it produces an error issue (field `privacy_level`) from `POST /v1/posts/validate` and blocks publishing. TikTok's Direct Post guidelines prohibit any client-applied default, so SocialAPI enforces an explicit selection.
+A post without `privacy_level` fails validation on the field `privacy_level`, and publishing is blocked. TikTok forbids a default chosen by the app, so SocialAPI sends none. A level the creator cannot use fails validation on the same field. Check [Creator info](/platforms/tiktok#creator-info) first.
 
-The allowed values are not static: they are returned by the TikTok creator info endpoint and vary per account. Validate before publishing to confirm the chosen value is allowed for the target account.
+At publish time the same rules fail a target with `400 validation.privacy_level_required` or `400 validation.invalid_privacy_level`, with the value you sent in `meta.privacy_level`.
 
-### Photo carousels require 2 to 35 images
+### Photo carousels need 2 to 35 images
 
-Sending fewer than 2 or more than 35 `media` entries when `media_type` is `"photo"` returns a `400` validation error immediately. Single-image photo posts are not supported by TikTok.
+A photo post with fewer than 2 or more than 35 images fails with `400 validation.media_count`. TikTok has no single-image post.
 
 ### Media type must match the file
 
-TikTok publishes videos and photos through different endpoints, and it will not build a video out of an image. If an image reaches the video path (for example, a single image with no `media_type`, which resolves to a video), TikTok accepts the job but never downloads the file, so it stalls until the 60-second timeout. SocialAPI now blocks this before publishing: both `POST /v1/posts/validate` and `POST /v1/posts` return a `400` error on the `media` field (code `validation.media_type_mismatch`) telling you to publish the images as a photo post instead. To post images, set `media_type` to `"photo"` and attach 2 or more JPEG or WebP images.
+TikTok will not build a video out of an image. A single image with no `media_type` resolves to a video, and a post like that fails with `400 validation.media_type_mismatch` before anything is sent. Set `media_type` to `"photo"` and attach 2 or more JPEG or WebP images. A `media_type` that is neither `video` nor `photo` fails with `400 validation.unsupported_media_type`.
 
 ### Photo posts accept only JPEG and WebP
 
-A photo carousel that includes a PNG, AVIF, GIF, or any non-JPEG/WebP image is rejected with a `400` error on the `media` field (code `validation.unsupported_photo_format`) that names the offending format. A video included in a photo post is rejected the same way. Convert images to JPEG or WebP before uploading.
+A photo carousel that holds a PNG, AVIF, GIF, or a video fails with `400 validation.unsupported_photo_format`, which names the offending format. Convert the images to JPEG or WebP before uploading.
 
-### disable\_duet and disable\_stitch are silently ignored for photo posts
+### disable_duet and disable_stitch are ignored on photo posts
 
-Setting `disable_duet: true` or `disable_stitch: true` on a photo carousel post has no effect. TikTok does not expose these controls for photo posts. `POST /v1/posts/validate` will return a warning (not an error) if these fields are set on a photo post.
+`disable_duet` and `disable_stitch` set to `true` on a photo carousel have no effect. Validation returns a warning on the field `interactions`, not an error.
 
-### brand\_content\_toggle is incompatible with SELF\_ONLY privacy
+### Branded content cannot be private
 
-Setting `brand_content_toggle: true` alongside `privacy_level: "SELF_ONLY"` is rejected by TikTok. SocialAPI validates this combination before submitting and returns a `400` error.
+`brand_content_toggle: true` with `privacy_level: "SELF_ONLY"` fails with `400 validation.branded_content_private`.
 
-### video\_cover\_timestamp\_ms applies only to videos
+### Daily posting limit
 
-This field is sent only when `media_type` is `"video"`. It is not included in photo carousel requests.
-
-### Creator daily posting limit
-
-When a creator has reached their daily TikTok posting limit, TikTok reports an empty `privacy_level_options` list, which surfaces as a `400` validation error with field `posting_limit`.
-
-### Token auto-refresh
-
-TikTok access tokens expire. SocialAPI refreshes them automatically. If the refresh token has also expired, calls return `401 invalid_token` and the account must be reconnected.
+When the creator reached TikTok's daily posting limit, TikTok lists no privacy level, `can_post` is `false`, and validation fails on the field `posting_limit`. At publish time the target fails with `400 validation.posting_limit`. SocialAPI's own cap of 18 posts per 24 hours returns `429 publishing.velocity_limit` first: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
 
 ### Slow publishes and the `publishing` status
 
-TikTok often takes longer to settle than the publish request does, either because the video is still being processed or because it has finished but has not yet exposed the post ID. In both cases the target stays at `status: "publishing"` with `platform_post_id` and `permalink` absent, and the outcome is resolved automatically afterwards: the target settles at `published` with its ID and permalink, or at `failed` if TikTok rejected it.
+TikTok often settles after the request that created the post returned, either because it is still processing the video or because it has not yet exposed the post ID. In both cases the target stays `status: "publishing"` with `platform_post_id` and `permalink` absent. SocialAPI then settles it on its own: `published` with its ID and permalink, or `failed` if TikTok rejected it.
 
-`publishing` is not terminal, so treat it as "still working" rather than success or failure:
+`publishing` is not terminal, so treat it as "still working":
 
-- **Do not confirm success on it.** Only `published` is a completed publish. A `published` TikTok target carries a `platform_post_id`, except in the rare case described below where TikTok withholds it for hours.
-- **Do not retry or republish it.** The upload may already be live on TikTok, so retrying risks a duplicate post. It resolves on its own.
-- **Keep polling `GET /v1/posts/{post_id}`, or wait for the webhook.** The `post.published`, `post.partial` and `post.failed` webhooks fire when the post reaches its terminal status, including when it happens after the original request returned.
+- **Do not confirm success on it.** Only `published` is a completed publish.
+- **Do not retry or republish it.** The video can already be live on TikTok, so a retry risks a duplicate post.
+- **Keep reading `GET /v1/posts/{pid}`, or wait for the webhook.** The `post.published`, `post.partial`, and `post.failed` events fire when the post reaches its final status, including after the original request returned.
 
-Typical settle time is a few seconds to a few minutes. If TikTok reports the post live but still has not returned its ID after about 2 hours, the target settles at `published` without a `platform_post_id` or `permalink`. Both appear on `GET /v1/posts/{post_id}` once TikTok returns the ID, with no further webhook. A target TikTok is still processing after about 2 hours is failed with error code `system.internal` and the detail `publish timed out: target stuck in publishing`. Check the TikTok profile before retrying such a target: the post can still have gone live.
+If TikTok reports the post live but still has not returned its ID after about 2 hours, the target settles at `published` without `platform_post_id` or `permalink`. A target TikTok is still processing after about 2 hours fails with `500 system.internal`. Check the TikTok profile before retrying such a target: the post can still have gone live.
 
-### Error categories
+### Errors on a failed target
 
-| Error code prefix | Category | Caused by | Description |
-|---|---|---|---|
-| `platform.tiktok.api_error` | `platform` | `platform` | Generic TikTok API error (includes publish failures and timeouts) |
-| `platform.tiktok.auth` | `auth` | `platform` | Invalid or expired token, missing scope |
-| `validation.*` | `validation` | `user` | Missing or invalid `platform_data.tiktok` fields (privacy level, media count, media type mismatch, unsupported photo format, etc.) |
+A publish that fails after the request returned puts a structured error on the target, in `targets[].error`, with its `code`. Every code is in [Errors](/guides/errors).
+
+- `401 platform.tiktok.auth`: the access token is no longer valid and the refresh failed. Reconnect the account.
+- `429 platform.tiktok.rate_limit`: TikTok's own limit. Wait, then retry.
+- `422 platform.tiktok.publish_failed`: TikTok rejected the post while processing it. `message` carries TikTok's reason.
+- `502 platform.tiktok.api_error`: TikTok returned no usable answer. Retry.
+
+### Recovery
+
+- **Validation error.** Fix the field the issue names, then send the post again.
+- **Auth error.** Reconnect the TikTok account through the OAuth flow.
+- **Failed target.** Read `targets[].error`, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
 
 ---
 
 ## 8. Full worked example
 
-This example publishes a video, validates the request first, then creates the post.
+This example reads creator info, validates the post, creates it, and reads the result.
 
-### Step 1: validate
+**Step 1: Read creator info**
+
+```bash
+curl https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/creator-info \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Use a value from `privacy_level_options` as `privacy_level`.
+
+**Step 2: Upload media**
+
+Upload the video and verify it as described in [Media](/guides/media). The result is a `media_id`, here `f47ac10b-58cc-4372-a567-0e02b2c3d479`.
+
+**Step 3: Validate**
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/validate \
@@ -247,8 +342,7 @@ curl -X POST https://api.social-api.ai/v1/posts/validate \
     "platform_data": {
       "tiktok": {
         "privacy_level": "PUBLIC_TO_EVERYONE",
-        "brand_content_toggle": true,
-        "brand_organic_toggle": false,
+        "brand_organic_toggle": true,
         "disable_comment": false,
         "disable_duet": true,
         "disable_stitch": true,
@@ -258,16 +352,9 @@ curl -X POST https://api.social-api.ai/v1/posts/validate \
   }'
 ```
 
-Expected response (no issues):
+Response (HTTP 200): `{"valid": true, "errors": [], "warnings": []}`
 
-```json
-{
-  "valid": true,
-  "issues": []
-}
-```
-
-### Step 2: create post
+**Step 4: Create the post**
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -277,11 +364,11 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Behind the scenes of our product shoot #bts #brand",
     "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
     "platform_data": {
       "tiktok": {
         "privacy_level": "PUBLIC_TO_EVERYONE",
-        "brand_content_toggle": true,
-        "brand_organic_toggle": false,
+        "brand_organic_toggle": true,
         "disable_comment": false,
         "disable_duet": true,
         "disable_stitch": true,
@@ -291,42 +378,50 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-Expected response:
+Response (HTTP 201): the post with `status: "publishing"`, as in [Create post](#3-create-post).
+
+**Step 5: Check the status**
+
+```bash
+curl https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200) once TikTok finished:
 
 ```json
 {
-  "id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "Behind the scenes of our product shoot #bts #brand",
   "status": "published",
-  "platforms": [
+  "hidden": false,
+  "retry_count": 0,
+  "published_at": "2026-10-13T09:00:47Z",
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:47Z",
+  "targets": [
     {
-      "platform": "tiktok",
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "tiktok",
       "status": "published",
-      "platform_post_id": "7380000000000000001"
+      "platform_post_id": "7380000000000000001",
+      "permalink": "https://www.tiktok.com/@acmecorp/video/7380000000000000001",
+      "published_at": "2026-10-13T09:00:47Z"
     }
-  ],
-  "created_at": "2026-04-10T12:00:00Z"
+  ]
 }
 ```
 
-### Handling a failed publish
-
-If TikTok rejects the video during processing, the platform status is `failed` with an error detail. Inspect the error and retry:
-
-```bash
-curl -X POST https://api.social-api.ai/v1/posts/post_01HZ9X3Q4R5M6N7P8V2K0W1J/retry \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+If TikTok rejects the video while processing, the target is `failed` with `error`. Read it, fix the cause, then send `POST /v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7/retry`.
 
 ---
 
 ## 9. Required OAuth scopes
 
+SocialAPI's TikTok app requests these scopes during the OAuth flow. You configure nothing. The full list is in [TikTok permissions](/platforms/tiktok#permissions). Publishing uses `user.info.basic`, `video.publish`, and, for `post_mode: "inbox"`, `video.upload`.
+
 | Scope | Purpose |
 |---|---|
-| `user.info.basic` | Read account profile (open ID, username, display name, avatar) |
-| `user.info.profile` | Read additional profile fields (e.g. bio, follower counts) |
-| `video.publish` | Publish videos and photo carousels via PULL\_FROM\_URL |
-| `video.upload` | Upload video files directly (used for file-based publish flows) |
-
-These scopes are requested automatically during the OAuth connect flow (`POST /v1/accounts/connect`). No additional configuration is required.
+| `user.info.basic` | Identify the account |
+| `video.publish` | Publish videos and photo carousels |
+| `video.upload` | Upload a video to the creator's TikTok drafts |

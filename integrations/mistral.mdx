@@ -1,68 +1,99 @@
 ---
-title: Mistral / Le Chat
-description: Connect SocialAPI to Le Chat on web and mobile.
+title: "Mistral / Le Chat"
+description: "Connect SocialAPI to Le Chat from Mistral on web and mobile with a custom MCP connector to manage comments, DMs, and posts."
 ---
 
-**MCP Server URL:** `https://api.social-api.ai/mcp`
+Connect SocialAPI to Le Chat and ask it to list your connected accounts, reply to comments, send DMs, and publish posts. Le Chat connects to SocialAPI's MCP server at `https://api.social-api.ai/mcp` and signs in with OAuth 2.1, so you create no API key.
 
-## Web (chat.mistral.ai)
+## Prerequisites
 
-### Prerequisites
+- A SocialAPI account with at least one connected account.
+- A Le Chat account on any plan. MCP connectors are available on the Free plan.
 
-- A [SocialAPI](https://social-api.ai) account with at least one connected social account
-- Any Le Chat plan (MCP connectors are available on the **free plan**)
+## Set up on web
 
-### Setup
+<Steps>
+  <Step title="Open Connectors">
+    Open [chat.mistral.ai](https://chat.mistral.ai), open the side panel, expand **Intelligence**, and click **Connectors**.
+  </Step>
+  <Step title="Add a custom connector">
+    Click **+ Add Connector** on the right, then select the **Custom MCP Connector** tab.
 
-1. Open Le Chat at [chat.mistral.ai](https://chat.mistral.ai)
-2. Open the **side panel** and expand the **Intelligence** menu
-3. Click **Connectors**
-4. Click **+ Add Connector** on the right side
-5. Select the **Custom MCP Connector** tab
+    <img
+      src="/images/mcp-lechat-settings.png"
+      alt="Le Chat custom MCP connector form"
+    />
+  </Step>
+  <Step title="Fill in the form">
+    - **Connector name:** `SocialAPI`
+    - **Connection server:** `https://api.social-api.ai/mcp`
+    - **Description** (optional): `Manage social media accounts, posts, comments, DMs, and more`
 
-<img
-  src="/images/mcp-lechat-settings.png"
-  alt="Le Chat Custom MCP Connector configuration"
-/>
+    Click **Connect**.
+  </Step>
+  <Step title="Authorize with your SocialAPI account">
+    Le Chat detects the OAuth 2.1 sign-in and opens the SocialAPI authorization page. Log in and click **Authorize**.
 
-6. Fill in:
-   - **Connector name:** `SocialAPI`
-   - **Connection server:** `https://api.social-api.ai/mcp`
-   - **Description** (optional): `Manage social media accounts, posts, comments, DMs, and more`
-7. Click **Connect**
+    <img
+      src="/images/mcp-lechat-oauth.png"
+      alt="Le Chat authorization screen for SocialAPI"
+    />
+  </Step>
+  <Step title="Turn the connector on in a conversation">
+    Click **Tools** (the four-squares icon) below the message box and check **SocialAPI**. You can also type `/SocialAPI` in the message box.
+  </Step>
+</Steps>
 
-Le Chat auto-detects the OAuth 2.1 authentication and guides you through the authorization flow.
+Le Chat asks for approval before each tool call. Select **Always Allow** to skip the prompt for that tool in future. Le Chat labels the Connectors feature as Beta.
 
-<img
-  src="/images/mcp-lechat-oauth.png"
-  alt="Le Chat OAuth authorization for SocialAPI"
-/>
+## Use it on mobile (iOS and Android)
 
-### Using the connector
+A connector you added on the web appears in the Le Chat mobile apps.
 
-In a conversation, click the **Tools** button (four squares icon) below the chat input and check the box for **SocialAPI**. You can also type `/SocialAPI` in the input to activate it.
+<Steps>
+  <Step title="Add the connector on the web">
+    Follow [Set up on web](#set-up-on-web).
+  </Step>
+  <Step title="Open the app">
+    Open the Le Chat mobile app. The connector is already there.
+  </Step>
+  <Step title="Turn the connector on in a conversation">
+    Open the **Tools** menu and check **SocialAPI**.
+  </Step>
+</Steps>
 
-Le Chat will ask for approval before executing each tool call. You can select **Always Allow** to skip future prompts for that tool.
+## Try it
 
-<Note>
-  The Connectors feature is currently in **Beta**. MCP connectors are also available on the Le Chat mobile apps (iOS and Android) - connectors configured on the web sync automatically.
-</Note>
+Ask Le Chat:
+
+```text
+List my connected social accounts
+```
+
+Le Chat calls `social_api_list_accounts` and answers with your connected accounts and their platforms.
 
 <img
   src="/images/mcp-lechat-conversation.png"
-  alt="Le Chat conversation using [SocialAPI](https://social-api.ai) tools"
+  alt="Le Chat conversation using SocialAPI tools"
 />
 
-### Troubleshooting
+## Troubleshooting
 
-**Connector not auto-detected** - Make sure the URL does not have a trailing slash. Enter exactly `https://api.social-api.ai/mcp`.
+<AccordionGroup>
+  <Accordion title="Le Chat does not detect the sign-in">
+    Check that the connection server URL is exactly `https://api.social-api.ai/mcp`, with no trailing slash.
+  </Accordion>
+  <Accordion title="SocialAPI is missing from the Tools menu">
+    Check that the connector shows as connected in **Intelligence** → **Connectors**. Then check **SocialAPI** in **Tools** for the conversation.
+  </Accordion>
+  <Accordion title="Tool calls fail with HTTP 401">
+    The OAuth session expired. Remove the SocialAPI connector and add it again to sign in again.
+  </Accordion>
+</AccordionGroup>
 
----
+## Related
 
-## Mobile (iOS / Android)
-
-Le Chat mobile apps support MCP connectors. Configure them on the web at [chat.mistral.ai](https://chat.mistral.ai) and they sync automatically to your mobile app.
-
-1. Add SocialAPI as a connector on the web (see [Web](#web-chatmistralai) above)
-2. Open the Le Chat mobile app - the connector is already available
-3. Enable it via the **Tools** menu in a conversation
+- [SocialAPI MCP server](/integrations/overview): the server URL and the other supported clients.
+- [MCP tools reference](/integrations/tools): every tool Le Chat can call.
+- [OAuth for MCP clients](/integrations/oauth): how the sign-in works.
+- [Errors](/guides/errors): every error code a tool can return.

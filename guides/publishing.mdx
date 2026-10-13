@@ -1,135 +1,344 @@
 ---
-title: Posts overview
-description: Compare post publishing capabilities across all supported platforms.
+title: Publish a post
+description: Publish, validate, edit, and import posts to Instagram, Facebook, TikTok, YouTube, and more with one POST /v1/posts request and per-platform delivery status.
 ---
 
-The Posts API is a content publishing API: one endpoint to publish and schedule photos, videos, carousels, stories, and reels across Instagram, Facebook, TikTok, LinkedIn, YouTube, Threads, and Zalo, with per-platform delivery status.
+A post in SocialAPI is one piece of content sent to one or more connected accounts. You create it with `POST /v1/posts`, name each destination in `targets`, and read the delivery result per platform. The same request publishes to Instagram, Facebook, Threads, TikTok, YouTube, LinkedIn, X, Pinterest, Google Business Profile, Zalo, and Bluesky.
 
-Publishing uses a single endpoint, `POST /v1/posts`, with per-platform behavior controlled by the `platform_data` field. This page compares capabilities across all platforms at a glance. For full details on a specific platform, see the deep-dive pages linked below.
+Zalo publishes text articles only, and Bluesky publishes text with 1 to 4 images. What each platform accepts is on its publishing page, linked from [Platform support](#platform-support). A post costs 1 post credit when it is published or scheduled, whatever the number of targets. Saving a draft is free. See [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction).
 
-Use `POST /v1/posts/validate` to check constraints before publishing, and `GET /v1/posts/validate` to fetch platform-specific constraints (e.g. TikTok's per-creator privacy levels and duration limits).
+## Endpoints
 
-## Attaching media
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/posts` | Create a draft, schedule a post, or publish it now |
+| `GET` | `/v1/posts` | List posts. Filter by `status`, `platform`, `account_ids`, `brand_id`, `from`, `to`, and `search` |
+| `GET` | `/v1/posts/{pid}` | Read one post with its targets |
+| `PATCH` | `/v1/posts/{pid}` | Edit a `draft`, `scheduled`, or `failed` post |
+| `POST` | `/v1/posts/{pid}/publish` | Publish a `draft` or `scheduled` post now |
+| `POST` | `/v1/posts/{pid}/retry` | Re-send the failed targets of a `failed` or `partial` post |
+| `POST` | `/v1/posts/{pid}/unpublish` | Remove the published copies from the platforms and keep the post |
+| `DELETE` | `/v1/posts/{pid}` | Delete a post |
+| `POST` | `/v1/posts/validate` | Check a post against platform rules without creating it |
+| `GET` | `/v1/posts/validate` | Read each platform's text and media rules |
+| `POST` | `/v1/posts/import` | Create up to 500 posts from a CSV file |
 
-Photos and videos are attached through the ordered `media` array. Each item sets a `source_type`: an uploaded library file (`media_id`), a public URL we fetch at publish time (`url`), or media you uploaded to the platform yourself (`platform_attachment_id`, supported on Instagram, Threads, LinkedIn, LinkedIn Page, and X/Twitter). The older flat `media_ids` array still works and is equivalent to a list of `media_id` sources. See the [Media uploads guide](/guides/media) for upload paths, URL rules, and storage limits.
+## Your first post
 
-## Capability matrix
+Publish one text post to a Threads account and a Facebook Page:
 
-| Capability | Instagram | Facebook | LinkedIn | Threads | TikTok | YouTube | X / Twitter | Google |
-|---|---|---|---|---|---|---|---|---|
-| Create post | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Update post | No | Yes (text only) | Yes (text only) | No | No | Yes | No | Yes (text only) |
-| Delete post | No | Yes | Yes | Yes | No | Yes | Yes | Yes |
-| Schedule | Yes | Yes | Yes | Yes | No | Native | No | Yes |
-| First comment | Yes (best-effort) | Yes (best-effort) | No | No | No | Yes (best-effort) | No | No |
-| Image | Yes | Yes | Yes | Yes | Yes (1-35) | Thumbnail | No | Yes (1) |
-| Video | Yes (as Reel) | Yes | Yes | Yes | Yes | Yes | No | No |
-| Carousel | Yes (2-10) | Yes (2-10) | Yes (2-20) | Yes (2-20) | Photo carousel only | No | No | No |
-| Max media per post | 10 | 10 | 20 | 20 | 35 (photo) / 1 (video) | 1 (video + thumb) | 0 (text only) | 1 |
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Spring sale starts today: https://example.com/spring",
+    "publish_now": true,
+    "targets": [
+      {"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"},
+      {"account_id": "acc_01HZ9X4T6B8C2D5F7G9H1J3K", "page_id": "sapi_page_01HZ9X5V7C9D3E6G8H1J4K2M"}
+    ]
+  }'
+```
 
-## Retrieving a post
-
-`GET /v1/posts/{pid}` and `GET /v1/posts/{pid}/metrics` accept either identifier:
-
-- The SocialAPI post ID (UUID) returned when the post was created.
-- A platform post ID: the platform's own ID for a published target, for example a TikTok video ID or a Facebook post ID.
-
-A platform post ID resolves to the SocialAPI post it was published from, so you can fetch a post or its live metrics using the ID you already track on the platform side. If a platform post ID happens to match more than one post across your accounts, the API returns `409` with code `ambiguous_post_id`; retry with the SocialAPI post ID. Mutating endpoints (update, delete, publish, retry, unpublish) accept only the SocialAPI post ID.
-
-## Deleting posts
-
-`DELETE /v1/posts/{pid}` is best-effort and never lets the dashboard drift from the platform.
-
-For a draft, scheduled, or failed post (nothing was ever published), the post is removed locally. For a published post, each platform is asked to delete its copy in turn:
-
-- If the platform deletes the copy, that target is cleared.
-- If the platform does not support deletion (for example TikTok) or the delete call fails, that copy stays live and the post is kept (shrunk to the targets that are still live), not removed. A post is fully removed only when no live copy remains.
-
-The response is a per-platform result, not a bare acknowledgement:
+Response (HTTP 201):
 
 ```json
 {
-  "success": true,
-  "deleted": false,
-  "results": [
-    { "platform": "instagram", "account_id": "acc_...", "outcome": "deleted" },
-    { "platform": "tiktok", "account_id": "acc_...", "outcome": "not_supported", "message": "Operation not supported for this platform" }
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "Spring sale starts today: https://example.com/spring",
+  "status": "publishing",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "threads",
+      "status": "publishing"
+    },
+    {
+      "account_id": "acc_01HZ9X4T6B8C2D5F7G9H1J3K",
+      "page_id": "sapi_page_01HZ9X5V7C9D3E6G8H1J4K2M",
+      "platform": "facebook",
+      "status": "publishing"
+    }
   ]
 }
 ```
 
-`deleted` is `true` only when the post was fully removed. Each entry in `results` has an `outcome` of `deleted`, `not_supported`, or `failed`. A `failed` target can be retried; a `not_supported` target must be removed on the platform itself. See `DELETE /v1/posts/{pid}` in the API reference for the full schema.
+The post is accepted, and delivery continues after the response. Read the post again or wait for the `post.published`, `post.partial`, or `post.failed` event. [Track post delivery](/guides/delivery) explains the statuses, the HTTP codes, and the per-target errors.
 
-## Core field handling
+## Choose what the request does
 
-How each platform interprets the shared `PostDraft` fields:
-
-| Field | Instagram | Facebook | LinkedIn | Threads | TikTok | YouTube | X / Twitter | Google |
-|---|---|---|---|---|---|---|---|---|
-| `text` | Caption (max 2200 chars) | Post message | Commentary | Post text (max 500 chars) | Video description | Video description | Tweet text (max 280) | Summary |
-| `media` | Determines image/video/carousel | First item only; photo or video | Image or video | Image or video | Video, or photo carousel | Single video | Up to 4 photos, or one video, or one GIF | Single image |
-| `first_comment` | Posted as a comment after publish (best-effort, non-blocking) | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported | Not supported | Posted as a comment after publish (best-effort, non-blocking) | Not supported | Not supported |
-| `scheduled_at` | Deferred publish | Deferred publish | Deferred publish | Deferred publish | Not supported | Not supported | Not supported | Not supported |
-
-## Platform-specific `platform_data` summary
-
-Each platform accepts optional fields inside `platform_data.<platform>`. For the full reference, see the per-platform page.
-
-Pass these inside each target's `platform_data` object (per-target overrides supported).
-
-| Platform | Required fields | Notable optional fields |
-|---|---|---|
-| [Instagram](/platforms/instagram/publishing) | None | `alt_text`, `location_id`, `share_to_feed`, `cover_url` |
-| [Facebook](/platforms/facebook/publishing) | None | `link`, `cta_type`, `cta_link`, `min_age`, `max_age` (text, link, album posts); `alt_text` (single-photo); `title` (single-video) |
-| [LinkedIn](/platforms/linkedin/publishing) | None | `disable_reshare`, `cta_label`, `cta_url`, `article_url`, `article_title`, `article_description`, `media_title`, `alt_text`, `alt_texts` |
-| [Threads](/platforms/threads/publishing) | None | `reply_control`, `link_attachment` |
-| [TikTok](/platforms/tiktok/publishing) | `privacy_level` | `media_type`, `brand_content_toggle`, `disable_duet`, `disable_stitch`, `disable_comment`, `is_aigc`, `video_cover_timestamp_ms` |
-| [YouTube](/platforms/youtube/publishing) | None | `category_id`, `tags`, `made_for_kids`, `embeddable`, `notify_subscribers`, `publish_at` |
-| [X / Twitter](/platforms/twitter) | None | `reply_settings` (`following`, `mentionedUsers`, `subscribers`, `verified`) |
-| [Google](/platforms/google/publishing) | None (defaults to STANDARD) | `topicType` (STANDARD, EVENT, OFFER, ALERT), `updateMask` |
-| [Zalo](/platforms/zalo/publishing) | None | None (article title falls back to `text`) |
-
-## Required OAuth scopes
-
-| Platform | Scopes |
+| You send | Result |
 |---|---|
-| Instagram | `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages`, `instagram_business_content_publish` |
-| Facebook | `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_messaging`, `pages_manage_posts`, `public_profile`, `business_management` |
-| LinkedIn | `r_liteprofile`, `r_organization_social`, `w_organization_social`, `r_organization_social_feed`, `w_organization_social_feed`, `rw_organization_admin` |
-| Threads | `threads_basic`, `threads_content_publish`, `threads_read_replies`, `threads_delete` |
-| TikTok | `user.info.basic`, `user.info.profile`, `video.publish`, `video.upload` |
-| YouTube | `https://www.googleapis.com/auth/youtube.force-ssl` |
-| X / Twitter | `tweet.read`, `tweet.write`, `tweet.moderate.write`, `users.read`, `dm.read`, `dm.write`, `like.write`, `offline.access` (BYOK; you configure your own app) |
-| Google | `https://www.googleapis.com/auth/business.manage` |
+| `publish_now: true` and at least one target | The post is published now. Its status is `publishing` |
+| `scheduled_at` in the future and at least one target | The post is scheduled. See [Schedule posts](/guides/scheduling) |
+| Neither, or no targets | The post is saved as a draft. It is not published, even when you send targets |
+| Both `publish_now` and `scheduled_at` | The post is scheduled |
 
-## Per-platform deep dives
+A `scheduled_at` that is not RFC 3339 returns `400 validation.field_invalid`. A `scheduled_at` in the past on `POST /v1/posts` returns the same error.
 
-<CardGroup cols={3}>
-  <Card title="Instagram" href="/platforms/instagram/publishing">
-    Images, videos, reels, carousels. Meta Graph API.
-  </Card>
-  <Card title="Facebook" href="/platforms/facebook/publishing">
-    Text, photo, and video posts. Facebook Pages API.
-  </Card>
-  <Card title="LinkedIn" href="/platforms/linkedin/publishing">
-    Organization page posts. LinkedIn Marketing API.
-  </Card>
-  <Card title="Threads" href="/platforms/threads/publishing">
-    Text, image, video posts. Threads API.
-  </Card>
-  <Card title="TikTok" href="/platforms/tiktok/publishing">
-    Video and photo carousel posts. TikTok Content Posting API.
-  </Card>
-  <Card title="YouTube" href="/platforms/youtube/publishing">
-    Video uploads. YouTube Data API v3.
-  </Card>
-  <Card title="X / Twitter" href="/platforms/twitter">
-    Tweets with text or images. X API v2.
-  </Card>
-  <Card title="Google" href="/platforms/google/publishing">
-    Business Profile local posts. Google My Business API v4.
-  </Card>
-  <Card title="Zalo" href="/platforms/zalo/publishing">
-    Official Account articles and videos. Zalo Official Account Open API.
-  </Card>
-</CardGroup>
+## Fields every platform shares
+
+| Field | Type | Description |
+|---|---|---|
+| `text` | string | The post body. Required, unless every target supplies its own `text` or a `platform_data` field the platform uses as the body (a Pinterest Pin description). A missing body returns `400 validation.field_required` |
+| `title` | string | The post title. Used by YouTube (required there), LinkedIn, and Google Business Profile. A Pinterest Pin title is `platform_data.pinterest.title` |
+| `media` | array | The ordered media list. Each item has `source_type` (`media_id`, `url`, or `platform_attachment_id`), `source`, and `type` for a `platform_attachment_id`. See [Upload media](/guides/media) |
+| `visibility` | string | `public`, `private`, `connections_only`, or `logged_in`. Which values apply depends on the platform |
+| `first_comment` | string | A comment SocialAPI posts after publishing. Instagram, Facebook, and YouTube read it. Every other platform ignores it, and Facebook Page Stories ignore it |
+| `scheduled_at` | string | The publish time (RFC 3339). See [Schedule posts](/guides/scheduling) |
+| `publish_now` | boolean | Publish immediately. Default `false` |
+| `skip_validation` | boolean | Publish without the pre-publish validation. Default `false`. The platform can still reject the post |
+| `skip_duplicate_check` | boolean | Skip the duplicate-content check. Default `false` |
+| `segments` | array | Continuation posts that publish as a thread on X, each with `text`. See [X publishing](/platforms/twitter/publishing) |
+| `platform_data` | object | Platform-specific fields, keyed by platform slug. See [Where platform data goes](#where-platform-data-goes) |
+| `targets` | array | The destinations. See below |
+
+Each item of `targets` has:
+
+| Field | Description |
+|---|---|
+| `account_id` | The connected account. Required |
+| `page_id` | The `sapi_page_` ID of the Facebook Page when the account has more than one |
+| `board_id` | The Pinterest board. Required on a Pinterest target. See [Pinterest boards](/platforms/pinterest/boards) |
+| `text`, `title`, `media`, `first_comment`, `visibility`, `scheduled_at` | Override the post-level value for this target. An empty `media` array means this target publishes no media |
+| `platform_data` | Platform-specific fields for this target |
+
+A target that does not set a field inherits the post-level value. The same account and Page twice in one request returns `400 publishing.duplicate_target`.
+
+SocialAPI ignores request fields it does not recognize. `POST /v1/posts` is not idempotent: a second request with the same account, title, and text as a `published` or `scheduled` post from the last 24 hours returns `409 resource.conflict`. Send `skip_duplicate_check: true` to post the same content again. See [IDs](/guides/ids#create-requests-are-not-idempotent).
+
+## Where platform data goes
+
+Put platform-specific fields in `platform_data`, in one of 2 places:
+
+- **On the post, under the platform slug:** `platform_data.instagram` applies to every Instagram target.
+- **On a target, as flat keys:** `targets[].platform_data` applies to that target only.
+
+When both set the same key, the target's value wins. A platform slug used as a key inside a target's `platform_data` is dropped, so write `{"reply_control": "everyone"}` on a target, not `{"threads": {...}}`.
+
+```json
+{
+  "text": "New video is live.",
+  "publish_now": true,
+  "platform_data": {
+    "youtube": {"tags": ["launch"], "category_id": "22"}
+  },
+  "targets": [
+    {"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "platform_data": {"made_for_kids": false}}
+  ]
+}
+```
+
+The keys each platform accepts are on its publishing page, for example [YouTube platform data fields](/platforms/youtube/publishing#platform-data-fields).
+
+## Validate before you publish
+
+`POST /v1/posts/validate` checks a post without creating it and costs no credit. Name the platforms with `platforms`, `account_ids`, or `targets`. It accepts the same `text`, `media`, `scheduled_at`, `segments`, and `platform_data` fields as `POST /v1/posts`.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/validate \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Spring sale starts today: https://example.com/spring",
+    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"]
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": []
+}
+```
+
+`errors` lists the violations that block publishing. `warnings` lists the rest, for example text within 10% of a platform's length limit. Each issue has `platform`, `field`, `message`, and, when it applies to one target, `target` and `segment_index`. A `scheduled_at` that is not in the future returns `400 validation.field_invalid`. Calling it without any platform returns `400 validation.field_required`.
+
+`POST /v1/posts` runs the same validation unless you send `skip_validation: true`. A post with errors returns `400 publishing.validation_failed`, and `error.meta.issues` holds the same list. Drafts skip validation until you publish them.
+
+`GET /v1/posts/validate` returns each platform's text and media rules, so a client can check content before it sends a request. Add `?platform=instagram` for one platform. An unknown platform returns `400 validation.field_invalid`.
+
+```bash
+curl "https://api.social-api.ai/v1/posts/validate?platform=instagram" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": {
+    "instagram": {
+      "text": {"max_length": 2200, "counting_mode": "chars", "max_hashtags": 30, "max_mentions": 20},
+      "media": {
+        "supported_image_types": ["image/jpeg"],
+        "max_image_size_bytes": 8388608,
+        "supported_video_types": ["video/mp4", "video/quicktime"],
+        "max_video_size_bytes": 314572800,
+        "min_video_duration_sec": 3,
+        "max_video_duration_sec": 900
+      },
+      "carousel": {"supported": true, "min_items": 2, "max_items": 10, "allow_video": true, "images_only": false, "photos_only": false},
+      "scheduling": {"supported": true, "mode": "server_side"},
+      "supports_platform_attachment_id": true,
+      "supports_mixed_media": false
+    }
+  }
+}
+```
+
+The endpoint covers Instagram, Facebook, Threads, LinkedIn, YouTube, TikTok, Google Business Profile, Bluesky, and X. `counting_mode` is `chars`, `utf16`, or `bytes`. TikTok's per-creator privacy levels and maximum duration come from `GET /v1/accounts/{id}/creator-info`. See [TikTok publishing](/platforms/tiktok/publishing).
+
+## Drafts
+
+A post saved without `publish_now` or `scheduled_at` is a `draft`. It costs no credit, skips validation, and can have no targets.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Draft of the spring announcement."}'
+```
+
+The response is HTTP 201 with `"status": "draft"`. Publish it later with `POST /v1/posts/{pid}/publish`, which costs 1 post credit.
+## Edit a post before it publishes
+
+`PATCH /v1/posts/{pid}` changes a post that has not been delivered yet. Send only the fields you change.
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Spring sale starts tomorrow: https://example.com/spring"}'
+```
+
+The response is HTTP 200 with the updated post. Editing costs no credit.
+
+- **Editable statuses:** `draft`, `scheduled`, and `failed`. Any other status returns `409 post.state_invalid`, and `error.meta.state` is the current status. A `published` post cannot be edited on any platform, except a YouTube video, which has its own endpoint. See [YouTube publishing](/platforms/youtube/publishing).
+- **Editable fields:** `text`, `title`, `media`, `visibility`, `first_comment`, `scheduled_at`, `hidden`, `segments`, `platform_data`, and `targets`. Sending `targets` replaces all the post's targets.
+- **Validation:** an edit to content runs the validation again. It returns `400 publishing.validation_failed` for a post with errors, unless you send `skip_validation: true`.
+- **After a failure:** edit a `failed` post, then call `POST /v1/posts/{pid}/retry`.
+- **Event:** SocialAPI sends `post.updated` with `changed_fields`.
+
+## Import posts from a CSV file
+
+`POST /v1/posts/import` creates posts from a CSV file sent as multipart form data in the `file` field. The first row is a header and must start with the `text` column. The file holds at most 500 data rows and 5 MB.
+
+| Column | Description |
+|---|---|
+| `text` | The post body. Required |
+| `title` | The post title |
+| `account_ids` | Connected account IDs separated by `\|`. Each ID is one target |
+| `scheduled_at` | RFC 3339 time. A row without it is saved as a draft |
+| `visibility` | The visibility |
+| `first_comment` | The first comment |
+| `platform_data` | A JSON object applied to every target of the row |
+| `board_id` | The Pinterest board, applied to every target of the row. Give Pinterest its own row |
+
+Columns are read by position, in this order. A row can end early: only `text` is required. There is no `publish_now` column, so an imported post is a draft or a scheduled post.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/posts/import?dry_run=true" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -F "file=@posts.csv"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "total_rows": 3,
+  "created": 0,
+  "failed": 1,
+  "errors": [
+    {"row": 3, "message": "invalid date format for scheduled_at"}
+  ],
+  "posts": []
+}
+```
+
+`dry_run=true` checks every row and creates nothing. Row numbers count the header as row 1, so the first data row is row 2. A malformed file returns `400 validation.field_invalid`. When the valid rows need more post credits than you have left, the request returns `429 billing.post_limit` and creates nothing. Each created post is a normal post: it costs 1 post credit when scheduled and nothing as a draft.
+
+## Unpublish and delete
+
+`POST /v1/posts/{pid}/unpublish` removes the published copies from the platforms and keeps the post. `DELETE /v1/posts/{pid}` deletes a post, and also removes its published copies. Both are documented, with their responses, in [Track post delivery](/guides/delivery#delete-a-post).
+
+## Platform support
+
+Each platform accepts different content, sizes, and `platform_data` keys. The cross-platform matrix is on [Platform support](/platforms/overview). The details are on each platform's publishing page:
+
+- [Instagram](/platforms/instagram/publishing)
+- [Facebook](/platforms/facebook/publishing)
+- [Threads](/platforms/threads/publishing)
+- [TikTok](/platforms/tiktok/publishing)
+- [YouTube](/platforms/youtube/publishing)
+- [LinkedIn](/platforms/linkedin/publishing)
+- [X / Twitter](/platforms/twitter/publishing)
+- [Pinterest](/platforms/pinterest/publishing)
+- [Google Business Profile](/platforms/google/publishing)
+- [Zalo](/platforms/zalo/publishing)
+- [Bluesky](/platforms/bluesky/publishing)
+
+Every platform accepts `scheduled_at`. A platform that cannot do something returns the error described on its page, for example `501 resource.not_supported`.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Post credits | 1 per published or scheduled post, whatever the number of targets. At the allowance, `POST /v1/posts` returns `429 validation.post_limit_exhausted` |
+| Posting speed per account | Per hour and per 24 hours, by platform. At the cap, an immediate publish returns `429 publishing.velocity_limit`. See [Rate limits](/guides/rate-limits#posting-velocity-caps) |
+| CSV import | 500 data rows and 5 MB per file |
+
+## Errors
+
+`400 publishing.validation_failed`, `409 resource.conflict`, `409 post.state_invalid`, and `429 publishing.velocity_limit` are the codes you branch on most. Every code is in [Errors](/guides/errors#publish-a-post). A failure after the request returned appears on the target, not as an HTTP error. See [Track post delivery](/guides/delivery#target-errors).
+
+## Scopes
+
+| Scope | Grants |
+|---|---|
+| `posts:read` | List and read posts |
+| `posts:write` | Create, edit, publish, retry, unpublish, validate, import, and delete posts |
+| `media:write` | Upload and verify the media a post uses |
+
+A brand-restricted key can publish only to accounts in its brands. See [Scoped API keys](/guides/scoped-keys).
+
+## Events
+
+| Event | When it fires |
+|---|---|
+| `post.scheduled` | You create a scheduled post |
+| `post.updated` | You edit a post |
+| `post.published`, `post.partial`, `post.failed` | The post settles. Each fires once |
+| `post.retried` | You retry a post |
+| `post.unpublished`, `post.deleted` | You unpublish or delete a post |
+
+Payloads are in [Webhook events](/guides/webhook-events).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_create_post` | Creates, schedules, or publishes a post |
+| `social_api_update_post` | Edits a draft, scheduled, or failed post |
+| `social_api_publish_post` | Publishes a draft or scheduled post now |
+| `social_api_validate_post` | Checks a post without creating it |
+| `social_api_get_constraints` | Returns each platform's rules |
+
+The import endpoint has no tool. See [MCP tools](/integrations/tools).
+
+## Related
+
+- [Track post delivery](/guides/delivery): statuses, HTTP codes, target errors, retry, and delete
+- [Schedule posts](/guides/scheduling): publish at a chosen time
+- [Upload media](/guides/media): upload files and attach media
+- [Platform support](/platforms/overview): what each platform publishes
+- [Errors](/guides/errors): every error code with its HTTP status

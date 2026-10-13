@@ -1,0 +1,284 @@
+---
+title: "Plans and usage"
+description: "Compare SocialAPI plans, see what costs a post or interaction credit, read your usage from the API, and learn what happens when a payment fails."
+---
+
+Every SocialAPI plan includes every platform and every feature, with two exceptions listed below. Plans differ by allowances: how many brands you can create, how many posts and interactions you can send per billing period, how much media you can store, how long your history is kept, and how many analytics exports you can run.
+
+A brand groups the connected accounts of one business, client, or project. Pricing pages call a brand a "profile": the two words mean the same thing.
+
+Compare prices on the [pricing page](https://social-api.ai/pricing) and change your plan in the dashboard under **Billing**.
+
+## Plan allowances
+
+| Plan (`tier`) | Name | Brands | Posts per billing period | Interactions per billing period | Media storage | Price per month | Price per year |
+|---|---|---|---|---|---|---|---|
+| Free (`free`) | Hobby | 2 | 10 | 50 | 100 MB | $0 | $0 |
+| Starter (`starter`) | Side Hustle | 10 | Unlimited | Unlimited | Unlimited | $29 | $278 |
+| Pro (`pro`) | Full Send | 50 | Unlimited | Unlimited | Unlimited | $109 | $1,044 |
+| Business (`business`) | Empire | 200 | Unlimited | Unlimited | Unlimited | $349 | $3,348 |
+| Enterprise (`enterprise`) | Enterprise | Unlimited | Unlimited | Unlimited | Unlimited | Custom | Custom |
+
+Prices are in USD. 100 MB is 104,857,600 bytes.
+
+What each limit returns when you reach it:
+
+| Allowance | When you reach it |
+|---|---|
+| Brands | Creating another brand returns `403 billing.brands_limit` |
+| Posts | The next publish returns `429 validation.post_limit_exhausted` |
+| Interactions | The next reply or DM returns `429 validation.interaction_limit_exhausted` |
+| Media storage | An upload that would exceed it returns `413 billing.storage_quota`. See [Media](/guides/media) |
+
+Two features depend on the plan rather than on an allowance:
+
+- **WhatsApp template messages** need a paid plan. On the Free plan, `POST /v1/platforms/whatsapp/accounts/{id}/send-template` returns `403 whatsapp.paid_plan_required`. Replies to people who messaged you first work on every plan. See [WhatsApp templates](/platforms/whatsapp/templates).
+- **Visual analysis in exports** (`include_vision`) needs a paid plan. On the Free plan, SocialAPI ignores `include_vision: true` and runs the export without it.
+
+### Profile packs
+
+On the Pro (Full Send) and Business (Empire) plans, your brand allowance grows in Profile packs of 50 brands. When your brand count reaches the scale threshold of your allowance (90% by default), SocialAPI adds a pack, within the pack budget you set. Packs you no longer need are released at the end of the billing period. Set the threshold and the budget in the dashboard under **Billing**. Each pack held raises `brands_limit` in `GET /v1/usage` by 50.
+
+## History and export allowances
+
+| Allowance | Free | Starter | Pro | Business | Enterprise |
+|---|---|---|---|---|---|
+| Event history in `GET /v1/events` | 1 day | 7 days | 30 days | 90 days | 90 days |
+| Webhook delivery log | 3 days | 7 days | 30 days | 90 days | 90 days |
+| Analytics exports per billing period | 2 | 10 | 20 | Unlimited | Unlimited |
+| Videos per export | 30 | 200 | 500 | All | All |
+| Wait between 2 exports of the same connected account | 7 days | 24 hours | 1 hour | 1 hour | None |
+| Report link lifetime | 7 days | 30 days | 30 days | 90 days | 90 days |
+| Transcripts (`include_transcript`) | Yes | Yes | Yes | Yes | Yes |
+| Visual analysis (`include_vision`) | No | Yes | Yes | Yes | Yes |
+
+Your SocialAPI account runs 1 export at a time on every plan. When an export cannot start:
+
+- The billing period's export allowance is used up: `429 billing.export_limit`. It resets at the start of the next billing period.
+- The same connected account was exported less than the wait above ago: `429 billing.export_cooldown`.
+- Another export is still running: `429 billing.export_concurrent`.
+
+Pinterest accounts cannot be exported on any plan: an export returns `400 account.exports_not_supported`.
+
+## The plan catalog
+
+`GET /v1/billing/plans` returns every plan with its prices and allowances, ordered from cheapest to most expensive. Read it instead of hardcoding the table above. Any API key can call it, and it costs no credits.
+
+```bash
+curl https://api.social-api.ai/v1/billing/plans \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200), shortened to 2 of the 5 plans:
+
+```json
+{
+  "plans": [
+    {
+      "tier": "free",
+      "name": "Hobby",
+      "tagline": "Kick the tires, no card required",
+      "monthly_price_usd": 0,
+      "annual_price_usd": 0,
+      "popular": false,
+      "limits": {
+        "profiles": 2,
+        "posts_per_month": 10,
+        "interactions_per_month": 50,
+        "storage_bytes": 104857600,
+        "event_retention_days": 1,
+        "exports_per_month": 2
+      }
+    },
+    {
+      "tier": "pro",
+      "name": "Full Send",
+      "tagline": "For growing teams and products",
+      "monthly_price_usd": 109,
+      "annual_price_usd": 1044,
+      "popular": true,
+      "limits": {
+        "profiles": 50,
+        "posts_per_month": -1,
+        "interactions_per_month": -1,
+        "storage_bytes": -1,
+        "event_retention_days": 30,
+        "exports_per_month": 20
+      }
+    }
+  ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `tier` | The plan's identifier: `free`, `starter`, `pro`, `business`, or `enterprise` |
+| `name` | The plan's display name |
+| `monthly_price_usd` | Price per month in USD. `-1` means custom pricing |
+| `annual_price_usd` | Price for a full year in USD, charged once per year. `-1` means custom pricing |
+| `popular` | `true` for the plan the pricing page highlights |
+| `limits.profiles` | Brands allowed. `-1` means unlimited |
+| `limits.posts_per_month` | Post credits per billing period. `-1` means unlimited |
+| `limits.interactions_per_month` | Interaction credits per billing period. `-1` means unlimited |
+| `limits.storage_bytes` | Media storage in bytes. `-1` means unlimited |
+| `limits.event_retention_days` | Days of event history in `GET /v1/events` |
+| `limits.exports_per_month` | Analytics exports per billing period. `-1` means unlimited |
+
+## What counts as a post or interaction
+
+Post and interaction credits are counted on plans with a post or interaction allowance (the Free plan). On plans where both are unlimited, nothing is counted and `posts_used` and `interactions_used` stay at `0`.
+
+**1 post credit** for each of these requests:
+
+- `POST /v1/posts` with `publish_now: true` or a `scheduled_at`. Saving a draft costs nothing.
+- `POST /v1/posts/{pid}/publish`, which publishes a draft or a scheduled post. It costs 1 credit even when the post was scheduled with `POST /v1/posts`, which already cost 1 credit.
+- `POST /v1/posts/{pid}/retry`.
+
+A post costs 1 credit whatever the number of targets.
+
+**1 interaction credit** for each of these requests:
+
+- A public reply to a comment: `POST /v1/inbox/comments/{postId}`.
+- A reply to a review: `POST /v1/inbox/reviews/{id}/reply`.
+- A reply to a mention: `POST /v1/accounts/{id}/mentions/reply`.
+- A DM: `POST /v1/inbox/conversations/{id}/messages`. One request costs 1 credit, even when it sends more than one message.
+- A WhatsApp template: `POST /v1/platforms/whatsapp/accounts/{id}/send-template`.
+
+**No credit** for everything else, including private replies, hiding, liking, or deleting a comment, reactions to messages, every read, and every account, brand, key, webhook, and Automation operation.
+
+The same rules apply to [MCP tools](/integrations/tools) and to the actions an [Automation](/guides/automations) carries out: each costs what the equivalent API request costs.
+
+### When a credit comes back
+
+SocialAPI gives the credit back when:
+
+- Any request that costs a credit fails with a `validation.*` error.
+- `POST /v1/posts` fails with `publishing.validation_failed` or `publishing.velocity_limit`.
+- Every target of `POST /v1/posts` with `publish_now: true`, or of `POST /v1/posts/{pid}/publish`, fails.
+- A reply or DM is refused by the [messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
+
+Any other failure keeps the credit spent, including a request the platform refuses, a `409 resource.conflict` for duplicate content, and a retry that fails again.
+
+## Billing periods
+
+Allowances reset at the start of each billing period.
+
+- **Paid plans:** the billing period is your subscription's current period. It starts on the date you subscribed and renews with each payment.
+- **Free plan:** the billing period starts at 00:00 UTC on the day of the month your SocialAPI account was created, and ends at the same time on that day of the next month.
+
+`period_start` and `period_end` in `GET /v1/usage` give the exact bounds of the current period.
+
+## Check your usage
+
+`GET /v1/usage` returns what you used in the current billing period and your allowances. Any API key can call it, and it costs no credits.
+
+```bash
+curl https://api.social-api.ai/v1/usage \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200) for a SocialAPI account on the Free plan:
+
+```json
+{
+  "brands_used": 1,
+  "brands_limit": 2,
+  "profile_units_used": 1,
+  "profile_units_limit": 2,
+  "page_allowance": 2,
+  "page_billing_exempt": false,
+  "posts_used": 7,
+  "posts_limit": 10,
+  "interactions_used": 23,
+  "interactions_limit": 50,
+  "period_start": "2026-10-04T00:00:00Z",
+  "period_end": "2026-11-04T00:00:00Z"
+}
+```
+
+| Field | Description |
+|---|---|
+| `brands_used` | Brands in your SocialAPI account |
+| `brands_limit` | Brands your plan allows, including Profile packs. `-1` means unlimited |
+| `profile_units_used` | Always equal to `brands_used` |
+| `profile_units_limit` | Always equal to `brands_limit` |
+| `page_allowance` | Ignore this field |
+| `page_billing_exempt` | Deprecated. Facebook Pages are not billed: ignore this field |
+| `posts_used` | Post credits spent in the current billing period |
+| `posts_limit` | Post credits per billing period. `-1` means unlimited |
+| `interactions_used` | Interaction credits spent in the current billing period |
+| `interactions_limit` | Interaction credits per billing period. `-1` means unlimited |
+| `period_start` | Start of the current billing period (ISO 8601, UTC) |
+| `period_end` | End of the current billing period (ISO 8601, UTC). Credits reset at this time |
+
+`GET /v1/media/storage` returns your media storage: `used_bytes`, `limit_bytes` (`-1` means unlimited), and `count`, the number of stored files.
+
+### Usage headers
+
+Responses also report usage in headers, so you can track it without calling `GET /v1/usage`:
+
+| Header | Sent on | Value |
+|---|---|---|
+| `X-Posts-Limit` | Requests that spend a post credit, on a plan with a post allowance | Post credits per billing period |
+| `X-Posts-Remaining` | Same as `X-Posts-Limit` | Post credits left in the current billing period |
+| `X-Interactions-Limit` | Requests that spend an interaction credit, on a plan with an interaction allowance | Interaction credits per billing period |
+| `X-Interactions-Remaining` | Same as `X-Interactions-Limit` | Interaction credits left in the current billing period |
+| `X-Storage-Used` | `GET /v1/media/storage`, `GET /v1/media/upload-url`, `POST /v1/media/upload`, and `POST /v1/media/{id}/verify`, on every plan | Bytes of media stored |
+| `X-Storage-Limit` | Same as `X-Storage-Used` | Media storage allowance in bytes. `-1` means unlimited |
+
+## When you reach an allowance
+
+Over the post or interaction allowance, the request returns HTTP 429 and nothing is sent:
+
+```json
+{
+  "error": {
+    "code": "validation.post_limit_exhausted",
+    "message": "Monthly post limit exhausted"
+  },
+  "request_id": "a1b2c3d4"
+}
+```
+
+The interaction allowance returns the same shape with `validation.interaction_limit_exhausted`. Both reset at `period_end`. To continue before then, upgrade your plan.
+
+`POST /v1/posts/import` checks the allowance before it creates anything. When the CSV holds more valid rows than you have post credits left, it returns `429 billing.post_limit` and creates no post.
+
+The request rate limit and the posting and messaging velocity caps are separate from plan allowances: upgrading does not raise them. See [Rate limits](/guides/rate-limits).
+
+## Change or cancel your plan
+
+Change or cancel your plan in the dashboard under **Billing**. A cancelled subscription moves your SocialAPI account to the Free plan at the end of the billing period.
+
+When a plan change lowers your allowances:
+
+- Brands above the new allowance stay. Creating another brand returns `403 billing.brands_limit` until you are below the allowance.
+
+## Past-due accounts
+
+Your SocialAPI account becomes past due when a subscription payment fails for the second time (the first charge and one automatic retry). While it is past due:
+
+- **API:** every `/v1` request returns `402 billing.past_due`, except `GET /v1/users/me`, `PATCH /v1/users/me`, and every `/v1/billing/*` endpoint, which stay available so you can pay.
+- **MCP server:** every request returns HTTP 402 with the code `billing.past_due`.
+- **Webhooks:** SocialAPI delivers no events to your webhook endpoints. Events from this time are not queued, get no delivery record, and are not sent after you pay.
+- **Automations:** Automations carry out no actions and record no Firings.
+- **Platform events:** SocialAPI still records comments, messages, and other platform events. Read them with `GET /v1/events` after you pay, within your plan's event history.
+- **Scheduled posts:** scheduled posts still publish at their scheduled time.
+
+`GET /v1/users/me` shows the state: `billing_blocked` is `true`, `billing_blocked_at` is when it began, and `billing_block_reason` is `past_due`.
+
+Pay the open invoice in the dashboard under **Billing** to restore access. Access returns when the payment succeeds, with no request to make. If every automatic retry fails and the subscription is cancelled, your SocialAPI account moves to the Free plan and access returns on the Free plan's allowances.
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_get_usage` | Returns the `brands_*`, `posts_*`, `interactions_*`, `period_start`, and `period_end` fields of `GET /v1/usage`. It omits `profile_units_*`, `page_allowance`, and `page_billing_exempt` |
+| `social_api_get_storage_usage` | Returns bytes used, the storage allowance in bytes (`-1` means unlimited), and the number of stored files |
+
+## Related
+
+- [Rate limits](/guides/rate-limits): posting and messaging velocity caps, and platform limits that apply on every plan
+- [Errors](/guides/errors): every `billing.*` code with its status
+- [Media](/guides/media): uploads, storage, and the storage quota
+- [Webhooks](/guides/webhooks): event delivery and the delivery log
+- [Automations](/guides/automations): what each action costs

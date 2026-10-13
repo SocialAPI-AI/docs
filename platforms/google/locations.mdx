@@ -1,0 +1,322 @@
+---
+title: Google Business Profile locations
+sidebarTitle: "Locations"
+description: Read, assign, and update Google Business Profile locations, and manage the photos and videos on a location's public profile.
+icon: "map-pin"
+---
+
+A Google Business Profile location is one business listing on Google Search and Maps. In SocialAPI, each connected `google` account is one location. These endpoints list the locations a Google login manages, connect another one to a brand, update a location's public profile, and manage the photos and videos on it.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/platforms/google/logins/{loginId}/locations` | List every location a Google login manages, with its details and assignment |
+| `POST` | `/v1/platforms/google/logins/{loginId}/locations/{locationId}/assign` | Connect a location from the login to a brand |
+| `PUT` | `/v1/platforms/google/accounts/{id}` | Update a location's public profile |
+| `GET` | `/v1/platforms/google/accounts/{id}/media` | List the photos and videos on a location's profile |
+| `GET` | `/v1/platforms/google/accounts/{id}/media/{mediaId}` | Read one photo or video |
+| `POST` | `/v1/platforms/google/accounts/{id}/media` | Add one photo or video to the profile |
+| `DELETE` | `/v1/platforms/google/accounts/{id}/media/{mediaId}` | Remove a photo or video you added |
+
+`{loginId}` is the `login_id` returned when you connect Google and on every Google account: see [Choose a Google Business Profile](/guides/connect-accounts#choose-a-google-business-profile). `{id}` is the connected account ID (`acc_...`). The full schemas are in the [API reference](/api-reference/google/list-a-google-logins-business-profile-locations).
+
+## Read a location's details
+
+`GET /v1/platforms/google/logins/{loginId}/locations` returns the locations the Google login can manage, read from Google at request time. A location added in Google Business Profile after the login was authorized appears at once, with no new consent screen.
+
+```bash
+curl https://api.social-api.ai/v1/platforms/google/logins/cred_01J8X3Q4R5M6N7P8V2K0W1JA/locations \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "login_id": "cred_01J8X3Q4R5M6N7P8V2K0W1JA",
+  "login_name": "Joe Rossi",
+  "login_email": "joe@example.com",
+  "count": 1,
+  "locations": [
+    {
+      "platform_account_id": "accounts/123/locations/456",
+      "name": "Joe's Pizza (Downtown)",
+      "bio": "Wood-fired pizza since 1998",
+      "category": "Pizza restaurant",
+      "maps_uri": "https://maps.google.com/?cid=123",
+      "assignable": false,
+      "assigned_brand_id": "7d3b2c1a-5e4f-4a6b-9c8d-0e1f2a3b4c5d",
+      "assigned_brand_name": "Joe's Pizza",
+      "assigned_account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "details": {
+        "place_id": "ChIJabc",
+        "new_review_uri": "https://g.page/r/abc/review",
+        "website_uri": "https://joes.example",
+        "primary_phone": "+33 1 23 45 67 89",
+        "storefront_address": {
+          "region_code": "FR",
+          "postal_code": "75001",
+          "locality": "Paris",
+          "address_lines": ["12 rue de Rivoli"]
+        },
+        "primary_category": { "name": "categories/gcid:pizza_restaurant", "display_name": "Pizza restaurant" },
+        "latlng": { "latitude": 48.8566, "longitude": 2.3522 },
+        "regular_hours": [
+          { "open_day": "MONDAY", "open_time": "09:00", "close_day": "MONDAY", "close_time": "17:30" }
+        ],
+        "open_status": "OPEN",
+        "language_code": "en",
+        "has_voice_of_merchant": true,
+        "can_operate_local_post": true
+      }
+    }
+  ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `login_id`, `login_name`, `login_email` | The Google login. `login_name` and `login_email` are absent for a login authorized before SocialAPI stored them |
+| `count` | The number of locations in `locations` |
+| `locations[].platform_account_id` | Google's resource name for the location, for example `accounts/123/locations/456` |
+| `locations[].name`, `bio`, `category`, `maps_uri` | The location's name, description, primary category, and Google Maps link |
+| `locations[].assignable` | `true` when no brand holds the location. `false` when a brand holds it: `assigned_brand_id`, `assigned_brand_name`, and `assigned_account_id` then name it |
+| `locations[].details` | Everything else Google publishes about the location, in the table below |
+
+`details` carries these fields. Each one is absent when Google returns no value for it, so treat every field as optional. A service-area business (a locksmith, a plumber) has no `storefront_address` and carries `service_area` instead.
+
+| Field | Description |
+|---|---|
+| `place_id` | The Google Places identifier. Use it to join a location to Places, Maps, and Geocoding results |
+| `new_review_uri` | The short link that opens Google's review form for the location |
+| `website_uri`, `primary_phone`, `additional_phones`, `ad_phone` | Website and phone numbers. `ad_phone` is the number shown on Google Ads extensions |
+| `storefront_address` | `region_code`, `postal_code`, `administrative_area`, `locality`, `sublocality`, `sorting_code`, `organization`, and `address_lines` |
+| `primary_category`, `additional_categories` | Each has `name` (`categories/gcid:...`) and `display_name` |
+| `latlng` | `latitude` and `longitude` |
+| `regular_hours`, `special_hours`, `more_hours` | Weekly hours, holiday and exception hours, and hours for a department such as a drive-through |
+| `open_status`, `opening_date` | `OPEN`, `CLOSED_PERMANENTLY`, or `CLOSED_TEMPORARILY`, and the opening date |
+| `service_area`, `service_items`, `relationship_data` | Where a business without a storefront operates, the services it offers with prices, and its chain and parent or child locations |
+| `store_code`, `labels`, `language_code` | Your own code and labels for the location, and its language |
+| `has_voice_of_merchant` | `true` when the merchant controls the profile. `false` when the merchant does not: publishing and replying fail until the merchant resolves it in Google Business Profile. Absent when Google reported nothing |
+| `has_pending_edits`, `has_google_updated` | Edits awaiting Google's review, and updates Google suggested |
+| `can_operate_local_post`, `can_have_food_menus`, and the other `can_*` flags | Which Google surfaces the location supports. `can_operate_local_post` says whether the location supports local posts |
+| `duplicate_location` | Present when Google flagged the location as a duplicate |
+
+A boolean flag that is absent means Google told SocialAPI nothing. It does not mean `false`: check that the key is present before treating a flag as a denial.
+
+## Connect another location to a brand
+
+`POST /v1/platforms/google/logins/{loginId}/locations/{locationId}/assign` connects one location from the login to a brand, without a second consent screen. `{locationId}` is the `platform_account_id`, with the slashes either sent as they are or URL-encoded as `%2F`.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/platforms/google/logins/cred_01J8X3Q4R5M6N7P8V2K0W1JA/locations/accounts%2F123%2Flocations%2F789/assign" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"brand_id": "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d"}'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1K",
+  "brand_id": "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d",
+  "platform_account_id": "accounts/123/locations/789"
+}
+```
+
+The rules:
+
+- **One brand per location.** A location belongs to exactly 1 brand. Assigning a location that another brand holds returns `400 validation.location_already_assigned`.
+- **One Google Business Profile per brand.** A brand holds at most 1 location. Assigning a second location to the same brand returns `409 platform.google.brand_has_account`. Disconnect the first account, or assign the location to another brand.
+- **The login must still grant the location.** A location the login no longer manages returns `400 validation.location_not_granted`.
+- **The brand must exist.** An unknown brand returns `404 brand.not_found`. A missing `brand_id` returns `400 validation.field_required`.
+- **Cost.** Assigning a location costs no credits.
+
+When the Google login manages more than 1 location, the connect flow pauses so you choose one. The other locations stay available on the same login: assign each to another brand with this endpoint.
+
+## Update a location
+
+`PUT /v1/platforms/google/accounts/{id}` writes the location's public profile. Send only the fields you want to change:
+
+```bash
+curl -X PUT https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "website_uri": "https://joes-pizza.example",
+    "phone_numbers": { "primary_phone": "+33 1 23 45 67 89" },
+    "regular_hours": {
+      "periods": [
+        { "open_day": "MONDAY", "open_time": "09:00", "close_day": "MONDAY", "close_time": "17:30" }
+      ]
+    }
+  }'
+```
+
+Response (HTTP 200): the location as Google now holds it, in `data`, in the shape of `details` above:
+
+```json
+{
+  "data": {
+    "website_uri": "https://joes-pizza.example",
+    "primary_phone": "+33 1 23 45 67 89",
+    "regular_hours": [
+      { "open_day": "MONDAY", "open_time": "09:00", "close_day": "MONDAY", "close_time": "17:30" }
+    ],
+    "has_pending_edits": true
+  }
+}
+```
+
+The writable fields:
+
+| Field | Description |
+|---|---|
+| `title`, `description`, `store_code`, `website_uri`, `ad_phone` | Strings |
+| `labels` | Array of strings. Replaces the whole list |
+| `phone_numbers` | `primary_phone` (string) and `additional_phones` (array, replaces the whole list) |
+| `storefront_address` | Any of `region_code`, `postal_code`, `administrative_area`, `locality`, `sublocality`, `sorting_code`, `organization`, `address_lines` |
+| `latlng` | `latitude` and `longitude` |
+| `categories` | `primary_category` and `additional_categories` (array, replaces the whole list), as `categories/gcid:...` names |
+| `open_status` | `OPEN`, `CLOSED_PERMANENTLY`, or `CLOSED_TEMPORARILY` |
+| `regular_hours`, `special_hours` | `{ "periods": [...] }`. Replaces all periods. Google rejects `special_hours` on a location with no `regular_hours` |
+| `more_hours` | Array of `{ "hours_type_id": "DRIVE_THROUGH", "periods": [...] }`. Replaces the whole list |
+| `service_area` | `business_type` (`CUSTOMER_LOCATION_ONLY` or `CUSTOMER_AND_BUSINESS_LOCATION`) and `place_ids` (array) |
+
+<Warning>
+  A field you omit is left alone. A field you send with an empty value is cleared: `"website_uri": ""` removes the website. Send only the fields you mean to change, and never send back a location you just read. Fields the read omitted would arrive empty and erase what is there.
+</Warning>
+
+Lists replace instead of merging: `regular_hours.periods`, `labels`, `additional_phones`, and `additional_categories` each overwrite the whole list, so include every entry you want to keep. Objects merge: inside `storefront_address` you can send only `postal_code` and the rest of the address stays.
+
+Not writable: `place_id`, `maps_uri`, `new_review_uri`, and the status flags are output only. `language_code` is fixed when the location is created. A request with none of the writable fields returns `400 validation.no_fields_to_update`. A value Google rejects returns `502 platform.google.api_error`, with Google's reason in `error.message`.
+
+### Validate before you write
+
+Google has no sandbox, so every write changes a real Business Profile. Add `validate_only=true` to have Google check the change and apply nothing:
+
+```bash
+curl -X PUT "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J?validate_only=true" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "title": "Joe'"'"'s Pizza (Downtown)" }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "data": {}, "validated": true }
+```
+
+### Edits are moderated
+
+A `200` means Google accepted the change for review. It does not mean the change is live on Search and Maps. Read the location back to see what is live, and check `details.has_pending_edits` for edits still under review.
+
+## Profile media
+
+A location's profile carries its own photos and videos: the logo, the cover image, interior and exterior shots. They are separate from the media attached to a post, and they are what customers see on the listing.
+
+`GET /v1/platforms/google/accounts/{id}/media` lists them:
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/media" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "items": [
+    {
+      "id": "accounts/123/locations/456/media/789",
+      "media": { "url": "https://lh3.googleusercontent.com/p/abc", "type": "image" },
+      "category": "INTERIOR",
+      "description": "Main dining room",
+      "width_pixels": 1600,
+      "height_pixels": 1200,
+      "created_at": "2026-03-01T12:00:00Z"
+    }
+  ],
+  "count": 1,
+  "total_count": 42,
+  "next_cursor": "CiAKGjB4MTIzNDU2Nzg"
+}
+```
+
+| Field | Description |
+|---|---|
+| `items[].id` | Google's resource name for the item |
+| `items[].media` | `url` and `type`, the same object review photos and post attachments use |
+| `items[].category` | Where the item sits on the profile |
+| `items[].thumbnail_url`, `description`, `width_pixels`, `height_pixels`, `created_at` | Present when Google reports them |
+| `count` | The items on this page |
+| `total_count` | The items on the location across all pages. 0 for an empty gallery |
+| `next_cursor` | Pass it as `cursor` for the next page. Absent on the last page. `limit` sets the page size |
+
+`GET /v1/platforms/google/accounts/{id}/media/{mediaId}` returns one item. `mediaId` accepts the bare ID or the full resource name from the list.
+
+### Add a photo or video
+
+`POST /v1/platforms/google/accounts/{id}/media` adds one item. `media` takes exactly 1 entry, in the same `{source_type, source}` form the publishing endpoints accept:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/media \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "media": [{ "source_type": "media_id", "source": "550e8400-e29b-41d4-a716-446655440000" }],
+    "category": "INTERIOR",
+    "description": "Main dining room"
+  }'
+```
+
+Response (HTTP 201): the new item, in the shape of a list item.
+
+| `source_type` | Use it for |
+|---|---|
+| `media_id` | A file in your [media library](/guides/media). SocialAPI reads the photo or video format from the file |
+| `url` | A public URL Google can reach |
+| `platform_attachment_id` | Bytes you uploaded to Google yourself. `source` is the resource name Google returned. Set `type` as well, because there is no file to read it from |
+
+`category` is one of `COVER`, `PROFILE`, `LOGO`, `EXTERIOR`, `INTERIOR`, `PRODUCT`, `AT_WORK`, `FOOD_AND_DRINK`, `MENU`, `COMMON_AREA`, `ROOMS`, `TEAMS`, or `ADDITIONAL`. `PROFILE` sets the avatar shown for the location. `LOGO` is the fallback when no `PROFILE` photo exists.
+
+A request with other than 1 media entry returns `422 google.media.single_item_required`. An unknown `category` returns `422 google.media.invalid_category`. A media entry that cannot be resolved returns `422 google.media.unresolvable`.
+
+### Remove a photo or video
+
+`DELETE /v1/platforms/google/accounts/{id}/media/{mediaId}` removes an item you added and returns `204` with no body. `mediaId` accepts the bare ID or the full resource name.
+
+### Photos your customers posted
+
+Customers add their own photos to a listing. They live in a separate read-only gallery. Read it with `contributed=true`:
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/media?contributed=true" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each item carries an `attribution` block with `profile_name`, `profile_photo_url`, `profile_url`, and `takedown_url`. Google requires you to display the attribution exactly as given, without changing or removing it. A delete on a customer photo returns `403 platform.google.access_denied`. Report the photo to Google through its `takedown_url` instead.
+
+## Limits
+
+| Limit | Value | When it is hit |
+|---|---|---|
+| Edits | 10 per minute per Business Profile | Updates, and photo or video adds and deletes, count together. Google cannot raise it. The 11th edit in a minute returns `429 platform.google.rate_limit`. Wait, then retry |
+
+## Scopes
+
+| Operation | Scope |
+|---|---|
+| List a login's locations, list and read media | `accounts:read` |
+| Assign a location, update a location, add or delete media | `accounts:manage` |
+
+## Related
+
+- [Google Business Profile API](/platforms/google): capabilities, connect rules, and limits for the platform
+- [Reviews](/platforms/google/reviews): list and reply to the reviews on a location
+- [Google Business Profile publishing](/platforms/google/publishing): publish local posts to a location
+- [Connect accounts](/guides/connect-accounts#choose-a-google-business-profile): choose a location when a login manages more than 1
+- [Errors](/guides/errors): every error code

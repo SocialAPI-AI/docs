@@ -1,0 +1,206 @@
+---
+title: Google Business Profile reviews
+sidebarTitle: "Reviews"
+description: List the Google reviews on a Business Profile location, reply to them, and handle Google's moderation of replies and the review webhook events.
+icon: "star"
+---
+
+Google Business Profile is the only platform with reviews in SocialAPI. These endpoints list the reviews on a connected location, report its rating summary, and post the business's public reply. Google moderates every reply: a reply is accepted first and goes live only after Google approves it. For the platform-independent review workflow, see [Reviews](/guides/reviews).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/reviews` | List your review-capable accounts, each with its rating summary |
+| `GET` | `/v1/inbox/reviews/{account_id}` | List the reviews of one account, with the account's summary |
+| `POST` | `/v1/inbox/reviews/{id}/reply` | Post the business's public reply to a review |
+
+Reviews cannot be created or deleted through the API, and SocialAPI has no endpoint to edit or delete a reply. To change a reply, send a new one: a review has one business reply, and a new reply replaces it.
+
+## The two list endpoints
+
+The two `GET` endpoints answer different questions:
+
+- **`GET /v1/inbox/reviews`** returns one row per review-capable account: the account, its average rating, its review count, and the time of its newest review. Use it to build a list of locations. It returns no reviews. Add `platform=google` to filter.
+- **`GET /v1/inbox/reviews/{account_id}`** returns the reviews of the 1 account you name. Use it to read, sort, and page through them.
+
+```bash
+curl https://api.social-api.ai/v1/inbox/reviews \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "name": "Joe's Pizza (Downtown)",
+      "platform": "google",
+      "average_rating": 4.2,
+      "total_count": 87,
+      "last_review_at": "2026-06-22T02:24:05Z",
+      "status": "ok"
+    }
+  ]
+}
+```
+
+`status` is `ok`, `reconnection_required` (the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account)), or `error` (Google did not answer in time). `average_rating`, `total_count`, and `last_review_at` are `null` unless `status` is `ok`. A failing account never fails the whole list.
+
+## List the reviews of a location
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/reviews/acc_01HZ9X3Q4R5M6N7P8V2K0W1J?limit=20&order=newest" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+| Parameter | Description |
+|---|---|
+| `limit` | 1 to 50 reviews per page. The default is 20. A value above 50 is treated as 50. A value below 1 returns `400 validation.field_invalid` |
+| `cursor` | The `next_cursor` of the previous page |
+| `order` | `newest` (default), `rating_asc`, or `rating_desc`. Another value returns `400 validation.field_invalid` |
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "rating": 3,
+      "text": "Great pizza, slow service.",
+      "author": {
+        "name": "Jane Smith",
+        "avatar_url": "https://lh3.googleusercontent.com/a/abc"
+      },
+      "media": [
+        {
+          "thumbnail_label": "Storefront",
+          "thumbnail_url": "https://lh3.googleusercontent.com/p/abc"
+        }
+      ],
+      "reply": {
+        "state": "APPROVED",
+        "text": "Thanks for the feedback!",
+        "updated_at": "2026-06-21T10:00:00Z"
+      },
+      "reply_url": "https://business.google.com/reviews/reply/abc",
+      "created_at": "2026-06-20T18:24:31Z",
+      "updated_at": "2026-06-20T18:24:31Z"
+    }
+  ],
+  "summary": { "average_rating": 4.2, "total_count": 87 },
+  "pagination": { "has_more": true, "next_cursor": "CgwI9ZyPyQYQ6IiYuQE" }
+}
+```
+
+| Field | Description |
+|---|---|
+| `id` | The review's SocialAPI ID (`sapi_rev_...`). Use it in the reply path |
+| `rating` | 1 to 5. 0 when Google gave no rating |
+| `text` | The review text. Empty for a rating-only review |
+| `author` | `name` and `avatar_url`. Both are empty for an anonymous reviewer |
+| `media` | Photos or videos the reviewer attached. Each has `thumbnail_url`, and optionally `thumbnail_label` and `video_url` (videos only). Absent when there are none |
+| `reply` | The business's reply: `text`, `updated_at`, `state`, and `policy_violation` on a rejected reply. `null` when there is no reply |
+| `reply_url` | A Google-hosted page for replying to the review. Absent when empty |
+| `created_at`, `updated_at` | When the reviewer posted the review and last changed it |
+| `summary` | The average rating and total review count of the whole location, not of this page |
+| `pagination` | `has_more`, and `next_cursor` when `has_more` is `true` |
+
+Google serves reviews for verified locations only. `GET /v1/inbox/reviews/{account_id}` on an account whose platform has no reviews returns `422 account.platform_unsupported`.
+
+## Reply to a review
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/reviews/sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I/reply \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Thank you for your kind review, Jane!"
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "reply_id": "sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+  "state": "PENDING"
+}
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected account that owns the review |
+| `text` | Required. The reply. Google accepts up to 4,096 bytes. The MCP tool `social_api_reply_to_review` accepts up to 2,200 characters |
+| `reply_id` | The review's SocialAPI ID, which is also the ID of its reply |
+| `state` | The reply's moderation state, in the next section |
+
+A reply costs 1 interaction credit. When the allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. A missing `account_id` or `text` returns `400 validation.field_required`. A review ID that is not a review ID returns `400 validation.id_invalid`, and one from another platform returns `400 validation.id_platform_mismatch`. An account that needs reconnecting returns `403 account.reconnection_required`.
+
+### Replies are moderated
+
+<Warning>
+  **A successful reply is not yet published.** `success: true` means Google accepted the reply for review. Nobody can see it until its `state` is `APPROVED`.
+</Warning>
+
+| `state` | Meaning |
+|---|---|
+| `PENDING` | Submitted and awaiting Google's review. A new reply returns this |
+| `APPROVED` | Published and visible on the listing |
+| `REJECTED` | Not published, and never will be. `policy_violation` holds Google's reason |
+
+SocialAPI checks a pending reply for you and sends a `review.updated` webhook event when Google decides, with `change` set to `reply_approved` or `reply_rejected`. You can also read the review again and look at `reply.state`. A rejected reply carries `reply.policy_violation`, passed through as Google sends it:
+
+```json
+{
+  "reply": {
+    "policy_violation": { "reason": "PROMOTIONAL_CONTENT" },
+    "state": "REJECTED",
+    "text": "Thanks! Use code SAVE10 for 10% off.",
+    "updated_at": "2026-07-03T10:00:00Z"
+  }
+}
+```
+
+Google rejects promotional language, discount codes, and links to sales pages. Send a new reply without them. A review read right after a reply can still show the old reply.
+
+## Review events
+
+Google Business Profile sends review events to SocialAPI as they happen, and SocialAPI delivers them to your [webhook endpoints](/guides/webhooks) like every other event.
+
+| `change` | Event | Meaning |
+|---|---|---|
+| `new_review` | `review.received` | Someone left a new review. `data.review` holds the whole review |
+| `review_edited` | `review.updated` | The reviewer edited the review |
+| `reply_approved` | `review.updated` | A reply you posted passed moderation and is live |
+| `reply_rejected` | `review.updated` | Google rejected a reply you posted |
+
+The payloads are in [Webhook events](/guides/webhook-events#reviews). Google can miss a notification and does not replay it, so a gap is permanent. Read `GET /v1/inbox/reviews/{account_id}` on a schedule to backfill.
+
+## Scopes
+
+| Operation | Scope |
+|---|---|
+| List accounts and list reviews | `inbox:read` |
+| Reply to a review | `inbox:write` |
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_review_accounts` | Lists review-capable accounts with their rating summaries |
+| `social_api_get_reviews` | Lists the reviews of 1 account |
+| `social_api_reply_to_review` | Replies to a review |
+
+## Related
+
+- [Reviews](/guides/reviews): the platform-independent review workflow
+- [Webhook events](/guides/webhook-events#reviews): the `review.received` and `review.updated` payloads
+- [Google Business Profile API](/platforms/google): capabilities, connect rules, and limits for the platform
+- [Google Business Profile locations](/platforms/google/locations): read and update the location behind the reviews
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit

@@ -1,24 +1,25 @@
 ---
 title: Use cases
-description: "Common ways developers and AI agents use the SocialAPI.ai unified social media API: unified inbox, comment-to-DM automations, management, publishing, and AI agents."
+description: See how developers and AI agents use the SocialAPI REST API and MCP server for an inbox, comment-to-DM Automations, publishing, scheduling, and agents.
+icon: lightbulb
 ---
 
-SocialAPI.ai is one REST API and MCP server across every social network. Here are the five most common ways teams use it.
+SocialAPI is a REST API and MCP server for the comments, direct messages (DMs), mentions, reviews, and posts of your connected social accounts. These are 5 common ways to use it, each with the guide that has the details.
 
-## Unified inbox
+## Read and answer an inbox
 
-Read and respond to comments, DMs, mentions, and reviews across platforms via one endpoint that returns the same `Interaction` schema, so your inbox logic is written once.
+Read the comments, DMs, mentions, and reviews of every connected account through one set of endpoints, and answer them. Each area has its own guide: [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [Reviews](/guides/reviews), and [Mentions](/guides/mentions).
 
 ```bash
 curl https://api.social-api.ai/v1/inbox/conversations \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-See the [Unified Inbox API](https://social-api.ai/solutions/unified-inbox-api) overview.
+Start with [Unified inbox](/guides/inbox). Receive new items as they arrive with [Webhooks](/guides/webhooks).
 
-## Comment-to-DM automations
+## Answer comments and DMs automatically
 
-Answer Instagram and Facebook comments and DMs that match keywords within seconds, with no server of your own: a private reply with a link, a public reply, a hidden comment, or a button menu. On Instagram, a Follow gate sends the link only to people who follow the account.
+An Automation answers Instagram and Facebook comments and DMs that match keywords: a private reply with a link, a public reply, a hidden comment, or a button menu. SocialAPI runs it, so you run no server. On Instagram, a Follow gate sends the link only to people who follow the account.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/automations \
@@ -38,20 +39,9 @@ curl -X POST https://api.social-api.ai/v1/automations \
 
 See [Automations](/guides/automations).
 
-## Social media management
+## Publish to many platforms
 
-Schedule posts, moderate comments, and reply to DMs across networks from one API, without per-platform glue code.
-
-```bash
-curl https://api.social-api.ai/v1/posts \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-See the [Social Media Management API](https://social-api.ai/solutions/social-media-management-api) overview.
-
-## Content publishing
-
-Publish and schedule photos, videos, carousels, stories, and reels across networks via one endpoint, with per-platform delivery status.
+Send one post to 1 or more connected accounts with one request, and read the status of each platform's copy. Add media with [Media](/guides/media). Some platforms need media or extra fields: Instagram, for example, needs an image or video ([Instagram publishing](/platforms/instagram/publishing)).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -60,14 +50,41 @@ curl -X POST https://api.social-api.ai/v1/posts \
   -d '{
     "text": "Hello from SocialAPI!",
     "publish_now": true,
+    "targets": [
+      { "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" },
+      { "account_id": "acc_01HZ9X4T6B8C2D5F7G9H1J3K" }
+    ]
+  }'
+```
+
+See [Publishing](/guides/publishing) and [Track post delivery](/guides/delivery).
+
+## Schedule posts
+
+Set `scheduled_at` instead of `publish_now` to publish at a time you choose. Edit, reschedule, or cancel the post before that time.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Our spring sale starts today.",
+    "scheduled_at": "2026-10-20T09:00:00Z",
     "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }]
   }'
 ```
 
-See the [Content Publishing API](https://social-api.ai/solutions/content-publishing-api) overview and the [Posts](/guides/publishing) reference.
+See [Scheduling](/guides/scheduling).
 
-## AI agents (MCP)
+## Give an AI agent access
 
-Every capability is a typed Model Context Protocol tool, so agents in Claude, ChatGPT, and Cursor manage social media with no platform-specific code.
+Every operation is an MCP tool, so an agent in Claude, ChatGPT, or Cursor can read the inbox, reply, and publish. Give an agent a [scoped API key](/guides/scoped-keys) to limit what it can do.
 
-See the [Social Media API for AI Agents](https://social-api.ai/solutions/social-media-api-for-ai-agents) overview and the [Integrations](/integrations/overview) guides.
+See [MCP server](/integrations/overview) and [MCP tools reference](/integrations/tools).
+
+## Related
+
+- [Quickstart](/quickstart) to connect an account and make your first calls
+- [Core concepts](/guides/concepts) for the objects behind these use cases
+- [Supported platforms](/platforms/overview) for what each platform allows
+- [Plans and usage](/guides/plans) for what each request costs

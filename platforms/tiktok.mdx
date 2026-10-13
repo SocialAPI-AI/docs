@@ -1,39 +1,50 @@
 ---
-title: TikTok
-description: Connect and interact with TikTok accounts via the TikTok API.
+title: TikTok API
+sidebarTitle: "Overview"
+description: Connect TikTok accounts to publish videos and photo carousels, list videos with their counts, and read creator settings and profile statistics.
+icon: "tiktok"
 ---
 
-<Badge>Available</Badge>
-
-**Managed connector** - [SocialAPI](https://social-api.ai) handles the TikTok Developer App and platform app review for you. No customer-side TikTok for Developers registration required. See [Platform credentials](/guides/platform-credentials).
-
-TikTok is supported for listing videos and publishing new posts via the TikTok Content Posting API.
+The TikTok API in SocialAPI connects a TikTok account through TikTok's authorization screen. It publishes videos and photo carousels, lists the account's videos with their counts, returns the creator settings that govern each post, and reads profile statistics. SocialAPI's own TikTok app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `tiktok` |
-| Auth type | OAuth 2.0 (TikTok) |
-| API | TikTok Content Posting API |
-| Best for | Short-form video publishing to TikTok. |
+| Auth | OAuth 2.0 with TikTok Login |
+| Platform API | TikTok Content Posting API v2 and Login Kit |
+| Status | Available |
 
 ## Capabilities
 
-| Feature | Supported | Notes |
-|---|---|---|
-| List posts | Yes | Returns published videos |
-| Create post | Yes | Via TikTok Content Posting API |
-| Delete post | - | Not supported via TikTok API |
-| Comments | - | Not supported via TikTok API |
-| Reply to comment | - | |
-| Moderate comment | - | |
-| Toggle post comments | - | |
-| DMs | - | Not supported by platform API |
-| Reviews | - | Not applicable |
-| Mentions | - | Not supported via TikTok API |
+An unsupported call returns `501 resource.not_supported`.
 
-## Connecting
+| Feature | Status | Condition |
+|---|---|---|
+| Publish a video | Yes | See [TikTok publishing](/platforms/tiktok/publishing) |
+| Publish a photo carousel | Yes | 2 to 35 images |
+| Send a video to the account's TikTok drafts | Yes | `post_mode: "inbox"`. Video only. The creator finishes the post in the TikTok app |
+| Schedule a post | Yes | `scheduled_at` on the post |
+| First comment on a post | No | `first_comment` is ignored |
+| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post, and TikTok gives apps no edit call |
+| Delete a published post | No | `DELETE /v1/posts/{pid}` returns `501 resource.not_supported` for the TikTok target and the post stays live. Delete it in the TikTok app |
+| List posts | Yes | Videos with views, likes, comments, and shares. See [Sync videos](#sync-videos) |
+| Creator info | Yes | Allowed privacy levels and interaction settings. See [Creator info](#creator-info) |
+| Account summary | Yes | Follower, following, likes, and video counts. See [Account summary](#account-summary) |
+| Comments, replies, moderation | No | `501 resource.not_supported` |
+| DMs | No | `501 resource.not_supported` |
+| Mentions | No | `501 resource.not_supported` |
+| Reviews | No | TikTok has no reviews. `501 resource.not_supported` |
+| Automations | No | `422 automation.platform_unsupported` |
+| Analytics | Yes | See [Analytics](/guides/analytics) |
+| Webhook events | Partial | `account.disconnected` and the `post.*` events. See [Webhook events](#webhook-events) |
+
+The cross-platform matrix is on [Platforms](/platforms/overview).
+
+## Connect an account
+
+Connect with `POST /v1/accounts/connect` and `"platform": "tiktok"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
@@ -46,18 +57,20 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   }'
 ```
 
-Response:
+Response (HTTP 200):
 
 ```json
 {
-  "auth_url": "https://www.tiktok.com/v2/auth/authorize/?client_key=...&state=...",
+  "auth_url": "https://www.tiktok.com/v2/auth/authorize/?client_key=sbaw1234&state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
   "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
 }
 ```
 
-Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the code with TikTok and redirects the user to your `redirect_uri` with the connection result. See [OAuth flows](/guides/connect-accounts#step-3-receive-the-result-at-your-redirect_uri) for the redirect parameters.
+TikTok-specific rules:
 
-TikTok accounts include a `metadata` object with profile data:
+- **Profile data.** A connected TikTok account carries a `metadata` object with the profile counts read at connect time.
+- **Reconnect.** If the access token is no longer valid, calls return `401 platform.tiktok.auth` and the account needs reconnecting. SocialAPI refreshes access tokens itself, so this happens when the person revoked access or the refresh token expired. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **Older accounts.** An account connected before SocialAPI requested the `video.list` or `user.info.stats` permission needs one reconnect before the video list or the profile counts work.
 
 ```json
 {
@@ -66,7 +79,7 @@ TikTok accounts include a `metadata` object with profile data:
   "name": "Acme Corp",
   "username": "acmecorp",
   "metadata": {
-    "avatar_url": "https://p16.tiktokcdn.com/...",
+    "avatar_url": "https://p16.tiktokcdn.com/avatar.jpeg",
     "follower_count": 12400,
     "following_count": 180,
     "video_count": 94,
@@ -79,96 +92,130 @@ TikTok accounts include a `metadata` object with profile data:
 |---|---|---|
 | `avatar_url` | string | Profile picture URL |
 | `follower_count` | integer | Number of followers |
-| `following_count` | integer | Number of accounts followed |
-| `video_count` | integer | Total published videos |
-| `likes_count` | integer | Total likes across all videos |
+| `following_count` | integer | Number of accounts the account follows |
+| `video_count` | integer | Videos on the profile |
+| `likes_count` | integer | Likes across all videos |
 
-## Reading samples
+## Creator info
 
-### List posts
+`GET /v1/accounts/{id}/creator-info` returns the settings TikTok applies to the creator's next post. Read it before you publish, because the allowed privacy levels differ per creator. It needs the `accounts:read` scope.
 
 ```bash
-curl -X GET "https://api.social-api.ai/v1/posts?account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+curl https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/creator-info \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-## Publishing
+Response (HTTP 200):
 
-Create a TikTok post. `media_type` is optional and defaults to `video`. `privacy_level` must be supplied explicitly: omitting it returns a 400 validation error (`privacy_level_required`). Valid values depend on the creator's allowed options (returned by the TikTok creator info API); a common example is `PUBLIC_TO_EVERYONE`.
-
-```bash
-curl -X POST https://api.social-api.ai/v1/posts \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Check out this video!",
-    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
-    "targets": [
-      {
-        "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-        "platform_data": {
-          "media_type": "video",
-          "privacy_level": "PUBLIC_TO_EVERYONE"
-        }
-      }
-    ]
-  }'
+```json
+{
+  "platform": "tiktok",
+  "nickname": "Acme Corp",
+  "avatar_url": "https://p16.tiktokcdn.com/avatar.jpeg",
+  "can_post": true,
+  "max_video_duration_sec": 600,
+  "privacy_level_options": ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"],
+  "interaction_settings": {
+    "comment_disabled": false,
+    "duet_disabled": false,
+    "stitch_disabled": false
+  }
+}
 ```
 
-For the full field reference, media constraints, and error recovery, see [TikTok posts](/platforms/tiktok/publishing).
+| Field | Description |
+|---|---|
+| `can_post` | `false` when TikTok lists no privacy level, which happens when the creator reached TikTok's daily posting limit |
+| `max_video_duration_sec` | The longest video this creator can post, in seconds |
+| `privacy_level_options` | The `privacy_level` values this creator can use |
+| `interaction_settings` | `true` for a setting the creator turned off in TikTok. A post cannot turn that interaction back on |
+
+Other platforms return `501 resource.not_supported` from this endpoint.
 
 ## Account summary
 
-Retrieve live profile statistics for a connected TikTok account: display name, username, avatar URL, and the follower, following, likes, and video counts.
+`GET /v1/platforms/tiktok/accounts/{id}/summary` reads the account's profile and counts from TikTok at the time of the call. It needs the `accounts:read` scope.
 
 ```bash
-curl "https://api.social-api.ai/v1/platforms/tiktok/accounts/{id}/summary" \
+curl https://api.social-api.ai/v1/platforms/tiktok/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Response:
+Response (HTTP 200):
 
 ```json
 {
   "display_name": "Acme Corp",
   "username": "acmecorp",
-  "avatar_url": "https://p16-sign.tiktokcdn-us.com/...",
+  "avatar_url": "https://p16-sign.tiktokcdn-us.com/avatar.jpeg",
   "follower_count": 12400,
   "following_count": 87,
   "likes_count": 980000,
-  "video_count": 47
+  "video_count": 47,
+  "bio_description": "Spring collection out now.",
+  "profile_deep_link": "https://www.tiktok.com/@acmecorp",
+  "is_verified": false
 }
 ```
 
-The statistics come from TikTok's `user.info.stats` scope. Accounts connected before this scope was granted must be reconnected before the endpoint can return counts.
+TikTok grants the counts and the profile fields through separate permissions. When one is missing on the token, the fields it covers come back empty or `0` and the others are still filled. The call fails only when both are unavailable.
 
-## Force sync
+## Sync videos
 
-Force an immediate re-sync of the stored video list for an account. This pulls the most recent videos (up to 20) from TikTok, including view, like, comment, and share counts. Synced videos are then available from `GET /v1/posts?platform=tiktok`.
+`GET /v1/posts?platform=tiktok&account_ids={id}` lists the TikTok videos SocialAPI has synced, each with its `permalink` and `metrics` (`views`, `likes`, `comments`, `shares`). This includes videos published outside SocialAPI.
+
+`POST /v1/platforms/tiktok/accounts/{id}/sync` pulls the 20 most recent videos from TikTok at once instead of waiting for the next background sync. It needs the `accounts:manage` scope.
 
 ```bash
-curl -X POST "https://api.social-api.ai/v1/platforms/tiktok/accounts/{id}/sync" \
+curl -X POST https://api.social-api.ai/v1/platforms/tiktok/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/sync \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Returns `{"success": true}` on success.
+Response (HTTP 200):
 
-This endpoint uses TikTok's `video.list` scope and requires a reconnect for accounts connected before the scope was granted.
+```json
+{
+  "success": true
+}
+```
 
-## Limitations and gotchas
+## Webhook events
 
-- **Publishing.** Post creation uses the TikTok Content Posting API. Videos are uploaded via media upload, then published.
-- **Read-only interactions.** TikTok's API does not expose comment management or DM access. Only post listing and publishing are available.
-- **Token refresh.** TikTok OAuth tokens expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "platform.tiktok.auth"`, reconnect the account.
-- **Privacy level.** `privacy_level` is required and must be set explicitly for every post. Omitting it returns a 400 error (`privacy_level_required`). Use the value the TikTok creator info API returns for the account (for example, `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`, or `SELF_ONLY`); any other value is rejected.
+| Event | When it fires |
+|---|---|
+| `account.disconnected` | The person removed SocialAPI's app in TikTok's settings. SocialAPI disconnects and deletes the account, and the event carries `account_id`, `platform`, and `platform_user_id` |
+| `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery). A TikTok post can finish after the request that created it returned |
+
+Every event is described in [Webhook events](/guides/webhook-events).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Video caption | 2,200 UTF-16 characters |
+| Photo caption | 90 UTF-16 characters |
+| Photo carousel | 2 to 35 images, JPEG or WebP |
+| Posts | 18 per 24 hours and 25 per hour for each account. TikTok's own cap is 20 per day: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Videos per sync | 20 |
+| TikTok's own rate limit | `429 platform.tiktok.rate_limit`. It costs no SocialAPI credit |
 
 ## Permissions
 
-SocialAPI's managed TikTok Developer App already requests these scopes on your behalf: `user.info.basic`, `user.info.profile`, `video.publish`, `video.upload`. You don't need to register with TikTok for Developers. See [Platform credentials](/guides/platform-credentials).
+SocialAPI's TikTok app requests these scopes at connect. You apply for no app review.
+
+| Scope | Used for |
+|---|---|
+| `user.info.basic` | Account identity, display name, and avatar |
+| `user.info.profile` | Username, bio, profile link, and verification |
+| `video.publish` | Publish videos and photo carousels as the creator |
+| `video.upload` | Send a video to the creator's TikTok drafts |
+| `video.list` | List the account's videos and their counts |
+| `user.info.stats` | Follower, following, likes, and video counts |
 
 ## Related
 
-- [Platform credentials](/guides/platform-credentials)
-- [OAuth flows](/guides/connect-accounts)
-- [Publishing to TikTok](/platforms/tiktok/publishing)
-- [Errors](/guides/errors)
+- [TikTok publishing](/platforms/tiktok/publishing): fields, media rules, and quirks for publishing
+- [Connect accounts](/guides/connect-accounts): the shared connect flow
+- [Track post delivery](/guides/delivery): statuses and the `publishing` state
+- [Platforms](/platforms/overview): the capability matrix
+- [Errors](/guides/errors): every error code

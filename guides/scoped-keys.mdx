@@ -1,134 +1,24 @@
 ---
-title: Scoped API keys
-description: Restrict an API key to specific scopes and brands for least-privilege automations and agency client isolation.
+title: "Scoped API keys"
+description: "Restrict a SocialAPI key to specific scopes and brands for least-privilege automations, AI agents, and agency client isolation."
 ---
 
-By default, every API key has **full access**: it can perform any operation on every [brand](/guides/concepts#brand) in your account. You can narrow a key along two independent dimensions when you create it:
+A scoped API key is a SocialAPI API key restricted to some actions (its scopes), some brands, or both. A key with no restriction has full access: every action on every [brand](/guides/concepts) of your SocialAPI account.
 
-| Dimension | Field | Controls |
+Two uses are common. A bot that only answers comments holds a key with `inbox:read` and `inbox:write`, and nothing else. An agency gives each client's automation a key limited to that client's brand, so a leaked key cannot reach another client.
+
+| Restriction | Field | Controls |
 |---|---|---|
-| **Scopes** | `scopes` | Which actions the key may perform (`posts:write`, `inbox:read`, and so on) |
-| **Brands** | `brand_ids` | Which brands' resources the key may see and touch |
-
-The two dimensions combine. A key can be scoped, brand-restricted, both, or neither. This supports two common patterns:
-
-- **Least-privilege automations.** A bot that only replies to comments holds a key with exactly `inbox:read` and `inbox:write`, nothing else.
-- **Agency and client isolation.** A key limited to one client's brand cannot read or touch any other client, so a leaked or shared key stays contained.
+| Scopes | `scopes` | Which actions the key can perform |
+| Brands | `brand_ids` | Which brands' accounts, posts, conversations, and Automations the key can see and change |
 
 <Note>
-  **Empty means unrestricted.** An empty `scopes` array grants every scope. An empty `brand_ids` array grants every brand. A key is restricted only when at least one of the two arrays is non-empty. Every key created before this feature keeps full access with no change.
+  An empty `scopes` array grants every scope, and an empty `brand_ids` array grants every brand. A key is restricted when at least one of the two arrays holds a value.
 </Note>
 
-## Scopes
+## Create a scoped key
 
-Scopes are a stable, public vocabulary in the form `resource:action`. A scope-restricted key may only perform operations covered by the scopes it holds.
-
-| Group | Scope | Grants |
-|---|---|---|
-| Accounts | `accounts:read` | List brands, connected accounts, and their metadata |
-| Accounts | `accounts:manage` | Connect, configure, and disconnect accounts |
-| Posts | `posts:read` | Read posts and their per-platform status and metrics |
-| Posts | `posts:write` | Create, edit, publish, and delete posts |
-| Media | `media:read` | Browse the media library |
-| Media | `media:write` | Upload and delete media |
-| Inbox | `inbox:read` | Read comments, reviews, and mentions |
-| Inbox | `inbox:write` | Reply to and moderate comments, reviews, and mentions |
-| Messages | `dms:read` | Read direct message conversations |
-| Messages | `dms:send` | Send direct messages |
-| Automations | `automations:read` | Read [Automations](/guides/automations) and their recent runs |
-| Automations | `automations:write` | Create, edit, pause, and delete Automations. Each action also needs its own scope (see [below](#automations-need-their-actions-scopes)) |
-| Account-level | `webhooks:manage` | Manage webhook endpoints and deliveries (not available to brand-restricted keys) |
-| Account-level | `analytics:read` | Read the events log, summaries, and exports (not available to brand-restricted keys) |
-
-Fetch the catalog live from the API so your integration always renders the current list:
-
-```bash
-curl https://api.social-api.ai/v1/keys/scopes \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-```json
-{
-  "data": [
-    { "name": "posts:write", "description": "Create, edit, publish, and delete posts", "group": "Posts" }
-  ],
-  "count": 14
-}
-```
-
-`GET /v1/keys/scopes` is available to any valid key, including restricted ones.
-
-### Automations need their actions' scopes
-
-An [Automation](/guides/automations) carries out its actions on your behalf, long after the request that configured it. So a key may only configure an action it could perform itself: besides `automations:write`, it needs the scope of each action's own API call.
-
-| Action | Also needs |
-|---|---|
-| `hide_comment`, `reply_comment`, `private_reply` | `inbox:write` |
-| `send_dm` | `dms:send` |
-
-A key holding only `automations:write` that creates an Automation with a `send_dm` action gets `403 auth.insufficient_scope` with `meta.required_scope` set to `dms:send`.
-
-The rule applies whenever a change could make the Automation send more: creating it, resuming it, or changing its `steps`, `post_ids` or `once_per_person`. Renaming, pausing, and deleting need only `automations:write`, so a key can always stop an Automation it can see.
-
-### Always available
-
-A few identity and introspection endpoints stay available to any valid key regardless of its scopes, because they only ever return the caller's own data or static reference material:
-
-- `GET /v1/users/me` (your profile)
-- `GET /v1/usage` (your credit usage)
-- `GET /v1/keys/scopes` (this scope catalog)
-- `GET /v1/webhooks/events` (the static webhook event catalog)
-- the platform capability catalog
-
-A scoped key never needs to hold a scope to reach these.
-
-### Admin operations
-
-Some operations are never available to a restricted key. They require a full-access key or the dashboard:
-
-- Managing API keys (create, list, edit, rotate, revoke)
-- Editing or deleting your user profile
-- Creating, updating, or deleting brands (listing brands is allowed with `accounts:read`)
-- Managing brand invites
-
-The reason is escalation: a key that could call `POST /v1/keys` could mint itself an unrestricted key. Denying the whole admin tier to restricted keys closes that path completely. Create and manage keys from the dashboard, then hand the scoped keys to your machines.
-
-<Warning>
-  A restricted key **cannot create, edit, rotate, or revoke any key**, including itself. Rotate or revoke a scoped key with a full-access key or from the dashboard.
-</Warning>
-
-## Brand restrictions
-
-A brand-restricted key behaves as if the allowed brands are the only brands that exist. Filtering is **silent**:
-
-- **Reads** of an out-of-scope account, brand, conversation, or interaction return the ordinary `404` (`account.not_found`, `brand.not_found`, and so on). Never a `403`, and never any confirmation that the resource exists.
-- **List endpoints** (accounts, brands, posts, conversations, inbox, mentions, Automations) return only resources inside the allowed brands. `GET /v1/brands` returns only the allowed brands. An Automation belongs to the brand of its account.
-
-### Posts
-
-Posts are not stored with a brand directly; they reach a brand through their target accounts. So the rule is expressed per target account:
-
-- **Read.** A post is visible to a brand-restricted key if at least one of its target accounts belongs to an allowed brand. A draft with no targets is therefore invisible to a brand-restricted key.
-- **Write** (create, edit, publish, retry, delete). Every target account must belong to an allowed brand. A violation returns the same `404 account.not_found` as a nonexistent account, so there is no information leak.
-
-### Media stays shared
-
-`media:read` and `media:write` remain available to a brand-restricted key. The media library is a single account-level asset pool. An upload is inert until it is attached to a post, and post writes are brand-checked, so a brand-scoped key cannot use media to reach another client's brand.
-
-### Deleting a brand never widens a key
-
-When you delete a brand that appears in a key's `brand_ids`, the now-stale ID stays in the array and simply matches nothing. It is deliberately not pruned: emptying the array would flip the key back to unrestricted, which would be a silent privilege escalation.
-
-## Account-level scopes and brand restriction
-
-`webhooks:manage` and `analytics:read` govern data that is not partitioned by brand today. Webhook endpoints and deliveries, and the events log and exports, all span every brand in the account.
-
-Because of that, a **brand-restricted** key is denied these two scopes even when the scope is granted. A key that is scope-restricted but **not** brand-restricted may hold them normally. In the dashboard, selecting one or more brands disables the `webhooks:manage` and `analytics:read` checkboxes for this reason.
-
-## Creating a scoped key
-
-Pass `scopes` and `brand_ids` to `POST /v1/keys`. Both are optional; omit or leave empty for full access on that dimension.
+Pass `scopes`, `brand_ids`, or both to `POST /v1/keys`:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/keys \
@@ -141,73 +31,186 @@ curl -X POST https://api.social-api.ai/v1/keys \
   }'
 ```
 
-The full key is returned **once** in `raw_key`. The restriction fields are echoed back so you can confirm what was applied:
+Response (HTTP 201):
 
 ```json
 {
-  "id": "b7e2...",
+  "id": "5b0e6f3a-8c2d-4e1f-9a7b-3c4d5e6f7a8b",
   "name": "Acme client bot",
-  "raw_key": "sapi_key_...",
+  "raw_key": "sapi_key_cd27569b0823266d6431e5431c09fd746edd48faa40aeb43e5e7ccd9a34fee",
   "message": "Store this key securely. It will not be shown again.",
   "scopes": ["inbox:read", "inbox:write", "dms:send"],
   "brand_ids": ["1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f"]
 }
 ```
 
-Creating a key is itself an admin operation, so only a full-access key or the dashboard can mint keys.
+`raw_key` is shown once. Creating keys needs full access (a full-access key, an OAuth access token, or the dashboard), so a scoped key can never create a key with more access than it has.
 
-### Validation
+- An unknown scope returns `400 validation.scope_invalid`, and the message names it.
+- A brand ID that does not exist, is not a UUID, or belongs to another SocialAPI account returns `400 validation.brand_invalid`.
 
-- An unknown scope returns `400 validation.scope_invalid`, naming the offending value.
-- A brand ID that does not exist or that you do not own returns `400 validation.brand_invalid`.
+## Scopes
 
-## Reading a key's restrictions
+Scopes have the form `resource:action`. A scope-restricted key can perform an operation only when it holds the operation's scope.
 
-`GET /v1/keys` returns the `scopes` and `brand_ids` on every key. Both arrays are always present. Two empty arrays mean full access.
+| Scope | Grants |
+|---|---|
+| `accounts:read` | List brands and connected accounts. Read account Pages, creator info, usage limits, Pinterest boards and Pins, account and brand analytics, platform account summaries, Google Business Profile media, insights, and search keywords, and the Pages or locations of a Facebook or Google login |
+| `accounts:manage` | Connect, reconnect, and disconnect accounts, finish pending connections, assign Facebook Pages and Google locations, change account Page settings, re-sync an account's posts, edit a Google Business Profile and its media, and create, edit, and delete Pinterest boards |
+| `posts:read` | List and read posts, their metrics and analytics, and Instagram collaborators |
+| `posts:write` | Create, edit, publish, retry, unpublish, validate, and delete posts, edit YouTube video details, and accept or decline Instagram collab invites |
+| `media:read` | List the media library |
+| `media:write` | Get an upload URL, upload, verify, and delete media |
+| `inbox:read` | Read comments and their replies, reviews, mentions, and Instagram stories |
+| `inbox:write` | Reply to comments, reviews, and mentions, send private replies, and hide or unhide comments |
+| `dms:read` | Read DM conversations and messages, read Instagram participant profiles, and start or check an inbox sync |
+| `dms:send` | Send DMs and add or remove a reaction on a message |
+| `automations:read` | Read [Automations](/guides/automations) and their runs |
+| `automations:write` | Create, edit, pause, resume, and delete Automations. Each action also needs its own scope, see [below](#automations-need-their-actions-scopes) |
+| `webhooks:manage` | Manage webhook endpoints, read and retry deliveries, and send test events. Refused to brand-restricted keys |
+| `analytics:read` | Read the events log and its summary, create and read exports, and read Threads insights, and Threads profile lookups. Refused to brand-restricted keys |
+
+`GET /v1/keys/scopes` returns this catalog with a `group` and a `description` per scope, so your app can render a scope picker from it:
+
+```bash
+curl https://api.social-api.ai/v1/keys/scopes \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200, first entry shown):
 
 ```json
 {
-  "id": "b7e2...",
+  "data": [
+    { "name": "accounts:read", "description": "List brands, connected accounts, and their metadata", "group": "Accounts" }
+  ],
+  "count": 14
+}
+```
+
+### Automations need their actions' scopes
+
+An [Automation](/guides/automations) carries out its actions long after the request that configured it. A key can configure only actions it can perform itself: besides `automations:write`, it needs the scope of each action.
+
+| Action | Also needs |
+|---|---|
+| `hide_comment`, `reply_comment`, `private_reply` | `inbox:write` |
+| `send_dm` | `dms:send` |
+
+A key that holds only `automations:write` and creates an Automation with a `send_dm` action gets `403 auth.insufficient_scope` with `meta.required_scope` set to `dms:send`.
+
+The check runs on every change that can make the Automation send more: creating it, resuming it, or changing its `steps`, `post_ids`, or `once_per_person`. Renaming, pausing, and deleting need only `automations:write`, so a key can always stop an Automation it can see.
+
+### Always available
+
+Any valid key can call these endpoints, whatever its scopes and brands:
+
+- `GET /v1/users/me`
+- `GET /v1/usage`
+- `GET /v1/keys/scopes`
+- `GET /v1/webhooks/events`
+- `GET /v1/announcements` and `POST /v1/announcements/{id}/seen`
+
+### Full-access operations
+
+A restricted key can never perform these operations. They need full access: a full-access key, an OAuth access token, or the dashboard.
+
+- Managing API keys: list, create, edit, rotate, and revoke, including the key itself
+- Editing or deleting your SocialAPI account (`PATCH` and `DELETE /v1/users/me`)
+- Creating, editing, or deleting brands. Listing brands needs `accounts:read`
+- Listing, creating, and revoking invites
+
+A key that can create keys can create itself an unrestricted one, so every key operation needs full access.
+
+<Warning>
+  A restricted key cannot rotate or revoke itself. Rotate or revoke a leaked scoped key with a full-access key or from the dashboard.
+</Warning>
+
+## Brand restrictions
+
+A brand-restricted key behaves as if its brands are the only brands in your SocialAPI account. It never learns that other resources exist:
+
+- **Reading** an account, brand, or other resource outside the key's brands returns the same `404` as a resource that does not exist, for example `404 account.not_found` or `404 brand.not_found`.
+- **Lists** (accounts, brands, posts, conversations, comments, mentions, Automations) return only resources inside the key's brands. `GET /v1/brands` returns only the key's brands. An Automation belongs to the brand of its account.
+- **Connecting** an account needs a `brand_id` from the key's list. A connection without `brand_id` creates a new brand that the key cannot see. See [Connect a social account](/guides/connect-accounts).
+
+### Posts
+
+A post belongs to the brands of its target accounts:
+
+- **Read.** A post is visible when at least one of its target accounts is in the key's brands. A draft with no target is not visible to a brand-restricted key. A post the key cannot see returns `404 resource.not_found`.
+- **Change** (edit, publish, retry, unpublish, delete). Every target account must be in the key's brands. Otherwise the post returns `404 resource.not_found`.
+- **Create or retarget.** Every account in the request must be in the key's brands. Otherwise the request returns `404 account.not_found`.
+
+### Media is shared
+
+`media:read` and `media:write` work on the whole media library, whatever the key's brands. A file in the library reaches a platform only when a post uses it, and creating or changing a post is limited to the key's brands.
+
+### Webhooks and analytics need every brand
+
+Webhook endpoints, their deliveries, the events log, and exports cover every brand of your SocialAPI account. A brand-restricted key is refused `webhooks:manage` and `analytics:read` operations even when it holds the scope, with `403 auth.insufficient_scope`. A key restricted only by scopes can hold and use them.
+
+### Deleting a brand never widens a key
+
+When you delete a brand that a key lists in `brand_ids`, its ID stays in the array and matches nothing. The key does not become unrestricted, even when that brand was its only one.
+
+## Read a key's restrictions
+
+`GET /v1/keys` returns `scopes` and `brand_ids` on every key. Both arrays are always present, and two empty arrays mean full access:
+
+```json
+{
+  "id": "5b0e6f3a-8c2d-4e1f-9a7b-3c4d5e6f7a8b",
   "name": "Acme client bot",
-  "preview": "sapi_key_a1b2c...",
+  "preview": "sapi_key_cd275...",
   "is_active": true,
-  "last_used_at": "2026-07-12T12:00:00Z",
-  "created_at": "2026-07-10T09:00:00Z",
+  "last_used_at": "2026-10-12T16:04:00Z",
+  "created_at": "2026-09-30T08:15:00Z",
   "scopes": ["inbox:read", "inbox:write", "dms:send"],
   "brand_ids": ["1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f"]
 }
 ```
 
-## Changing a key's restrictions
+## Change the restrictions on a key
 
-Restrictions are editable after creation. Use a full-access key or the dashboard.
-
-**Edit in place** with `PATCH /v1/keys/{id}`. This replaces the name, scopes, and brands. The key value is unchanged, so live automations keep working with their existing secret:
+`PATCH /v1/keys/{id}` replaces the key's `name`, `scopes`, and `brand_ids` together. The secret does not change, so services using the key keep working:
 
 ```bash
-curl -X PATCH https://api.social-api.ai/v1/keys/<key-id> \
+curl -X PATCH https://api.social-api.ai/v1/keys/5b0e6f3a-8c2d-4e1f-9a7b-3c4d5e6f7a8b \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"scopes": ["inbox:read", "inbox:write"], "brand_ids": []}'
+  -d '{
+    "name": "Acme client bot",
+    "scopes": ["inbox:read", "inbox:write"],
+    "brand_ids": ["1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f"]
+  }'
 ```
 
-**Rotate the secret** with `POST /v1/keys/{id}/rotate`. This issues a new `raw_key` while keeping the same id, name, scopes, and brands. The old secret stops working immediately. Use it when a key may have leaked:
+Response (HTTP 200):
 
-```bash
-curl -X POST https://api.social-api.ai/v1/keys/<key-id>/rotate \
-  -H "Authorization: Bearer $SOCAPI_KEY"
+```json
+{
+  "id": "5b0e6f3a-8c2d-4e1f-9a7b-3c4d5e6f7a8b",
+  "name": "Acme client bot",
+  "scopes": ["inbox:read", "inbox:write"],
+  "brand_ids": ["1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f"]
+}
 ```
 
-## Error responses
+<Warning>
+  Send all three fields. `name` is required, or the request returns `400 validation.field_required`. A `scopes` or `brand_ids` you leave out is saved as empty, which removes that restriction.
+</Warning>
 
-When a restricted key is refused, the response is `403` with code `auth.insufficient_scope`. The exact message depends on the reason:
+Editing a key needs full access. Editing a revoked key, or an ID that is not one of your keys, returns `404 resource.not_found`. To issue a new secret with the same restrictions, rotate the key: see [Authentication](/guides/authentication).
 
-| Reason | Message | `meta.required_scope` |
-|---|---|---|
-| Missing scope | `This API key does not have the required scope: posts:write` | the required scope |
-| Account-level scope on a brand-restricted key | `This operation is not available to brand-restricted API keys` | the scope |
-| Admin operation | `This operation requires a full-access API key or the dashboard` | absent |
-| Operation the key cannot perform | `This API key cannot perform this operation` | absent |
+## Errors
+
+A restricted key that is refused gets `403 auth.insufficient_scope`. `meta.required_scope` tells you what is missing:
+
+- **The key lacks the scope.** `meta.required_scope` names the missing scope.
+- **A `webhooks:manage` or `analytics:read` operation with a brand-restricted key.** `meta.required_scope` names that scope. Brand-restricted keys are refused it even when they hold it.
+- **A full-access operation.** `meta.required_scope` is absent.
+- **An operation no scope covers.** `meta.required_scope` is absent.
 
 ```json
 {
@@ -220,12 +223,12 @@ When a restricted key is refused, the response is `403` with code `auth.insuffic
 }
 ```
 
-A resource outside the key's allowed brands returns its ordinary `404` (for example `account.not_found`), never a `403`. This is deliberate: a scoped key gets no signal about whether resources it cannot reach exist.
+A resource outside the key's brands returns its ordinary `404`, never a `403`. Full-access keys and [OAuth 2.1 access tokens](/integrations/oauth) are never restricted.
 
-<Note>
-  Enforcement is **fail-closed**. A new operation that has not been mapped to a scope is denied to restricted keys rather than left open. Full-access keys, dashboard JWTs, and OAuth 2.1 access tokens (used by MCP clients) are never scope-restricted.
-</Note>
+## Related
 
-## Configuring from the dashboard
-
-In the dashboard, **Keys** > **New Key** offers a permissions step: choose **Full access** (default) or **Restricted**. When restricted, pick scopes grouped by resource and select one or more brands (default is all brands). The keys table shows each key's restrictions at a glance.
+- [Authentication](/guides/authentication) for creating, rotating, and revoking keys
+- [Connect a social account](/guides/connect-accounts) for connecting accounts with a brand-restricted key
+- [Automations](/guides/automations) for the scopes each action needs
+- [The MCP server](/integrations/overview) for giving an AI agent a scoped key
+- [Errors](/guides/errors) for every `auth.*` code

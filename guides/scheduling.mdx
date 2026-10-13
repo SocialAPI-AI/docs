@@ -1,140 +1,158 @@
 ---
-title: Scheduling posts
-description: Schedule posts across platforms via the unified social media API. One call, multiple targets, one scheduled time.
+title: Schedule posts
+description: Schedule a post to publish at a future time on every platform, edit or cancel it, and learn how posting caps and failures affect a scheduled post.
 ---
 
-Schedule a post by passing the `scheduled_at` field to `POST /v1/posts`. SocialAPI holds the post and publishes it at the scheduled time. Multi-platform fan-out works the same way as immediate publishing: one post object, multiple targets, one scheduled time applied to all of them.
+Scheduling publishes a post at a time you choose. Send `scheduled_at` with `POST /v1/posts`, and SocialAPI holds the post and sends it to each target when the time arrives. Every platform accepts `scheduled_at`: SocialAPI does the waiting, not the platform.
 
-## How scheduling works
+A scheduled post costs 1 post credit when you create it, whatever the number of targets. Editing and cancelling cost nothing. See [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction).
 
-Set `scheduled_at` to an ISO 8601 timestamp in the future. SocialAPI validates the request immediately and queues it for delivery at the specified time.
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/posts` | Schedule a post with `scheduled_at` |
+| `GET` | `/v1/posts?status=scheduled` | List scheduled posts |
+| `PATCH` | `/v1/posts/{pid}` | Change the time, content, or targets of a scheduled post |
+| `POST` | `/v1/posts/{pid}/publish` | Publish a scheduled post now |
+| `DELETE` | `/v1/posts/{pid}` | Cancel a scheduled post |
+
+## Schedule a post
+
+Set `scheduled_at` to an RFC 3339 time in the future and name at least one target:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "text": "Launching next week.",
+    "text": "Launching today: https://example.com/launch",
+    "scheduled_at": "2026-10-20T09:00:00Z",
     "targets": [
-      { "account_id": "acc_instagram_01" },
-      { "account_id": "acc_facebook_01" }
-    ],
-    "scheduled_at": "2026-06-01T09:00:00Z"
+      {"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"},
+      {"account_id": "acc_01HZ9X4T6B8C2D5F7G9H1J3K", "page_id": "sapi_page_01HZ9X5V7C9D3E6G8H1J4K2M"}
+    ]
   }'
 ```
 
-Response:
+Response (HTTP 201):
 
 ```json
 {
-  "id": "p_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "Launching today: https://example.com/launch",
   "status": "scheduled",
-  "scheduled_at": "2026-06-01T09:00:00Z",
+  "scheduled_at": "2026-10-20T09:00:00Z",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
   "targets": [
-    { "account_id": "acc_instagram_01", "platform": "instagram", "status": "scheduled" },
-    { "account_id": "acc_facebook_01", "platform": "facebook", "status": "scheduled" }
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "threads",
+      "status": "pending",
+      "scheduled_at": "2026-10-20T09:00:00Z"
+    },
+    {
+      "account_id": "acc_01HZ9X4T6B8C2D5F7G9H1J3K",
+      "page_id": "sapi_page_01HZ9X5V7C9D3E6G8H1J4K2M",
+      "platform": "facebook",
+      "status": "pending",
+      "scheduled_at": "2026-10-20T09:00:00Z"
+    }
   ]
 }
 ```
 
-To publish immediately instead of scheduling, pass `"publish_now": true`. Passing neither `scheduled_at` nor `publish_now` saves the post as a **draft** (even when targets are provided), it is not published.
+The post is `scheduled` and each target is `pending`. SocialAPI sends `post.scheduled` when the post is created.
 
-## Managing scheduled posts
+- **Time:** a `scheduled_at` in the past returns `400 validation.field_invalid`. A value that is not RFC 3339 returns the same error. Include the UTC offset or `Z`.
+- **One time per target:** a target can set its own `scheduled_at`, which overrides the post's. The post's `scheduled_at` is the earliest of them.
+- **Without targets:** a post with no targets is saved as a draft, even with `scheduled_at`.
+- **Both flags:** when you send `publish_now` and `scheduled_at` together, the post is scheduled.
+- **Validation:** SocialAPI validates the post when you schedule it, so a violation returns `400 publishing.validation_failed` immediately, and validates the post again when its time arrives.
+- **Allowance:** at the post allowance, scheduling returns `429 validation.post_limit_exhausted` and creates nothing.
 
-### List scheduled posts
+## How a scheduled post moves through statuses
 
-Filter by status to see all upcoming posts:
-
-```bash
-curl "https://api.social-api.ai/v1/posts?status=scheduled" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
+```mermaid
+flowchart LR
+  A[POST /posts with scheduled_at] --> B[scheduled]
+  B -->|PATCH scheduled_at| B
+  B -->|DELETE| D[deleted]
+  B -->|scheduled time reached| C[targets publishing]
+  B -->|POST /posts/pid/publish| C
+  C --> E[published, partial, or failed]
+  E -->|failed or partial: POST /posts/pid/retry| C
 ```
 
-### Edit or reschedule a post
+A scheduled post keeps its `scheduled` status until every target has settled. While SocialAPI sends it, each target shows `publishing`. The post then becomes `published`, `partial`, or `failed`, and SocialAPI sends one `post.published`, `post.partial`, or `post.failed` event. The statuses and the per-target fields are in [Track post delivery](/guides/delivery#post-status).
 
-Use `PATCH /v1/posts/:pid` to update the text, media, or schedule time of a post in `draft`, `scheduled`, or `failed` status. Editing a failed post lets you correct content issues before calling `POST /v1/posts/:pid/retry`. Update the scheduled time with:
+## Edit or reschedule
+
+`PATCH /v1/posts/{pid}` changes a `scheduled` post. SocialAPI re-queues the post, so a new time or a new target list takes effect at once.
 
 ```bash
-curl -X PATCH https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
+curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "scheduled_at": "2026-06-02T14:00:00Z" }'
+  -d '{"scheduled_at": "2026-10-21T14:00:00Z"}'
 ```
 
-### Publish a draft or scheduled post now
+The response is HTTP 200 with the updated post. SocialAPI sends `post.updated` with `changed_fields`. An edit to the content or targets runs validation again. A post in any status other than `draft`, `scheduled`, or `failed` returns `409 post.state_invalid`. [Publish a post](/guides/publishing#edit-a-post-before-it-publishes) lists every editable field.
 
-To publish a post that is currently in `draft` or `scheduled` status, call the publish endpoint. This sends it to all targets immediately and synchronously (the response reflects the final delivery result):
+## Publish now
 
-```bash
-curl -X POST https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J/publish \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+`POST /v1/posts/{pid}/publish` sends a scheduled post immediately. It costs 1 post credit again, on top of the credit the scheduling cost. The response is HTTP 201 and the post is `publishing`. A post that is `published`, `partial`, or `failed` returns `409 post.state_invalid`.
 
-This is the only way to publish an existing draft. `PATCH` only edits a post's content, it does not trigger publishing. Consumes 1 post credit.
+## Cancel a scheduled post
 
-### Cancel a scheduled post
+`DELETE /v1/posts/{pid}` cancels a `scheduled` post: SocialAPI removes the post and sends nothing. The response is HTTP 200 with `{"success": true, "deleted": true}`, and SocialAPI sends `post.deleted`. The post credit is not returned. Deleting a post that is already `publishing` returns `409 post.state_invalid`. See [Delete a post](/guides/delivery#delete-a-post).
 
-Delete it before it publishes:
+## Posting caps can delay a scheduled post
 
-```bash
-curl -X DELETE https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+SocialAPI caps how many posts one account publishes per hour and per 24 hours, by platform. A scheduled post that reaches a cap is not failed. The target stays `pending`, and SocialAPI publishes it when the cap window clears, so the post goes out later than `scheduled_at`. The caps and their values are in [Rate limits](/guides/rate-limits#posting-velocity-caps). Immediate publishes that reach a cap return `429 publishing.velocity_limit` instead.
 
-Only posts in `scheduled`, `draft`, or `failed` status can be deleted. Once a post enters `publishing`, it cannot be stopped.
+## When a scheduled post fails
 
-## Status lifecycle
+SocialAPI makes one delivery attempt per target at the scheduled time. A failed attempt is final: the target becomes `failed` with its `error`, the post becomes `failed` or `partial`, and SocialAPI sends one `post.failed` or `post.partial` event. Nothing is re-sent automatically. A scheduled post's credit is not returned when it fails.
 
-Every post moves through this state machine:
+Common causes are a disconnected account (`publishing.delivery.account_load_failed`), content that stopped passing validation (`validation.publish`), and a platform refusal (`platform.{platform}.*`). The causes are in [Track post delivery](/guides/delivery#target-errors).
 
-```
-draft ------> scheduled --> publishing --> published
-   \                   /                \-> partial
-    \-----------------/                  \-> failed
-   (publish_now / POST /posts/{pid}/publish)
-```
+To send a failed post again, fix the cause, optionally edit the post, and call `POST /v1/posts/{pid}/retry`. It re-sends only the failed targets and costs 1 post credit.
 
-A `draft` reaches `publishing` either by being created with `publish_now: true`, or later via `POST /v1/posts/{pid}/publish`.
+A scheduled post still publishes when your SocialAPI account is past due. See [Past-due accounts](/guides/plans#past-due-accounts).
 
-| Status | Meaning |
-|--------|---------|
-| `draft` | Created but not yet scheduled or published |
-| `scheduled` | Queued for future delivery at `scheduled_at` |
-| `publishing` | SocialAPI is actively sending the post to platforms |
-| `published` | All targets delivered successfully |
-| `partial` | Some targets succeeded, some failed (check per-target status) |
-| `failed` | All targets failed |
+## YouTube has 2 schedulers
 
-Deleting a post permanently removes it (the post returns `404` on subsequent fetch). For scheduled posts, any pending platform deliveries are marked `cancelled` before the post row is removed.
+On YouTube, `scheduled_at` makes SocialAPI upload the video at that time, and `platform_data.youtube.publish_at` uploads it now and lets YouTube make it public later. See [Schedule a YouTube post](/platforms/youtube/publishing#schedule-a-post).
 
-## Platform scheduling support
+## Read scheduling support from the API
 
-When you set `scheduled_at`, SocialAPI holds the post and publishes it when the scheduled time arrives. This works the same way for every platform: the post is sent to the platform only at the scheduled moment, and the platform's own scheduler is never used. Every platform below accepts `scheduled_at`.
+`GET /v1/posts/validate` returns `scheduling.supported` for each platform it covers. It is `true` for each of them. See [Publish a post](/guides/publishing#validate-before-you-publish).
 
-### YouTube: `scheduled_at` vs `publish_at`
+## Scopes
 
-YouTube has its own native scheduling, which is a **separate feature** from `scheduled_at`. The two behave differently:
+| Scope | Grants |
+|---|---|
+| `posts:read` | List scheduled posts |
+| `posts:write` | Schedule, edit, publish now, and cancel posts |
 
-- **`scheduled_at`** (this page): SocialAPI holds the post and uploads it to YouTube at the scheduled time. YouTube is not told about the schedule.
-- **`platform_data.youtube.publish_at`**: SocialAPI uploads the video to YouTube right away, and YouTube itself makes it public at the given time.
+## Use from an AI agent
 
-Use `scheduled_at` to have SocialAPI do the waiting; use `publish_at` to hand scheduling to YouTube. See [YouTube posts](/platforms/youtube/publishing) for details.
-
-To discover scheduling support programmatically instead of hardcoding this table, call [`GET /v1/posts/validate`](/api-reference/posts/get-platform-constraints). Each platform includes a `scheduling` object with a `supported` boolean. It is `true` for every publishing platform today, but querying it means your integration never relies on a hardcoded list that can silently go stale.
-
-```json
-{
-  "data": {
-    "tiktok": {
-      "scheduling": { "supported": true },
-      "text": { "max_length": 2200, "counting_mode": "utf16" }
-    }
-  }
-}
-```
+| Tool | What it does |
+|---|---|
+| `social_api_create_post` | Schedules a post with `scheduled_at` |
+| `social_api_list_posts` | Lists posts, including `status=scheduled` |
+| `social_api_update_post` | Changes the time or content of a scheduled post |
+| `social_api_publish_post` | Publishes a scheduled post now |
+| `social_api_delete_post` | Cancels a scheduled post |
 
 ## Related
 
-- [Posts overview](/guides/publishing) for the full publishing capability matrix
-- [Platform support](/guides/platforms) for per-platform feature coverage
-- [API Reference](/api-reference/introduction) for the complete `POST /v1/posts` schema
+- [Publish a post](/guides/publishing): fields every platform shares
+- [Track post delivery](/guides/delivery): post statuses, target errors, and retry
+- [Rate limits](/guides/rate-limits): the posting caps that hold a scheduled post
+- [Plans and usage](/guides/plans): what scheduling costs
+- [Webhook events](/guides/webhook-events): `post.scheduled` and the settle events

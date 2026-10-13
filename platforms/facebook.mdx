@@ -1,47 +1,52 @@
 ---
-title: Facebook
-description: Connect and interact with Facebook Pages via the Meta Graph API.
+title: Facebook API
+sidebarTitle: "Overview"
+description: Connect Facebook Pages to publish posts and Reels, moderate comments, send private replies and Messenger DMs, and read mentions through one API.
+icon: "facebook"
 ---
 
-<Badge>Available</Badge>
-
-**Managed connector** - [SocialAPI](https://social-api.ai) handles the Meta App and platform app review for you. No customer-side Meta for Developers registration required. See [Platform credentials](/guides/platform-credentials).
-
-Facebook Pages are fully supported. The connector uses the Meta Graph API for posts, comments, DMs (Messenger), and mentions.
+The Facebook API in SocialAPI connects Facebook Pages. It publishes text, link, photo, video, album, Reel, and Story posts, reads and moderates comments, sends private replies and Messenger direct messages (DMs), and reads mentions. SocialAPI's own Meta app connects the Pages, so you register nothing: see [Platform apps](/guides/platform-credentials). A Facebook profile is not supported: only Pages.
 
 ## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `facebook` |
-| Auth type | OAuth 2.0 (Meta) |
-| API | Meta Graph API |
-| Best for | Page-level engagement: post and reply on Facebook Pages. |
+| Auth | OAuth 2.0 (Meta), one login for every Page the person manages |
+| Platform API | Meta Graph API (Facebook Pages and Messenger) |
+| Status | Available |
 
 ## Capabilities
 
-| Feature | Supported | Notes |
-|---|---|---|
-| List posts | Yes | Page feed posts |
-| Comments | Yes | Scoped to a specific post |
-| Reply to comment | Yes | |
-| Private reply | Yes | Sends a one-time DM to the commenter |
-| Comment replies (thread) | Yes | Fetch the reply thread under a comment |
-| Moderate comment (hide/unhide/delete) | Yes | |
-| Toggle post comments | No | Not supported by Facebook Graph API |
-| DMs | Yes | Via Messenger (24-hour messaging window) |
-| Send DM | Yes | Text and/or media attachment (`attachment_url`) |
-| Send DM attachment | Yes | Image, video, audio, or file via `attachment_url` (type inferred from URL extension, max 25 MB), or by `attachment_id` (requires `attachment_type`) |
-| Get DM thread by user | Yes | |
-| Automations | Yes | Keyword replies to comments and DMs, postback buttons and multi-step flows. No `follows_account` filter or Follow gate: Facebook does not tell apps whether a person follows a Page. See [Automations](/guides/automations) |
-| Reviews | No | Deprecated in Graph API v22.0 |
-| Mentions | Yes | Posts where the Page is tagged |
-| Reply to mention | Yes | Posts a public comment reply on a mention (post or comment mention) |
-| Like/unlike comment | Yes | Page can like or unlike a comment |
-| Create post | Yes | Text, photos, links, videos, Reels (set `content_type: reel` in platform_data) |
-| Delete post | Yes | |
+An unsupported call returns `501 resource.not_supported`.
 
-## Connecting
+| Feature | Status | Condition |
+|---|---|---|
+| Publish text, link, photo, video, multi-photo album, Reel, Story | Yes | See [Facebook publishing](/platforms/facebook/publishing) |
+| Schedule a post | Yes | `scheduled_at` on the post |
+| First comment on a post | Yes | Not on a Story |
+| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post with `DELETE /v1/posts/{pid}` and publish a new one |
+| Delete a published post | Yes | |
+| List posts | Yes | Posts in the Page feed. A Reel is not in the Page feed, so it is not in this list |
+| List comments and replies | Yes | Comments are read per post |
+| Reply to a comment | Yes | |
+| Hide, unhide, delete a comment | Yes | |
+| Like or unlike a comment | Yes | The Page likes the comment |
+| Private reply to a comment | Yes | One per comment, within 7 days of the comment |
+| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text, attachments, quick replies, buttons, cards |
+| React to a DM | Yes | |
+| Mentions | Partial | `GET /v1/accounts/{id}/mentions` returns posts that tag the Page. A mention in a comment arrives as a `mention.received` event |
+| Reply to a mention | Yes | A public comment on the mention |
+| Reviews | No | Facebook removed the reviews edge in Graph API v22.0. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
+| Automations | Yes | Comment and DM triggers, buttons, multi-step flows. No `follows_account` filter and no Follow gate: `400 validation.filter_unsupported` |
+| Analytics | Yes | See [Analytics](/guides/analytics) |
+| Webhook events | Yes | See [Webhook events](#webhook-events) |
+
+The cross-platform matrix is on [Platforms](/platforms/overview).
+
+## Connect an account
+
+Connect with `POST /v1/accounts/connect` and `"platform": "facebook"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
@@ -54,7 +59,7 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   }'
 ```
 
-Response:
+Response (HTTP 200):
 
 ```json
 {
@@ -63,32 +68,34 @@ Response:
 }
 ```
 
-Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the code with Facebook, but the result is never an immediate `status=success`: every Facebook connect returns a pending connection that asks you to choose which Pages to assign. See [OAuth flows: Facebook, choosing which Pages to connect](/guides/connect-accounts#facebook-choosing-which-pages-to-connect) for the full `login_id` / `pages[]` / `lost_access[]` shape and the `POST /v1/accounts/pending/{connection_id}/select` call that completes it.
+After the person authorizes, the redirect carries `status=success` and the brand's Facebook account. That account holds every Page the login granted that none of your other brands already holds. A Page that another of your brands holds stays with that brand.
+
+- A login that grants no Page fails with `404 platform.facebook.no_pages`.
+- A login whose every Page belongs to another of your brands fails with `409 platform.facebook.no_assignable_pages`.
+- A brand whose Facebook account is connected through a different login returns `409 account.different_login`. Disconnect the brand's Facebook account first.
+- Reconnecting the same login refreshes the access for every brand that uses it, not only the brand you reconnected from.
+
+### Pages of an account
+
+List the Pages of a connected account with `GET /v1/accounts/{id}/pages`. Each Page has an `id` (`sapi_page_` prefix), `platform_page_id`, `name`, `is_default`, and `is_active`. Publish to a Page with `page_id` on the post target: see [Delivery](/guides/delivery). `PATCH /v1/accounts/{id}/pages/{pageId}` sets `is_default` or `is_active`.
 
 ### One login, many brands
 
-A Facebook login is a shared credential, not a one-to-one link to a brand. The same login can serve many brands at once: each Page you have access to belongs to exactly one brand, but the login behind it, and the OAuth grant that keeps it alive, is shared across all of them.
-
-This has two practical consequences:
-
-- **Assigning Pages is explicit.** Connecting a login does not attach every Page it can see to the brand you connected from. Each Page is assigned to a brand only when you select it, either during the connect flow's pending-selection step or afterward through the endpoints below.
-- **Re-authenticating refreshes everyone.** When you or a teammate re-runs the OAuth flow for a login that already backs one or more brands, the refreshed token and Page grant apply to every brand using that login, not just the one you happened to reconnect from.
-
-### Managing Pages after connecting
-
-Pages don't have to be assigned at connect time. List a login's current Pages, live from Meta, merged with which brand (if any) already owns each one:
+A Facebook login is a shared credential. One login can serve many brands, and each Page belongs to exactly one brand. List the Pages a login can manage, live from Facebook, with the brand that holds each:
 
 ```bash
-curl "https://api.social-api.ai/v1/platforms/facebook/logins/{loginId}/pages" \
+curl "https://api.social-api.ai/v1/platforms/facebook/logins/cred_01J8X3Q4R5M6N7P8V2K0W1J/pages" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
+
+Response (HTTP 200):
 
 ```json
 {
   "login_id": "cred_01J8X3Q4R5M6N7P8V2K0W1J",
   "pages": [
     {
-      "platform_page_id": "17841400000000000",
+      "platform_page_id": "104857392011223",
       "name": "Acme Bakery",
       "assigned_brand_id": "",
       "assignable": true
@@ -98,155 +105,88 @@ curl "https://api.social-api.ai/v1/platforms/facebook/logins/{loginId}/pages" \
 }
 ```
 
-Assign one unassigned Page to a brand:
+`login_id` is on each connected account. Move a Page to a brand with `POST /v1/platforms/facebook/logins/{loginId}/pages/{pageId}/assign` and `{"brand_id": "7d2e4b1a-9c3f-4e5d-8a6b-1f2e3d4c5b6a"}`. A Page that another of your brands holds moves to the target brand. The response has `account_id`, `brand_id`, and `platform_page_id`. A brand whose Facebook account uses a different login returns `409 account.different_login`.
 
-```bash
-curl -X POST "https://api.social-api.ai/v1/platforms/facebook/logins/{loginId}/pages/{pageId}/assign" \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"brand_id": "b_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
-```
+## Comments
 
-A Page already assigned to one of your brands cannot be assigned to a different one while it stays connected there. Trying to connect the same login into a brand whose Facebook account is already tied to a different login returns `409`:
+List comments on a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID. Reply, hide, unhide, delete, like, and unlike work as described in [Comments](/guides/comments).
 
-```json
-{
-  "error": {
-    "code": "account.different_login",
-    "message": "This brand's Facebook is connected through a different login. Disconnect it first."
-  }
-}
-```
+- **Edited comments.** Facebook sends an edited comment again, as another `comment.received` event. Automations ignore edits and answer new comments only.
+- **Page admins.** An [Automation](/guides/automations) skips comments and messages from the Page itself. A Page admin who comments from a personal profile is a commenter like any other, so the comment triggers the Automation.
 
-Disconnect the brand's existing Facebook account first if you intend to move it to a different login.
+## Private replies
 
-Each brand can connect up to 5 Facebook Pages. This is a hard cap, the same on every plan, not a billed allowance: there is no per-page charge for staying under it, and no way to go over it. Assigning a 6th Page to a brand returns `403 platform.facebook.page_cap`:
+A private reply sends a one-time DM to the person who commented. Send it with `POST /v1/inbox/comments/{postId}/{commentId}/private-reply`. Facebook allows one private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.facebook.private_reply_ineligible`.
 
-```json
-{
-  "error": {
-    "code": "platform.facebook.page_cap",
-    "message": "Each brand can connect up to 5 Facebook Pages. Disconnect one or connect the rest to another brand."
-  }
-}
-```
+## Direct messages and the messaging window
 
-## Reading samples
+A Page can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.facebook.window_closed`.
 
-### List posts
+- **Message types.** Text, one attachment by `attachment_url`, or by `attachment_id` with `attachment_type` (without the type the request returns `400 validation.attachment_type_required`), quick replies, buttons, and cards. Field rules are in [Direct messages](/guides/direct-messages).
+- **Cap.** A Page sends 10 messages per clock minute. More returns `429 messaging.velocity_limit`: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
+- **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` reacts to a message, and `DELETE` on the same path removes the reaction.
+- **Delivery status.** `dm.status.sent`, `dm.status.delivered`, and `dm.status.read` events follow each DM you send.
 
-```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+## Mentions
 
-Sample response:
+`GET /v1/accounts/{id}/mentions` returns the posts that tag the Page. A mention inside a comment is not in that list: it arrives as a `mention.received` event. Reply to a mention with `POST /v1/accounts/{id}/mentions/reply`, which posts a public comment. Details are in [Mentions](/guides/mentions).
 
-```json
-{
-  "data": [
-    {
-      "id": "123456789_987654321",
-      "platform": "facebook",
-      "caption": "Check out our new product!",
-      "media_type": "status",
-      "permalink": "https://www.facebook.com/123456789/posts/987654321",
-      "timestamp": "2026-03-01T12:00:00Z",
-      "like_count": 0,
-      "comments_count": 0,
-      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
-    }
-  ],
-  "count": 1
-}
-```
+## Reviews
 
-### List comments on a post
+Facebook removed Page reviews from Graph API v22.0. `GET /v1/inbox/reviews/{account_id}` for a Facebook account returns `422 account.platform_unsupported`, and no other call replaces it.
 
-```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/posts/123456789_987654321/comments?limit=10" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+## Webhook events
 
-Sample response:
+Facebook Pages emit these events to your webhook endpoints. Payloads are in [Webhook events](/guides/webhook-events).
 
-```json
-{
-  "data": [
-    {
-      "id": "sapi_cmt_...",
-      "platform": "facebook",
-      "type": "comment",
-      "author": {
-        "id": "111222333",
-        "name": "Jane Smith"
-      },
-      "content": {
-        "text": "Great post!"
-      },
-      "metadata": {
-        "post_id": "123456789_987654321",
-        "hidden": false,
-        "like_count": 2,
-        "has_replies": true
-      },
-      "created_at": "2026-03-01T13:00:00Z",
-      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-      "platform_id": "987654321_111222333"
-    }
-  ],
-  "count": 1
-}
-```
+| Event | When it fires |
+|---|---|
+| `comment.received` | A person comments on a Page post, or edits a comment |
+| `mention.received` | The Page is tagged in a post or a comment |
+| `dm.received` | A person sends a Messenger message |
+| `dm.sent` | A message left the Page, including one sent from Meta Business Suite |
+| `dm.referral` | A person opened a conversation from an ad or referral link without sending a message |
+| `dm.postback` | A person tapped a quick reply or a button |
+| `dm.status.sent`, `dm.status.delivered`, `dm.status.read` | Facebook accepted, delivered, or showed as read a DM you sent |
+| `account.disconnected` | The person revoked access on Facebook |
+| `page.removed` | A Page was removed from the login |
+| `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
 
-### List DMs
+## Limits
 
-```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/dms?limit=10" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+| Limit | Value |
+|---|---|
+| Post text | 63,206 characters |
+| Photo | 10 MB: JPEG, PNG, GIF, or WebP |
+| Video | 4 GB and 240 minutes: MP4, QuickTime, AVI, or WMV |
+| Multi-photo album | 2 to 10 images |
+| Posts | 100 per 24 hours and 25 per hour for each Page: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Messages | 10 per clock minute for each Page |
+| Private reply | 1 per comment, within 7 days |
+| Facebook's own rate limit | `429 platform.facebook.rate_limit`. It costs no SocialAPI credit |
 
-## Publishing
-
-Create a Facebook Page post with optional platform-specific fields:
-
-```bash
-curl -X POST https://api.social-api.ai/v1/posts \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Check out our new product!",
-    "targets": [
-      {
-        "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-        "platform_data": {
-          "link": "https://example.com/product"
-        }
-      }
-    ]
-  }'
-```
-
-For the full field reference, media constraints, and error recovery, see [Facebook posts](/platforms/facebook/publishing).
-
-## Limitations and gotchas
-
-- **Shared login, one Page per brand**: a single OAuth flow surfaces every Page the login can manage, but each Page belongs to exactly one brand's `account_id`, assigned explicitly during the pending-connection step or later. See [One login, many brands](#one-login-many-brands).
-- **Page tokens never expire**: unlike Instagram, Facebook Page tokens derived from long-lived user tokens do not expire. No reconnection needed unless the user revokes access.
-- **Private replies**: replying to a comment with `"private": true` sends a one-time DM to the commenter. Can only be sent once per comment, within 7 days of the comment.
-- **Automations and Page admins**: an [Automation](/guides/automations) skips comments and messages from the account itself, and on Facebook that is the Page. A Page admin commenting from their personal profile is a commenter like any other, so their comment does trigger it.
-- **Edited comments**: Facebook sends an edited comment again, as another `comment.received` event. Automations ignore edits and answer new comments only.
-- **24-hour messaging window**: Pages can send any message within 24 hours of the user's last message. After that, only approved message tags are allowed. If you get an error sending a DM, the window may have closed.
-- **Reviews deprecated**: Facebook deprecated Page Recommendations/Reviews in Graph API v22.0 (January 2025). The API returns `501` for review endpoints.
+A Page access token does not expire on its own. Reconnect only when a call returns `401 platform.facebook.auth`, for example after the person revoked access.
 
 ## Permissions
 
-[SocialAPI](https://social-api.ai)'s managed Meta App already requests these scopes on your behalf: `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_messaging`, `pages_manage_posts`, `public_profile`, `business_management`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
+SocialAPI's Meta app requests these scopes at connect. You apply for no app review.
+
+| Scope | Used for |
+|---|---|
+| `pages_show_list` | List the Pages the person manages |
+| `business_management` | List Pages owned through a Business Portfolio |
+| `pages_read_engagement` | Read likes, comments, and shares on Page posts |
+| `pages_read_user_content` | Read posts and comments that people make on the Page |
+| `pages_manage_engagement` | Reply to, hide, delete, and like comments |
+| `pages_manage_metadata` | Subscribe the Page to webhook events |
+| `pages_messaging` | Send and receive Messenger DMs |
+| `pages_manage_posts` | Create, edit, and delete Page posts |
+| `public_profile` | Identify the person who connected |
 
 ## Related
 
-- [Platform credentials](/guides/platform-credentials)
-- [OAuth flows](/guides/connect-accounts)
-- [Publishing to Facebook](/platforms/facebook/publishing)
-- [Errors](/guides/errors)
-- [Interaction IDs](/guides/ids)
+- [Facebook publishing](/platforms/facebook/publishing): fields, media rules, and quirks for publishing
+- [Connect accounts](/guides/connect-accounts): the shared connect flow
+- [Automations](/guides/automations): comment-to-DM flows
+- [Platforms](/platforms/overview): the capability matrix
+- [Errors](/guides/errors): every error code

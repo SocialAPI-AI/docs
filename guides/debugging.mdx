@@ -1,45 +1,81 @@
 ---
-title: Debugging with request IDs
-description: Use X-Request-ID to correlate API calls with server-side logs.
+title: "Request IDs"
+description: "Read the X-Request-ID header and the request_id error field to identify a SocialAPI call, send your own request ID, and report a failed call."
 ---
 
-Every API response includes an `X-Request-ID` header. The same value appears in every error response body as `request_id`. Include this ID when reporting an issue to support and we can find the full server-side trace for your call in seconds.
+Every response from the SocialAPI REST API carries an `X-Request-ID` header, and every error response repeats the same value as `request_id` in its body. Log it with each call, and include it when you contact support about a failed request.
 
-## Supplying your own ID
-
-If your application already generates correlation IDs (for tracing across your own services), send them on the `X-Request-ID` request header. The server uses your ID when it matches `^[a-zA-Z0-9_-]{1,64}$` and falls back to generating an 8-char hex ID otherwise.
-
-## Example
+## Read the request ID
 
 ```bash
-curl -i -H "X-Request-ID: my-trace-abc-123" https://api.social-api.ai/v1/accounts
+curl -i https://api.social-api.ai/v1/accounts \
+  -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-The response includes `X-Request-ID: my-trace-abc-123` on success and on error.
+The response headers include:
 
-## Error response shape
+```text
+HTTP 200
+X-Request-ID: 9f3c1a7e
+```
+
+SocialAPI generates the ID when you do not send one: 8 lowercase hexadecimal characters, such as `9f3c1a7e`.
+
+An error response has the ID in the body too:
+
+```bash
+curl -i https://api.social-api.ai/v1/accounts \
+  -H "Authorization: Bearer sapi_key_invalid"
+```
+
+Response (HTTP 401):
 
 ```json
 {
   "error": {
-    "code": "auth.invalid_token",
-    "message": "Bearer token is invalid"
+    "code": "auth.invalid_key",
+    "message": "invalid or inactive API key"
   },
-  "request_id": "my-trace-abc-123"
+  "request_id": "4d82b0c6"
 }
 ```
 
-When something goes wrong, copy the `request_id` from the response body (or the `X-Request-ID` response header) and include it in your support email or message. That lets us pull the full log trace for the failing request without you having to re-run anything.
+The `X-Request-ID` response header has the value `4d82b0c6`, the same as `request_id`.
 
-## Logging request IDs in your application
+## Send your own request ID
 
-It is good practice to log the `X-Request-ID` from every response alongside your own trace context. Here is a minimal example in TypeScript:
+Send `X-Request-ID` on the request to use your own correlation ID. SocialAPI returns it unchanged in the `X-Request-ID` response header and in `request_id`.
+
+```bash
+curl -i https://api.social-api.ai/v1/accounts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "X-Request-ID: order-4821-attempt-2"
+```
+
+Response headers:
+
+```text
+HTTP 200
+X-Request-ID: order-4821-attempt-2
+```
+
+| Rule | Value |
+|---|---|
+| Allowed characters | Letters `A-Z` and `a-z`, digits, hyphen, and underscore |
+| Length | 1 to 64 characters |
+| When the value does not match | SocialAPI ignores it, returns a generated 8-character ID instead, and does not return an error |
+
+SocialAPI does not check that your IDs are unique. Send a different value on each request, or you cannot tell the requests apart when you report one.
+
+## Log the request ID in your application
+
+Log the ID of every response, not only of errors, so you can look up any call later:
 
 ```typescript
 const resp = await fetch("https://api.social-api.ai/v1/accounts", {
   headers: {
-    Authorization: `Bearer ${apiKey}`,
-    "X-Request-ID": myCorrelationId, // your own trace ID
+    Authorization: `Bearer ${process.env.SOCAPI_KEY}`,
+    "X-Request-ID": myCorrelationId,
   },
 });
 
@@ -47,10 +83,29 @@ const requestId = resp.headers.get("X-Request-ID");
 
 if (!resp.ok) {
   const body = await resp.json();
-  console.error("API error", {
+  console.error("SocialAPI error", {
     code: body.error.code,
     message: body.error.message,
-    request_id: requestId, // same as body.request_id
+    request_id: body.request_id,
   });
+} else {
+  console.info("SocialAPI call", { request_id: requestId });
 }
 ```
+
+## Report a failed request
+
+Send support the `request_id`, the HTTP method and path, and the time of the call. The `request_id` identifies the single request that failed.
+
+Two other IDs identify different things:
+
+- **Delivery ID:** `X-SocialAPI-Delivery` on a webhook your endpoint receives identifies one webhook delivery, not an API request. See [Webhooks](/guides/webhooks).
+- **Target errors:** a failed post target shows its reason in `targets[].error`, with no `request_id`. Report the post ID and the target's `account_id`. See [Track post delivery](/guides/delivery).
+
+## Related
+
+- [Errors](/guides/errors): the error envelope and every error code
+- [Authentication](/guides/authentication): `auth.*` errors for a missing or invalid API key
+- [Rate limits](/guides/rate-limits): handle HTTP 429 and `Retry-After`
+- [Webhooks](/guides/webhooks): `X-SocialAPI-Delivery` on webhook deliveries
+- [IDs](/guides/ids): formats of SocialAPI object IDs

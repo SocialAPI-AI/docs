@@ -1,82 +1,101 @@
 ---
-title: Twitter BYOK setup
+title: Use your own X app
 sidebarTitle: "Use your own X app"
-description: Bring your own Twitter Developer app to connect Twitter accounts to SocialAPI.
+description: Create an X developer app, save its OAuth 2.0 credentials in SocialAPI, and connect X accounts, with the exact settings and fixes for common errors.
+icon: "key"
 ---
 
-Twitter requires each SocialAPI user to supply their own Twitter Developer app. Twitter's free API tier is scoped per-app, so using a single shared app across tenants hits rate limits immediately. BYOK (Bring Your Own Keys) gives each user their own rate-limit bucket.
+Connecting X to SocialAPI needs an X developer app that you create. SocialAPI has no shared X app, because X bills API usage to the developer account that owns the app, in pay-per-use credits, and X's free API tier is closed to new developer accounts. Every read and write on your X accounts is billed to your X developer account. See [Why X uses your own app](/guides/platform-credentials#why-x-uses-your-own-app).
 
-<Note>
-When you create the app, X immediately shows you a **Bearer Token** and **OAuth 1.0 Keys** (Consumer Key, Access Token). These are *not* the credentials SocialAPI uses. SocialAPI uses **OAuth 2.0**, which you have to enable separately by completing step 2 below. The OAuth 2.0 Client ID and Client Secret will appear in the app panel only after you finish that setup.
-</Note>
+SocialAPI uses the app's OAuth 2.0 Client ID and Client Secret. When you create the app, X first shows a Bearer Token and OAuth 1.0 keys (Consumer Key, Access Token). SocialAPI does not use them. The OAuth 2.0 Client ID and Client Secret appear only after you finish step 2.
 
-## 1. Create a Twitter Developer project and app
+## Before you start
 
-1. Sign in at [developer.x.com](https://developer.x.com) and create a Free or Basic project.
-2. Inside the project, create a new **App**.
-3. Click your app in the **Apps** sidebar to open its detail panel on the right side of the console.
+- An X account with a verified email address and phone number.
+- A payment method for X pay-per-use credits. X sells no free tier to new developer accounts.
+- Access to the SocialAPI dashboard. Saving X credentials is a dashboard action: no API endpoint saves them.
 
-## 2. Set up User authentication settings
+## Set up the app
 
-In the app's detail panel, scroll to **User authentication settings** and click **Set up**. On the form that opens, configure all of the following on the same screen:
+<Steps>
+  <Step title="Create the developer account and the app">
+    Sign in at [console.x.com](https://console.x.com) with your X account and accept the Developer Agreement. Describe your use case, add a payment method, and buy credits. Create a Project, then create an App inside it.
 
-- **App permissions:** Read and write and Direct message
-- **Type of App:** Web App, Automated App or Bot
-- **Callback URI / Redirect URL:** copy the exact URL from the SocialAPI setup dialog (format: `https://api.social-api.ai/oauth/callback/twitter`)
-- **Website URL:** your own site or `https://social-api.ai`
-- **Scopes** (sometimes shown on the same form, sometimes in a sub-step): enable
+    X shows each credential once. Copy it when it appears, because X issues a new one instead of showing it again.
+  </Step>
+  <Step title="Set up user authentication">
+    Open the app, find **User authentication settings**, and click **Set up**. Set all of these on the same form:
 
-  ```
-  tweet.read tweet.write tweet.moderate.write users.read dm.read dm.write like.write offline.access
-  ```
+    - **App permissions:** Read and write and Direct message.
+    - **Type of App:** Web App, Automated App or Bot. Both give the app a Client Secret.
+    - **Callback URI / Redirect URL:** `https://api.social-api.ai/oauth/callback/twitter`. It must match exactly, with no trailing slash.
+    - **Website URL:** your own site, or `https://social-api.ai`.
 
-  Missing any of these will cause the OAuth flow to succeed but API calls to fail with permission errors afterwards.
+    Click **Save**. SocialAPI requests these scopes from each person who connects: `tweet.read`, `tweet.write`, `tweet.moderate.write`, `users.read`, `dm.read`, `dm.write`, `like.write`, `media.write`, and `offline.access`. The app permissions above let X grant them. Changing the app permissions later means each person reconnects.
+  </Step>
+  <Step title="Copy the OAuth 2.0 credentials">
+    After you save, an **OAuth 2.0** section appears in the app. Copy the **Client ID** and the **Client Secret**. Store the secret somewhere safe.
+  </Step>
+  <Step title="Save the credentials in SocialAPI">
+    In the SocialAPI dashboard, open **Settings** > **Integrations** > **Twitter integration**. Paste the Client ID and the Client Secret, click **Test credentials** to check them with X, then click **Save**.
 
-Click **Save**.
+    SocialAPI never returns the Client Secret from any endpoint. It shows only the start of the Client ID.
+  </Step>
+  <Step title="Connect an account">
+    Call `POST /v1/accounts/connect` with `"platform": "twitter"`, as in [Connect an X account](/platforms/twitter#connect-an-account).
 
-## 3. Copy your OAuth 2.0 Client ID and Client Secret
+    ```bash
+    curl -X POST https://api.social-api.ai/v1/accounts/connect \
+      -H "Authorization: Bearer $SOCAPI_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "platform": "twitter",
+        "redirect_uri": "https://app.example.com/oauth/callback",
+        "state": "session_abc123"
+      }'
+    ```
 
-After saving, an **OAuth 2.0** section appears in the app's detail panel. Copy both the **Client ID** and **Client Secret**. Store the secret somewhere safe, X only shows it once on first generation.
+    Send the person to the returned `auth_url`. Without saved credentials, the request returns `412 byok.credentials_missing`.
+  </Step>
+</Steps>
 
-## 4. Paste into SocialAPI
+## Use a different app for one brand
 
-In the SocialAPI dashboard, go to **Settings → Twitter integration**. Paste the Client ID and Client Secret, click **Test credentials** to verify, then **Save**. You can now click Connect on any Twitter platform card to complete the OAuth flow.
+Save a second X app for a single brand, for example one client's brand in an agency account, from the same dashboard page. A brand with its own app connects through that app. Every other brand uses your default app. Deleting a brand's app returns that brand to the default.
 
-## Brand overrides
+## Replace the client secret
 
-If you manage multiple brands (agency use case), you can add a different Twitter Developer app per brand from the same settings page. Brand-scoped credentials take precedence over the default when connecting a Twitter account to that brand.
-
-## Rotation
-
-Rotating the Client Secret in Twitter's developer portal invalidates all tokens issued by the app. After rotation:
-
-1. Paste the new secret into SocialAPI.
-2. Reconnect any Twitter accounts that were using the old credentials (they will be marked as needing reconnection on the next API call).
+After you regenerate the Client Secret in X, save the new secret in SocialAPI the same way as in step 4. Until you do, a new connection fails with `401 byok.credentials_invalid`.
 
 ## Troubleshooting
 
-- **Pasted credentials don't work / `invalid_client` on save:** Double-check you're pasting the **OAuth 2.0** Client ID and Client Secret from the app panel, not the Consumer Key, Secret Key, or Bearer Token shown right after app creation. Those are OAuth 1.0a and app-only credentials and won't work with SocialAPI's OAuth 2.0 flow.
-- **`invalid_client` on connect:** The secret was rotated in Twitter's dashboard without updating SocialAPI. Copy the current pair from developer.x.com.
-- **OAuth flow succeeds but API calls return 403:** Scopes are missing. Enable all scopes listed in step 2 and reconnect.
-- **Callback URL mismatch error:** The Twitter app's callback URL doesn't match what SocialAPI sent. Copy the URL from the setup dialog exactly, no trailing slash, no environment suffix.
-- **Hitting rate limits immediately:** Check which environment your X app is in (development, staging, or production) and what your X developer plan tier is. The OAuth 2.0 setup mechanics are identical across all three environments, but the rate-limit quotas attached to each environment depend on your paid tier. The Free tier is heavily throttled; Basic and above unlock higher quotas in production.
+<AccordionGroup>
+  <Accordion title="Test credentials fails, or connecting returns 401 byok.credentials_invalid">
+    X rejected the saved Client ID and Client Secret. Check that you pasted the OAuth 2.0 **Client ID** and **Client Secret** from the app's **OAuth 2.0** section, not the Consumer Key, the API Secret, or the Bearer Token that X shows when you create the app. If you regenerated the secret in X, save the new one.
+  </Accordion>
+  <Accordion title="Connecting returns 412 byok.credentials_missing">
+    No X app is saved for the brand and no default is saved. Save the credentials as in step 4, then connect again.
+  </Accordion>
+  <Accordion title="Connecting returns 412 byok.app_access_denied">
+    X refused your app access to its API. The app's access level on X does not allow the call. Check your X developer account, its credits, and the app's access level in the X Developer Console.
+  </Accordion>
+  <Accordion title="X shows a callback URL mismatch">
+    The callback URL on your X app differs from the one SocialAPI sends. Set it to `https://api.social-api.ai/oauth/callback/twitter` exactly, with no trailing slash and no extra path.
+  </Accordion>
+  <Accordion title="The connection works but calls return 403 platform.twitter.insufficient_scope">
+    The app permissions on X are lower than Read and write and Direct message, or the account connected before you raised them. Set the permissions as in step 2, then reconnect the account. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+  </Accordion>
+  <Accordion title="Calls return 402 platform.twitter.usage_capped">
+    Your X developer account is out of credits or reached its spending limit. Add credits or raise the spending limit in the X Developer Console.
+  </Accordion>
+  <Accordion title="Calls return 429 platform.twitter.rate_limit">
+    X's own rate limit applies to each connected account. Wait, then retry. SocialAPI's own limits are in [Rate limits](/guides/rate-limits).
+  </Accordion>
+</AccordionGroup>
 
-## Security
+## Related
 
-- Your Client Secret is encrypted at rest with AES-256-GCM and is never returned by any API endpoint. Only the first six characters of the Client ID are stored in plaintext for UI preview.
-- Credential CRUD endpoints (`/v1/platforms/twitter/credentials`) are dashboard-only: they require a Dashboard JWT and reject Bearer API keys, so a leaked API key cannot read or write BYOK credentials.
-
-## Endpoints
-
-These endpoints are **dashboard-only** (Dashboard JWT required; Bearer API keys are rejected):
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/v1/platforms/twitter/credentials` | List stored credential sets (default + brand overrides) |
-| `PUT` | `/v1/platforms/twitter/credentials` | Create or update the default credential set |
-| `DELETE` | `/v1/platforms/twitter/credentials` | Delete the default credential set |
-| `PUT` | `/v1/platforms/twitter/credentials/brand/:brand_id` | Create or update a brand-scoped credential override |
-| `DELETE` | `/v1/platforms/twitter/credentials/brand/:brand_id` | Delete a brand-scoped credential override |
-| `POST` | `/v1/platforms/twitter/credentials/test` | Test a credential pair before saving |
-
-These routes are not included in the public OpenAPI spec. They are used exclusively by the SocialAPI dashboard.
+- [X / Twitter API](/platforms/twitter): capabilities, limits, and permissions
+- [Platform apps](/guides/platform-credentials): which platforms use SocialAPI's app and which use yours
+- [Connect accounts](/guides/connect-accounts): the shared connect flow
+- [Errors](/guides/errors): every error code

@@ -7,7 +7,7 @@ An Automation is a rule on one Instagram or Facebook account. When a comment or 
 
 The classic use is comment-to-DM: someone comments "link" on a post and gets the link in their DMs. With buttons and steps, the same rule can offer a small menu or ask people to follow the account before they get the link.
 
-Automations send through the same path as your API calls. Each action costs what the same API call costs, and the same platform rules apply: the messaging window, one private reply per comment, and SocialAPI's sending limits.
+Automations send through the same path as your API calls. Each action costs what the same API call costs, and the same platform rules apply: the [messaging window](/guides/direct-messages#the-messaging-window), one [private reply](/guides/comments#send-a-private-reply) per comment, and the [messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 
 ## Endpoints
 
@@ -94,7 +94,7 @@ Response (HTTP 201):
 }
 ```
 
-The Automation is `active` as soon as it is created. A comment such as "Can I get the LINK?" now gets one of the two texts, picked at random, and `once_per_person` makes sure each commenter gets it only once.
+The Automation is `active` when the request returns. A comment such as "Can I get the LINK?" now gets one of the two texts, picked at random, and `once_per_person` makes sure each commenter gets it only once.
 
 To stop it, pause it. Send `active` to resume:
 
@@ -114,21 +114,21 @@ When a comment or DM arrives on the account, every active Automation with a matc
 3. The `start` step's filters must all pass. If they do not, nothing happens and no run is recorded.
 4. Unless `once_per_person` or the [hourly cap on dm Automations](#limits-and-safety) stops it, the run is recorded as a [Firing](#firings) and the `start` step's actions are carried out.
 
-If several Automations match the same event, each one runs. There is no priority between them, so avoid two Automations that send a private reply to the same comments: Meta allows one private reply per comment, and the second one fails.
+If 2 or more Automations match the same event, each one runs. There is no priority between them, so avoid two Automations that send a private reply to the same comments: Meta allows one private reply per comment, and the second one fails.
 
 ## Triggers
 
-| Trigger | Fires on | Start step may use |
+| Trigger | Fires on | Actions allowed on the start step |
 |---|---|---|
 | `comment` | A new comment on any post of the account, or on the posts listed in `post_ids` | `hide_comment`, `reply_comment`, `private_reply` |
-| `dm` | A new DM to the account, the same messages your webhooks receive as `dm.received` | `send_dm` |
+| `dm` | A new DM to the account, the same messages your webhooks receive as [`dm.received`](/guides/webhook-events#dmreceived) | `send_dm` |
 
 Fields that shape the trigger:
 
 | Field | Description |
 |---|---|
 | `trigger` | `comment` or `dm`. Fixed at creation |
-| `post_ids` | Comment trigger only. Up to 100 platform post IDs, each 1 to 100 characters, the same value as `platform_post_id` on a `comment.received` event. Omit it to cover every post. On update, an empty list means every post |
+| `post_ids` | Comment trigger only. Up to 100 platform post IDs, each 1 to 100 characters, the same value as `platform_post_id` on a [`comment.received`](/guides/webhook-events#commentreceived) event. Omit it to cover every post. On update, an empty list means every post |
 | `once_per_person` | Reach each person at most once. Defaults to `false`. A run in which every action failed does not count, so that person can trigger it again. Turning it on later also covers the people the Automation already reached |
 
 A `dm` trigger fires on every `dm.received`, which can include story replies and story mentions on Instagram. Add a keyword filter to the `start` step when you only want to answer certain messages.
@@ -169,7 +169,7 @@ Matches the comment or message text against a list of keywords.
 How matching works:
 
 - **Case, accents, and spacing are ignored.** "LINK", "Link" and "link" all match `link`, and "cafe" matches "Café". Runs of spaces count as one space.
-- **`contains` matches whole words.** `link` matches "send me the link!" but not "linked". A keyword of several words matches that phrase. An apostrophe separates words, so `info` matches "l'info".
+- **`contains` matches whole words.** `link` matches "send me the link!" but not "linked". A keyword of 2 or more words matches that phrase. An apostrophe separates words, so `info` matches "l'info".
 - **`exact` compares the whole text.** `link` matches "Link" but not "link please" or "link!".
 - **Symbols and emoji need no boundary.** On a side where a keyword starts or ends with a symbol or emoji, it matches with no space there: `#promo` matches "join#promo", and 🔥 matches wherever it appears.
 - **Unspaced scripts match anywhere.** Chinese, Japanese, Korean, Thai, Lao, Khmer and Burmese are written without spaces between words, so a keyword in those scripts matches wherever it appears in the text.
@@ -184,7 +184,7 @@ Passes when the person follows the account. Instagram only.
 ```
 
 - It cannot be used on `start`. Instagram shares whether someone follows the account only after they tap a button or message it, and a comment does not count. Put it on a step reached by a button.
-- It is checked live when the step runs. If Instagram's answer is unknown, it is checked once more a few seconds later, and a person whose status is still unknown is treated as following. Only a definite "does not follow" fails the filter, because denying a real follower costs you more than letting one non-follower through, and Instagram can take a few seconds to report a fresh follow.
+- It is checked live when the step runs. If Instagram's answer is unknown, it is checked once more 3 seconds later, and a person whose status is still unknown is treated as following. Only a definite "does not follow" fails the filter, because denying a real follower costs you more than letting one non-follower through, and Instagram can be slow to report a fresh follow.
 - On a Facebook account it is refused with `400 validation.filter_unsupported`: Facebook does not tell apps whether a person follows a Page.
 
 ## Actions
@@ -198,7 +198,7 @@ Actions run in a fixed order, whatever order you write them in: `hide_comment`, 
 | `private_reply` | Sends a DM to the commenter | `start` of a comment Automation | Free |
 | `send_dm` | Sends a DM in the conversation | `start` of a dm Automation, and every step after `start` | 1 interaction credit |
 
-Each cost is the cost of the same API call. See [what counts as an interaction](/guides/rate-limits#what-counts-as-a-post-or-interaction).
+Each cost is the cost of the same API call. See [what counts as an interaction](/guides/plans#what-counts-as-a-post-or-interaction).
 
 Set the field named by `type` with the texts to send. `hide_comment` takes no field:
 
@@ -212,7 +212,7 @@ Set the field named by `type` with the texts to send. `hide_comment` takes no fi
 
 `texts` holds 1 to 10 variants, each 1 to 1,000 characters, and one is picked at random each time the action runs. When the step has buttons, each `private_reply` and `send_dm` text is at most 640 characters.
 
-Steps after `start` run after a button tap, which opens the messaging window but has no comment to act on, so they may only use `send_dm`.
+Steps after `start` run after a button tap, which opens the messaging window but has no comment to act on, so they can use only `send_dm`.
 
 ## Buttons and multi-step flows
 
@@ -269,7 +269,7 @@ curl -X POST https://api.social-api.ai/v1/automations \
   }'
 ```
 
-A tap on **Prices** runs the `prices` step and sends 1 DM (1 interaction credit). The **Opening hours** answer offers **Prices** again, since buttons may loop: each loop needs a person to tap.
+A tap on **Prices** runs the `prices` step and sends 1 DM (1 interaction credit). The **Opening hours** answer offers **Prices** again, since buttons can loop: each loop needs a person to tap.
 
 Rules for the graph:
 
@@ -344,8 +344,8 @@ What keeps an Automation from misbehaving:
 
 - **Your own activity never triggers it.** Comments and messages sent by the account itself are skipped, so an Automation's replies cannot trigger it again. On Facebook the account is the Page: a Page admin commenting from their personal profile does trigger it.
 - **A dm Automation answers one person at most 5 times an hour.** This stops two auto-responders from replying to each other forever. Button taps are not counted.
-- **Each event runs once per Automation.** A webhook Meta delivers twice, or an internal retry, never sends twice.
-- **A past-due account gets no actions.** While your subscription is [past due](/guides/errors#past-due-accounts), Automations do nothing and record no Firings, the same way the API returns `402`.
+- **Each event runs at most once per Automation**, even when the platform delivers it twice.
+- **A past-due account gets no actions.** While your subscription is [past due](/guides/plans#past-due-accounts), Automations do nothing and record no Firings, the same way the API returns `402`.
 - **Platform rules still apply.** An action the platform or SocialAPI refuses (a private reply on a comment older than 7 days, a DM outside the messaging window, an exhausted interaction allowance) fails with the same error code the API call returns, and the failure is recorded on the Firing.
 
 ## Firings
@@ -433,14 +433,14 @@ A [brand-restricted key](/guides/scoped-keys#brand-restrictions) sees only the A
 
 Automations do not change what your [webhooks](/guides/webhooks) receive. Every event goes to your webhook endpoints and to your Automations alike:
 
-- **Triggers are still delivered.** A comment or DM an Automation answers still arrives as `comment.received` or `dm.received`. If your own handler also replies to those events, the person gets both replies, so let one or the other answer each kind of event.
-- **Button taps arrive as `dm.postback`.** A tap on an Automation's postback button reaches your endpoint like any other tap, with an opaque `metadata.payload` that starts with `sa1.`. The Automation handles the tap, so ignore those payloads, and do not start your own payloads with `sa1.`.
-- **Sent DMs echo as `dm.sent`.** DMs an Automation sends are messages the account sent through SocialAPI, so on Instagram and Facebook they produce the same `dm.sent` echo as a DM you send through the API. Nothing in the event tells the two apart.
+- **Triggers are still delivered.** A comment or DM an Automation answers still arrives as [`comment.received`](/guides/webhook-events#commentreceived) or [`dm.received`](/guides/webhook-events#dmreceived). If your own handler also replies to those events, the person gets both replies, so let one or the other answer each kind of event.
+- **Button taps arrive as [`dm.postback`](/guides/webhook-events#dmpostback).** A tap on an Automation's postback button reaches your endpoint like any other tap, with an opaque `metadata.payload` that starts with `sa1.`. The Automation handles the tap, so ignore those payloads, and do not start your own payloads with `sa1.`.
+- **Sent DMs echo as [`dm.sent`](/guides/webhook-events#dmsent).** DMs an Automation sends are messages the account sent through SocialAPI, so on Instagram and Facebook they produce the same `dm.sent` echo as a DM you send through the API. Nothing in the event tells the two apart.
 - **There are no Automation events.** To see what an Automation did, read its [Firings](#firings).
 
 ## Use from an AI agent
 
-An agent connected to the [SocialAPI MCP server](/integrations/overview) can create and manage Automations. The tool descriptions carry the main rules on this page, so an agent can build a valid definition from a plain request such as "When someone comments 'menu' on my Instagram posts, send them a private reply with a link to our menu."
+An agent connected to the [SocialAPI MCP server](/integrations/overview) can create and manage Automations: see the [MCP tools reference](/integrations/tools). The tool descriptions carry the main rules on this page, so an agent can build a valid definition from a plain request such as "When someone comments 'menu' on my Instagram posts, send them a private reply with a link to our menu."
 
 | Tool | What it does |
 |---|---|
@@ -453,8 +453,9 @@ An agent connected to the [SocialAPI MCP server](/integrations/overview) can cre
 
 ## Related
 
-- [Unified inbox](/guides/inbox) for replying, private replies, and DMs through the API
-- [Webhooks](/guides/webhooks) for the events your own code receives
+- [Comments](/guides/comments) for replying, private replies, and hiding through the API
+- [Direct messages](/guides/direct-messages) for the messaging window and sending DMs through the API
+- [Webhook events](/guides/webhook-events) for the events your own code receives
 - [Scoped API keys](/guides/scoped-keys) for least-privilege keys
 - [Errors](/guides/errors) for every error code an action can record
-- [API Reference](/api-reference/introduction) for complete request and response schemas
+- [Unified inbox](/guides/inbox) for the inbox areas an Automation answers

@@ -1,15 +1,32 @@
 ---
-title: "Media uploads"
-description: "Attach media to posts from an uploaded file, a public URL, or a platform attachment ID."
+title: Upload media
+description: Upload images and videos to your SocialAPI media library with one request or a presigned URL, or attach a public URL or platform attachment ID to a post.
 ---
 
-Posts carry an ordered `media` array. Each item names where the media comes from with `source_type`, so one list can mix an uploaded file, a public URL, and media you uploaded to a platform yourself. Order is preserved and decides carousel sequence.
+Media in SocialAPI is the images and videos you attach to a post. A post carries an ordered `media` array, and each item names where the file comes from: your media library, a public URL, or a media ID you created on the platform. Order decides carousel sequence.
+
+Uploading, verifying, and listing media cost no credits. A credit is charged when a post is published or scheduled. Storage counts against your plan: Free has 100 MB, and every paid plan is unlimited. See [Plans and usage](/guides/plans#plan-allowances).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/media/upload` | Upload a file of up to 50 MB in one request |
+| `GET` | `/v1/media/upload-url` | Get a signed URL to upload a larger file |
+| `POST` | `/v1/media/{id}/verify` | Confirm a signed-URL upload |
+| `GET` | `/v1/media` | List the files in your library |
+| `DELETE` | `/v1/media/{id}` | Delete a file |
+| `GET` | `/v1/media/storage` | Read your storage use and quota |
+
+## Media sources
+
+Each item of `media` has a `source_type` and a `source`:
 
 | `source_type` | `source` is | Use it when |
 |---|---|---|
-| `media_id` | A media library UUID from an upload | You uploaded the file to SocialAPI (see below) |
-| `url` | A public `http(s)` URL | The file is already hosted somewhere public and you do not want to upload it |
-| `platform_attachment_id` | A media ID from the target platform's own API | You uploaded to the platform directly and want to publish it without re-upload |
+| `media_id` | The ID of a file in your library | You uploaded the file to SocialAPI |
+| `url` | A public `http` or `https` URL | The file is already hosted and you do not want to upload it |
+| `platform_attachment_id` | A media ID from the platform's own API | You uploaded the file to the platform yourself. Add `type`: `image`, `video`, `audio`, or `file` |
 
 ```json
 {
@@ -22,28 +39,21 @@ Posts carry an ordered `media` array. Each item names where the media comes from
 }
 ```
 
-<Note>
-The older `media_ids` array still works and is not going away without notice. `["abc"]` is exactly equivalent to `[{ "source_type": "media_id", "source": "abc" }]`. If you send both, `media` wins and `media_ids` is ignored. Responses continue to include `media_ids` alongside `media`, listing the `media_id` items only.
-</Note>
+`media` is also accepted on a target, where it replaces the post's list for that target. A target without `media` uses the post's list.
 
-Uploading and verifying media does not cost credits. A credit is charged only when the post publishes or is scheduled.
+The older `media_ids` array still works: `["abc"]` equals `[{"source_type": "media_id", "source": "abc"}]`. When you send both, `media` wins. Responses return `media_ids` next to `media`, listing the `media_id` items only.
 
-## Choosing an upload path
+## Choose an upload path
 
-There are two ways to get a file into SocialAPI. Both return a `media_id` that you use the same way.
-
-| | Server-side upload | Presigned URL |
+| | Server-side upload | Signed URL upload |
 |---|---|---|
-| Endpoint(s) | `POST /v1/media/upload` | `GET /v1/media/upload-url`, then `PUT`, then `POST /v1/media/{id}/verify` |
-| Calls | One | Three |
-| Max file size | 50 MB | No API limit (plan storage quota applies) |
-| Best for | Small files, or clients that cannot upload to an external URL (for example AI sandboxes) | Large files, especially video |
+| Requests | 1 | 3 |
+| Largest file | 50 MB | No SocialAPI limit. Your storage quota and the platform's limits apply |
+| Use it for | Small files, and clients that cannot call another host (AI sandboxes) | Large files, especially video |
 
-If a file is larger than 50 MB, use the presigned-URL path.
+## Upload with one request
 
-## Server-side upload
-
-Send the file as multipart form data in a single request. The `file` field is required.
+Send the file as multipart form data in the `file` field:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/media/upload \
@@ -51,7 +61,7 @@ curl -X POST https://api.social-api.ai/v1/media/upload \
   -F "file=@photo.jpg"
 ```
 
-Response:
+Response (HTTP 201):
 
 ```json
 {
@@ -59,74 +69,85 @@ Response:
 }
 ```
 
-The returned media is immediately `ready`. Pass it as a `media_id` source on your next `POST /v1/posts` call (see [Using media in posts](#using-media-in-posts)).
+The file is `ready` at once. A request without `file` returns `400 validation.field_required`. A file over 50 MB returns `400 validation.field_invalid`.
 
-## Presigned URL upload
+## Upload with a signed URL
 
-Use this path for large files. It has three steps: request a signed URL, upload the bytes to it, then verify.
+<Steps>
+  <Step title="Request a signed URL">
+    Send the file's MIME type as `media_type` and its name as `filename`. Both are required.
 
-**Step 1: Request a signed upload URL.** Both `media_type` (the file's MIME type) and `filename` are required.
+    ```bash
+    curl "https://api.social-api.ai/v1/media/upload-url?media_type=video/mp4&filename=reel.mp4" \
+      -H "Authorization: Bearer $SOCAPI_KEY"
+    ```
 
-```bash
-curl "https://api.social-api.ai/v1/media/upload-url?media_type=video/mp4&filename=reel.mp4" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+    Response (HTTP 200):
 
-Response:
+    ```json
+    {
+      "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "upload_url": "https://storage.example.com/media/reel.mp4?X-Amz-Signature=abc123",
+      "expires_at": "2026-10-13T09:15:00Z"
+    }
+    ```
 
-```json
-{
-  "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "upload_url": "https://storage.example.com/media/...?X-Amz-Signature=...",
-  "expires_at": "2026-07-07T09:15:00Z"
-}
-```
+    The response has no public URL: the file becomes usable through its `media_id`. `upload_url` stops working at `expires_at`, 15 minutes after the request. The media is `pending`.
+  </Step>
+  <Step title="Upload the bytes">
+    Send the file with `PUT` to `upload_url`. The `Content-Type` header must equal the `media_type` from step 1.
 
-The `upload_url` is valid for 15 minutes.
+    ```bash
+    curl -X PUT "https://storage.example.com/media/reel.mp4?X-Amz-Signature=abc123" \
+      -H "Content-Type: video/mp4" \
+      --data-binary @reel.mp4
+    ```
+  </Step>
+  <Step title="Verify the upload">
+    Verification is required. It confirms the file arrived, records its size, and makes the media `ready`.
 
-**Step 2: Upload the file** with an HTTP `PUT` to `upload_url`. The `Content-Type` must match the `media_type` you declared in step 1.
+    ```bash
+    curl -X POST https://api.social-api.ai/v1/media/f47ac10b-58cc-4372-a567-0e02b2c3d479/verify \
+      -H "Authorization: Bearer $SOCAPI_KEY"
+    ```
 
-```bash
-curl -X PUT "https://storage.example.com/media/...?X-Amz-Signature=..." \
-  -H "Content-Type: video/mp4" \
-  --data-binary @reel.mp4
-```
+    Response (HTTP 200):
 
-**Step 3: Verify the upload.** This step is required. It confirms the bytes landed, records the file size, and flips the media from `pending` to `ready`.
+    ```json
+    {
+      "success": true
+    }
+    ```
+  </Step>
+</Steps>
 
-```bash
-curl -X POST https://api.social-api.ai/v1/media/f47ac10b-58cc-4372-a567-0e02b2c3d479/verify \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+If the file is not at the upload URL when you verify, the media becomes `failed` and the request returns `404 media.not_found`. If the file would take you over your storage quota, SocialAPI deletes it, the media becomes `failed`, and the request returns `413 billing.storage_quota`.
 
-<Warning>
-If you skip verification, the media stays `pending` and publishing fails with `Media not found`.
-</Warning>
+Media has 3 statuses: `pending` (created, bytes not confirmed), `ready` (usable in posts), and `failed`. Only `ready` media publishes. A post that names media that is not `ready` returns `400 publishing.validation_failed`, as [Track post delivery](/guides/delivery#verify-media-before-you-publish) describes.
 
-## Using media in posts
+## Attach media to a post
 
-Pass the `media` array on `POST /v1/posts`. Order is preserved. A single entry produces an image or video; multiple entries produce a carousel, subject to each platform's limits.
+Pass `media` on `POST /v1/posts`. One item is an image or a video, and 2 or more items are a carousel, within each platform's limits.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
     "text": "Behind the scenes from our studio shoot.",
+    "publish_now": true,
     "media": [
       { "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }
-    ]
+    ],
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }]
   }'
 ```
 
-`media` is also accepted per target, where it overrides the post-level list for that platform only. A target that sets no `media` inherits the post-level one.
+The formats, sizes, and counts each platform accepts are on its publishing page. `GET /v1/posts/validate` returns them as data. See [Publish a post](/guides/publishing#validate-before-you-publish).
 
-Per-platform media limits (image versus video, carousel counts, maximum items per post) are listed in the [Posts overview](/guides/publishing) capability matrix.
+## Publish from a public URL
 
-### Publishing from a public URL
-
-Set `source_type` to `url` and we fetch the file at publish time. Nothing is stored in your media library and no storage quota is consumed.
+A `url` source is not stored in your library and uses no storage quota.
 
 ```json
 {
@@ -136,13 +157,15 @@ Set `source_type` to `url` and we fetch the file at publish time. Nothing is sto
 }
 ```
 
-The URL must be publicly reachable over `http` or `https`. URLs resolving to private, loopback, link-local, or otherwise internal addresses are rejected. The check runs again at publish time, so a URL that stops resolving publicly between scheduling and publishing fails the post rather than silently dropping the media.
+- **Reachable:** the URL must be a public `http` or `https` address when you create the post and again when the post publishes. A URL that resolves to a private, loopback, or link-local address returns `400 validation.field_invalid`. A post scheduled for later fails when the URL stops working before it publishes.
+- **Typed:** SocialAPI reads the file type from the URL. When it cannot, the request returns `422 publishing.media.untyped_url`. Use a URL with an extension such as `.jpg` or `.mp4`, or upload the file.
+- **Lookup failure:** when the host cannot be looked up for a moment, the request returns `503 system.internal`. Send it again.
 
-Because the fetch happens when the post publishes, the URL must still be live at that moment. For a post scheduled weeks out, an uploaded `media_id` is the safer choice: a link that expires or rotates in the meantime will fail the post.
+For a post scheduled far ahead, upload the file and use a `media_id`: a link that expires or changes before the post publishes fails the post.
 
-### Publishing a platform attachment ID
+## Publish a platform attachment ID
 
-If you have already uploaded media to a platform through its own API, pass that ID directly and we publish it without re-uploading.
+If you uploaded media through a platform's own API, pass its ID and SocialAPI publishes it without a second upload. `type` is required.
 
 ```json
 {
@@ -152,43 +175,34 @@ If you have already uploaded media to a platform through its own API, pass that 
 }
 ```
 
-`type` is required here (`image`, `video`, `audio`, or `file`). For `url` and `media_id` we infer it from the file, but a platform attachment ID is opaque to us, so you have to declare it.
+Instagram, Threads, LinkedIn, and X accept `platform_attachment_id`. Any other platform returns `422 publishing.media.unsupported_source` for that target. A missing `type` returns `422 publishing.media.missing_type`.
 
-Supported on **Instagram, Threads, LinkedIn, LinkedIn Page, and X/Twitter**. Any other platform returns `422 publishing.media.unsupported_source`.
-
-Mixing rules differ by platform:
-
-| Platform | Can mix an attachment ID with other media? |
+| Platform | Mix an attachment ID with other media |
 |---|---|
-| LinkedIn, LinkedIn Page, X/Twitter | Yes, combine freely with `url` and `media_id` items |
-| Instagram, Threads | No. The attachment must be the only item in `media` |
+| LinkedIn, X | Yes. Combine it freely with `url` and `media_id` items |
+| Instagram, Threads | No. The attachment ID must be the only item in `media`, because it is one finished photo, video, or carousel. More items return `422 publishing.media.mixing_unsupported` |
 
-On Instagram and Threads a `platform_attachment_id` is one finished, publishable container (a single photo or video, or a carousel you assembled yourself), so it cannot be combined with anything else. Sending more than one item returns `422 publishing.media.mixing_unsupported`. To build a mixed carousel there, pass `url` or `media_id` items and we assemble it for you.
+These errors apply per target: the post still publishes to its other targets. To build a mixed carousel on Instagram or Threads, send `url` or `media_id` items.
 
-These gates are per target: a post can still publish to its other targets when one target is rejected.
+## Manage your library
 
-## Managing your library
-
-**List media.** Returns your `ready` files, newest first, with cursor pagination (default 50 per page, max 100). Each item includes a short-lived `url` for previewing the file.
+`GET /v1/media` lists your `ready` files, newest first. Each item has `id`, `filename`, `content_type`, `size_bytes`, `status`, `created_at`, and a `url` for previewing the file. The `url` stops working after 2 hours. `limit` is 1 to 100 and defaults to 50. `cursor` is the `next_cursor` of the previous page. See [Pagination](/guides/pagination).
 
 ```bash
 curl "https://api.social-api.ai/v1/media?limit=50" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-**Delete media.**
+`DELETE /v1/media/{id}` deletes a file and returns HTTP 204. SocialAPI does not check whether a post uses the file, so a scheduled post that uses a deleted file fails when it publishes. A file that does not exist returns `404 media.not_found`.
 
-```bash
-curl -X DELETE https://api.social-api.ai/v1/media/f47ac10b-58cc-4372-a567-0e02b2c3d479 \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-**Check storage usage.** Returns bytes used, the plan limit, and file count. The same values come back as `X-Storage-Used` and `X-Storage-Limit` response headers on media requests (`-1` means unlimited).
+`GET /v1/media/storage` returns your storage use:
 
 ```bash
 curl https://api.social-api.ai/v1/media/storage \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
+
+Response (HTTP 200):
 
 ```json
 {
@@ -198,22 +212,44 @@ curl https://api.social-api.ai/v1/media/storage \
 }
 ```
 
-### Storage limits
+`limit_bytes` is `-1` when your plan has no limit. Media requests also return the values in the `X-Storage-Used` and `X-Storage-Limit` headers. Only `ready` files count.
 
-| Plan | Storage |
+## Limits
+
+| Limit | Value |
 |---|---|
-| Free | 100 MB |
-| Starter, Pro, Business, Enterprise | Unlimited |
+| Server-side upload | 50 MB per file. Larger returns `400 validation.field_invalid` |
+| Signed upload URL | Valid for 15 minutes |
+| Storage, Free plan | 100 MB. An upload over it returns `413 billing.storage_quota` |
+| Storage, paid plans | Unlimited |
+| Library list | 100 files per page |
+| Library preview `url` | Valid for 2 hours |
 
-An upload that would exceed your quota returns `413`. On the presigned path the object is removed and the media is marked `failed`.
+SocialAPI reads the duration of a video when the upload completes. You do not send it.
 
-## Constraints and gotchas
+## Scopes
 
-- A public URL now publishes directly as a `url` source. In the deprecated `media_ids` array a raw URL is still ignored: `media_ids` only accepts media library IDs.
-- `url` sources are fetched at publish time and must still be reachable then. Prefer an uploaded `media_id` for posts scheduled far ahead.
-- `platform_attachment_id` requires an explicit `type`, works only on Instagram, Threads, LinkedIn, LinkedIn Page, and X/Twitter, and cannot be mixed with other media on Instagram or Threads.
-- The verify step is mandatory on the presigned path. Without it, media stays `pending` and publishing fails with `Media not found`.
-- The server-side upload endpoint caps files at 50 MB. Use the presigned path for anything larger.
-- Media has three states: `pending` (created, bytes not yet confirmed), `ready` (usable in posts), and `failed` (quota exceeded, or the object was missing at verify).
-- Video duration is detected automatically at verify or upload time. You do not need to send it.
-- Per-platform format, size, and count rules are enforced when you publish. See each platform's posts page.
+| Scope | Grants |
+|---|---|
+| `media:read` | List the library and read storage use |
+| `media:write` | Upload, get a signed URL, verify, and delete media |
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_get_media_upload_url` | Gets a signed URL and a `media_id` |
+| `social_api_verify_media_upload` | Confirms the upload |
+| `social_api_list_media` | Lists the library |
+| `social_api_delete_media` | Deletes a file |
+| `social_api_get_storage_usage` | Reads storage use and quota |
+
+An agent uploads with the signed URL. The server-side upload has no tool. See [MCP tools](/integrations/tools).
+
+## Related
+
+- [Publish a post](/guides/publishing): the `media` field and validation
+- [Track post delivery](/guides/delivery): media status and delivery errors
+- [Plans and usage](/guides/plans): storage allowance for each plan
+- [Pagination](/guides/pagination): cursor lists
+- [Errors](/guides/errors): every media error code

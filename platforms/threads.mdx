@@ -1,43 +1,53 @@
 ---
-title: Threads
-description: Connect and interact with Threads accounts via the Meta Threads API.
+title: Threads API
+sidebarTitle: "Overview"
+description: Connect Threads accounts to publish text, image, video, and carousel posts, read and moderate replies, and read mentions and insights through one API.
+icon: "threads"
 ---
 
-<Badge>Available</Badge>
-
-**Managed connector** - SocialAPI handles the Meta Threads App and platform app review for you. No customer-side Meta for Developers registration required. See [Platform credentials](/guides/platform-credentials).
-
-Threads is fully supported for posts, comments, moderation, and publishing.
+The Threads API in SocialAPI connects Threads accounts. It publishes text, image, video, and carousel posts, reads and answers replies, and, in beta, reads mentions, insights, and public profiles. Threads has no direct messages in the API. SocialAPI's own Meta Threads app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `threads` |
-| Auth type | OAuth 2.0 (Meta) |
-| API | Threads Graph API |
-| Best for | Text-first posting and replying on Threads. |
+| Auth | OAuth 2.0 (Meta Threads) |
+| Platform API | Threads API (Meta) |
+| Status | Available. Mentions, insights, profile discovery, and reply moderation are in beta |
 
 ## Capabilities
 
-| Feature | Supported | Notes |
-|---|---|---|
-| List posts | Yes | Text posts, images, videos, carousels |
-| Comments | Yes | Replies to a specific post |
-| Reply to comment | Yes | |
-| Comment replies (thread) | Yes | Fetch the reply thread under a comment |
-| Moderate comment (hide/unhide/delete) | Yes | Hide, unhide, and delete supported. Unknown actions return `501`. |
-| Toggle post comments | No | Not supported by Threads API |
-| DMs | No | Not supported by platform |
-| Reviews | No | Not applicable |
-| Mentions | Beta | List, reply, and the `mention.received` webhook. Requires the `threads_manage_mentions` scope, pending Meta App Review. |
-| Insights | Beta | Post-level and account-level metrics. Requires the `threads_manage_insights` scope, pending Meta App Review. |
-| Profile discovery | Beta | Public profile lookup by exact username. Requires the `threads_profile_discovery` scope, pending Meta App Review. |
-| Create post | Yes | Text, images, videos, carousels |
-| Delete post | Yes | |
-| Update post | No | Not supported by Threads API |
+An unsupported call returns `501 resource.not_supported`. A Beta row depends on a Threads permission that Meta has not granted to SocialAPI's app for every account: see [Beta permissions](#beta-permissions).
 
-## Connecting
+| Feature | Status | Condition |
+|---|---|---|
+| Publish text, image, video, carousel | Yes | See [Threads publishing](/platforms/threads/publishing) |
+| Reply chains with `segments` | No | A Threads target publishes the first post only and ignores `segments` |
+| Schedule a post | Yes | `scheduled_at` on the post |
+| First comment on a post | No | `first_comment` is not published on Threads |
+| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post and publish a new one |
+| Delete a published post | Yes | |
+| List posts | Yes | Text posts, images, videos, carousels |
+| List replies | Yes | Replies to a post, and replies to a reply |
+| Reply to a reply | Yes | |
+| Delete a reply | Yes | |
+| Hide, unhide a reply | Beta | Needs the `threads_manage_replies` permission. Without it the call returns an HTTP 403 error whose code starts with `platform.threads.` |
+| Like a reply | No | `501 resource.not_supported` |
+| Private reply | No | `501 resource.not_supported` |
+| DMs | No | Threads has no messaging API. `501 resource.not_supported` |
+| Reviews | No | `501 resource.not_supported` |
+| Mentions | Beta | Needs `threads_manage_mentions`. List, reply, and the `mention.received` event |
+| Insights | Beta | Needs `threads_manage_insights`. Post-level and account-level metrics |
+| Profile discovery | Beta | Needs `threads_profile_discovery`. Public profile lookup by exact username |
+| Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
+| Webhook events | Yes | See [Webhook events](#webhook-events) |
+
+The cross-platform matrix is on [Platforms](/platforms/overview).
+
+## Connect an account
+
+Connect with `POST /v1/accounts/connect` and `"platform": "threads"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
@@ -50,7 +60,7 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   }'
 ```
 
-Response:
+Response (HTTP 200):
 
 ```json
 {
@@ -59,50 +69,36 @@ Response:
 }
 ```
 
-Redirect your user to `auth_url`. After they authorize, SocialAPI exchanges the code with Threads and redirects the user to your `redirect_uri` with the connection result. See [OAuth flows](/guides/connect-accounts#step-3-receive-the-result-at-your-redirect_uri) for the redirect parameters.
+A Threads access token lasts about 60 days. SocialAPI refreshes it. If a call returns `401 platform.threads.auth`, the person revoked access or the refresh failed: reconnect the account. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 
-## Reading samples
+## Replies
 
-### List posts
+List the replies to a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID. Reply and delete work as described in [Comments](/guides/comments). Threads calls a comment a reply.
+
+- A hide or an unhide needs the beta permission `threads_manage_replies`. Delete works without it.
+- A like and a private reply return `501 resource.not_supported`.
+
+## Mentions
+
+A mention is a public Threads post that tags your account. `GET /v1/accounts/{id}/mentions` lists mentions, and `POST /v1/accounts/{id}/mentions/reply` replies to one. The `mention.received` event delivers a mention as it happens, and the list returns the same mention with the same `id`, so you can match them. Details are in [Mentions](/guides/mentions).
 
 ```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/posts?limit=10" \
+curl "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions?limit=20" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Sample response:
-
-```json
-{
-  "data": [
-    {
-      "id": "17895695668004550",
-      "platform": "threads",
-      "caption": "Hello from Threads!",
-      "media_type": "TEXT_POST",
-      "permalink": "https://www.threads.net/@acmecorp/post/ABC123",
-      "timestamp": "2026-03-01T12:00:00Z",
-      "like_count": 18,
-      "comments_count": 3,
-      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
-    }
-  ],
-  "count": 1
-}
-```
-
-### List comments on a post
-
 ```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/posts/17895695668004550/comments?limit=10" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
+curl -X POST "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions/reply" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"media_id": "sapi_mnt_01HZ9X3Q4R5M6N7P8V2K0W1J", "text": "Thanks for the mention!"}'
 ```
 
-## Beta endpoints
+`media_id` is the `id` from the list response. Until Meta grants `threads_manage_mentions` for every account, only mentions made by accounts on the app's tester list are returned or delivered. Mentions from any other account are left out, and the list comes back empty with no error. Mention queries reject timestamps before `1688540400`.
 
-These are live for beta accounts and gated on scopes still pending Meta App Review. See [Beta scopes pending review](#beta-scopes-pending-review).
+## Insights
 
-### Insights
+`GET /v1/platforms/threads/insights` returns post-level or account-level metrics. It needs `threads_manage_insights`.
 
 Post-level metrics for one post:
 
@@ -111,14 +107,14 @@ curl "https://api.social-api.ai/v1/platforms/threads/insights?account_id=acc_01H
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Account-level metrics, with an optional window:
+Account-level metrics over a window:
 
 ```bash
-curl "https://api.social-api.ai/v1/platforms/threads/insights?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&level=account&since=1712991600" \
+curl "https://api.social-api.ai/v1/platforms/threads/insights?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&level=account&since=1760000000" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Each metric comes back as either a scalar or a dated series, never both. Account-level `views` is a series; the rest are scalars.
+Response (HTTP 200) for `level=account`:
 
 ```json
 {
@@ -128,8 +124,8 @@ Each metric comes back as either a scalar or a dated series, never both. Account
       "clicks": { "value": 47 },
       "views": {
         "values": [
-          { "end_time": "2026-08-20T07:00:00Z", "value": 910 },
-          { "end_time": "2026-08-21T07:00:00Z", "value": 1204 }
+          { "end_time": "2026-10-11T07:00:00Z", "value": 910 },
+          { "end_time": "2026-10-12T07:00:00Z", "value": 1204 }
         ]
       }
     }
@@ -137,91 +133,89 @@ Each metric comes back as either a scalar or a dated series, never both. Account
 }
 ```
 
-Follower demographics need exactly one breakdown and reject `since` and `until`:
+Each metric comes back as a scalar (`value`) or a dated series (`values`), never both. Account-level `views` is a series. The other account-level metrics are scalars.
 
-```bash
-curl "https://api.social-api.ai/v1/platforms/threads/insights?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&level=account&metric=follower_demographics&breakdown=country" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
+| Level | Metrics |
+|---|---|
+| `media` | `views`, `likes`, `replies`, `reposts`, `quotes`, `shares` |
+| `account` | `views`, `likes`, `replies`, `reposts`, `quotes`, `clicks`, `followers_count`, `follower_demographics` |
 
-### Profile discovery
+- `level` is required: `media` or `account`. `post_id` is required at `level=media`. `since` and `until` are Unix timestamps in seconds, are not accepted at `level=media`, and must not be earlier than `1712991600` (2024-04-13).
+- `follower_demographics` needs exactly one `breakdown`: `country`, `city`, `age`, or `gender`. It rejects `since` and `until`, and Threads returns nothing for an account with fewer than 100 followers.
+- Metrics for a new post appear after a delay, and a deleted post returns nothing. Both return an empty result, not an error.
 
-Look up a public profile by exact username. A leading `@` is optional.
+The `400` codes for these parameters are in [Errors](/guides/errors).
+
+## Profile discovery
+
+`GET /v1/platforms/threads/profile-lookup` returns the public profile for an exact username. A leading `@` is optional. It needs `threads_profile_discovery`.
 
 ```bash
 curl "https://api.social-api.ai/v1/platforms/threads/profile-lookup?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&username=meta" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-A `404` means the username is not discoverable. Meta returns the same response whether the account does not exist, has fewer than 100 followers, or falls outside the access tier, so the three cases cannot be told apart.
+- The lookup matches the exact username. There is no prefix or fuzzy search.
+- Only profiles with 100 or more followers are discoverable.
+- A `404` means the username is not discoverable. Threads gives the same answer when the account does not exist, has fewer than 100 followers, or is outside the access tier, so the three cases look the same.
+- Threads allows 1,000 lookups per user per rolling 24 hours. More returns `429`.
 
-### Mentions
+## Webhook events
 
-Mentions use the standard mentions routes:
+Threads accounts emit these events to your webhook endpoints. Payloads are in [Webhook events](/guides/webhook-events).
 
-```bash
-curl "https://api.social-api.ai/v1/accounts/{id}/mentions?limit=20" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
+| Event | When it fires |
+|---|---|
+| `comment.received` | A person replies to one of your posts |
+| `mention.received` | Another account mentions yours. Beta: see [Mentions](#mentions) |
+| `account.disconnected` | The person revoked access to the account on Threads |
+| `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
 
-# Reply to a mention: media_id is the id from the list response
-curl -X POST "https://api.social-api.ai/v1/accounts/{id}/mentions/reply" \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"media_id": "sapi_mnt_...", "text": "Thanks for the mention!"}'
-```
+## Limits
 
-Until Meta approves the `threads_manage_mentions` scope, only mentions made by accounts on the app's tester list are returned or delivered. Mentions from any other account are left out, and the list comes back empty rather than as an error.
+| Limit | Value |
+|---|---|
+| Post text | 500 characters and 1 hashtag |
+| Carousel | 2 to 20 items |
+| Image | 8 MB: JPEG, PNG, GIF, or WebP |
+| Video | 1 GB: MP4 or QuickTime |
+| Links in a post | 5 unique links |
+| Posts | 250 per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Replies | 1,000 per rolling 24 hours, set by Threads |
+| Threads' own rate limit | `429 platform.threads.rate_limit`. It costs no SocialAPI credit |
 
-## Publishing
-
-Create a Threads post with optional platform-specific fields:
-
-```bash
-curl -X POST https://api.social-api.ai/v1/posts \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Hello from Threads!",
-    "targets": [
-      {
-        "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-        "platform_data": {
-          "reply_control": "accounts_you_follow"
-        }
-      }
-    ]
-  }'
-```
-
-For the full field reference, media constraints, and error recovery, see [Threads posts](/platforms/threads/publishing).
-
-## Limitations and gotchas
-
-- **Moderation.** Hide, unhide, and delete are supported. Unsupported moderation actions return `501`.
-- **No post updates.** Threads does not support editing published posts. Use delete and re-create if needed.
-- **Publishing.** Supports text posts, single images, single videos, and carousel posts.
-- **Mentions have two paths.** The `mention.received` webhook delivers a mention in near real time, and `GET /mentions` returns the same mention with the same `id`, so the two can be matched.
-- **Insight metric sets differ by level.** Post-level metrics are `views`, `likes`, `replies`, `reposts`, `quotes`, and `shares`. Account-level metrics are those five minus `shares`, plus `clicks`, `followers_count`, and `follower_demographics`. `shares` is post-only and `clicks` is account-only.
-- **`follower_demographics` is fussy.** It needs exactly one `breakdown` (`country`, `city`, `age`, or `gender`), it rejects `since` and `until`, and Meta returns nothing unless the account has 100 or more followers.
-- **Insights lag publishing.** Metrics for a new post can take a few minutes to appear, and deleted posts return nothing. Both come back as an empty result rather than an error.
-- **Insight date range floor.** Insight queries reject timestamps before `1712991600` (2024-04-13). Mentions use a different floor, `1688540400`.
-- **Profile discovery is exact-match only.** There is no fuzzy or prefix search, only profiles with 100 or more followers are discoverable, and the budget is 1000 lookups per user per rolling 24 hours.
-- **Token refresh.** Threads tokens can expire. SocialAPI handles refresh automatically. If you receive `401` with `code: "platform.threads.auth"`, reconnect the account.
+`GET /v1/accounts/{id}/limits` returns `posts_remaining`, `posts_total`, `replies_remaining`, and `replies_total`.
 
 ## Permissions
 
-SocialAPI's managed Meta Threads App already requests these scopes on your behalf: `threads_basic`, `threads_content_publish`, `threads_read_replies`, `threads_delete`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
+SocialAPI's Meta Threads app requests these scopes at connect. You apply for no app review.
 
-### Beta scopes pending review
+| Scope | Used for |
+|---|---|
+| `threads_basic` | Profile and posts |
+| `threads_content_publish` | Publish posts and replies |
+| `threads_delete` | Delete posts and replies |
+| `threads_read_replies` | Read replies |
 
-Four further scopes are submitted to Meta but not yet granted: `threads_manage_replies`, `threads_manage_insights`, `threads_manage_mentions`, and `threads_profile_discovery`.
+### Beta permissions
 
-The endpoints behind them are built and documented, and they are requested only for accounts enrolled in the beta. Until Meta grants a scope, calls that depend on it return an upstream authorization error for any account outside our app's tester roster. Nothing you need to do: the scopes are added to your connection automatically once approval lands.
+Seven further scopes are requested only for accounts enrolled in the beta, because Meta fails the whole authorization when an app asks for a scope it has not been granted:
+
+| Scope | Used for |
+|---|---|
+| `threads_manage_replies` | Hide and unhide replies |
+| `threads_manage_insights` | Insights, and the like and reply counts on posts |
+| `threads_manage_mentions` | Mentions |
+| `threads_profile_discovery` | Profile discovery |
+| `threads_location_tagging` | `location_id` on a post |
+| `threads_share_to_instagram` | `crossreshare_to_ig` on a post |
+| `threads_keyword_search` | Not used by an endpoint |
+
+Until Meta grants a scope for every account, a call that needs it returns an HTTP 403 error whose code starts with `platform.threads.` for an account outside the app's tester list. SocialAPI adds the scope to your connection when Meta grants it: you do nothing.
 
 ## Related
 
-- [Platform credentials](/guides/platform-credentials)
-- [OAuth flows](/guides/connect-accounts)
-- [Publishing to Threads](/platforms/threads/publishing)
-- [Errors](/guides/errors)
-- [Interaction IDs](/guides/ids)
+- [Threads publishing](/platforms/threads/publishing): fields, media rules, and quirks for publishing
+- [Connect accounts](/guides/connect-accounts): the shared connect flow
+- [Platforms](/platforms/overview): the capability matrix
+- [Errors](/guides/errors): every error code
