@@ -151,7 +151,7 @@ Response (HTTP 200):
     }
     ```
 
-    `code`, `client_id`, and `code_verifier` are required. `client_secret` is checked when you send it. `redirect_uri` is checked when you send it, and must equal the one used in step 2. An exchange that passes the `client_id` and `client_secret` check but fails on the code's owner, `redirect_uri`, or verifier still uses up the code: send the user through step 2 again.
+    `code`, `client_id`, and `code_verifier` are required. If you send `client_secret`, SocialAPI verifies it. If you omit it, PKCE alone protects the exchange. `redirect_uri` is checked when you send it, and must equal the one used in step 2. An exchange that passes the `client_id` and `client_secret` check but fails on the code's owner, `redirect_uri`, or verifier still uses up the code: send the user through step 2 again.
   </Step>
   <Step title="Call the API">
     Send the access token as the Bearer token:
@@ -184,7 +184,7 @@ curl -X POST https://api.social-api.ai/oauth/token \
   -d "client_secret=c572b7d490c47214440a3f049e0582a4d03e012b0a48b9ef8d2aeaa7c5e36f8c"
 ```
 
-The response (HTTP 200) has the same shape as the code exchange, with a new access token and a new refresh token. Store the new refresh token: the one you sent stops working. `refresh_token` and `client_id` are required, and `client_secret` is checked when you send it.
+The response (HTTP 200) has the same shape as the code exchange, with a new access token and a new refresh token. Store the new refresh token: the one you sent stops working. `refresh_token` and `client_id` are required. If you send `client_secret`, SocialAPI verifies it. If you omit it, the refresh token alone authorizes the refresh (PKCE does not apply to a refresh).
 
 ## Client authentication
 
