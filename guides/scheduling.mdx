@@ -67,7 +67,7 @@ Response (HTTP 201):
 
 The post is `scheduled` and each target is `pending`. SocialAPI sends `post.scheduled` when the post is created.
 
-- **Time:** a `scheduled_at` in the past returns `400 validation.field_invalid`. A value that is not RFC 3339 returns the same error. Include the UTC offset or `Z`.
+- **Time:** with at least one target, a `scheduled_at` in the past returns `400 validation.field_invalid`. With no targets, the post is saved as a draft. A value that is not RFC 3339 returns `400 validation.field_invalid`. Include the UTC offset or `Z`.
 - **One time per target:** a target can set its own `scheduled_at`, which overrides the post's. The post's `scheduled_at` is the earliest of them.
 - **Without targets:** a post with no targets is saved as a draft, even with `scheduled_at`.
 - **Both flags:** when you send `publish_now` and `scheduled_at` together, the post is scheduled.
@@ -87,11 +87,11 @@ flowchart LR
   E -->|failed or partial: POST /posts/pid/retry| C
 ```
 
-A scheduled post keeps its `scheduled` status until every target has settled. While SocialAPI sends it, each target shows `publishing`. The post then becomes `published`, `partial`, or `failed`, and SocialAPI sends one `post.published`, `post.partial`, or `post.failed` event. The statuses and the per-target fields are in [Track post delivery](/guides/delivery#post-status).
+A scheduled post keeps the status `scheduled` while it waits for its time and while SocialAPI sends it, until every target has settled. While SocialAPI sends it, each target shows `publishing`. The post then becomes `published`, `partial`, or `failed`, and SocialAPI sends one `post.published`, `post.partial`, or `post.failed` event. The statuses and the per-target fields are in [Track post delivery](/guides/delivery#post-status).
 
 ## Edit or reschedule
 
-`PATCH /v1/posts/{pid}` changes a `scheduled` post. SocialAPI re-queues the post, so a new time or a new target list takes effect at once.
+`PATCH /v1/posts/{pid}` changes a `scheduled` post. A new time or target list takes effect at once.
 
 ```bash
 curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \

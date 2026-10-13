@@ -5,6 +5,18 @@ description: "Read the HTTP status, post status, and per-target results of a pub
 
 Publishing through SocialAPI is asynchronous: an HTTP success means SocialAPI accepted the post, not that every platform has published it. The post has a `status`, and each platform it goes to is a target in `targets[]` with its own `status`, `platform_post_id`, `permalink`, and `error`. Read them with `GET /v1/posts/{pid}` or receive them in the `post.published`, `post.partial`, and `post.failed` webhook events.
 
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/posts/{pid}` | Read one post with its `status` and `targets[]` |
+| `GET` | `/v1/posts` | List posts with their targets |
+| `POST` | `/v1/posts/{pid}/publish` | Publish a `draft` or `scheduled` post now |
+| `POST` | `/v1/posts/{pid}/retry` | Re-send the failed targets of a `failed` or `partial` post |
+| `POST` | `/v1/posts/{pid}/unpublish` | Remove the published copies from the platforms and keep the post |
+| `DELETE` | `/v1/posts/{pid}` | Delete a post |
+| `POST` | `/v1/media/{id}/verify` | Verify uploaded media before it publishes |
+
 ## Publish and read the result
 
 Publish to 2 targets at once:
@@ -108,7 +120,7 @@ The post is `partial`: 1 target published and 1 failed. `POST /v1/posts/{pid}/re
 
 207 and 422 appear only when delivery finishes before SocialAPI builds the response. Do not rely on them: read `status` and each target's `status` on every response, whatever the HTTP status.
 
-`POST /v1/posts/{pid}/retry` returns `200` with `{"success": true}`, and the post goes back to `publishing`. Other statuses on these endpoints are errors in the standard envelope: `400 publishing.validation_failed` when the post fails validation (the issues are in `error.meta.issues`), `409 resource.conflict` for duplicate content, `409 post.state_invalid` when the post is not in a state the endpoint accepts, and `429 publishing.velocity_limit` or `429 validation.post_limit_exhausted`. See [Errors](/guides/errors).
+`POST /v1/posts/{pid}/retry` returns `200` with `{"success": true}`, and the post goes back to `publishing`. Other statuses on these endpoints are errors in the standard envelope: `400 publishing.validation_failed` when the post fails validation (the issues are in `error.meta.issues`), `409 resource.conflict` for duplicate content, `409 post.state_invalid` when the post is not in a state the endpoint accepts, `400 publishing.no_targets` when the post has no publishable targets, `400 post.no_retryable_deliveries` when a retry finds no failed target, and `429 publishing.velocity_limit` or `429 validation.post_limit_exhausted`. See [Errors](/guides/errors).
 
 SocialAPI ignores request fields it does not recognize, so a misspelled field is not an error: the post is created without it. Send only the documented field names, and read the post back with `GET /v1/posts/{pid}` when a missing field would be costly.
 
@@ -119,8 +131,8 @@ A post has one of these statuses. SocialAPI derives it from the statuses of the 
 | Status | Meaning |
 |---|---|
 | `draft` | Saved without `publish_now` or `scheduled_at`. Nothing is sent until you publish or schedule it |
-| `scheduled` | Every target is `pending` and waits for its scheduled time |
-| `publishing` | At least one target is `publishing`, or some targets finished while others are still `pending`. A scheduled post keeps the status `scheduled` until every target settles |
+| `scheduled` | The post is waiting for its scheduled time, or SocialAPI is sending it, until every target settles. While it waits, every target is `pending` |
+| `publishing` | A post published now (`publish_now` or `POST /v1/posts/{pid}/publish`) has at least one target `publishing`, or some targets finished while others are still `pending` |
 | `published` | Every target is `published` |
 | `partial` | At least one target is `published`, and at least one other target is `failed` or `unpublished` |
 | `failed` | No target is `published`, and at least one target is `failed` |
@@ -183,7 +195,7 @@ A failed target carries an `error` object with 4 fields:
 |---|---|
 | `code` | The error code. Match on this, never on `message` |
 | `message` | A description of what failed |
-| `category` | `validation`, `auth`, `rate_limit`, `platform`, or `system` |
+| `category` | `validation`, `auth`, `account`, `billing`, `resource`, `rate_limit`, `platform`, or `system` |
 | `caused_by` | `user` (the request or your connection caused it), `platform` (the platform refused it), or `system` (SocialAPI failed) |
 
 Surface `error.message` to your users instead of a generic retry prompt. Target errors appear in 2 places:
@@ -253,6 +265,16 @@ Response (HTTP 200) for a post published to Threads and TikTok, when Threads rem
 A target the platform did not delete stays `published`, so SocialAPI shows what is still live. Deleting a post costs no credits and sends `post.deleted` when SocialAPI removes the post.
 
 `POST /v1/posts/{pid}/unpublish` removes the published copies from the platforms and keeps the post. Send `{"account_id": "..."}` to remove one target only. Targets removed from the platform become `unpublished`. The post is `partial` while another target is still `published`, `failed` when none is published and one target failed, and `cancelled` when every target was removed. It returns `400 validation.field_invalid` when there is no published target to remove, and `501 resource.not_supported` when every remaining platform cannot delete posts. SocialAPI sends `post.unpublished` when at least one target is removed. See [Platform support](/platforms/overview) for what each platform can delete.
+
+## Scopes
+
+| Scope | Grants |
+|---|---|
+| `posts:read` | List and read posts and their targets |
+| `posts:write` | Publish, retry, unpublish, and delete posts |
+| `media:write` | Verify uploaded media |
+
+See [Scoped API keys](/guides/scoped-keys).
 
 ## Use from an AI agent
 

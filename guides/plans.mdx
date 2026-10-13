@@ -32,7 +32,7 @@ What each limit returns when you reach it:
 
 Two features depend on the plan rather than on an allowance:
 
-- **WhatsApp template messages** need a paid plan. On the Free plan, `POST /v1/platforms/whatsapp/accounts/{id}/send-template` returns `403 whatsapp.paid_plan_required`. Replies to people who messaged you first work on every plan. See [WhatsApp templates](/platforms/whatsapp/templates).
+- **WhatsApp template messages** need a paid plan. On the Free plan, `POST /v1/platforms/whatsapp/accounts/{id}/send-template` returns `403 whatsapp.paid_plan_required`. Replies to people who messaged you first work on every plan. See [WhatsApp](/platforms/whatsapp).
 - **Visual analysis in exports** (`include_vision`) needs a paid plan. On the Free plan, SocialAPI ignores `include_vision: true` and runs the export without it.
 
 ### Profile packs
@@ -242,9 +242,9 @@ Over the post or interaction allowance, the request returns HTTP 429 and nothing
 
 The interaction allowance returns the same shape with `validation.interaction_limit_exhausted`. Both reset at `period_end`. To continue before then, upgrade your plan.
 
-`POST /v1/posts/import` checks the allowance before it creates anything. When the CSV holds more valid rows than you have post credits left, it returns `429 billing.post_limit` and creates no post.
+`POST /v1/posts/import` checks the allowance before it creates anything. When the CSV holds more valid rows than you have post credits left, drafts included, it returns `429 billing.post_limit` and creates no post.
 
-The request rate limit and the posting and messaging velocity caps are separate from plan allowances: upgrading does not raise them. See [Rate limits](/guides/rate-limits).
+The posting and messaging velocity caps are separate from plan allowances: upgrading does not raise them. See [Rate limits](/guides/rate-limits).
 
 ## Change or cancel your plan
 
@@ -268,6 +268,7 @@ Your SocialAPI account becomes past due when a subscription payment fails for th
 `GET /v1/users/me` shows the state: `billing_blocked` is `true`, `billing_blocked_at` is when it began, and `billing_block_reason` is `past_due`.
 
 Pay the open invoice in the dashboard under **Billing** to restore access. Access returns when the payment succeeds, with no request to make. If every automatic retry fails and the subscription is cancelled, your SocialAPI account moves to the Free plan and access returns on the Free plan's allowances.
+
 ## Use from an AI agent
 
 | Tool | What it does |

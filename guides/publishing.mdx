@@ -12,7 +12,7 @@ Zalo publishes text articles only, and Bluesky publishes text with 1 to 4 images
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/v1/posts` | Create a draft, schedule a post, or publish it now |
-| `GET` | `/v1/posts` | List posts. Filter by `status`, `platform`, `account_ids`, `brand_id`, `from`, `to`, and `search` |
+| `GET` | `/v1/posts` | List posts. Filter by `status`, `platform`, `account_ids`, `page_id`, `brand_id`, `from`, `to`, and `search`. `hidden=true` also returns posts whose `hidden` field is `true`. `sort` is `scheduled_asc` (default), `scheduled_desc`, `created_asc`, or `created_desc` |
 | `GET` | `/v1/posts/{pid}` | Read one post with its targets |
 | `PATCH` | `/v1/posts/{pid}` | Edit a `draft`, `scheduled`, or `failed` post |
 | `POST` | `/v1/posts/{pid}/publish` | Publish a `draft` or `scheduled` post now |
@@ -79,7 +79,7 @@ The post is accepted, and delivery continues after the response. Read the post a
 | Neither, or no targets | The post is saved as a draft. It is not published, even when you send targets |
 | Both `publish_now` and `scheduled_at` | The post is scheduled |
 
-A `scheduled_at` that is not RFC 3339 returns `400 validation.field_invalid`. A `scheduled_at` in the past on `POST /v1/posts` returns the same error.
+A `scheduled_at` that is not RFC 3339 returns `400 validation.field_invalid`. With at least one target, a `scheduled_at` in the past returns `400 validation.field_invalid`. With no targets, the post is saved as a draft.
 
 ## Fields every platform shares
 
@@ -110,7 +110,7 @@ Each item of `targets` has:
 
 A target that does not set a field inherits the post-level value. The same account and Page twice in one request returns `400 publishing.duplicate_target`.
 
-SocialAPI ignores request fields it does not recognize. `POST /v1/posts` is not idempotent: a second request with the same account, title, and text as a `published` or `scheduled` post from the last 24 hours returns `409 resource.conflict`. Send `skip_duplicate_check: true` to post the same content again. See [IDs](/guides/ids#create-requests-are-not-idempotent).
+SocialAPI ignores request fields it does not recognize. `POST /v1/posts` is not idempotent: a second request with the same account, title, and text as a published post from the last 24 hours returns `409 resource.conflict`. Send `skip_duplicate_check: true` to post the same content again. See [IDs](/guides/ids#create-requests-are-not-idempotent).
 
 ## Where platform data goes
 
@@ -209,6 +209,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 ```
 
 The response is HTTP 201 with `"status": "draft"`. Publish it later with `POST /v1/posts/{pid}/publish`, which costs 1 post credit.
+
 ## Edit a post before it publishes
 
 `PATCH /v1/posts/{pid}` changes a post that has not been delivered yet. Send only the fields you change.
@@ -265,7 +266,7 @@ Response (HTTP 200):
 }
 ```
 
-`dry_run=true` checks every row and creates nothing. Row numbers count the header as row 1, so the first data row is row 2. A malformed file returns `400 validation.field_invalid`. When the valid rows need more post credits than you have left, the request returns `429 billing.post_limit` and creates nothing. Each created post is a normal post: it costs 1 post credit when scheduled and nothing as a draft.
+`dry_run=true` checks every row and creates nothing. Row numbers count the header as row 1, so the first data row is row 2. A malformed file returns `400 validation.field_invalid`. When the file has more valid rows than you have post credits left, drafts included, the request returns `429 billing.post_limit` and creates nothing. Each created post is a normal post: it costs 1 post credit when scheduled and nothing as a draft.
 
 ## Unpublish and delete
 

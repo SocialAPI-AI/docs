@@ -60,7 +60,7 @@ Where the platform publishes a hard limit, SocialAPI's cap sits below it: 45 aga
 
 - **Immediate publish** (`POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`): the request returns `429 publishing.velocity_limit` and creates nothing. `meta.window` is `hour` or `day`, `meta.limit` is the cap reached, and `meta.account_id` is the connected account. `POST /v1/posts` spends no post credit when refused.
 - **More than one target in one request:** the request is all or nothing. If one target is at a cap, the whole request is refused and no target's counter moves.
-- **Scheduled post:** a scheduled post is never failed by a velocity cap. SocialAPI holds the target and publishes it once the window clears, so it goes out late. The wait does not use one of its publish attempts.
+- **Scheduled post:** a scheduled post is never failed by a velocity cap. SocialAPI holds the target and publishes it once the window clears, so it goes out late. The wait does not count as a failed delivery.
 
 ## Messaging velocity cap
 
@@ -123,7 +123,7 @@ Reading comments, reviews, mentions, and posts costs no credits, and SocialAPI a
   <Step title="Back off when there is no Retry-After">
     For `platform.*.rate_limit` without `Retry-After`, wait 60 seconds, then double the wait on each further 429.
   </Step>
-  <Step title="Do not retry allowances and daily caps">
+  <Step title="Do not retry plan allowances">
     `validation.post_limit_exhausted`, `validation.interaction_limit_exhausted`, and the `billing.*` codes do not clear within minutes. Check `GET /v1/usage` and wait for `period_end`, or change your plan.
   </Step>
 </Steps>

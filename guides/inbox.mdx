@@ -86,7 +86,7 @@ curl "https://api.social-api.ai/v1/inbox/media/7f3c1e2a-9b4d-4e5f-8a6b-1c2d3e4f5
 | `404` | The media ID is unknown, or it belongs to another SocialAPI account |
 | `410` | The file is gone for good: it expired, or the platform reported the source unrecoverable. Stop retrying |
 | `503` | Too many requests are waiting for files. The response carries `Retry-After: 1`. Retry after 1 second |
-| `504` | SocialAPI is still fetching the file. Retry shortly: this is not a failure |
+| `504` | SocialAPI is still fetching the file. Send the request again until you get `200` or `410`: this is not a failure |
 
 A request for a file that is still being fetched waits up to 15 seconds for it before it returns `504`. `410` and `504` mean opposite things: `410` means stop, `504` means keep retrying. A file that cannot be downloaded at all, such as a Telegram file over 20 MB, returns `410`.
 

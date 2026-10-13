@@ -80,8 +80,7 @@ These codes apply to any endpoint. `error.meta.field` names the offending input 
 |---|---|---|
 | 400 | `validation.body_invalid` | The request body is not valid JSON, or has the wrong shape |
 | 400 | `validation.field_required` | A required field is missing. `meta.field` names it |
-| 400 | `validation.field_invalid` | A field or parameter has the wrong type, format, or value. `meta.field` names it. Examples: `from` is not RFC 3339, `cursor` is malformed, a webhook `url` is not an `https` URL, a webhook event type is unknown, a media `url` is not a public `http` or `https` address |
-| 400 | `validation.invalid_field` | `scheduled_at` is not in the future |
+| 400 | `validation.field_invalid` | A field or parameter has the wrong type, format, or value. `meta.field` names it. Examples: `from` is not RFC 3339, `cursor` is malformed, a webhook `url` is not an `https` URL, a webhook event type is unknown, a media `url` is not a public `http` or `https` address, `scheduled_at` is in the past on a post with targets |
 | 400 | `validation.id_invalid` | A comment or review ID in the path is neither a platform ID nor a SocialAPI ID |
 | 400 | `validation.id_platform_mismatch` | A comment or review ID belongs to a different platform than the `account_id` |
 | 400 | `validation.platform_unsupported` | A sync request names a platform other than `instagram` or `facebook` |
@@ -99,7 +98,7 @@ These codes apply to any endpoint. `error.meta.field` names the offending input 
 | 409 | `ambiguous_post_id` | The platform post ID you passed matches more than one post. Use the SocialAPI post ID |
 | 501 | `resource.not_supported` | The operation does not exist on this account's platform. `meta.platform` names it. See the [capability matrix](/platforms/overview) |
 | 422 | `account.platform_unsupported` | The account's platform has no reviews, and the request was for reviews |
-| 4xx, 5xx | `http.<status>` | A routing or transport error. `http.404` is an unknown path. `GET /v1/inbox/media/{id}` also returns `http.404` (unknown media), `http.410` (media expired), `http.503` (too many waiting requests, retry after 1 second), and `http.504` (media still being fetched, retry shortly) |
+| 4xx, 5xx | `http.<status>` | A routing or transport error. `http.404` is an unknown path. `GET /v1/inbox/media/{id}` also returns `http.404` (unknown media), `http.410` (media expired), `http.503` (too many waiting requests, retry after 1 second), and `http.504` (media still being fetched, send the request again until you get 200 or 410) |
 
 ## Rate limits
 
@@ -210,7 +209,7 @@ These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post life
 | 400 | `validation.duplicate_board_id` | A Pinterest target sets both `board_id` and `page_id`. Use `board_id` |
 | 400 | `validation.use_board_id` | A Pinterest board was set in `platform_data.board_id`. Set `board_id` on the target |
 | 400 | `validation.use_page_id` | `board_id` was set on a non-Pinterest target. Use `page_id` |
-| 409 | `resource.conflict` | Another post already holds identical content for the same account |
+| 409 | `resource.conflict` | The same account has a published post with the same title and text from the last 24 hours. Send `skip_duplicate_check: true` to publish the content again |
 | 409 | `post.state_invalid` | The post's status does not allow the call. Edit works on `draft`, `scheduled`, or `failed`. Publish works on `draft` or `scheduled`. Retry works on `failed` or `partial`. Delete does not work on a `publishing` post. `meta.state` is the current status |
 | 400 | `post.no_retryable_deliveries` | The post has no failed targets to retry |
 | 422 | `publishing.media.missing_source` | A media item has no source |
@@ -244,7 +243,7 @@ See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [R
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 400 | `platform.instagram.window_closed`, `platform.facebook.window_closed` | The 24-hour messaging window is closed. The person must message you first. After the first refusal, SocialAPI answers further untagged sends on that conversation with the same code until an inbound message reopens the window or 24 hours pass. Those refusals spend no credit |
+| 400 | `platform.instagram.window_closed`, `platform.facebook.window_closed` | The 24-hour messaging window is closed. The person must message you first. |
 | 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: it is older than 7 days, or already received one |
 | 422 | `platform.instagram.thread_unavailable`, `platform.facebook.thread_unavailable` | The platform refused to deliver to this conversation. It can be restricted or unavailable |
 | 422 | `platform.instagram.invalid_parameter` | Instagram rejected a parameter. Retrying unchanged will not help |
@@ -372,8 +371,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 400 | `validation.media_not_updatable` | A Google post's media cannot change after publishing. Delete the post and create a new one |
 | 400 | `validation.invalid_call_to_action` | The call to action is not valid. `error.message` gives the reason |
 | 400 | `validation.no_fields_to_update` | A location update set no updatable field |
-| 400 | `validation.pubsub_topic_required`, `validation.pubsub_topic_invalid`, `validation.pubsub_topic_conflict`, `validation.notification_type_invalid` | A Google notification setting is missing or invalid, or the account already publishes to a different topic |
-| 503 | `platform.google.service_disabled` | The Google API is not enabled for the project behind the connection |
+| 503 | `platform.google.service_disabled` | Google's API is temporarily unavailable. Retry the request |
 | 403 | `platform.google.access_denied` | Google denied access to the location |
 
 ## Platform-specific codes
@@ -392,7 +390,6 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 400 | `validation.media_invalid` | A Facebook Reel does not have exactly one video |
 | 400 | `validation.media_mixed` | A Facebook multi-photo post includes a video |
 | 400 | `validation.media_too_many` | A Facebook multi-photo post has more images than Facebook accepts |
-| 400 | `validation.field_invalid` | An image on Bluesky is larger than 2 MB. `meta.field` names the field |
 
 ### TikTok
 
@@ -427,7 +424,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 
 ### WhatsApp
 
-WhatsApp has the most codes because of its messaging window, frequency caps, and template states. See [WhatsApp](/platforms/whatsapp) and [WhatsApp templates](/platforms/whatsapp/templates).
+WhatsApp has the most codes because of its messaging window, frequency caps, and template states. See [WhatsApp](/platforms/whatsapp).
 
 | HTTP | Code | When it occurs |
 |---|---|---|
@@ -482,7 +479,7 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 | 403 | `platform.bluesky.dm_scope_missing` | The app password has no direct message access. Create a new app password with the option on, then reconnect. Posts, comments, and mentions keep working |
 | 403 | `platform.bluesky.account_takedown` | Bluesky suspended the account. Reconnecting does not restore access |
 | 429 | `platform.bluesky.rate_limit` | Bluesky's quota is used up. Sign-in is limited to 30 requests per 5 minutes per account |
-| 400 | `validation.field_invalid` | Bluesky could not resolve the handle |
+| 400 | `validation.field_invalid` | Bluesky could not resolve the handle, or an image is larger than 2 MB. `meta.field` names the field |
 | 400 | `validation.platform_param` | Bluesky rejected a parameter. `error.message` carries Bluesky's reason |
 
 `platform.bluesky.dm_scope_missing` affects only the DM endpoints. Treat it as a failure of one capability, not a dead connection.
