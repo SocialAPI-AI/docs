@@ -1,113 +1,136 @@
 ---
-title: Connectors Overview
-description: Platform capabilities and feature matrix.
+title: Supported platforms
+description: Which operations each SocialAPI platform supports for the inbox, Automations, publishing, analytics, and webhook events, in one matrix per feature area.
 ---
 
-Connectors give SocialAPI.ai one unified API across social networks: each connector normalizes a platform's comments, messages, mentions, reviews, and publishing into the shared SocialAPI schema.
+SocialAPI connects Instagram, Facebook, Threads, Google Business Profile, TikTok, LinkedIn, X / Twitter, Telegram, WhatsApp, Zalo, Bluesky, Pinterest, and YouTube through one API. Trustpilot is not available. Most platforms connect through SocialAPI's own platform app, so you register nothing with the platform. Telegram connects with a bot token from @BotFather, Bluesky with an app password, and X / Twitter through an X developer app that you create. See [Platform apps](/guides/platform-credentials) for who owns the app for each platform.
 
-[SocialAPI](https://social-api.ai) uses a connector pattern - each platform implements the same interface. If a platform doesn't support a feature, the API returns `501` with `error.code: "resource.not_supported"`. Your code doesn't need to branch per platform; just handle the 501.
+Every platform and every operation is available on every plan. Plans differ only in resource limits: see [Plans](/guides/plans). Each platform page holds a Capabilities table with the condition behind every cell below.
 
-## Feature matrix
+When you call an operation a platform does not support, SocialAPI returns `501 resource.not_supported`. That is a platform limit, not a mistake in your integration, so handle the 501 instead of branching per platform. Each error response carries a `request_id` of 8 lowercase hex characters, or the `X-Request-ID` you sent: quote it when you report an issue. An Automation on an account that does not support Automations returns `422 automation.platform_unsupported`, and a reviews call on a platform without reviews returns `422 account.platform_unsupported`.
 
-For the full per-feature, per-platform support table (reply, hide, like, delete, private reply, DMs, reviews, mentions, publishing), see [Platform support](/guides/platforms). It is the single source of truth and is kept in sync with each connector page.
+The cells have 5 values:
 
-## OAuth app ownership
-
-Every connector except Twitter uses SocialAPI's managed platform app. You don't need to create your own Meta App, Google Cloud project, or TikTok Developer registration.
-
-| Platform | OAuth app provided by |
+| Value | Meaning |
 |---|---|
-| Instagram | SocialAPI |
-| Facebook | SocialAPI |
-| Threads | SocialAPI |
-| TikTok | SocialAPI |
-| LinkedIn | SocialAPI |
-| YouTube | SocialAPI |
-| WhatsApp | SocialAPI |
-| Telegram | **You (bot token from @BotFather)** - no OAuth |
-| Zalo | SocialAPI |
-| X / Twitter | **You (BYOK)** - see [setup guide](/platforms/twitter/own-app) |
-| Google | SocialAPI (beta) |
-| Pinterest | SocialAPI |
-| Bluesky | **You (handle + app password)** - no OAuth |
-| Trustpilot | API key (Coming soon) |
+| Yes | Supported |
+| No | Not supported. The call returns an error, or the feature does not exist on the platform |
+| Partial | Supported with a limit on what it covers |
+| Conditional | Supported only when a condition holds, such as an action on your own comment |
+| Beta | Supported for accounts where the platform has granted the permission |
 
-See [Platform credentials](/guides/platform-credentials) for the full story, including consent-screen branding and FAQs.
+The condition behind every Partial, Conditional, and Beta cell is on the platform page. Each comment returned by the inbox also carries a `capabilities` object that tells you which actions the platform allows for it: see [Comments](/guides/comments).
 
-## Account object
+## Inbox
 
-`GET /v1/accounts` returns an array of Account objects:
+Comments, replies, moderation, private replies, direct messages, mentions, and reviews. Guides: [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [Mentions](/guides/mentions), [Reviews](/guides/reviews).
 
-```json
-{
-  "id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-  "platform": "instagram",
-  "name": "Acme Corp",
-  "username": "acmecorp",
-  "brand_id": "b7e2c1a0-4f3d-11ee-be56-0242ac120002",
-  "status": "active"
-}
-```
+| Platform | Comments | Reply | Hide | Delete | Like | Private reply | DMs | Mentions | Reviews |
+|---|---|---|---|---|---|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | Yes | Yes | Yes | No | Yes | Yes | Partial | No |
+| [Facebook](/platforms/facebook) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Partial | No |
+| [Threads](/platforms/threads) | Yes | Yes | Beta | Yes | No | No | No | Beta | No |
+| [Google Business Profile](/platforms/google) | No | No | No | No | No | No | No | No | Yes |
+| [TikTok](/platforms/tiktok) | No | No | No | No | No | No | No | No | No |
+| [LinkedIn](/platforms/linkedin) | No | No | No | No | No | No | No | No | No |
+| [X / Twitter](/platforms/twitter) | Yes | Yes | Yes | Conditional | No | No | Yes | Yes | No |
+| [Telegram](/platforms/telegram) | No | No | No | No | No | No | Conditional | No | No |
+| [WhatsApp](/platforms/whatsapp) | No | No | No | No | No | No | Yes | No | No |
+| [Zalo](/platforms/zalo) | No | No | No | No | No | No | Yes | No | No |
+| [Bluesky](/platforms/bluesky) | Yes | Yes | Yes | Partial | No | No | Partial | Yes | No |
+| [Pinterest](/platforms/pinterest) | No | No | No | No | No | No | No | No | No |
+| [YouTube](/platforms/youtube) | Yes | Yes | Yes | Partial | No | No | No | No | No |
+| [Trustpilot (not available)](/platforms/trustpilot) | No | No | No | No | No | No | No | No | No |
 
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | Account ID. Pass this as `:id` in all account-scoped endpoints. |
-| `platform` | string | Platform identifier (e.g. `instagram`, `facebook`, `tiktok`, `youtube`, `twitter`). |
-| `name` | string | Display name of the connected page or profile. |
-| `username` | string | Platform handle or username. |
-| `brand_id` | string | SocialAPI brand ID this account belongs to. Always present. |
-| `status` | string | Account status. One of: `active`, `reconnect_required`. Always present. |
-| `profile_picture_url` | string | Profile picture URL. Omitted when not available. |
-| `bio` | string | Profile biography or description. Omitted when not available. |
-| `reconnect_reason` | string | Human-readable reason why reconnection is required. Only set when `status` is `reconnect_required`. |
+## Automations
 
-## Connect response metadata
+[Automations](/guides/automations) run on Instagram and Facebook accounts.
 
-The `metadata` object is not included in the `GET /v1/accounts` account list response. It is returned only on the connect (`POST /v1/accounts/connect`) and OAuth exchange (`POST /v1/oauth/exchange`) responses. Use it to read platform-specific profile data at connection time.
+| Platform | Comment trigger | DM trigger | Postback buttons | Follow gate |
+|---|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | Yes | Yes | Yes |
+| [Facebook](/platforms/facebook) | Yes | Yes | Yes | No |
+| [Threads](/platforms/threads) | No | No | No | No |
+| [Google Business Profile](/platforms/google) | No | No | No | No |
+| [TikTok](/platforms/tiktok) | No | No | No | No |
+| [LinkedIn](/platforms/linkedin) | No | No | No | No |
+| [X / Twitter](/platforms/twitter) | No | No | No | No |
+| [Telegram](/platforms/telegram) | No | No | No | No |
+| [WhatsApp](/platforms/whatsapp) | No | No | No | No |
+| [Zalo](/platforms/zalo) | No | No | No | No |
+| [Bluesky](/platforms/bluesky) | No | No | No | No |
+| [Pinterest](/platforms/pinterest) | No | No | No | No |
+| [YouTube](/platforms/youtube) | No | No | No | No |
+| [Trustpilot (not available)](/platforms/trustpilot) | No | No | No | No |
 
-The following platforms populate `metadata`:
+## Publishing
 
-| Key | Type | Platform |
-|---|---|---|
-| `avatar_url` | string | TikTok |
-| `follower_count` | integer | TikTok |
-| `following_count` | integer | TikTok |
-| `video_count` | integer | TikTok, YouTube |
-| `likes_count` | integer | TikTok |
-| `subscriber_count` | integer | YouTube |
-| `uploads_playlist_id` | string | YouTube |
-| `byok_source` | string | X/Twitter (value: `"user"` or `"brand"`) |
-| `bot_id` | string | Telegram |
-| `phone_number_id` | string | WhatsApp |
-| `waba_id` | string | WhatsApp |
+Publish, schedule, update, and delete posts, and add a first comment. Guides: [Publishing](/guides/publishing), [Scheduling](/guides/scheduling), [Media](/guides/media). The media columns show the types a post can carry. Counts, sizes, and formats are on each platform's publishing page.
 
-Platforms not listed above omit `metadata` entirely.
+| Platform | Publish | Text only | Single image | Video | Multiple images | Schedule | Update | Delete | First comment |
+|---|---|---|---|---|---|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | No | Yes | Yes | Yes | Yes | No | No | Yes |
+| [Facebook](/platforms/facebook) | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
+| [Threads](/platforms/threads) | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
+| [Google Business Profile](/platforms/google) | Yes | Yes | Yes | No | No | Yes | No | Yes | No |
+| [TikTok](/platforms/tiktok) | Yes | No | No | Yes | Yes | Yes | No | No | No |
+| [LinkedIn](/platforms/linkedin) | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
+| [X / Twitter](/platforms/twitter) | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
+| [Telegram](/platforms/telegram) | No | No | No | No | No | No | No | No | No |
+| [WhatsApp](/platforms/whatsapp) | No | No | No | No | No | No | No | No | No |
+| [Zalo](/platforms/zalo) | Yes | Yes | No | No | No | Yes | Yes | Yes | No |
+| [Bluesky](/platforms/bluesky) | Yes | Yes | Yes | No | Yes | Yes | No | Yes | No |
+| [Pinterest](/platforms/pinterest) | Yes | No | Yes | No | No | Yes | No | Yes | No |
+| [YouTube](/platforms/youtube) | Yes | No | No | Yes | No | Yes | Yes | Yes | Yes |
+| [Trustpilot (not available)](/platforms/trustpilot) | No | No | No | No | No | No | No | No | No |
 
-## What "not supported" means
+Update and Delete describe a post that is already published.
 
-When a platform doesn't support a feature (e.g. Instagram has no reviews), calling that endpoint returns:
+## Analytics
 
-```json
-{
-  "error": {
-    "code": "resource.not_supported",
-    "message": "Operation not supported for this platform"
-  },
-  "request_id": "01HZAB1234CDEF5678GHIJ9012"
-}
-```
+Live post metrics, a live account summary, and the history SocialAPI stores. Guide: [Analytics](/guides/analytics).
 
-The `request_id` field is always present on every error response. Use it when reporting issues.
+| Platform | Post metrics | Live account summary | Stored history |
+|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | Yes | Yes |
+| [Facebook](/platforms/facebook) | Yes | No | Yes |
+| [Threads](/platforms/threads) | Yes | Beta | Yes |
+| [Google Business Profile](/platforms/google) | No | Yes | No |
+| [TikTok](/platforms/tiktok) | Yes | Yes | Yes |
+| [LinkedIn](/platforms/linkedin) | No | No | No |
+| [X / Twitter](/platforms/twitter) | Yes | No | Partial |
+| [Telegram](/platforms/telegram) | No | No | No |
+| [WhatsApp](/platforms/whatsapp) | No | No | No |
+| [Zalo](/platforms/zalo) | Partial | No | Yes |
+| [Bluesky](/platforms/bluesky) | Yes | No | Yes |
+| [Pinterest](/platforms/pinterest) | No | Yes | No |
+| [YouTube](/platforms/youtube) | Yes | Yes | Partial |
+| [Trustpilot (not available)](/platforms/trustpilot) | No | No | No |
 
-This is expected behavior, not a bug. Design your app to handle `501` gracefully.
+## Webhook events
 
-## Auth types
+Which event groups each platform emits. The events, their payloads, and the platforms behind each one are on [Webhook events](/guides/webhook-events), the canonical home of this list. Setup is in [Webhooks](/guides/webhooks).
 
-| Type | How it works |
-|---|---|
-| `oauth2` | `POST /accounts/connect` with a top-level `redirect_uri` returns an `auth_url`. Send the user there; SocialAPI handles the platform callback and redirects the user to your `redirect_uri` with the result. See [OAuth flows](/guides/connect-accounts). |
-| `apikey` | Pass the platform API key in `metadata` in `POST /accounts/connect`. Returns account ID immediately. |
+| Platform | Comment events | Mention events | DM events | Review events | Post events | Account events |
+|---|---|---|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | Yes | Yes | No | Yes | Yes |
+| [Facebook](/platforms/facebook) | Yes | Yes | Yes | No | Yes | Yes |
+| [Threads](/platforms/threads) | Yes | Beta | No | No | Yes | Yes |
+| [Google Business Profile](/platforms/google) | No | No | No | Yes | Yes | Yes |
+| [TikTok](/platforms/tiktok) | No | No | No | No | Yes | Yes |
+| [LinkedIn](/platforms/linkedin) | No | No | No | No | Yes | Yes |
+| [X / Twitter](/platforms/twitter) | No | No | No | No | Yes | Yes |
+| [Telegram](/platforms/telegram) | No | No | Yes | No | No | Yes |
+| [WhatsApp](/platforms/whatsapp) | No | No | Yes | No | No | Yes |
+| [Zalo](/platforms/zalo) | No | No | Partial | No | Yes | Yes |
+| [Bluesky](/platforms/bluesky) | No | No | No | No | Yes | Yes |
+| [Pinterest](/platforms/pinterest) | No | No | No | No | Yes | Yes |
+| [YouTube](/platforms/youtube) | No | No | No | No | Yes | Yes |
+| [Trustpilot (not available)](/platforms/trustpilot) | No | No | No | No | No | No |
 
-## Private replies
+## Related
 
-On Instagram and Facebook, posting a reply with `"private": true` sends a DM to the commenter instead of a public reply. This is the platform's native "Send Private Reply" feature. The `private` field is silently ignored on platforms that don't support it.
+- [Platform apps](/guides/platform-credentials): who owns the app behind each connection
+- [Connect accounts](/guides/connect-accounts): the connect flow and the account object
+- [Plans](/guides/plans): resource limits and storage per plan
+- [Errors](/guides/errors): every error code
