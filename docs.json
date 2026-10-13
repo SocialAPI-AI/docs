@@ -2,6 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "SocialAPI",
+  "description": "SocialAPI is a unified social media API and MCP server: one REST API to read and answer comments, DMs, reviews, and mentions, run Automations, and publish posts across Instagram, Facebook, TikTok, YouTube, LinkedIn, X, and more.",
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
@@ -15,6 +16,29 @@
   },
   "llms": {
     "enabled": true
+  },
+  "metadata": {
+    "timestamp": true
+  },
+  "seo": {
+    "metatags": {
+      "og:site_name": "SocialAPI"
+    }
+  },
+  "markdown": {
+    "instructions": [
+      "Base URL: https://api.social-api.ai/v1. Send your API key in the Authorization header: Authorization: Bearer <your API key>.",
+      "Every error response is JSON: { \"error\": { \"code\", \"message\", \"meta\" (optional) }, \"request_id\" }. Branch on error.code; use error.message only for logs.",
+      "A 429 response includes a Retry-After header, in seconds.",
+      "Paginated list endpoints return next_cursor. Pass it as the cursor query parameter to get the next page. An empty next_cursor means you have the last page.",
+      "Treat every ID as an opaque string: do not parse it or assume a format.",
+      "Support differs by platform and by operation. Check /platforms/overview before assuming an operation works on a platform. An unsupported operation returns 501 with error.code resource.not_supported."
+    ]
+  },
+  "api": {
+    "examples": {
+      "languages": ["bash", "javascript", "python"]
+    }
   },
   "navbar": {
     "links": [
@@ -41,41 +65,147 @@
     "tabs": [
       {
         "tab": "Guides",
+        "icon": "book-open",
         "groups": [
           {
-            "group": "Getting Started",
-            "pages": ["index", "quickstart"]
+            "group": "Get started",
+            "icon": "rocket",
+            "pages": ["index", "quickstart", "guides/concepts", "guides/use-cases"]
           },
           {
-            "group": "Core Concepts",
+            "group": "Connect accounts",
+            "icon": "plug",
+            "pages": ["guides/connect-accounts", "guides/platform-credentials"]
+          },
+          {
+            "group": "Inbox",
+            "icon": "inbox",
+            "pages": ["guides/inbox"]
+          },
+          {
+            "group": "Automations",
+            "icon": "bolt",
+            "pages": ["guides/automations"]
+          },
+          {
+            "group": "Publish",
+            "icon": "paper-plane",
+            "pages": ["guides/publishing", "guides/scheduling", "guides/media", "guides/delivery"]
+          },
+          {
+            "group": "Webhooks",
+            "icon": "webhook",
+            "pages": ["guides/webhooks"]
+          },
+          {
+            "group": "API essentials",
+            "icon": "code",
             "pages": [
               "guides/authentication",
               "guides/scoped-keys",
-              "guides/platform-credentials",
-              "guides/concepts",
-              "guides/use-cases",
-              "guides/inbox",
-              "guides/automations",
+              "guides/errors",
               "guides/rate-limits",
               "guides/pagination",
-              "guides/media",
-              "guides/oauth",
-              "guides/interaction-ids",
-              "guides/webhooks",
-              "guides/errors",
-              "guides/reliability",
+              "guides/ids",
               "guides/debugging",
-              "guides/announcements",
-              "guides/platforms"
+              "guides/announcements"
             ]
           }
         ]
       },
       {
-        "tab": "Integrations",
+        "tab": "Platforms",
+        "icon": "grid-2",
         "groups": [
           {
-            "group": "AI Assistants",
+            "group": "Platforms",
+            "pages": [
+              "platforms/overview",
+              "guides/platforms",
+              {
+                "group": "Instagram",
+                "icon": "instagram",
+                "root": "platforms/instagram",
+                "expanded": false,
+                "pages": ["platforms/instagram/publishing"]
+              },
+              {
+                "group": "Facebook",
+                "icon": "facebook",
+                "root": "platforms/facebook",
+                "expanded": false,
+                "pages": ["platforms/facebook/publishing"]
+              },
+              {
+                "group": "Threads",
+                "icon": "threads",
+                "root": "platforms/threads",
+                "expanded": false,
+                "pages": ["platforms/threads/publishing"]
+              },
+              {
+                "group": "Google Business Profile",
+                "icon": "google",
+                "root": "platforms/google",
+                "expanded": false,
+                "pages": ["platforms/google/publishing"]
+              },
+              {
+                "group": "TikTok",
+                "icon": "tiktok",
+                "root": "platforms/tiktok",
+                "expanded": false,
+                "pages": ["platforms/tiktok/publishing"]
+              },
+              {
+                "group": "LinkedIn",
+                "icon": "linkedin",
+                "root": "platforms/linkedin",
+                "expanded": false,
+                "pages": ["platforms/linkedin/publishing"]
+              },
+              {
+                "group": "X / Twitter",
+                "icon": "x-twitter",
+                "root": "platforms/twitter",
+                "expanded": false,
+                "pages": ["platforms/twitter/own-app"]
+              },
+              "platforms/telegram",
+              "platforms/whatsapp",
+              {
+                "group": "Zalo",
+                "icon": "comment",
+                "root": "platforms/zalo",
+                "expanded": false,
+                "pages": ["platforms/zalo/publishing"]
+              },
+              "platforms/bluesky",
+              {
+                "group": "Pinterest",
+                "icon": "pinterest",
+                "root": "platforms/pinterest",
+                "expanded": false,
+                "pages": ["platforms/pinterest/publishing"]
+              },
+              {
+                "group": "YouTube",
+                "icon": "youtube",
+                "root": "platforms/youtube",
+                "expanded": false,
+                "pages": ["platforms/youtube/publishing"]
+              },
+              "platforms/trustpilot"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "AI agents",
+        "icon": "robot",
+        "groups": [
+          {
+            "group": "MCP server",
             "pages": [
               "integrations/overview",
               "integrations/claude",
@@ -92,53 +222,16 @@
         ]
       },
       {
-        "tab": "API Reference",
-        "openapi": "api-reference/openapi.json"
-      },
-      {
-        "tab": "Posts",
+        "tab": "API reference",
+        "icon": "square-terminal",
         "groups": [
           {
-            "group": "Posts",
-            "pages": [
-              "posts/overview",
-              "posts/scheduling",
-              "posts/instagram",
-              "posts/facebook",
-              "posts/google",
-              "posts/linkedin",
-              "posts/pinterest",
-              "posts/threads",
-              "posts/tiktok",
-              "posts/zalo",
-              "posts/youtube"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Connectors",
-        "groups": [
+            "group": "Get started",
+            "pages": ["api-reference/introduction"]
+          },
           {
-            "group": "Platforms",
-            "pages": [
-              "connectors/overview",
-              "connectors/instagram",
-              "connectors/facebook",
-              "connectors/threads",
-              "connectors/google",
-              "connectors/tiktok",
-              "connectors/linkedin",
-              "connectors/twitter",
-              "connectors/twitter-byok",
-              "connectors/telegram",
-              "connectors/whatsapp",
-              "connectors/zalo",
-              "connectors/bluesky",
-              "connectors/pinterest",
-              "connectors/youtube",
-              "connectors/trustpilot"
-            ]
+            "group": "Endpoints",
+            "openapi": "api-reference/openapi.json"
           }
         ]
       }
@@ -158,8 +251,19 @@
       ]
     }
   },
+  "redirects": [
+    { "source": "/connectors/overview", "destination": "/platforms/overview" },
+    { "source": "/connectors/twitter-byok", "destination": "/platforms/twitter/own-app" },
+    { "source": "/connectors/:slug", "destination": "/platforms/:slug" },
+    { "source": "/posts/overview", "destination": "/guides/publishing" },
+    { "source": "/posts/scheduling", "destination": "/guides/scheduling" },
+    { "source": "/posts/:slug", "destination": "/platforms/:slug/publishing" },
+    { "source": "/guides/oauth", "destination": "/guides/connect-accounts" },
+    { "source": "/guides/interaction-ids", "destination": "/guides/ids" },
+    { "source": "/guides/reliability", "destination": "/guides/delivery" }
+  ],
   "contextual": {
-    "options": ["copy", "view", "chatgpt", "claude", "mcp", "cursor"]
+    "options": ["copy", "view", "chatgpt", "claude"]
   },
   "footer": {
     "links": [

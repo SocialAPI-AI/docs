@@ -239,7 +239,7 @@ Every webhook POST has a JSON body with an `event` field and a `data` field cont
 }
 ```
 
-The `data` object is the same `Interaction` shape returned by `GET /accounts/{id}/comments` (and the equivalent DM and mention endpoints). Google review events are the exception: see [Review event payloads](#review-event-payloads). The `id` field is a stable SocialAPI interaction ID - see [Interaction IDs](/guides/interaction-ids).
+The `data` object is the same `Interaction` shape returned by `GET /accounts/{id}/comments` (and the equivalent DM and mention endpoints). Google review events are the exception: see [Review event payloads](#review-event-payloads). The `id` field is a stable SocialAPI interaction ID - see [Interaction IDs](/guides/ids).
 
 ### Matching a DM event to a stored message
 
@@ -255,7 +255,7 @@ For platform-originated events, the body also includes a top-level `raw_payload`
 
 WhatsApp has no message echo, so `dm.sent` is raised when WhatsApp accepts the message rather than when a copy comes back. The payload is the same full interaction object the other platforms send: `author` is the sending phone number ID, `recipient` is the contact's `wa_id`, `content` and `conversation_id` describe the message you sent, and `received_at` is WhatsApp's own send timestamp. It covers both `POST /v1/inbox/conversations/{id}/messages` and the `send-template` endpoint.
 
-Two differences from Instagram and Facebook are worth designing around. It reports only messages sent through the API, since a message WhatsApp never accepted from us produces no receipt. The exception is a number that stays on the WhatsApp Business app, where a message sent from the phone app raises `dm.sent` too, with the same payload (see [Keep using the WhatsApp Business app](/connectors/whatsapp#keep-using-the-whatsapp-business-app)). And it fires once per message, on the transition to `sent`, so a redelivered webhook does not repeat it and the later `delivered` and `read` receipts do not either. `dm.status.sent` still fires alongside it and is unchanged, so an integration built on the receipts keeps working as-is.
+Two differences from Instagram and Facebook are worth designing around. It reports only messages sent through the API, since a message WhatsApp never accepted from us produces no receipt. The exception is a number that stays on the WhatsApp Business app, where a message sent from the phone app raises `dm.sent` too, with the same payload (see [Keep using the WhatsApp Business app](/platforms/whatsapp#keep-using-the-whatsapp-business-app)). And it fires once per message, on the transition to `sent`, so a redelivered webhook does not repeat it and the later `delivered` and `read` receipts do not either. `dm.status.sent` still fires alongside it and is unchanged, so an integration built on the receipts keeps working as-is.
 
 The `dm.status.*` events use a smaller payload instead of the full interaction object. On Instagram and Facebook, `data` contains `status`, `mids` (the platform message IDs the receipt covers), and `recipient_id`. On WhatsApp, `data` contains `status`, `recipient_id`, `message_id` (the WhatsApp `wamid`), and `id`: the same SocialAPI message ID returned by `POST /v1/inbox/conversations/{id}/messages` and by the `send-template` endpoint's `message_id`, so you can match a receipt to the row you stored without guessing by recency when several messages are in flight.
 

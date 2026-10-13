@@ -22,7 +22,7 @@ Brands matter for two reasons:
 
 The numbers above are unit limits, not a strict brand count. Billing counts **profile units**: each brand costs one unit. Profile units track brand count only, Facebook Pages do not add units.
 
-Facebook Pages have their own limit instead: each brand can connect up to 5 Facebook Pages (see [Facebook: one login, many brands](/connectors/facebook#one-login-many-brands)), accumulated one at a time through the [Facebook logins endpoints](/connectors/facebook#managing-pages-after-connecting). This is a hard cap, not a billed allowance: there is no charge for staying under it, and assigning a Page beyond it returns `403 platform.facebook.page_cap` rather than a unit-limit error.
+Facebook Pages have their own limit instead: each brand can connect up to 5 Facebook Pages (see [Facebook: one login, many brands](/platforms/facebook#one-login-many-brands)), accumulated one at a time through the [Facebook logins endpoints](/platforms/facebook#managing-pages-after-connecting). This is a hard cap, not a billed allowance: there is no charge for staying under it, and assigning a Page beyond it returns `403 platform.facebook.page_cap` rather than a unit-limit error.
 
 `GET /v1/usage` reports where you stand:
 
@@ -53,7 +53,7 @@ Facebook Pages have their own limit instead: each brand can connect up to 5 Face
 See [`/v1/brands`](/api-reference/introduction) for the full schema and CRUD endpoints.
 
 <Note>
-  Treat IDs as opaque strings. Brands, posts, and invites are UUIDs; accounts are prefixed with `acc_`. Do not parse them or assume a format, and store them as text. See [IDs are opaque strings](/guides/reliability#ids-are-opaque-strings).
+  Treat IDs as opaque strings. Brands, posts, and invites are UUIDs; accounts are prefixed with `acc_`. Do not parse them or assume a format, and store them as text. See [IDs are opaque strings](/guides/delivery#ids-are-opaque-strings).
 
   Brand creation is not idempotent: there is no `external_id` or idempotency key, and brand names are not unique, so a retried `POST /v1/brands` creates a duplicate. Persist the returned brand ID immediately, and check for an existing brand before creating another.
 </Note>
@@ -75,9 +75,9 @@ You connect an account by calling `POST /v1/accounts/connect` and walking the us
 }
 ```
 
-The full Account schema, including the per-platform `metadata` object, is documented in [Connectors overview](/connectors/overview#account-object).
+The full Account schema, including the per-platform `metadata` object, is documented in [Connectors overview](/platforms/overview#account-object).
 
-See also: [Authentication](/guides/authentication), [OAuth](/guides/oauth).
+See also: [Authentication](/guides/authentication), [OAuth](/guides/connect-accounts).
 
 ## Post
 
@@ -105,7 +105,7 @@ A post has two parts: the post itself (text, media, scheduled time) and a per-pl
 }
 ```
 
-Posts move through a state machine: `draft`, `scheduled`, `publishing`, then `published` (or `partial`, `failed`). See the [Posts tab](/posts/overview) for per-platform field references.
+Posts move through a state machine: `draft`, `scheduled`, `publishing`, then `published` (or `partial`, `failed`). See the [Posts tab](/guides/publishing) for per-platform field references.
 
 Targets follow the same rule: `published` and `failed` are terminal, `publishing` is not. A target at `published` carries a `platform_post_id`, so treating "`published` and a non-empty `platform_post_id`" as your success condition is correct. The one exception is a TikTok draft sent to the creator's inbox (`platform_data.tiktok.post_mode: "inbox"`), which is terminal without an ID because it is not a post until the creator finishes it in the TikTok app. While a target is `publishing`, keep polling `GET /v1/posts/{post_id}` or wait for the `post.published` / `post.partial` / `post.failed` webhook. Do not republish it: some platforms (TikTok in particular) confirm an upload minutes before they expose its post ID, so a retry at that point can duplicate a post that is already live.
 
@@ -143,7 +143,7 @@ Interaction IDs encode their type as a prefix:
 }
 ```
 
-The prefix lets the API dispatch a reply without a database lookup. See [Interaction IDs](/guides/interaction-ids) for the encoding details.
+The prefix lets the API dispatch a reply without a database lookup. See [Interaction IDs](/guides/ids) for the encoding details.
 
 ## Capability
 
