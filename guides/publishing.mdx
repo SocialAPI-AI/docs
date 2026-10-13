@@ -5,14 +5,14 @@ description: Publish, validate, edit, and import posts to Instagram, Facebook, T
 
 A post in SocialAPI is one piece of content sent to one or more connected accounts. You create it with `POST /v1/posts`, name each destination in `targets`, and read the delivery result per platform. The same request publishes to Instagram, Facebook, Threads, TikTok, YouTube, LinkedIn, X, Pinterest, Google Business Profile, Zalo, and Bluesky.
 
-Zalo publishes text articles only, and Bluesky publishes text with 1 to 4 images. What each platform accepts is on its publishing page, linked from [Platform support](#platform-support). A post costs 1 post credit when it is published or scheduled, whatever the number of targets. Saving a draft is free. See [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction).
+Zalo publishes text articles only, and Bluesky publishes text and up to 4 images. What each platform accepts is on its publishing page, linked from [Platform support](#platform-support). A post costs 1 post credit when it is published or scheduled, whatever the number of targets. Saving a draft is free. See [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction).
 
 ## Endpoints
 
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/v1/posts` | Create a draft, schedule a post, or publish it now |
-| `GET` | `/v1/posts` | List posts. Filter by `status`, `platform`, `account_ids`, `page_id`, `brand_id`, `from`, `to`, and `search`. `hidden=true` also returns posts whose `hidden` field is `true`. `sort` is `scheduled_asc` (default), `scheduled_desc`, `created_asc`, or `created_desc` |
+| `GET` | `/v1/posts` | List posts. Parameters are in the table below |
 | `GET` | `/v1/posts/{pid}` | Read one post with its targets |
 | `PATCH` | `/v1/posts/{pid}` | Edit a `draft`, `scheduled`, or `failed` post |
 | `POST` | `/v1/posts/{pid}/publish` | Publish a `draft` or `scheduled` post now |
@@ -22,6 +22,20 @@ Zalo publishes text articles only, and Bluesky publishes text with 1 to 4 images
 | `POST` | `/v1/posts/validate` | Check a post against platform rules without creating it |
 | `GET` | `/v1/posts/validate` | Read each platform's text and media rules |
 | `POST` | `/v1/posts/import` | Create up to 500 posts from a CSV file |
+
+`GET /v1/posts` takes these query parameters, all optional. Pagination is in [Pagination](/guides/pagination).
+
+| Parameter | Description |
+|---|---|
+| `status` | `draft`, `scheduled`, `publishing`, `published`, `partial`, `failed`, or `cancelled` |
+| `platform` | A platform slug, such as `instagram` |
+| `account_ids` | Connected account IDs, comma-separated |
+| `page_id` | A platform page ID, for a Facebook account that has more than one Page |
+| `brand_id` | Posts with a target in this brand |
+| `from`, `to` | RFC 3339 timestamps, both inclusive. They match the post's publish time, else its scheduled time, else its creation time |
+| `search` | Case-insensitive substring of the post's `text` |
+| `hidden` | `true` also returns posts whose `hidden` field is `true` |
+| `sort` | `scheduled_asc` (default), `scheduled_desc`, `created_asc`, or `created_desc` |
 
 ## Your first post
 
@@ -266,7 +280,7 @@ Response (HTTP 200):
 }
 ```
 
-`dry_run=true` checks every row and creates nothing. Row numbers count the header as row 1, so the first data row is row 2. A malformed file returns `400 validation.field_invalid`. When the file has more valid rows than you have post credits left, drafts included, the request returns `429 billing.post_limit` and creates nothing. Each created post is a normal post: it costs 1 post credit when scheduled and nothing as a draft.
+`dry_run=true` checks only each row's `text`, `scheduled_at`, and `platform_data` format, and creates nothing. Row numbers count the header as row 1, so the first data row is row 2. A malformed file returns `400 validation.field_invalid`. When the file has more valid rows than you have post credits left, drafts included, the request returns `429 billing.post_limit` and creates nothing. Each created post is a normal post: it costs 1 post credit when scheduled and nothing as a draft.
 
 ## Unpublish and delete
 

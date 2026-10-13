@@ -20,7 +20,7 @@ Every failed request to the SocialAPI REST API returns a JSON error with an HTTP
 |---|---|
 | `error.code` | A dot-separated code, stable across releases. Match the whole code, or a prefix such as `platform.` or `billing.` |
 | `error.message` | A description for logs and display |
-| `error.meta` | Structured context, present on some errors. `meta.field` names the invalid input, `meta.plan` and `meta.max` describe a plan allowance, `meta.retry_after_seconds` is how long to wait |
+| `error.meta` | Structured context, present on some errors. `meta.field` names the invalid input, `meta.max` is set on `automation.limit_reached` and `meta.plan` on `whatsapp.paid_plan_required`, `meta.retry_after_seconds` is how long to wait |
 | `request_id` | Identifies the request. It equals the `X-Request-ID` response header |
 
 `request_id` is the `X-Request-ID` request header you sent when it matches `^[a-zA-Z0-9_-]{1,64}$`. Otherwise it is 8 lowercase hexadecimal characters that SocialAPI generates. Quote it in support requests: see [Debugging](/guides/debugging).
@@ -65,7 +65,7 @@ Every `/v1` request needs `Authorization: Bearer <API key>`. See [Authentication
 | 401 | `auth.invalid_token` | The bearer token is neither a valid API key nor a valid OAuth 2.1 access token, or it has expired |
 | 401 | `auth.user_not_found` | The token belongs to a SocialAPI account that no longer exists |
 | 403 | `auth.insufficient_scope` | A [scoped API key](/guides/scoped-keys) lacks the scope the request needs, or a scoped key called an admin operation (managing keys, brands, invites, or `PATCH /v1/users/me`). `meta.required_scope` names the scope when one applies |
-| 402 | `billing.past_due` | Your subscription payment failed twice. See [Past-due accounts](/guides/plans#past-due-accounts) for what stays available and how access returns |
+| 402 | `billing.past_due` | Your subscription payment failed twice. Every endpoint returns it except every method of `/v1/users/me` and every `/v1/billing/*` endpoint. See [Past-due accounts](/guides/plans#past-due-accounts) for how access returns |
 | 403 | `auth.state_mismatch` | The `state` you passed to a connect step belongs to a different API key |
 | 400 | `auth.oauth.invalid_client` | The MCP client's `client_id` is unknown. See [OAuth for MCP clients](/integrations/oauth) |
 | 400 | `auth.oauth.invalid_redirect` | The MCP client's `redirect_uri` is not registered for its `client_id` |
@@ -83,7 +83,6 @@ These codes apply to any endpoint. `error.meta.field` names the offending input 
 | 400 | `validation.field_invalid` | A field or parameter has the wrong type, format, or value. `meta.field` names it. Examples: `from` is not RFC 3339, `cursor` is malformed, a webhook `url` is not an `https` URL, a webhook event type is unknown, a media `url` is not a public `http` or `https` address, `scheduled_at` is in the past on a post with targets |
 | 400 | `validation.id_invalid` | A comment or review ID in the path is neither a platform ID nor a SocialAPI ID |
 | 400 | `validation.id_platform_mismatch` | A comment or review ID belongs to a different platform than the `account_id` |
-| 400 | `validation.platform_unsupported` | A sync request names a platform other than `instagram` or `facebook` |
 
 ## Not found, conflicts, and unsupported operations
 
@@ -121,7 +120,7 @@ Allowances and billing periods are defined in [Plans and usage](/guides/plans).
 | 429 | `validation.post_limit_exhausted` | The post allowance for the billing period is used up. It resets at the start of the next period |
 | 429 | `validation.interaction_limit_exhausted` | The interaction allowance for the billing period is used up |
 | 429 | `billing.post_limit` | `POST /v1/posts/import` holds more posts than the allowance has credits left. `error.message` gives the credits needed and remaining |
-| 403 | `billing.brands_limit` | Creating the brand would exceed your plan's brand allowance. `meta.plan` and `meta.max` are set |
+| 403 | `billing.brands_limit` | Creating the brand would exceed your plan's brand allowance |
 | 403 | `billing.platform_not_available` | The platform slug is not one of the connectable platform slugs, such as `trustpilot` |
 | 413 | `billing.storage_quota` | The upload would exceed your plan's media storage |
 | 429 | `billing.export_limit` | You reached your plan's number of exports per billing period |
@@ -153,7 +152,7 @@ These codes come from `POST /v1/accounts/connect`, the steps that follow the con
 | 409 | `account.different_login` | The brand's Facebook is connected through a different login. Disconnect it first |
 | 403 | `account.reconnection_required` | The platform token is no longer usable. Reconnect with `POST /v1/accounts/connect`, passing the existing connected account's brand and platform: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account) |
 | 400 | `account.unsupported_platform` | The platform value is not recognized |
-| 404 | `platform.facebook.no_pages` | The Facebook login has no Pages. |
+| 404 | `platform.facebook.no_pages` | The Facebook login has no Pages |
 | 404 | `platform.google.no_locations` | The Google login has no Business Profile locations |
 | 404 | `platform.youtube.no_channels` | The Google login has no YouTube channels |
 | 404 | `platform.youtube.no_uploads_playlist` | The YouTube channel has no uploads playlist |
@@ -216,7 +215,7 @@ These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post life
 | 422 | `publishing.media.invalid_source_type` | `source_type` is not `url`, `media_id`, or `platform_attachment_id` |
 | 422 | `publishing.media.missing_type` | A `platform_attachment_id` item has no `type` (`image`, `video`, `audio`, or `file`) |
 | 422 | `publishing.media.untyped_url` | The media type cannot be read from the `url`. Use a URL with an extension such as `.jpg` or `.mp4`, or upload the file |
-| 422 | `publishing.media.unsupported_source` | The platform accepts only `platform_attachment_id` media. Upload the media to the platform first |
+| 422 | `publishing.media.unsupported_source` | The platform does not accept `platform_attachment_id` media. Only Instagram, Threads, LinkedIn, and X do |
 | 422 | `publishing.media.mixing_unsupported` | Instagram or Threads cannot combine a `platform_attachment_id` with other media. It must be the only item |
 | 500 | `publishing.media.proxy_unavailable` | SocialAPI could not prepare the media for the platform. Retry the request |
 | 429 | `publishing.velocity_limit` | See [Rate limits](#rate-limits) |
@@ -243,7 +242,7 @@ See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [R
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 400 | `platform.instagram.window_closed`, `platform.facebook.window_closed` | The 24-hour messaging window is closed. The person must message you first. |
+| 400 | `platform.instagram.window_closed`, `platform.facebook.window_closed` | The 24-hour messaging window is closed. The person must message you first |
 | 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: it is older than 7 days, or already received one |
 | 422 | `platform.instagram.thread_unavailable`, `platform.facebook.thread_unavailable` | The platform refused to deliver to this conversation. It can be restricted or unavailable |
 | 422 | `platform.instagram.invalid_parameter` | Instagram rejected a parameter. Retrying unchanged will not help |
@@ -261,7 +260,7 @@ See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [R
 | 400 | `validation.interactive_conflict` | More than one of `quick_replies`, `buttons`, and `cards` (Instagram), or of `buttons` and `list_sections` (WhatsApp), was sent |
 | 400 | `validation.too_many_quick_replies`, `validation.too_many_buttons`, `validation.too_many_cards`, `validation.too_many_sections`, `validation.too_many_rows` | An interactive message exceeds a count limit. Instagram: 13 quick replies, 3 buttons per card, 10 cards. WhatsApp: 3 buttons, 10 sections, 10 rows across all sections |
 | 400 | `validation.invalid_button_count` | A button template has more than 3 buttons: on an Instagram DM, or on an Instagram or Facebook private reply |
-| 400 | `validation.invalid_button_title`, `validation.title_too_long`, `validation.quick_reply_title_too_long`, `validation.card_text_too_long`, `validation.description_too_long`, `validation.text_too_long` | A title or text is empty or too long. Limits: button title 20 characters, quick reply title 20, card title 80, button template text 640 (Instagram DMs, and private replies on Instagram and Facebook), WhatsApp interactive text 1,024, WhatsApp row description 72 |
+| 400 | `validation.invalid_button_title`, `validation.title_too_long`, `validation.quick_reply_title_too_long`, `validation.card_text_too_long`, `validation.description_too_long`, `validation.text_too_long` | A title or text is empty or too long. Limits: button title 20 characters, quick reply title 20, card title 80, card subtitle 80, button template text 640 (Instagram DMs, and private replies on Instagram and Facebook), WhatsApp interactive text 1,024, WhatsApp `list_button` 20, WhatsApp section title 24, WhatsApp row title 24, WhatsApp row description 72 |
 | 400 | `validation.invalid_button_type` | A button `type` is not `url` or `postback` |
 | 400 | `validation.button_type_unsupported` | A WhatsApp interactive button is not `postback`. URL buttons exist only in templates |
 | 400 | `validation.cards_unsupported`, `validation.quick_replies_unsupported` | WhatsApp has no carousel or quick replies. Use buttons or `list_sections` |
@@ -570,6 +569,6 @@ For a `429` without `meta.retry_after_seconds` (a platform limit), wait and retr
 - [Debugging](/guides/debugging) for `X-Request-ID` and what to send to support
 - [Rate limits](/guides/rate-limits) for every 429 code, its window, and how to retry
 - [Plans and usage](/guides/plans) for allowances and past-due accounts
-- [Delivery](/guides/delivery) for target errors on a post
+- [Track post delivery](/guides/delivery) for target errors on a post
 - [Scoped API keys](/guides/scoped-keys) for `auth.insufficient_scope`
 - [Authentication](/guides/authentication) for API keys and OAuth 2.1 access tokens
