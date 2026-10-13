@@ -33,7 +33,8 @@ Fields named `platform_id` hold the platform's own ID for the same object, such 
 - **Review routes:** `:id` takes a `sapi_rev_` ID or the platform's review ID.
 - **Conversation routes:** `:id` takes the conversation `id` returned by `GET /v1/inbox/conversations`. It is a UUID, not a `sapi_dm_` ID.
 - **Mention replies:** `media_id` takes a `sapi_mnt_` ID or the platform's media ID.
-- **Post metrics:** `GET /v1/posts/{pid}/metrics` takes the SocialAPI post ID or a platform post ID.
+- **Read a post:** `GET /v1/posts/{pid}` takes the SocialAPI post ID or a platform post ID. A platform post ID that matches more than one post returns `409 ambiguous_post_id`: use the SocialAPI post ID.
+- **Post metrics:** `GET /v1/posts/{pid}/metrics` takes the SocialAPI post ID or a platform post ID, with the same `409 ambiguous_post_id`.
 
 A SocialAPI interaction ID of the wrong type returns `400 validation.id_invalid`: for example a `sapi_rev_` ID in a comment route. An interaction ID created for a different platform than the account returns `400 validation.id_platform_mismatch`.
 
@@ -93,7 +94,7 @@ No create endpoint accepts an idempotency key. When a request times out and you 
 | `POST /v1/webhooks` | Creates another webhook endpoint, even for the same URL |
 | `POST /v1/automations` | Creates another Automation, up to the limit of 50 Automations per account |
 | `POST /v1/invites` | Returns `409 resource.conflict` while an active invite exists for the same brand and platform |
-| `POST /v1/posts` | Returns `409 resource.conflict` when the same account already has a published post with the same title and text from the last 24 hours. Send `skip_duplicate_check: true` to publish the same content again. Drafts, scheduled posts, and posts still `publishing` are not compared |
+| `POST /v1/posts` | Returns `409 resource.conflict` when the same account already has a post with the same title and text that was created in the last 24 hours and is now `published`. Send `skip_duplicate_check: true` to publish the same content again. Drafts, scheduled posts, and posts still `publishing` are not compared |
 | Replies and direct messages | Send another reply or message and cost another interaction credit |
 
 After a timeout, persist the ID from the first response when you have it. Otherwise list the object (`GET /v1/brands`, `GET /v1/posts`) and look for it before you create another.

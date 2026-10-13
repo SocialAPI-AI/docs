@@ -84,7 +84,7 @@ Each item is an `Interaction`: see [The Interaction shape](/guides/inbox#the-int
 | `limit` | Mentions per page, 1 to 100. The default is 20 |
 | `cursor` | The `next_cursor` of the previous page |
 
-A malformed `since`, `limit`, or `cursor` returns `400 validation.field_invalid`. The response holds `data`, `count` (the number of items in `data`), and `next_cursor` when more mentions exist. Paging is in [Pagination](/guides/pagination#paginated-endpoints).
+A malformed `since`, `limit`, or `cursor` returns `400 validation.field_invalid`. The response holds `data`, `count` (the number of items in `data`), and `next_cursor` when more mentions exist. Paging is in [Pagination](/guides/pagination#paginated-endpoints). Each call that returns at least one item also sends a `mention.received` event: see [Events](#events).
 
 ## What the list returns
 
@@ -140,7 +140,9 @@ The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-revie
 
 ## Events
 
-SocialAPI sends [`mention.received`](/guides/webhook-events#mention-received) when your account is mentioned, on Instagram, Facebook, and Threads. The event and the list share the same `id` on Threads, so you can match them.
+SocialAPI sends [`mention.received`](/guides/webhook-events#mention-received) when Instagram, Facebook, or Threads reports that your account was mentioned. The event and the list share the same `id` on Threads, so you can match them.
+
+`GET /v1/accounts/{id}/mentions` also sends a `mention.received` event on every call that returns at least one item, on every platform that lists mentions. Its `data` is an array of the listed items and it has no `raw_payload`. A call that returns no items sends no event. See [Mentions you list](/guides/webhook-events#mentions-you-list).
 
 ## Use from an AI agent
 

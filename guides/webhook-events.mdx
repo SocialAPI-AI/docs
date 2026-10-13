@@ -5,7 +5,7 @@ description: "Every webhook event SocialAPI sends: when it fires, which platform
 
 A webhook event is one JSON body that SocialAPI sends to your [webhook endpoint](/guides/webhooks) when something happens on a connected account or on a post. This page lists every event you can subscribe to, when it fires, which platforms emit it, and its payload. Match on the `event` field, never on text inside `data`.
 
-`GET /v1/webhooks/events` returns the same list of event names with a description and an area for each (`posts`, `inbox`, or `accounts`). You subscribe to events by name when you [register an endpoint](/guides/webhooks#register-an-endpoint).
+`GET /v1/webhooks/events` returns the same list of event names with a description and a `category` for each (`posts`, `inbox`, or `accounts`). You subscribe to events by name when you [register an endpoint](/guides/webhooks#register-an-endpoint).
 
 ## Event envelope
 
@@ -55,8 +55,8 @@ SocialAPI delivers each event at least once, and events can arrive in a differen
 Which platforms emit an event is stated under each event as **Emitted for**. These groups hold across the page:
 
 - **Instagram, Facebook, Threads, WhatsApp, Telegram, Zalo, and Google Business Profile** send comments, direct messages, mentions, or reviews to SocialAPI as they happen, so those events arrive as webhook events. Each platform's page has a Capabilities table, and [Supported platforms](/platforms/overview) compares them.
-- **X / Twitter, YouTube, Bluesky, Pinterest, and LinkedIn** push nothing to SocialAPI. They emit no comment, DM, mention, or review events: read those with the inbox endpoints.
-- **TikTok** sends new comments to SocialAPI, so it emits `comment.received`. It has no DM events, mention events, or review events. TikTok accounts also emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect an account, and `account.disconnected` when SocialAPI flags the account for reconnection.
+- **X / Twitter, YouTube, Bluesky, Pinterest, and LinkedIn** push nothing to SocialAPI. They emit no comment, DM, or review events, and no mention event from the platform: read those with the inbox endpoints. Listing mentions on X and Bluesky sends `mention.received` (see [Mentions you list](#mentions-you-list)).
+- **TikTok** sends new comments to SocialAPI, so it emits `comment.received`. It has no DM events or review events. Listing TikTok mentions sends `mention.received` (see [Mentions you list](#mentions-you-list)). TikTok accounts also emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect an account, and `account.disconnected` when SocialAPI flags the account for reconnection.
 - **Trustpilot** is not available, so it emits no events.
 
 ## Posts
@@ -154,7 +154,7 @@ Fires when you edit a draft, scheduled, or failed post.
 | Field | Description |
 |---|---|
 | `status` | The post's status after the edit |
-| `changed_fields` | The fields the edit changed: `text`, `title`, `visibility`, `media`, `scheduled_at`, `hidden`, `targets`, `first_comment`, `segments` |
+| `changed_fields` | The fields the edit changed: `text`, `title`, `visibility`, `media`, `scheduled_at`, `hidden`, `targets`, `first_comment`, `segments`. It never lists `platform_data`, even when the edit changed it |
 
 ### `post.deleted`
 
@@ -454,9 +454,9 @@ On WhatsApp:
 
 ### `mention.received`
 
-Fires when a connected account is @mentioned in a comment or in a post caption.
+Fires in two cases: the platform tells SocialAPI that a connected account was @mentioned in a comment or in a post caption, or you list mentions with `GET /v1/accounts/{id}/mentions` (see [Mentions you list](#mentions-you-list)).
 
-**Emitted for:** Instagram, Facebook, and Threads. Instagram story mentions are not `mention.received`: they arrive as `dm.received` (see above).
+**Emitted for:** Instagram, Facebook, and Threads when the platform reports a mention, and every platform that lists mentions when you list them. Instagram story mentions are not `mention.received`: they arrive as `dm.received` (see above).
 
 ```json
 {
@@ -491,6 +491,36 @@ SocialAPI reads the mention's text and author from the platform before sending. 
 | Threads | `author.username` only. `platform_post_id` is the mentioning post's ID, `permalink` is its URL, and there is no `mention_type`. `account_id` is the Threads user ID, not an `acc_` ID |
 
 On Threads, `GET /v1/accounts/{id}/mentions` returns the same mention with the same `id`, so the event and the list can be matched. Mentions are described on [Mentions](/guides/mentions).
+
+#### Mentions you list
+
+Every `GET /v1/accounts/{id}/mentions` call that returns at least one item also sends one `mention.received` event, on every platform that lists mentions. A call that returns no items sends none. SocialAPI sends the event on every such call, including a repeated call that returns the same items.
+
+For this event, `data` is an array: the items of that response's `data`, in the same order, each with the fields of the item in the list. The event has no `raw_payload`. The event a platform notification triggers has an object in `data`, so a handler for `mention.received` must accept both an object and an array.
+
+```json
+{
+  "event": "mention.received",
+  "data": [
+    {
+      "id": "sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "platform": "instagram",
+      "type": "mention",
+      "author": { "id": "17846744073097661", "name": "Jane Smith", "username": "janesmith" },
+      "content": { "text": "Loving the new range from @acmecorp" },
+      "metadata": {
+        "mention_type": "caption",
+        "permalink": "https://www.instagram.com/p/C8xY2AbC/"
+      },
+      "received_at": "2026-10-13T14:35:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_post_id": "17895695668004550"
+    }
+  ]
+}
+```
+
+Repeated list calls send the same mention again, so deduplicate on `data[].id`.
 
 ## Reviews
 

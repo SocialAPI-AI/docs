@@ -165,7 +165,7 @@ SocialAPI gives the credit back when:
 - Every target of `POST /v1/posts` with `publish_now: true`, or of `POST /v1/posts/{pid}/publish`, fails.
 - A reply or DM is refused by the [messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 
-Any other failure keeps the credit spent, including a request the platform refuses, a `409 resource.conflict` for duplicate content, and a retry that fails again.
+Any other failure keeps the credit spent. That includes a request the platform refuses (for example `429 platform.{platform}.rate_limit` on a reply or DM), a `409 resource.conflict` for duplicate content, a post that fails on only some of its targets, and a retry that fails again.
 
 ## Billing periods
 
@@ -219,7 +219,7 @@ Response (HTTP 200) for a SocialAPI account on the Free plan:
 | `period_start` | Start of the current billing period (ISO 8601, UTC) |
 | `period_end` | End of the current billing period (ISO 8601, UTC). Credits reset at this time |
 
-`GET /v1/media/storage` returns your media storage: `used_bytes`, `limit_bytes` (`-1` means unlimited), and `count`, the number of stored files.
+`GET /v1/media/storage` returns your media storage: `used_bytes`, `limit_bytes` (`-1` means unlimited), and `count`, the number of stored files. Any API key can call it, whatever its scopes, and it costs no credits.
 
 ### Usage headers
 

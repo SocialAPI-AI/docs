@@ -124,7 +124,7 @@ Each item of `targets` has:
 
 A target that does not set a field inherits the post-level value. The same account and Page twice in one request returns `400 publishing.duplicate_target`.
 
-SocialAPI ignores request fields it does not recognize. `POST /v1/posts` is not idempotent: a second request with the same account, title, and text as a published post from the last 24 hours returns `409 resource.conflict`. Send `skip_duplicate_check: true` to post the same content again. See [IDs](/guides/ids#create-requests-are-not-idempotent).
+SocialAPI ignores request fields it does not recognize. `POST /v1/posts` is not idempotent: a request returns `409 resource.conflict` when the same account has a post with the same title and text that was created in the last 24 hours and is now `published`. Send `skip_duplicate_check: true` to post the same content again. See [IDs](/guides/ids#create-requests-are-not-idempotent).
 
 ## Where platform data goes
 
@@ -280,11 +280,13 @@ Response (HTTP 200):
 }
 ```
 
-`dry_run=true` checks only each row's `text`, `scheduled_at`, and `platform_data` format, and creates nothing. Row numbers count the header as row 1, so the first data row is row 2. A malformed file returns `400 validation.field_invalid`. When the file has more valid rows than you have post credits left, drafts included, the request returns `429 billing.post_limit` and creates nothing. Each created post is a normal post: it costs 1 post credit when scheduled and nothing as a draft.
+`dry_run=true` checks only each row's `text`, `scheduled_at`, and `platform_data` format, and creates nothing. Row numbers count the header as row 1, so the first data row is row 2. A request with no `file` field returns `400 validation.field_required`. A file over 5 MB, a file that is not valid CSV, a header that does not start with `text`, a file with no data rows, or a file with more than 500 data rows returns `400 validation.field_invalid`. When the file has more valid rows than you have post credits left, drafts included, the request returns `429 billing.post_limit` and creates nothing. Each created post is a normal post: it costs 1 post credit when scheduled and nothing as a draft.
 
 ## Unpublish and delete
 
-`POST /v1/posts/{pid}/unpublish` removes the published copies from the platforms and keeps the post. `DELETE /v1/posts/{pid}` deletes a post, and also removes its published copies. Both are documented, with their responses, in [Track post delivery](/guides/delivery#delete-a-post).
+`POST /v1/posts/{pid}/unpublish` removes the published copies from the platforms and keeps the post. It returns 200 `{"success": true}` when every targeted copy was removed, `400 validation.field_invalid` when no target is published, `501 resource.not_supported` when at least one remaining target is on a platform that cannot delete posts, and `500 system.internal` when a platform fails to delete a copy. With a `501` or `500`, every target that was removed is `unpublished`. See [Unpublish a post](/guides/delivery#unpublish-a-post).
+
+`DELETE /v1/posts/{pid}` deletes a post and also removes its published copies. See [Delete a post](/guides/delivery#delete-a-post).
 
 ## Platform support
 
@@ -310,7 +312,7 @@ Every platform accepts `scheduled_at`. A platform that cannot do something retur
 |---|---|
 | Post credits | 1 per published or scheduled post, whatever the number of targets. At the allowance, `POST /v1/posts` returns `429 validation.post_limit_exhausted` |
 | Posting speed per account | Per hour and per 24 hours, by platform. At the cap, an immediate publish returns `429 publishing.velocity_limit`. See [Rate limits](/guides/rate-limits#posting-velocity-caps) |
-| CSV import | 500 data rows and 5 MB per file |
+| CSV import | 500 data rows and 5 MB per file. No `file` field returns `400 validation.field_required`. A file over 5 MB, over 500 rows, with a header that does not start with `text`, or with no data rows returns `400 validation.field_invalid` |
 
 ## Errors
 
@@ -321,8 +323,10 @@ Every platform accepts `scheduled_at`. A platform that cannot do something retur
 | Scope | Grants |
 |---|---|
 | `posts:read` | List and read posts |
-| `posts:write` | Create, edit, publish, retry, unpublish, validate, import, and delete posts |
+| `posts:write` | Create, edit, publish, retry, unpublish, validate (`POST /v1/posts/validate`), import, and delete posts |
 | `media:write` | Upload and verify the media a post uses |
+
+`GET /v1/posts/validate` needs no scope: any valid API key can call it.
 
 A brand-restricted key can publish only to accounts in its brands. See [Scoped API keys](/guides/scoped-keys).
 

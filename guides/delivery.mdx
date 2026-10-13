@@ -264,7 +264,32 @@ Response (HTTP 200) for a post published to Threads and TikTok, when Threads rem
 
 A target the platform did not delete stays `published`, so SocialAPI shows what is still live. Deleting a post costs no credits and sends `post.deleted` when SocialAPI removes the post.
 
-`POST /v1/posts/{pid}/unpublish` removes the published copies from the platforms and keeps the post. Send `{"account_id": "..."}` to remove one target only. Targets removed from the platform become `unpublished`. The post is `partial` while another target is still `published`, `failed` when none is published and one target failed, and `cancelled` when every target was removed. It returns `400 validation.field_invalid` when there is no published target to remove, and `501 resource.not_supported` when every remaining platform cannot delete posts. SocialAPI sends `post.unpublished` when at least one target is removed. See [Platform support](/platforms/overview) for what each platform can delete.
+## Unpublish a post
+
+`POST /v1/posts/{pid}/unpublish` removes the published copies from the platforms and keeps the post. Send `{"account_id": "..."}` to remove one target only. Targets removed from the platform become `unpublished`. The post is `partial` while another target is still `published`, `failed` when none is published and one target failed, and `cancelled` when every target was removed. See [Platform support](/platforms/overview) for what each platform can delete.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7/unpublish \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
+```
+
+Response (HTTP 200), when every targeted copy was removed:
+
+```json
+{
+  "success": true
+}
+```
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.field_invalid` | No target is `published`, or the `account_id` you sent has no `published` target |
+| 501 | `resource.not_supported` | At least one remaining target is on a platform that cannot delete posts. Every target that was removed is `unpublished`, `post.unpublished` is sent for those targets, and the post status is recalculated. The copies on platforms that cannot delete stay live |
+| 500 | `system.internal` | A platform failed to delete a copy. Every target that was removed is `unpublished`, and the post status is recalculated. This code takes precedence over `501` when both happen in one request |
+
+SocialAPI sends `post.unpublished` when at least one target is removed, including on a `501` or `500` response.
 
 ## Scopes
 

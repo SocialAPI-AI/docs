@@ -107,7 +107,7 @@ Rate-limit codes are `429` and are covered in [Rate limits](/guides/rate-limits)
 |---|---|---|
 | 429 | `publishing.velocity_limit` | A publish target reached its post cap per hour or per 24 hours. `meta.window` is `hour` or `day` |
 | 429 | `messaging.velocity_limit` | A sender (Instagram account, Facebook Page, or WhatsApp phone number) reached its cap of messages per minute. Nothing was sent |
-| 429 | `platform.<name>.rate_limit` | The platform's own limit. It costs no SocialAPI credit. Wait, then retry with backoff |
+| 429 | `platform.<name>.rate_limit` | The platform's own limit. Wait, then retry with backoff. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 | 429 | `inbox.sync_rate_limited` | `POST /v1/inbox/sync` ran again before the wait for the same target ended. `meta.retry_after_seconds` is set |
 | 429 | `accounts.sync_rate_limited` | `POST /v1/accounts/{id}/sync` ran again before the wait for the same account ended. `meta.retry_after_seconds` is set |
 
@@ -208,7 +208,7 @@ These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post life
 | 400 | `validation.duplicate_board_id` | A Pinterest target sets both `board_id` and `page_id`. Use `board_id` |
 | 400 | `validation.use_board_id` | A Pinterest board was set in `platform_data.board_id`. Set `board_id` on the target |
 | 400 | `validation.use_page_id` | `board_id` was set on a non-Pinterest target. Use `page_id` |
-| 409 | `resource.conflict` | The same account has a published post with the same title and text from the last 24 hours. Send `skip_duplicate_check: true` to publish the content again |
+| 409 | `resource.conflict` | The same account has a post with the same title and text that was created in the last 24 hours and is now `published`. Send `skip_duplicate_check: true` to publish the content again |
 | 409 | `post.state_invalid` | The post's status does not allow the call. Edit works on `draft`, `scheduled`, or `failed`. Publish works on `draft` or `scheduled`. Retry works on `failed` or `partial`. Delete does not work on a `publishing` post. `meta.state` is the current status |
 | 400 | `post.no_retryable_deliveries` | The post has no failed targets to retry |
 | 422 | `publishing.media.missing_source` | A media item has no source |
@@ -402,7 +402,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 422 | `platform.threads.ERROR`, `platform.threads.EXPIRED` | Threads rejected the media, or the media expired before publishing |
 | 504 | `platform.threads.container_timeout` | Threads did not finish processing the media after about 4 minutes |
 | 422 | `platform.threads.801` | `follower_demographics` was requested for an account with fewer than 100 followers |
-| 429 | `platform.threads.rate_limit` | Threads' own rate limit. It costs no SocialAPI credit |
+| 429 | `platform.threads.rate_limit` | Threads' own rate limit. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 | 403 | `platform.threads.<code>` | A call needs a Threads permission that the account lacks, such as hiding a reply without `threads_manage_replies`. `<code>` is Meta's error code |
 | 404 | `resource.not_found` | The post, reply, or profile does not exist, or a profile is not discoverable |
 
@@ -427,7 +427,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 422 | `platform.tiktok.publish_failed` | TikTok rejected the post while processing it, or could not report its outcome. `error.message` carries TikTok's reason. Check the account in the TikTok app before retrying |
 | 401 | `platform.tiktok.auth` | TikTok's authorization for the account ended. Later calls return `403 account.reconnection_required` until you reconnect |
 | 401 | `platform.tiktok.unauthorized` | TikTok refused the call as unauthorized without saying the authorization ended. The account stays usable. Reconnect if it repeats |
-| 429 | `platform.tiktok.rate_limit` | TikTok's own request limit of 40 requests per minute for each account and each TikTok call. It costs no SocialAPI credit. Wait 1 minute, then retry |
+| 429 | `platform.tiktok.rate_limit` | TikTok's own request limit of 40 requests per minute for each account and each TikTok call. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back). Wait 1 minute, then retry |
 | 502 | `platform.tiktok.api_error` | TikTok returned no usable answer, or accepted a post without returning its publish ID. Check the account in the TikTok app before retrying a post |
 
 A TikTok code that this table does not list returns `502` with the code after `platform.tiktok.`.
