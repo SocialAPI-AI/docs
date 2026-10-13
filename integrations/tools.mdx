@@ -210,16 +210,18 @@ See [Webhooks](/guides/webhooks).
 
 No tool creates, rotates, or edits an API key, and no tool deletes your SocialAPI account. Create keys in the [dashboard](https://app.social-api.ai) or with `POST /v1/keys` (see [Authentication](/guides/authentication)).
 
-These operations are available through the REST API only:
+Among the operations available only through the REST API are:
 
 - Uploading a file in the request body (`POST /v1/media/upload`). An agent uploads with `social_api_get_media_upload_url` instead.
 - Inbox sync, inbound attachments, and message reactions (`/v1/inbox/sync`, `/v1/inbox/media/{id}`, `/v1/inbox/conversations/{id}/messages/{messageId}/reaction`).
 - Creating, editing, and deleting Pinterest boards.
 - The webhook event catalog (`GET /v1/webhooks/events`). The `social_api_create_webhook` description lists the event names.
+- Importing posts (`POST /v1/posts/import`), refreshing an account's posts (`POST /v1/accounts/{id}/sync`), announcements (`GET /v1/announcements`), and the plan catalog (`GET /v1/billing/plans`).
 - Every endpoint under `/v1/platforms/` except Instagram Stories: WhatsApp templates and phone numbers, Google Business Profile locations, platform summaries and insights.
 
 ## Errors and limits
 
+- **Timeout**: a request to the MCP server that runs longer than 5 minutes is stopped.
 - **Errors**: a failed tool returns `isError: true` with the same error code as its REST equivalent. Codes are listed in [Errors](/guides/errors).
 - **Scopes**: an agent connected with a scoped API key can run only the tools its scopes allow. A tool outside them returns `auth.insufficient_scope` with the missing scope in `required_scope`. `required_scope` is absent for tools that need a full-access key. See [Scoped API keys](/guides/scoped-keys).
 - **Cost**: a tool call consumes the same credits and plan allowances as its REST equivalent. See [Plans](/guides/plans).
