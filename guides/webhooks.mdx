@@ -65,7 +65,7 @@ An endpoint receives events for every connected account and brand of your Social
 
 ## What SocialAPI sends
 
-Every delivery is a `POST` with a JSON body that holds an `event` name and a `data` object (see the [event envelope](/guides/webhook-events#event-envelope)). These headers are on every request:
+Every delivery is a `POST` with a JSON body that holds an `event` name and a `data` value: an object, except an array on a `mention.received` event sent when you list mentions (see the [event envelope](/guides/webhook-events#event-envelope)). These headers are on every request:
 
 | Header | Value |
 |---|---|
@@ -238,7 +238,7 @@ Use a constant-time comparison (`timingSafeEqual`, `compare_digest`, `hmac.Equal
 
 `X-SocialAPI-Signature-V2` covers the timestamp, so an attacker cannot move a captured request into a later time window by editing the header. Reject any request whose `X-SocialAPI-Timestamp` is more than 5 minutes from your clock. The timestamp is the time of the attempt, so a retry of an old event carries a new timestamp and passes the check.
 
-To process each event once, store the `X-SocialAPI-Delivery` IDs you handled and skip repeats. A manual retry (`POST .../retry`) creates a new delivery with a new ID, so also deduplicate on the event's own identity: `data.id` for comment, DM, and mention events, and `data.post_id` with the event name for post events.
+To process each event once, store the `X-SocialAPI-Delivery` IDs you handled and skip repeats. A manual retry (`POST .../retry`) creates a new delivery with a new ID, so also deduplicate on the event's own identity: `data.id` for comment and DM events, `data.id` or each `data[].id` for `mention.received`, and `data.post_id` with the event name for post events.
 
 ## Respond to a webhook
 

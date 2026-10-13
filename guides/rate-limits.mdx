@@ -60,7 +60,7 @@ TikTok also limits publishing to 6 posts per minute per account. SocialAPI does 
 
 ### What happens at a cap
 
-- **Immediate publish** (`POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`): the request returns `429 publishing.velocity_limit` and creates nothing. `meta.window` is `hour` or `day`, `meta.limit` is the cap reached, and `meta.account_id` is the connected account. `POST /v1/posts` spends no post credit when refused.
+- **Immediate publish** (`POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`): the request returns `429 publishing.velocity_limit` and creates nothing. `meta.window` is `hour` or `day`, `meta.limit` is the cap reached, and `meta.account_id` is the connected account. `POST /v1/posts` spends no post credit when refused. `POST /v1/posts/{pid}/publish` and `POST /v1/posts/{pid}/retry` keep the credit when refused.
 - **More than one target in one request:** the request is all or nothing. If one target is at a cap, the whole request is refused and no target's counter moves.
 - **Scheduled post:** a scheduled post is never failed by a velocity cap. SocialAPI holds the target and publishes it once the window clears, so it goes out late. The wait does not count as a failed delivery.
 
