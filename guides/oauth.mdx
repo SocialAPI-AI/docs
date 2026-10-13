@@ -37,6 +37,7 @@ Fields:
 | `redirect_uri` | top-level | recommended | Your post-connection callback. If you have registered any redirect URIs, this must match one of them (see [Whitelisting redirect URIs](#whitelisting-redirect-uris)). If omitted, the user sees a built-in HTML success page instead of being redirected. |
 | `state` | top-level | optional | Opaque correlation value, max 512 chars, echoed back verbatim in the final redirect. Use it to tie the result to a session on your side. |
 | `brand_id` | top-level | optional | Attach the account to an existing brand. If omitted, your unused "Default" brand is reused when available; otherwise a new brand is auto-created. |
+| `permissions` | top-level | optional | List of [permissions](/guides/permissions) to connect the account with. If omitted, the brand's existing selection for the platform applies, and a brand with none gets every permission. See [Choose permissions](#choose-permissions). |
 | `metadata` | top-level | optional | Platform-specific connection data only (for example, TikTok BYOK uses this for `apikey`). For standard managed OAuth this is empty or omitted. |
 
 Response (HTTP 202):
@@ -81,6 +82,23 @@ https://app.example.com/oauth/callback
 ```
 
 Always check `status` first. On `success`, persist the `account_id` against your user record and call `/v1/accounts/{id}` for full account details. On `error`, surface a retry path in your UI — the customer can restart from Step 1.
+
+### Choose permissions
+
+Send `permissions` on the connect call to ask the platform only for what your integration uses. The person connecting the account sees a shorter consent screen, and the account can only do what you asked for.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "instagram",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "permissions": ["comments.read", "comments.write"]
+  }'
+```
+
+Reconnecting without `permissions` keeps the account's current ones. See [Account permissions](/guides/permissions) for the list of permissions, what each covers, and how to change them later.
 
 ### Pending connections: choosing among multiple candidates
 
