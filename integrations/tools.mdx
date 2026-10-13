@@ -50,7 +50,7 @@ A missing or malformed argument returns a plain-text message instead, for exampl
 | Tool | What it does | REST equivalent |
 |---|---|---|
 | `social_api_list_accounts` | List your connected accounts, optionally for one brand. Returns the `id` that every other tool takes as `account_id` | `GET /v1/accounts` |
-| `social_api_connect_account` | Start connecting an account. Returns the `auth_url` the person opens to authorize access. Accepts `permissions`: see [Account permissions](/guides/permissions) | `POST /v1/accounts/connect` |
+| `social_api_connect_account` | Start connecting an account. On OAuth platforms it returns the `auth_url` the person opens to authorize access. On Telegram and Bluesky it connects the account at once and returns its `account_id`. Accepts `permissions`: see [Account permissions](/guides/permissions) | `POST /v1/accounts/connect` |
 | `social_api_exchange_oauth` | Finish a connection by exchanging the authorization code | `POST /v1/oauth/exchange` |
 | `social_api_list_pending_profiles` | List the Google Business Profiles a pending connection can connect | `GET /v1/accounts/pending/{connection_id}` |
 | `social_api_select_pending_profile` | Connect the chosen Google Business Profile from a pending connection | `POST /v1/accounts/pending/{connection_id}/select` |
@@ -65,7 +65,7 @@ A missing or malformed argument returns a plain-text message instead, for exampl
 | `social_api_update_brand` | Rename a brand | `PATCH /v1/brands/{id}` |
 | `social_api_delete_brand` | Delete a brand and disconnect its accounts | `DELETE /v1/brands/{id}` |
 | `social_api_create_invite` | Create an invite link that lets someone connect an account to a brand. Accepts `permissions` | `POST /v1/invites` |
-| `social_api_list_invites` | List a brand's invites, active and expired | `GET /v1/invites` |
+| `social_api_list_invites` | List a brand's invites, active, expired, and used | `GET /v1/invites` |
 | `social_api_revoke_invite` | Revoke an invite link | `DELETE /v1/invites/{id}` |
 
 ## Comments
@@ -75,8 +75,8 @@ A missing or malformed argument returns a plain-text message instead, for exampl
 | `social_api_list_inbox_posts` | List your posts with their comment counts | `GET /v1/inbox/comments` |
 | `social_api_list_post_comments` | List the comments on one post | `GET /v1/inbox/comments/{postId}` |
 | `social_api_get_comment_replies` | List the replies to one comment | `GET /v1/inbox/comments/{postId}/{commentId}/replies` |
-| `social_api_reply_to_comment` | Reply publicly to a post or a comment | `POST /v1/inbox/comments/{postId}` |
-| `social_api_private_reply_to_comment` | Send a private reply to the person who wrote a comment | `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` |
+| `social_api_reply_to_comment` | Reply publicly to a post or a comment. The text is 2,200 bytes at most | `POST /v1/inbox/comments/{postId}` |
+| `social_api_private_reply_to_comment` | Send a private reply to the person who wrote a comment. The text is 1,000 bytes at most | `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` |
 | `social_api_hide_comment` | Hide a comment from public view | `POST /v1/inbox/comments/{postId}/{commentId}/hide` |
 | `social_api_unhide_comment` | Show a hidden comment again | `DELETE /v1/inbox/comments/{postId}/{commentId}/hide` |
 | `social_api_like_comment` | Like a comment as the connected account | `POST /v1/inbox/comments/{postId}/{commentId}/like` |
@@ -93,7 +93,7 @@ See [Comments](/guides/comments) for platform support and limits.
 | `social_api_list_conversations` | List DM conversations, ordered by their latest activity, newest first | `GET /v1/inbox/conversations` |
 | `social_api_get_conversation` | Get one conversation | `GET /v1/inbox/conversations/{id}` |
 | `social_api_list_messages` | List the messages in a conversation, newest first | `GET /v1/inbox/conversations/{id}/messages` |
-| `social_api_send_dm` | Send a DM in an existing conversation | `POST /v1/inbox/conversations/{id}/messages` |
+| `social_api_send_dm` | Send a DM in an existing conversation. The text is 1,000 bytes at most. Instagram also accepts `quick_replies` and `buttons`: see [Direct messages](/guides/direct-messages) | `POST /v1/inbox/conversations/{id}/messages` |
 | `social_api_update_conversation` | Archive a conversation, or restore it to `active` | `PATCH /v1/inbox/conversations/{id}` |
 | `social_api_mark_conversation_read` | Mark every message in a conversation as read | `POST /v1/inbox/conversations/{id}/read` |
 
@@ -173,7 +173,7 @@ See [Media](/guides/media) for the upload flow.
 | `social_api_get_post_analytics` | Get one published post's daily engagement history | `GET /v1/posts/{pid}/analytics` |
 | `social_api_create_export` | Start an analytics export for a connected account | `POST /v1/accounts/{id}/export` |
 | `social_api_get_export` | Get an export's status and, once it completes, its download links | `GET /v1/exports/{id}` |
-| `social_api_list_exports` | List your exports, newest first | `GET /v1/exports` |
+| `social_api_list_exports` | List your 50 most recent exports, newest first | `GET /v1/exports` |
 | `social_api_get_export_videos` | Get the per-video data of a completed export | `GET /v1/exports/{id}/videos` |
 
 See [Analytics](/guides/analytics).
@@ -188,8 +188,8 @@ See [Analytics](/guides/analytics).
 | `social_api_update_webhook` | Change an endpoint's URL or events, or turn it on or off | `PATCH /v1/webhooks/{id}` |
 | `social_api_delete_webhook` | Delete a webhook endpoint | `DELETE /v1/webhooks/{id}` |
 | `social_api_test_webhook` | Send a test event to an endpoint and return the HTTP status it answered with | `POST /v1/webhooks/{id}/test` |
-| `social_api_list_webhook_deliveries` | List an endpoint's delivery attempts | `GET /v1/webhooks/{id}/deliveries` |
-| `social_api_get_webhook_delivery` | Get one delivery attempt with its payload and the endpoint's response | `GET /v1/webhooks/{id}/deliveries/{did}` |
+| `social_api_list_webhook_deliveries` | List an endpoint's deliveries | `GET /v1/webhooks/{id}/deliveries` |
+| `social_api_get_webhook_delivery` | Get one delivery with its payload and each attempt's response | `GET /v1/webhooks/{id}/deliveries/{did}` |
 | `social_api_retry_webhook_delivery` | Send a failed delivery again | `POST /v1/webhooks/{id}/deliveries/{did}/retry` |
 
 See [Webhooks](/guides/webhooks).
