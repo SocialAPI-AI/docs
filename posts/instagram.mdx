@@ -195,12 +195,15 @@ Each post includes a `targets` array with per-platform status and engagement met
       "platform_post_id": "17895695668004550",
       "status": "published",
       "permalink": "https://www.instagram.com/p/ABC123/",
+      "platform_media": [
+        { "type": "image", "url": "https://scontent.cdninstagram.com/v/t51.29350-15/123_n.jpg" },
+        { "type": "video", "url": "https://scontent.cdninstagram.com/o1/v/t16/456.mp4", "thumbnail_url": "https://scontent.cdninstagram.com/v/t51.29350-15/456_n.jpg" }
+      ],
       "metrics": {
         "likes": 42,
         "comments": 5,
         "shares": 0,
         "saves": 0,
-        "extra": null,
         "metrics_synced_at": "2026-04-10T12:00:00Z"
       }
     }
@@ -209,10 +212,59 @@ Each post includes a `targets` array with per-platform status and engagement met
 ```
 
 **Metrics notes:**
-- `likes`, `comments`, and `shares` are synced periodically from the Meta Graph API.
-- `saves` is not available from the Instagram API and is always `0`.
-- `shares` is `0` because SocialAPI does not yet sync the `shares_count` field from the Graph API.
+- `likes` and `comments` come from the media object itself. `shares`, `saves` and the insight metrics below are read live from `GET /v1/posts/{pid}/metrics`.
 - `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Instagram.
+
+### Live metrics and insights
+
+`GET /v1/posts/{pid}/metrics` reads the post's current counts and insights from Instagram:
+
+```bash
+curl "https://api.social-api.ai/v1/posts/p_01HZ9X3Q4R5M6N7P8V2K0W1J/metrics" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+```json
+{
+  "data": {
+    "post_id": "p_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "targets": [
+      {
+        "platform": "instagram",
+        "metrics": {
+          "likes": 42,
+          "comments": 5,
+          "shares": 8,
+          "saves": 31,
+          "views": 4300,
+          "reach": 1820,
+          "interactions": 86,
+          "avg_watch_time_ms": 3400,
+          "total_watch_time_ms": 14620000,
+          "skip_rate": 41.2,
+          "crossposted_views": 310,
+          "metrics_synced_at": "2026-04-10T12:00:00Z"
+        }
+      }
+    ]
+  }
+}
+```
+
+The metric names are the same on every platform, so code written against them does not change per platform. Which metrics Instagram reports depends on the media type:
+
+| Metric | Feed posts and carousels | Reels |
+|---|---|---|
+| `views`, `reach`, `interactions`, `saves`, `shares` | yes | yes |
+| `follows`, `profile_visits` | yes | no |
+| `profile_actions`, broken down into `website_clicks`, `calls`, `directions`, `emails`, `texts` | yes | no |
+| `avg_watch_time_ms`, `total_watch_time_ms`, `skip_rate` | no | yes |
+| `crossposted_views` | when shared to Facebook | when shared to Facebook |
+
+- A metric Instagram has not reported is absent rather than returned as `0`, so a missing key means "not reported", not "zero".
+- `interactions` is Instagram's own total of likes, comments, saves and shares. `skip_rate` is a percentage.
+- If an Instagram target returns `likes` and `comments` but none of the insight metrics, the account was connected before the insights permission was added. Reconnect the account to enable them.
+- Instagram's insight data can lag by up to 48 hours.
 
 ### Settings on published posts
 
@@ -228,6 +280,24 @@ An Instagram target can include a `settings` object with the options Instagram r
 | `audio_type` | string | Kind of audio on a Reel: `MUSIC` or `ORIGINAL_SOUND`. |
 
 `settings` is absent when Instagram reported none of these for the post. Instagram does not report paid partnership, sponsor, location, user tag, audio name, or trial settings back, so those never appear here even when you set them at publish time. `settings` is also returned for posts published outside SocialAPI, since it reflects what Instagram currently reports for the post rather than what was sent through this API.
+
+### Media on published posts
+
+An Instagram target includes `platform_media`: every image and video on the published post, carousel slides in order. It is returned for posts published outside SocialAPI too, so you can read the photos and videos of an account's existing posts.
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | string | `image` or `video`. |
+| `url` | string | Link to the file, hosted by Instagram. |
+| `thumbnail_url` | string | Link to a video's cover image. Absent on images. |
+
+The links expire after a few days. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{id}/sync`, then read the post again.
+
+`url` is absent when Instagram withholds the file, for example a video with licensed audio. The cover image is still included.
+
+`POST /v1/accounts/{id}/sync` covers up to the 500 most recent posts on an Instagram account. Each account can be synced once every 5 minutes; an earlier call returns `429` with a `Retry-After` header.
+
+`platform_media` is separate from `media`, which lists what you sent when publishing through SocialAPI and is empty for posts published elsewhere.
 
 ---
 
@@ -364,7 +434,6 @@ Response once published:
         "comments": 5,
         "shares": 0,
         "saves": 0,
-        "extra": null,
         "metrics_synced_at": "2026-04-10T12:00:00Z"
       }
     }
@@ -386,5 +455,6 @@ SocialAPI's managed Meta App requests the following scopes on your behalf during
 | `instagram_business_manage_comments` | Post and manage comments (required for first comment) |
 | `instagram_business_manage_messages` | Send and receive DMs |
 | `instagram_business_content_publish` | Create and publish media containers |
+| `instagram_business_manage_insights` | Read per-post insights, account insights, and audience demographics |
 
 To verify which scopes your connected account has granted, call `GET /v1/accounts/:id/limits`.

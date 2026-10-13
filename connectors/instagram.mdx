@@ -241,7 +241,7 @@ For the full field reference, media constraints, and error recovery, see [Instag
 
 ## Account summary (beta)
 
-Retrieve live profile statistics and trailing-30-day insights for a connected Instagram account: username, display name, picture, follower, following, and media counts, plus reach, views, interactions, engaged accounts, and net follower change.
+Retrieve live profile statistics and trailing-30-day insights for a connected Instagram account: username, display name, picture, follower, following, and media counts, plus reach, views, interactions, engaged accounts, net follower change, likes, comments, saves, and shares.
 
 ```bash
 curl "https://api.social-api.ai/v1/platforms/instagram/accounts/{id}/summary" \
@@ -263,12 +263,85 @@ Response:
   "interactions": 5500,
   "accounts_engaged": 4000,
   "net_follows": 120,
+  "likes": 4100,
+  "comments": 610,
+  "saves": 780,
+  "shares": 240,
   "period_start": "2026-07-01T10:00:00Z",
   "period_end": "2026-07-31T10:00:00Z"
 }
 ```
 
 This endpoint is in beta. The insight totals come from Instagram's `instagram_business_manage_insights` permission: accounts connected before the permission was granted must be reconnected before totals can be returned.
+
+This endpoint returns a fixed set of metrics over a fixed window. To choose the metrics or the window yourself, use account insights below.
+
+## Account insights
+
+Retrieve account-level insight totals for a metric set and window you choose. Defaults to every supported metric over the trailing 30 days.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/instagram/accounts/{id}/insights?metric=reach,saves,shares&since=1754006400&until=1756598400" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "metrics": {
+      "reach": 22400,
+      "saves": 780,
+      "shares": 240
+    },
+    "period_start": "2026-08-01T00:00:00Z",
+    "period_end": "2026-08-31T00:00:00Z"
+  }
+}
+```
+
+Supported metrics: `reach`, `views`, `total_interactions`, `accounts_engaged`, `follows_and_unfollows`, `likes`, `comments`, `saves`, `shares`, `replies`, `reposts`, `profile_links_taps`.
+
+`since` and `until` are Unix timestamps. Send them together, and keep the window to 30 days or less: Instagram rejects anything wider.
+
+A metric Instagram has no data for is left out of the `metrics` object rather than returned as `0`, so an absent key means "not reported", not "zero". Instagram's data can lag by up to 48 hours.
+
+## Audience demographics
+
+Retrieve the age, gender, city, or country breakdown of your audience.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/instagram/accounts/{id}/demographics?breakdown=country&timeframe=last_30_days" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "metric": "follower_demographics",
+    "breakdown": "country",
+    "timeframe": "last_30_days",
+    "entries": [
+      { "value": "FR", "count": 5200 },
+      { "value": "US", "count": 3100 },
+      { "value": "DE", "count": 900 }
+    ]
+  }
+}
+```
+
+`metric` is either `follower_demographics` (your followers, the default) or `engaged_audience_demographics` (accounts that engaged during the window).
+
+`breakdown` is required and accepts exactly one of `age`, `city`, `country`, or `gender`. Reading two dimensions takes two calls.
+
+`timeframe` is one of `last_14_days`, `last_30_days` (the default), `last_90_days`, `prev_month`, `this_month`, or `this_week`.
+
+Entries come back sorted by count descending, so top cities and top countries are simply the first entries in the list.
+
+Two limits come from Instagram, not from [SocialAPI](https://social-api.ai): accounts with fewer than 100 followers get no demographic data at all, and each dimension returns at most its top 45 values. In both cases `entries` is an empty list, which is a valid answer rather than an error.
 
 ## Limitations and gotchas
 
@@ -277,10 +350,12 @@ This endpoint is in beta. The insight totals come from Instagram's `instagram_bu
 - **Unsending messages.** Instagram does not let apps unsend or delete a DM once it is sent; only the Instagram app can. When the other person unsends a message they sent you, you receive a [`dm.deleted` webhook](/guides/webhooks#event-types) and the message is removed from the conversation.
 - **Token expiry.** Instagram access tokens can expire. If you receive `401` with `code: "invalid_token"`, reconnect the account using the OAuth flow.
 - **Account fields.** See the shared [account object](/connectors/overview#account-object) reference for the fields returned by `/v1/accounts`.
+- **Per-post insights.** `GET /v1/posts/{id}/metrics` adds views, reach, interactions, saves and shares to Instagram targets, plus profile activity on feed posts and watch time and skip rate on Reels. A metric Instagram has not reported is absent rather than zero. See [Instagram posts](/posts/instagram#live-metrics-and-insights) for the full list.
+- **Insights permission.** Account insights, demographics, and per-post insights all need `instagram_business_manage_insights`. For accounts connected before that permission was added, account insights and demographics return `403 platform.instagram.insights_scope_missing`, and per-post metrics come back without the insight fields. Reconnect the account to enable them.
 
 ## Permissions
 
-- **Permissions.** [SocialAPI](https://social-api.ai)'s managed Meta App already requests these scopes on your behalf: `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages`, `instagram_business_content_publish`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
+- **Permissions.** [SocialAPI](https://social-api.ai)'s managed Meta App already requests these scopes on your behalf: `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages`, `instagram_business_content_publish`, `instagram_business_manage_insights`. You don't need to apply for any platform app review. See [Platform credentials](/guides/platform-credentials).
 
 ## Related
 
