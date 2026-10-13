@@ -1,0 +1,315 @@
+---
+title: Zalo publishing
+sidebarTitle: "Publishing"
+description: Publish, schedule, and delete text articles on a Zalo Official Account with SocialAPI, including asynchronous creation and title rules.
+---
+
+## 1. Overview
+
+A Zalo post is an article on a Zalo Official Account (OA). It goes through the same `POST /v1/posts` endpoint as every other platform: Zalo has no publishing endpoints of its own. SocialAPI publishes text articles only: it sends no images or videos.
+
+| Field | Value |
+|---|---|
+| Platform slug | `zalo` |
+| Auth type | OAuth 2.0 with PKCE |
+| Platform API | Zalo Official Account Open API |
+| Create post | Yes (text article, created asynchronously) |
+| Update post | Not after publishing (`409 post.state_invalid`). `draft`, `scheduled`, and `failed` posts can be edited |
+| Delete post | Yes |
+| Schedule | Yes (deferred publish via `scheduled_at`) |
+| First comment | No (`first_comment` is not published on Zalo) |
+| Posting caps | 25 posts per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Text article | `text`, with an optional `title` | The article body is `text`. The title is `title`, or `text` when you send no `title` |
+| Image, video, carousel | Not supported | A `url` or `media_id` item on a Zalo target is ignored: the article publishes with `text` only, with no warning and no error. A `platform_attachment_id` item fails the Zalo target with `422 publishing.media.unsupported_source` |
+
+**Title limit:** Zalo limits an article title to 150 characters. SocialAPI does not check the length before it sends. When `text` is longer than 150 characters, send a `title` of 150 characters or fewer, because the title falls back to `text`.
+
+**Text limit:** SocialAPI sets no text limit for Zalo. Zalo's own rules apply, and a refusal fails the target: see [Quirks, errors, and recovery](#7-quirks-errors-and-recovery).
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `targets` that name a Zalo account. `publish_now: true` publishes immediately. Without it and without `scheduled_at`, SocialAPI saves a draft.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "New store opening",
+    "text": "Our new store opens this weekend. Visit us from 9:00 to 21:00.",
+    "publish_now": true,
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }]
+  }'
+```
+
+Response (HTTP 201, delivery continues after the response):
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "title": "New store opening",
+  "text": "Our new store opens this weekend. Visit us from 9:00 to 21:00.",
+  "status": "publishing",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "zalo",
+      "status": "publishing"
+    }
+  ]
+}
+```
+
+The Official Account shows the article with Zalo's article type `normal` and status `show`, so it is visible once Zalo finishes processing it.
+
+### Platform data fields
+
+Zalo has no `platform_data` fields. SocialAPI forwards any additional keys in `platform_data.zalo` only when a table in this section lists them. None does, so SocialAPI sends no key to Zalo and returns no warning for an unlisted key.
+
+### Draft validation
+
+SocialAPI checks a draft before it creates the article. A draft with an empty `title` and an empty `text` fails with `400 publishing.validation_failed`. `error.meta.issues` holds one issue: field `title`, message `Zalo articles require a title`. A draft with only `text` passes, because the title falls back to `text`.
+
+### Asynchronous creation
+
+Zalo does not return a finished article. It accepts the article, processes it, and then makes an article ID available. SocialAPI waits 10 seconds for that ID. The target becomes `published` when the ID arrives, and its `platform_post_id` holds the article ID.
+
+If Zalo is still processing after 10 seconds, the target fails with `202 platform.zalo.article_processing`. The article can still finish publishing on Zalo. Check the Official Account before you send `POST /v1/posts/{pid}/retry`, because a retry creates a second article.
+
+### Scheduling
+
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
+
+```json
+{
+  "title": "New store opening",
+  "text": "Our new store opens today.",
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "scheduled_at": "2026-10-17T02:00:00Z"
+}
+```
+
+See [Scheduling](/guides/scheduling) for how scheduled posts settle.
+
+---
+
+## 4. Update post
+
+A published Zalo article cannot be edited through SocialAPI. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for any post whose status is not `draft`, `scheduled`, or `failed`, with the message "Only draft, scheduled, or failed posts can be edited".
+
+A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{pid}` before it publishes.
+
+To correct a published article, delete it with `DELETE /v1/posts/{pid}` and publish a new article.
+
+---
+
+## 5. Delete post
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+To remove only the Zalo target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{pid}` always removes every target.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/unpublish \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
+```
+
+The article is removed from the Official Account. See [Delete a post](/guides/delivery#delete-a-post) for how a cross-platform post is handled.
+
+---
+
+## 6. Retrieve posts
+
+Use `GET /v1/posts` to list posts. Filter by platform or account:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?platform=zalo&account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each post includes a `targets` array with the per-platform status. Results default to `sort=scheduled_asc`: pass `sort` to change the order.
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "title": "New store opening",
+  "text": "Our new store opens this weekend. Visit us from 9:00 to 21:00.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "zalo",
+      "platform_post_id": "c3a1f4e2b6d84a7f9e21",
+      "status": "published",
+      "metrics": {
+        "likes": 0,
+        "comments": 0,
+        "shares": 3,
+        "saves": 0,
+        "extra": { "view_count": 120 }
+      },
+      "metrics_synced_at": "2026-10-17T03:00:00Z"
+    }
+  ]
+}
+```
+
+**Metrics notes:**
+
+Zalo reports a view count and a share count for each article. `shares` holds the share count and `extra.view_count` holds the view count in `GET /v1/posts`. `GET /v1/posts/{pid}/metrics` returns the view count as `metrics.views` and `metrics.extra.views`. Zalo reports no likes, comments, or saves, so those stay `0`.
+
+**Articles published outside SocialAPI:** SocialAPI imports the 20 most recent articles of type `normal` when you connect the account and when you call `POST /v1/accounts/{id}/sync`. Older articles and articles of type `video` do not appear.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### Text only
+
+SocialAPI publishes the text of an article and nothing else. A `url` or `media_id` item is ignored without an error, so a post meant to carry a video publishes as text. A `platform_attachment_id` item fails the Zalo target with `422 publishing.media.unsupported_source`.
+
+### Title falls back to text
+
+The article title is the `title` you send, or `text` when you send none. A `text` longer than 150 characters needs its own `title`: Zalo refuses a longer title and the target fails.
+
+### Asynchronous creation
+
+A new article can take longer than 10 seconds to process. See "Asynchronous creation" in section 3. The target fails with `202 platform.zalo.article_processing`, and the article can still appear on the Official Account.
+
+### Posting caps
+
+SocialAPI refuses a publish that would pass 25 posts in an hour or 50 posts in 24 hours for one account, with `429 publishing.velocity_limit`. A scheduled post is held and published when the window clears. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+
+### Errors on a failed target
+
+A publish that fails after the request returned puts a structured error on the target, in `targets[].error`:
+
+```json
+{
+  "code": "platform.zalo.article_processing",
+  "message": "Article is still processing; try again shortly",
+  "category": "platform",
+  "caused_by": "platform"
+}
+```
+
+- `202 platform.zalo.article_processing`: Zalo was still processing after 10 seconds. Check the Official Account before you retry.
+- `401 platform.zalo.auth`: the access token expired or was revoked, or the Official Account is no longer authorized. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
+- `429 platform.zalo.rate_limit`: Zalo's quota for the app or the Official Account is used up. Wait, then retry.
+- `400 validation.platform_param`: Zalo rejected a parameter, for example a title over 150 characters. `error.message` carries Zalo's reason.
+- `502 platform.zalo.e<N>`: Zalo returned an error SocialAPI does not map. `<N>` is the absolute value of Zalo's numeric code.
+
+Every code is in [Errors](/guides/errors).
+
+### Recovery
+
+- **Still processing.** Open the Official Account. If the article is there, do nothing. If it is not, send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Auth error.** Connect the account again with `POST /v1/accounts/connect`, using the same `platform` and `brand_id`. See [Connect accounts](/guides/connect-accounts).
+- **Parameter error.** Fix the field that `error.message` names, then retry.
+
+---
+
+## 8. Full worked example
+
+Zalo articles carry text only, so there is no upload step. The example publishes an article, checks its status, and deletes it.
+
+**Step 1: Publish the article**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "New store opening",
+    "text": "Our new store opens this weekend. Visit us from 9:00 to 21:00.",
+    "publish_now": true,
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }]
+  }'
+```
+
+Response (HTTP 201, delivery continues after the response):
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "status": "publishing",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "zalo",
+      "status": "publishing"
+    }
+  ]
+}
+```
+
+**Step 2: Check the status**
+
+```bash
+curl "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200) once Zalo finished processing:
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "title": "New store opening",
+  "text": "Our new store opens this weekend. Visit us from 9:00 to 21:00.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "zalo",
+      "platform_post_id": "c3a1f4e2b6d84a7f9e21",
+      "status": "published"
+    }
+  ],
+  "created_at": "2026-10-16T09:00:00Z",
+  "published_at": "2026-10-16T09:00:04Z"
+}
+```
+
+**Step 3: Delete the article**
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "deleted": true,
+  "results": [
+    {
+      "platform": "zalo",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "outcome": "deleted"
+    }
+  ]
+}
+```
+
+---
+
+## 9. Required OAuth scopes
+
+SocialAPI's Zalo app requests no scope list. The administrator of the Official Account approves the scopes on Zalo's consent screen when connecting. You configure nothing. See [Zalo scopes](/platforms/zalo#scopes).
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

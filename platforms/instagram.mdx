@@ -1,0 +1,292 @@
+---
+title: Instagram API
+sidebarTitle: "Overview"
+description: Connect Instagram Business and Creator accounts to publish, moderate comments, send DMs, and read mentions, stories, and insights through one API.
+icon: "instagram"
+---
+
+The Instagram API in SocialAPI connects an Instagram Business or Creator account through Instagram Login. It publishes posts, Reels, carousels, and Stories, reads and moderates comments, sends private replies and direct messages (DMs), and reads mentions, stories, and insights. SocialAPI's own Meta app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `instagram` |
+| Auth | OAuth 2.0 with Instagram Login. The account needs no linked Facebook Page |
+| Platform API | Instagram API with Instagram Login (Meta) |
+| Status | Available |
+
+## Capabilities
+
+An unsupported call returns `501 resource.not_supported`. Read the `capabilities` object on each comment instead of assuming (`can_like`, `can_private_reply`).
+
+| Feature | Status | Condition |
+|---|---|---|
+| Publish feed image, Reel, carousel, Story | Yes | See [Instagram publishing](/platforms/instagram/publishing) |
+| Schedule a post | Yes | `scheduled_at` on the post |
+| First comment on a post | Yes | Not part of a Story |
+| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post in the Instagram app and publish a new one |
+| Delete a published post | No | `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the Instagram target, and the post stays live. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported`. Delete the post in the Instagram app |
+| List posts | Yes | Posts, Reels, and carousels |
+| List active stories | Yes | Only stories that are live now |
+| List comments and replies | Yes | Comments are read per post |
+| Reply to a comment | Yes | |
+| Hide, unhide, delete a comment | Yes | |
+| Like a comment | No | `501 resource.not_supported`. `can_like` is `false` on every comment |
+| Private reply to a comment | Yes | One per comment, within 7 days of the comment |
+| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text, attachments, quick replies, buttons, cards |
+| React to a DM | Yes | |
+| Unsend or delete a DM | No | Only the Instagram app can |
+| Messaging participant profile | Yes | Only for a person who messaged the account or tapped an icebreaker or the persistent menu |
+| Mentions | Partial | `GET /v1/accounts/{id}/mentions` returns media the account is tagged in. Caption and comment @mentions arrive as `mention.received` events only |
+| Reply to a mention | Yes | |
+| Reviews | No | Instagram has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
+| Automations | Yes | Comment and DM triggers, buttons, multi-step flows, the Follow gate. See [Automations](/guides/automations) |
+| Account summary | Yes | Needs the `analytics.read` [permission](/guides/permissions): see [Account summary](#account-summary) |
+| Analytics | Yes | See [Analytics](/guides/analytics) |
+| Collaboration invites | Yes | List, accept, decline. Invites are sent at publish time only |
+| Webhook events | Yes | See [Webhook events](#webhook-events) |
+
+The cross-platform matrix is on [Platforms](/platforms/overview).
+
+## Connect an account
+
+Connect with `POST /v1/accounts/connect` and `"platform": "instagram"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "instagram",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
+  }'
+```
+
+Response (HTTP 202):
+
+```json
+{
+  "auth_url": "https://www.instagram.com/oauth/authorize/?client_id=1234567890&redirect_uri=https%3A%2F%2Fapi.social-api.ai%2Foauth%2Fcallback%2Finstagram&response_type=code&state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2#weblink",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Open this link to connect your instagram account. Once you've authorized, the account will be connected automatically."
+}
+```
+
+Instagram-specific rules:
+
+- **Account type.** The person must connect an Instagram Business or Creator account. A personal account cannot be connected.
+- **One account per brand.** A brand holds one Instagram account. Connecting a different Instagram account to the same brand ends with `status=error` and `error=account.already_linked` on your `redirect_uri`.
+- **Reconnect.** If a token is no longer valid, calls return `401 platform.instagram.auth` and the account needs reconnecting. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **Permissions.** Send `permissions` to ask the person for fewer scopes: see [Scopes](#scopes).
+
+## Comments
+
+List comments on a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID (`targets[].platform_post_id`). Reply, hide, unhide, and delete work as described in [Comments](/guides/comments). Instagram-specific rules:
+
+- A comment's `capabilities.can_like` is always `false`, because Instagram has no like endpoint for comments.
+
+## Private replies
+
+A private reply sends a DM to the person who commented. Send it with `POST /v1/inbox/comments/{postId}/{commentId}/private-reply`.
+
+- Instagram allows one private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.instagram.private_reply_ineligible`.
+- A private reply does not open the 24-hour messaging window: the person's answer does.
+- The request accepts up to 3 `buttons`, sent as a button template.
+- An [Automation](/guides/automations) can send the private reply whenever a comment matches its keywords.
+
+## Direct messages and the messaging window
+
+An Instagram account can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.instagram.window_closed`. Send `message_tag: "HUMAN_AGENT"` to reply up to 7 days after the person's last message. Instagram accepts no other tag: any other value returns `400 validation.invalid_message_tag`.
+
+- **Message types.** Text, attachments, quick replies, buttons, and cards. Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
+- **Size limits.** Instagram sets them and refuses a larger message: text up to 1,000 bytes of UTF-8; images in PNG or JPEG up to 8 MB; video in MP4, OGG, AVI, MOV, or WebM up to 25 MB; audio in AAC, M4A, WAV, or MP4 up to 25 MB; files in PDF up to 25 MB.
+- **Cap.** DMs, public comment replies, and private replies from an Instagram account together count toward 10 per clock minute. More returns `429 messaging.velocity_limit`: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
+- **Unsending.** Instagram does not let apps unsend or delete a sent DM. When the other person unsends a message, you receive a `dm.deleted` event and the message disappears from the conversation.
+- **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` reacts to a message with any emoji, and `DELETE` on the same path removes the reaction.
+- **Story mentions.** A story that mentions your account arrives as `dm.received` with an attachment of type `story_mention`, not as `mention.received`.
+
+### Participant profile
+
+`GET /v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile` returns the profile of a person in a conversation, including whether they follow the account (`is_user_follow_business`) and whether the account follows them (`is_business_follow_user`). `participantId` is the `participant_id` of the conversation.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/instagram/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/participants/2287522528728101/profile" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "id": "2287522528728101",
+  "username": "janedoe",
+  "name": "Jane Doe",
+  "profile_pic": "https://scontent.cdninstagram.com/v/.../profile.jpg",
+  "follower_count": 310,
+  "is_user_follow_business": true
+}
+```
+
+- Read the follow fields at each call, because they change when a person unfollows.
+- `profile_pic` links expire: do not store them.
+- Instagram discloses a profile only for a person who messaged the account or tapped an icebreaker or the persistent menu. For anyone else the call returns `403 platform.instagram.230`, which means Instagram withholds the data. It does not mean the person does not follow the account.
+- A field that Instagram has no value for, such as `name`, is absent.
+- `is_verified_user`, `is_user_follow_business`, and `is_business_follow_user` are absent when `false`, and `follower_count` is absent when it is `0`. An absent follow flag means the person does not follow in that direction, or Instagram did not report it: the response does not tell the two apart. When Instagram withholds the relationship because the person has not given consent, the call returns `403 platform.instagram.230` instead.
+
+## Mentions
+
+`GET /v1/accounts/{id}/mentions` returns media in which another account tagged yours. An @mention written in a caption or a comment is not in that list: it arrives as a `mention.received` event, with `metadata.mention_type` set to `comment` or `caption`. Reply to a mention with `POST /v1/accounts/{id}/mentions/reply`. A story mention arrives as a DM: see [Direct messages](#direct-messages-and-the-messaging-window). Details are in [Mentions](/guides/mentions).
+
+## Stories
+
+`GET /v1/platforms/instagram/accounts/{id}/stories` lists the stories that are live now. Instagram removes a story 24 hours after posting, so a call returns nothing older. The request takes `limit` (1 to 100, default 20) and `cursor`, and no `since`.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/instagram/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/stories?limit=10" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "17895695668004550",
+      "platform": "instagram",
+      "caption": "",
+      "media_type": "VIDEO",
+      "media_url": "https://scontent.cdninstagram.com/v/t51.../story.jpg",
+      "permalink": "https://www.instagram.com/stories/acmecorp/17895695668004550/",
+      "timestamp": "2026-10-12T12:00:00Z",
+      "like_count": 0,
+      "comments_count": 0,
+      "shares_count": 0,
+      "view_count": 0,
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "metadata": {
+        "is_story": true,
+        "expires_at": "2026-10-13T12:00:00Z"
+      }
+    }
+  ],
+  "count": 1
+}
+```
+
+Each item has `id`, `platform`, `caption`, `media_type`, `media_url`, `permalink`, `timestamp`, `like_count`, `comments_count`, `shares_count`, `view_count`, `account_id`, and `metadata`. `like_count`, `comments_count`, `shares_count`, and `view_count` are always `0` on a story. An item also carries `settings` when Instagram reports any: see [Settings on published posts](/platforms/instagram/publishing#settings-on-published-posts). `metadata.is_story` is always `true`, and `metadata.expires_at` is the posting time plus 24 hours. For a video story with no `media_url`, the cover image is returned as `media_url`.
+
+## Collaboration invites
+
+A collaborator is invited when a post is published, with `platform_data.collaborators`: see [Instagram publishing](/platforms/instagram/publishing#platform-data-fields). Instagram has no call that adds a collaborator to a published post. Three calls remain:
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collaborators` | Lists the collaborators of a post and the `status` of each invite. Call it with the account that published the post |
+| `POST` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collab/accept` | Accepts a pending invite and publishes the co-authored post on this account's feed. Call it with the invited account. An invite expires 14 days after it is sent |
+| `POST` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collab/decline` | Declines a pending invite. The post does not appear on this account's feed. Call it with the invited account |
+
+The list call returns HTTP 200:
+
+```json
+{
+  "data": [
+    { "id": "17841405793187218", "username": "janesmith", "status": "pending" }
+  ],
+  "count": 1
+}
+```
+
+`status` is `accepted`, `pending`, or `declined`.
+
+Accepting or declining with no pending invite for the account on that media returns an error from Instagram. Accept and decline return `{"success": true}`.
+
+## Account summary
+
+`GET /v1/platforms/instagram/accounts/{id}/summary` returns live profile counts and insight totals for the trailing 30 days.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/instagram/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "username": "acmecorp",
+  "display_name": "Acme Corp",
+  "picture_url": "https://scontent.cdninstagram.com/v/t51.../profile.jpg",
+  "follower_count": 12400,
+  "following_count": 87,
+  "media_count": 340,
+  "reach": 22400,
+  "views": 90100,
+  "interactions": 5500,
+  "accounts_engaged": 4000,
+  "net_follows": 120,
+  "period_start": "2026-09-13T10:00:00Z",
+  "period_end": "2026-10-13T10:00:00Z"
+}
+```
+
+The insight totals need the `analytics.read` [permission](/guides/permissions) on the account. An account without it returns `403 account.permission_missing`. When Instagram withdraws the insights access, the next call can return `403 platform.instagram.insights_scope_missing` instead: reconnect the account. Instagram's insight data can lag by up to 48 hours. Per-post and per-account metrics over a window you choose are in [Analytics](/guides/analytics).
+
+## Webhook events
+
+Instagram accounts emit these events to your webhook endpoints. Payloads are in [Webhook events](/guides/webhook-events).
+
+| Event | When it fires |
+|---|---|
+| `comment.received` | A person comments on a post |
+| `mention.received` | Another account @mentions yours in a caption or a comment |
+| `dm.received` | A person sends a DM, including a story mention |
+| `dm.sent` | A message left the account, including one sent from the Instagram app |
+| `dm.deleted` | A person unsent a message |
+| `dm.referral` | A person opened a conversation from an ad or referral link without sending a message |
+| `dm.postback` | A person tapped a quick reply or a button |
+| `dm.status.sent` | Instagram accepted a DM you sent |
+| `dm.status.read` | A person read a DM you sent. Instagram sends no delivery receipts, so there is no `dm.status.delivered` |
+| `account.connected` | You finished connecting or reconnecting the account |
+| `account.disconnected` | The person revoked access to the account on Instagram, or SocialAPI flagged the account for reconnection (`reconnect_required: true`, see `reason`) |
+| `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
+| `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
+
+Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for this platform.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Caption | 2,200 characters, 30 hashtags, 20 mentions |
+| Carousel | 2 to 10 items |
+| Posts | 45 per 24 hours and 25 per hour for each account. Instagram's own cap is 50 per rolling 24 hours: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Messages | DMs, public comment replies, and private replies together count toward 10 per clock minute for each account: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap) |
+| Private reply | 1 per comment, within 7 days |
+| Instagram's own rate limit | `429 platform.instagram.rate_limit`. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
+
+`GET /v1/accounts/{id}/limits` returns `posts_remaining`, the posts left in Instagram's rolling 24 hours.
+
+## Scopes
+
+SocialAPI's Meta app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected. `instagram_business_basic` is always requested.
+
+| Scope | Used for | Permissions |
+|---|---|---|
+| `instagram_business_basic` | Profile and media | Every account |
+| `instagram_business_manage_comments` | Read, reply to, hide, and delete comments, read mentions, and the first comment | `comments.read`, `comments.write` |
+| `instagram_business_manage_messages` | Read and send DMs and private replies | `messages.read`, `messages.write` |
+| `instagram_business_content_publish` | Publish posts, Reels, carousels, and Stories | `posts.write` |
+| `instagram_business_manage_insights` | Account summary and post insights | `analytics.read` |
+
+Instagram asks for comments and for messages as 1 scope each, covering both reading and writing, so the consent screen shows the broader scope. The account stays limited to the permissions you selected: an account connected with `comments.read` alone cannot reply to comments.
+
+## Related
+
+- [Instagram publishing](/platforms/instagram/publishing): fields, media rules, and quirks for publishing
+- [Connect accounts](/guides/connect-accounts): the shared connect flow
+- [Automations](/guides/automations): comment-to-DM and the Follow gate
+- [Platforms](/platforms/overview): the capability matrix
+- [Errors](/guides/errors): every error code

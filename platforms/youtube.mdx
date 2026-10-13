@@ -1,0 +1,259 @@
+---
+title: YouTube API
+sidebarTitle: "Overview"
+description: Connect YouTube channels to publish and edit videos, read and moderate comments, and read channel stats through one API.
+icon: "youtube"
+---
+
+The YouTube API in SocialAPI connects a YouTube channel. It uploads, schedules, edits, and deletes videos, reads and moderates comments, posts replies and top-level comments, and reads channel stats. SocialAPI's own Google app connects the channel, so you register nothing: see [Platform apps](/guides/platform-credentials).
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `youtube` |
+| Auth | OAuth 2.0 with Google |
+| Platform API | YouTube Data API v3 |
+| Status | Available |
+
+## Capabilities
+
+An unsupported call returns `501 resource.not_supported`.
+
+| Feature | Status | Condition |
+|---|---|---|
+| Publish a video | Yes | 1 video per post. See [YouTube publishing](/platforms/youtube/publishing) |
+| Schedule a post | Yes | 2 ways: `scheduled_at` makes SocialAPI upload the video at that time, and `platform_data.youtube.publish_at` makes YouTube publish an uploaded private video at that time |
+| First comment on a video | Yes | Posted after the upload. A failure does not fail the post |
+| Add a video to a playlist | Yes | `platform_data.youtube.playlist_id`. A failure does not fail the post |
+| Update a video | Yes | Before publishing: `PATCH /v1/posts/{pid}`. After publishing: `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` |
+| Delete a video | Yes | Removes the video from YouTube |
+| List posts | Yes | Every video in the channel's uploads, including videos uploaded outside SocialAPI |
+| List comments and replies | Yes | Comments are read per video |
+| Reply to a comment | Yes | |
+| Post a top-level comment | Yes | Omit `comment_id` when you reply |
+| Hide, unhide a comment | Yes | Hiding sets the comment to `rejected` |
+| Hold a comment for review, ban its author | Yes | `POST /v1/platforms/youtube/comments/{commentId}/moderate` |
+| Delete a comment | Partial | Only comments your channel wrote. Another person's comment returns `422 platform.youtube.processing_failure`: hide it instead |
+| Edit your own comment | Yes | `PATCH /v1/platforms/youtube/comments/{commentId}` |
+| Like a comment | No | `501 resource.not_supported`. YouTube has no comment-like API |
+| Private reply | No | `501 resource.not_supported` |
+| DMs | No | `501 resource.not_supported` |
+| Mentions | No | `501 resource.not_supported` |
+| Reviews | No | `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
+| Automations | No | A YouTube account returns `422 automation.platform_unsupported` |
+| Channel summary | Yes | Subscribers, views, and video count |
+| Analytics | Yes | Live post metrics (`likes`, `comments`, `views`, `extra.views`), stored post history, and a live channel summary. SocialAPI stores no channel history. See [Analytics](/guides/analytics) |
+| Webhook events | Partial | Post and account events only. YouTube sends no comment events |
+
+The cross-platform matrix is on [Platforms](/platforms/overview).
+
+## Connect an account
+
+Connect with `POST /v1/accounts/connect` and `"platform": "youtube"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "youtube",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
+  }'
+```
+
+Response (HTTP 202):
+
+```json
+{
+  "auth_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Open this link to connect your youtube account. Once you've authorized, the account will be connected automatically."
+}
+```
+
+YouTube-specific rules:
+
+- **One account per channel.** Each connected `youtube` account is 1 YouTube channel. When the Google login manages more than 1 channel, one authorization connects all of them, and the redirect carries their IDs in `account_ids`.
+- **A login with no channel.** A Google login that has no YouTube channel ends with `status=error` and `error=platform.youtube.no_channels` on your `redirect_uri`.
+- **Reconnect.** When YouTube no longer accepts the saved connection, calls return `401 platform.youtube.auth`. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+
+## Read videos and channel stats
+
+`GET /v1/posts?platform=youtube&account_ids={account_id}` lists the channel's videos with their `permalink` and engagement metrics: see [YouTube publishing](/platforms/youtube/publishing#6-retrieve-posts).
+
+`GET /v1/platforms/youtube/accounts/{id}/summary` returns the channel's aggregate stats:
+
+```bash
+curl https://api.social-api.ai/v1/platforms/youtube/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "title": "Acme Corp",
+  "handle": "@acmecorp",
+  "thumbnail_url": "https://yt3.ggpht.com/abc",
+  "subscriber_count": 12400,
+  "view_count": 980000,
+  "video_count": 47
+}
+```
+
+`POST /v1/platforms/youtube/accounts/{id}/sync` re-reads the channel's videos at once and returns `{"success": true}`. Use it after you upload a video outside SocialAPI.
+
+## Comments
+
+YouTube comments are read per video. A video is identified by its YouTube video ID, which is the `{postId}` in the comment paths. For the cross-platform endpoints, see [Comments](/guides/comments). This section lists what is specific to YouTube.
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/dQw4w9WgXcQ?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&order=relevance" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL",
+      "platform_id": "UgxK3m9pQ2",
+      "platform": "youtube",
+      "text": "Great video!",
+      "author_id": "UCxyz123",
+      "author_name": "Jane Smith",
+      "author_username": "Jane Smith",
+      "author_picture": "https://yt3.ggpht.com/abc",
+      "is_owner": false,
+      "like_count": 5,
+      "reply_count": 2,
+      "has_replies": true,
+      "liked_by_viewer": false,
+      "is_hidden": false,
+      "moderation_status": "published",
+      "parent_id": null,
+      "created_at": "2026-03-15T10:30:00Z",
+      "capabilities": {
+        "can_reply": true,
+        "can_delete": true,
+        "can_hide": true,
+        "can_like": false,
+        "can_private_reply": false
+      }
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" }
+}
+```
+
+These query parameters apply to YouTube only:
+
+| Parameter | Description |
+|---|---|
+| `moderation_status` | `published` (default), `held_for_review`, or `likely_spam`. The last two list comments waiting for your review. Another value returns `400 validation.field_invalid` |
+| `order` | `recent` (default) or `relevance`. Another value returns `400 validation.field_invalid` |
+| `q` | Keyword search across comment text, up to 256 characters |
+
+YouTube-specific behavior:
+
+- **Videos with comments.** `GET /v1/inbox/comments` lists commented videos only when you pass `account_id`. The list is 1 page with no cursor.
+- **Comments turned off.** A video with comments turned off returns `501 resource.not_supported` when you list its comments.
+- **Reply or top-level comment.** `POST /v1/inbox/comments/{postId}` with `comment_id` replies to that comment. Without `comment_id`, it posts a new top-level comment on the video. Each costs 1 interaction credit.
+- **Hide.** `POST /v1/inbox/comments/{postId}/{commentId}/hide` sets the comment to `rejected`, which removes it from public view. `DELETE` on the same path sets it back to `published`.
+- **Moderate.** `POST /v1/platforms/youtube/comments/{commentId}/moderate` sets the status explicitly.
+- **Delete.** `DELETE /v1/inbox/comments/{postId}/{commentId}` removes a comment your channel wrote. `capabilities.can_delete` is `true` on every YouTube comment, including other people's. Deleting another person's comment returns `422 platform.youtube.processing_failure`. Hide it instead.
+- **Like and private reply.** Not available. `can_like` and `can_private_reply` are `false`.
+
+### Moderate a comment
+
+```bash
+curl -X POST https://api.social-api.ai/v1/platforms/youtube/comments/UgxK3m9pQ2/moderate \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "post_id": "dQw4w9WgXcQ",
+    "status": "rejected",
+    "ban_author": true
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected YouTube account |
+| `post_id` | Required. The YouTube video ID the comment is on |
+| `status` | Required. `published`, `held_for_review`, or `rejected`. Another value returns `400 validation.field_invalid` |
+| `ban_author` | Optional. `true` also bans the author from commenting on your channel. Valid only with `status` `rejected`, otherwise `400 validation.field_invalid` |
+
+A missing `account_id` or `post_id` returns `400 validation.field_required`.
+
+### Edit your own comment
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/platforms/youtube/comments/UgxK3m9pQ2 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "post_id": "dQw4w9WgXcQ",
+    "text": "Updated comment text"
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+`account_id`, `post_id`, and `text` are all required. A missing one returns `400 validation.field_required`. YouTube accepts the edit only on a comment your channel wrote.
+
+## Webhook events
+
+YouTube sends nothing to SocialAPI, so it emits no comment events: read comments with the endpoints above. Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for videos you publish through SocialAPI. You also receive `account.connected` when you connect a channel, `account.disconnected` when SocialAPI flags the channel, and `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself. See [Webhook events](/guides/webhook-events).
+
+## Suspended or closed channels
+
+When YouTube suspends or closes the account or its channel, every call on it returns `403 platform.youtube.account_suspended`. The saved connection is still valid, so reconnecting changes nothing: the owner resolves the suspension with YouTube. SocialAPI sets the account's `reconnect_reason` to `youtube_account_suspended`, and sends an `account.disconnected` event with that `reason`.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Video title | 100 characters |
+| Video description | 5,000 bytes |
+| Video file | 256 GB |
+| YouTube's own limits | A call that reaches one returns `429 platform.youtube.rate_limit`. Wait, then retry |
+
+The publishing rules are in [YouTube publishing](/platforms/youtube/publishing#2-supported-media).
+
+## Scopes
+
+SocialAPI's Google app requests this scope at connect. You apply for no Google app review. The consent screen is the same whichever [permissions](/guides/permissions) you select.
+
+| Scope | Used for |
+|---|---|
+| `https://www.googleapis.com/auth/youtube.force-ssl` | Upload, edit, and delete videos, read channel and video data, and read, post, moderate, and edit comments |
+
+YouTube asks for 1 scope that covers reading and writing, so the consent screen shows it whatever you select. The account is still limited to the permissions you selected: an account connected with `comments.read` alone cannot reply to comments.
+
+A call the granted scope does not permit returns `403 platform.youtube.insufficientPermissions`. Reconnect the account to grant it again.
+
+## Related
+
+- [YouTube publishing](/platforms/youtube/publishing): fields, scheduling, and quirks for publishing videos
+- [Comments](/guides/comments): the cross-platform comment endpoints
+- [Connect accounts](/guides/connect-accounts): the shared connect flow
+- [Webhook events](/guides/webhook-events): the post and account events
+- [Platforms](/platforms/overview): the capability matrix
+- [Errors](/guides/errors): every error code

@@ -1,0 +1,351 @@
+---
+title: Comments
+description: List posts with comments, read comments and replies, reply publicly or privately, hide, delete, and like comments across platforms through one API.
+---
+
+SocialAPI's comments API reads the comments on the posts of your connected accounts and acts on them: reply publicly, send a private reply, hide, unhide, delete, and like. The endpoints are the same on every platform that has comments, and each comment tells you which actions the platform allows for it in its `capabilities` object.
+
+A public reply costs 1 interaction credit. Reading, private replies, hiding, deleting, and liking cost none. [Platform pages](/platforms/overview) hold the rules that differ per platform.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/comments` | List posts that received comments |
+| `GET` | `/v1/inbox/comments/{postId}` | List the comments on one post |
+| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to one comment |
+| `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or comment on the post |
+| `POST` | `/v1/inbox/comments/{postId}/{commentId}/private-reply` | Send a private reply to the person who commented |
+| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a comment |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide a comment |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a comment |
+| `POST` | `/v1/inbox/comments/{postId}/{commentId}/like` | Like a comment as the connected account |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/like` | Remove that like |
+
+`{postId}` is the platform's post ID (`targets[].platform_post_id` on a post you published through SocialAPI, or `id` from `GET /v1/inbox/comments`). `{commentId}` and `comment_id` accept the comment's `sapi_cmt_` ID or the platform's comment ID. See [IDs](/guides/ids#what-each-endpoint-accepts).
+
+## Your first reply
+
+List the posts that have comments on one account:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&min_comments=1" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "instagram",
+      "id": "17895695668004550",
+      "content": "Spring collection is live",
+      "thumbnail": "https://scontent.cdninstagram.com/v/t51/spring.jpg",
+      "permalink": "https://www.instagram.com/p/C8xY2AbC/",
+      "comment_count": 4,
+      "like_count": 87,
+      "published_at": "2026-10-12T09:00:00Z",
+      "created_at": "2026-10-12T09:00:05Z",
+      "updated_at": "2026-10-13T14:30:00Z"
+    }
+  ],
+  "pagination": { "has_more": false }
+}
+```
+
+Read the comments on that post. `account_id` is required:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/17895695668004550?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "platform_id": "17858893269577012",
+      "platform": "instagram",
+      "text": "Love this product!",
+      "author_id": "17841400008460056",
+      "author_name": "Jane Smith",
+      "author_username": "janesmith",
+      "author_picture": "",
+      "is_owner": false,
+      "like_count": 2,
+      "reply_count": 1,
+      "has_replies": true,
+      "liked_by_viewer": false,
+      "is_hidden": false,
+      "parent_id": null,
+      "created_at": "2026-10-13T14:30:00Z",
+      "capabilities": {
+        "can_reply": true,
+        "can_delete": true,
+        "can_hide": true,
+        "can_like": false,
+        "can_private_reply": true
+      }
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" }
+}
+```
+
+Reply to that comment:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/17895695668004550" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "comment_id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "text": "Thank you, Jane!"
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "comment_id": "sapi_cmt_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1X"
+}
+```
+
+The reply is public when the platform accepts it. `comment_id` in the response is the new reply's `sapi_cmt_` ID.
+
+## List posts with comments
+
+`GET /v1/inbox/comments` returns the posts that received comments, newest published first.
+
+| Parameter | Description |
+|---|---|
+| `account_id` | Only posts of this connected account |
+| `brand_id` | Only posts of accounts in this brand |
+| `platform` | Only posts of this platform, for example `instagram` |
+| `page_id` | Facebook only: only posts of this Facebook Page, by its SocialAPI Page ID |
+| `min_comments` | Only posts with at least this many comments. A non-integer or negative value returns `400 validation.field_invalid` |
+| `since` | Only posts published at or after this time, in RFC 3339 format. A malformed value returns `400 validation.field_invalid` |
+| `sort_by` | `date` (default): the publish date of the post |
+| `sort_order` | `desc` (default) or `asc` |
+| `limit` | Posts per page. The default is 25. A value above 100 is treated as 100. A value of 0 or less, or one that is not an integer, returns `400 validation.field_invalid` |
+| `cursor` | The `next_cursor` of the previous page |
+
+Each post has `id` (the platform's post ID, the value for `{postId}`), `user_id` (the ID of your SocialAPI account), `account_id`, `page_id` (Facebook only), `platform`, `content`, `thumbnail`, `permalink`, `comment_count`, `like_count`, `published_at`, `created_at`, and `updated_at`. `pagination` holds `has_more`, and `next_cursor` when `has_more` is `true`. Paging is in [Pagination](/guides/pagination#paginated-endpoints).
+
+YouTube videos with comments appear only when you pass `account_id`, and that list is 1 page with no cursor.
+
+## List comments and replies
+
+`GET /v1/inbox/comments/{postId}` lists the comments on a post. `GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the replies to one comment in the same shape. Both need `account_id`, the connected account that owns the post. A missing `account_id` returns `400 validation.field_required`.
+
+| Parameter | Description |
+|---|---|
+| `account_id` | Required. The connected account that owns the post |
+| `limit` | Items per page. The default is 25 for comments and 10 for replies. A value above 100 is treated as 100. A value of 0 or less, or one that is not an integer, returns `400 validation.field_invalid` |
+| `cursor` | The `next_cursor` of the previous page |
+
+A page can hold fewer comments than `limit`, because the platform sets its own page size. Follow `next_cursor` until `has_more` is `false`: see [Pagination](/guides/pagination#fetch-every-page).
+
+| Field | Description |
+|---|---|
+| `id` | The comment's `sapi_cmt_` ID. Use it as `{commentId}` |
+| `platform_id` | The platform's own comment ID |
+| `platform` | The platform slug |
+| `text` | The comment text |
+| `author_id`, `author_name`, `author_username`, `author_picture` | Who wrote it. Each is empty when the platform gives none |
+| `is_owner` | `true` when the connected account wrote the comment |
+| `like_count` | Likes on the comment |
+| `reply_count` | Deprecated: not every platform reports an exact count. Read `has_replies` instead |
+| `has_replies` | `true` when the comment has replies |
+| `liked_by_viewer` | `true` when the connected account liked the comment. On Facebook it reflects only likes made through SocialAPI. On Instagram it is always `false` |
+| `is_hidden` | `true` when the comment is hidden |
+| `moderation_status` | YouTube only: `published`, `held_for_review`, `likely_spam`, or `rejected`. Absent elsewhere |
+| `parent_id` | The `platform_id` of the comment this one replies to, or `null` for a top-level comment |
+| `created_at` | When the comment was posted, in ISO 8601 UTC |
+| `capabilities` | What you can do with this comment, in the next table |
+
+Comments in webhook events use the nested [Interaction](/guides/webhook-events#interaction-payload) shape instead of this flat one.
+
+| `capabilities` key | `true` when |
+|---|---|
+| `can_reply` | You can reply publicly |
+| `can_delete` | You can delete the comment. On YouTube it is `true` for every comment, but deleting another person's comment fails: see [YouTube comments](/platforms/youtube#comments) |
+| `can_hide` | You can hide and unhide the comment |
+| `can_like` | You can like the comment |
+| `can_private_reply` | You can send a private reply to its author |
+
+Read `capabilities` instead of assuming. A call the platform does not support returns `501 resource.not_supported`.
+
+## Reply to a comment
+
+`POST /v1/inbox/comments/{postId}` posts a public reply.
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected account that replies |
+| `text` | Required. The reply text. A missing value returns `400 validation.field_required` |
+| `comment_id` | The comment to reply to. Omit it to comment on the post itself. Instagram has no comment on the post itself through the API, so an Instagram reply needs `comment_id` |
+
+A reply costs 1 interaction credit and counts as 1 message toward the [messaging velocity cap](/guides/rate-limits#messaging-velocity-cap) of the Instagram account or Facebook Page. When the plan's interaction allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. A credit is returned when the request fails with a `validation.*` error: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
+
+## Send a private reply
+
+A private reply is a DM to the person who wrote a comment. It has its own endpoint: `POST /v1/inbox/comments/{postId}/{commentId}/private-reply`. The reply endpoint above never sends one.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/17895695668004550/17858893269577012/private-reply" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Thanks for asking! Here is the full range.",
+    "buttons": [
+      { "type": "url", "title": "See the range", "url": "https://shop.example.com/spring" }
+    ]
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected account that sends it |
+| `text` | Required. The message. With `buttons`, it is the body of the button template (640 characters at most). On Instagram, the text holds 1,000 bytes of UTF-8 at most |
+| `buttons` | 1 to 3 buttons, sent as a button template. Fields and limits are in [Buttons](/guides/direct-messages#buttons). A tap on a `postback` button arrives as a `dm.postback` event |
+
+Private replies exist on Instagram and Facebook. The platform allows 1 private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.instagram.private_reply_ineligible` or `400 platform.facebook.private_reply_ineligible`. `error.meta.reason` says why: `already_replied`, `platform_refused`, or `window_expired`. This 400 is final, so retrying never succeeds, and the refusal does not count toward the messaging velocity cap. Every other platform returns `501 resource.not_supported`.
+
+A private reply does not open the [messaging window](/guides/direct-messages#the-messaging-window). You cannot message the person again until they answer, and their answer opens the window.
+
+To answer comments by keyword with no handler of your own, use an [Automation](/guides/automations): it sends the private reply and handles each button tap, including a [Follow gate](/guides/automations#the-follow-gate) on Instagram.
+
+## Hide and unhide a comment
+
+Hiding removes a comment from public view. Unhiding restores it.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/17895695668004550/17858893269577012/hide" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+Unhide with `DELETE` on the same path and `account_id` as a query parameter:
+
+```bash
+curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/17895695668004550/17858893269577012/hide?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Hiding is free. A platform without it returns `501 resource.not_supported`. Threads hides replies only with a beta scope: see [Threads](/platforms/threads).
+
+## Delete a comment
+
+`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes the comment on the platform. It returns `{ "success": true }` and cannot be undone. On X, Bluesky, and YouTube, you can delete only comments the connected account wrote. Each other platform's page states its rule.
+
+## Like and unlike a comment
+
+`POST /v1/inbox/comments/{postId}/{commentId}/like` likes a comment as the connected account. `DELETE` on the same path removes the like. Both take `account_id`: in the body for `POST`, as a query parameter for `DELETE`. They return `{ "success": true }`. A platform without comment likes returns `501 resource.not_supported`, and `can_like` is `false` on its comments.
+
+## Filter YouTube comments
+
+`GET /v1/inbox/comments/{postId}` accepts 3 more parameters. Only YouTube uses them. Every other platform ignores them.
+
+| Parameter | Description |
+|---|---|
+| `moderation_status` | `published` (default), `held_for_review`, or `likely_spam`. The last two list comments waiting for your review |
+| `order` | `recent` (default) or `relevance` |
+| `q` | A keyword searched in the comment text, up to 256 characters |
+
+A value outside these lists, or a longer `q`, returns `400 validation.field_invalid`. See [YouTube comments](/platforms/youtube#comments).
+
+## Platform support
+
+Every platform has its own comment rules: whether replies nest, who can hide or delete what, and which account permissions and platform scopes the connection needs. The [capability matrix](/platforms/overview) compares platforms, and each platform page has the details: [Instagram](/platforms/instagram#comments), [Facebook](/platforms/facebook), [Threads](/platforms/threads#replies), [TikTok](/platforms/tiktok#comments), [YouTube](/platforms/youtube#comments), [X](/platforms/twitter), and [Bluesky](/platforms/bluesky#comments-and-replies). Google Business Profile has no comments or Q&A: its calls return `501 resource.not_supported`. Read reviews on [Reviews](/guides/reviews).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Private replies per comment | 1, within 7 days of the comment |
+| Buttons on a private reply | 1 to 3, with a body of 640 characters at most |
+| Private reply text on Instagram | 1,000 bytes of UTF-8 |
+| `q` filter length | 256 characters |
+| Posts per page | Default 25, up to 100 |
+| Comments per page | Default 25, up to 100. On TikTok, up to 30 comments and 30 replies |
+| Replies per page | Default 10, up to 100 |
+| Messages per minute per sender | 10 on Instagram and Facebook: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap) |
+
+## Errors and debugging
+
+Check these in order when a comment call fails or returns nothing:
+
+1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
+2. **`404 account.not_found`, `403 account.reconnection_required`.** The `acc_` ID is not yours, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list the comments on a post and the replies to a comment, `comments.write` to reply, hide, unhide, delete, or like, and `messages.write` for a private reply. `error.meta.permission` names it. `GET /v1/inbox/comments` lists the posts SocialAPI stored and never returns this error: an account without `comments.read` stores no new posts.
+4. **`400 validation.field_required`, `400 validation.field_invalid`.** A required field is missing, or a parameter has a wrong value. `error.meta.field` names it.
+5. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The comment ID is the wrong type or belongs to another platform: see [IDs](/guides/ids#what-each-endpoint-accepts).
+6. **`501 resource.not_supported`.** The platform lacks the action. Read `capabilities` on the comment.
+7. **`404 resource.not_found`.** The post was deleted on the platform. The same post returns the same 404 afterwards.
+8. **`400 platform.instagram.private_reply_ineligible`, `400 platform.facebook.private_reply_ineligible`.** The comment already received its private reply, or is older than 7 days.
+9. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.{platform}.rate_limit`.** Your allowance, the sender's messages per minute, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
+10. **`422 platform.youtube.processing_failure`.** YouTube refused to delete a comment that your channel did not write. Hide it instead.
+
+When the list is empty, check that the post has comments, that `account_id` owns the post, and, on a platform that sends events, that the comment arrived: see [Webhook events](/guides/webhook-events#comments). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `inbox:read` | List posts with comments, list comments, list replies |
+| `inbox:write` | Reply, send a private reply, hide, unhide, delete, like, unlike |
+
+## Events
+
+SocialAPI sends `comment.received` when a person comments on a post of a connected account, on the platforms that report comments to SocialAPI. See [`comment.received`](/guides/webhook-events#comments) for the platforms and the payload. Platforms that report nothing, such as X, YouTube, and Bluesky, need the list endpoints above. An account without the `comments.read` [permission](/guides/permissions) receives no `comment.received` events.
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_inbox_posts` | List your posts with their comment counts |
+| `social_api_list_post_comments` | List the comments on one post |
+| `social_api_get_comment_replies` | List the replies to one comment |
+| `social_api_reply_to_comment` | Reply publicly to a post or a comment. The text is 2,200 bytes at most, and an Instagram reply needs `comment_id` |
+| `social_api_private_reply_to_comment` | Send a private reply. The text is 1,000 bytes at most |
+| `social_api_hide_comment`, `social_api_unhide_comment` | Hide or unhide a comment |
+| `social_api_delete_comment` | Delete a comment |
+| `social_api_like_comment`, `social_api_unlike_comment` | Like or unlike a comment |
+| `social_api_moderate_comment` | Hide, unhide, or delete a comment by its `sapi_cmt_` ID, with `action` set to `hide`, `unhide`, or `delete` |
+
+The tool list and error shape are in [MCP tools](/integrations/tools#comments).
+
+## Related
+
+- [Direct messages](/guides/direct-messages): the messages and buttons a private reply starts.
+- [Automations](/guides/automations): answer comments by keyword with no handler of your own.
+- [Webhook events](/guides/webhook-events#comments): the `comment.received` payload per platform.
+- [Platform support](/platforms/overview): which platform supports which comment action.
+- [IDs](/guides/ids): the `sapi_cmt_` ID and the platform IDs these endpoints accept.
+- [Account permissions](/guides/permissions): the permissions an account needs for each comment action.
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit.

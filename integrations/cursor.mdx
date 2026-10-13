@@ -1,55 +1,79 @@
 ---
-title: Cursor
-description: Connect SocialAPI to Cursor via config file or Settings UI.
+title: "Cursor"
+description: "Connect SocialAPI to Cursor with a config file or the Settings UI so Agent mode can manage comments, DMs, and posts in plain language."
 ---
 
-**MCP Server URL:** `https://api.social-api.ai/mcp`
+Connect SocialAPI to Cursor and ask Agent mode to list your connected accounts, reply to comments, send direct messages (DMs), and publish posts. Cursor connects to SocialAPI's MCP server at `https://api.social-api.ai/mcp` and signs in with OAuth 2.1, so you create no API key and put no credentials in the config.
 
 ## Prerequisites
 
-- [Cursor](https://cursor.com) installed
-- A [SocialAPI](https://social-api.ai) account with at least one connected social account
+- [Cursor](https://cursor.com) installed.
+- A SocialAPI account with at least one connected account.
 
-## Config file
+## Set up with the config file
 
-Add to your project config (`.cursor/mcp.json`) or global config (`~/.cursor/mcp.json`):
+<Steps>
+  <Step title="Add the server">
+    Add this to the project config `.cursor/mcp.json` or the global config `~/.cursor/mcp.json`:
 
-```json
-{
-  "mcpServers": {
-    "SocialAPI": {
-      "url": "https://api.social-api.ai/mcp"
+    ```json
+    {
+      "mcpServers": {
+        "SocialAPI": {
+          "url": "https://api.social-api.ai/mcp"
+        }
+      }
     }
-  }
-}
+    ```
+  </Step>
+  <Step title="Authorize">
+    The first time you use a SocialAPI tool, Cursor opens your browser on the SocialAPI authorization page. Log in and click **Authorize**. Cursor stores and refreshes the token.
+  </Step>
+</Steps>
+
+Cursor supports both the SSE and Streamable HTTP transports for remote servers.
+
+## Set up with the Settings UI
+
+<Steps>
+  <Step title="Open MCP settings">
+    Open **Cursor Settings** (gear icon) and go to **Tools & Integrations**.
+  </Step>
+  <Step title="Add the server">
+    Under **MCP Tools**, click **Add Custom MCP** and enter `https://api.social-api.ai/mcp` as the URL.
+  </Step>
+  <Step title="Authorize">
+    Click **Needs login** and authorize in the browser window that opens.
+  </Step>
+</Steps>
+
+## Try it
+
+Open **Agent** mode and ask:
+
+```text
+List my connected social accounts
 ```
 
-No tokens or credentials are needed in the config - Cursor handles OAuth automatically.
+SocialAPI tools appear under **Available Tools**, and Cursor calls them when a request needs them. You can also name a tool in your prompt. Cursor calls `social_api_list_accounts` and answers with your connected accounts and their platforms.
 
-When you first use a [SocialAPI](https://social-api.ai) tool, Cursor discovers the OAuth metadata, opens your browser for authorization, and exchanges the code using PKCE. The token is stored and refreshed automatically.
+## Troubleshooting
 
-<Note>
-  Cursor supports both **SSE** and **Streamable HTTP** transports for remote servers. OAuth with Dynamic Client Registration and PKCE is handled automatically.
-</Note>
+<AccordionGroup>
+  <Accordion title="The connection fails">
+    Open the **Output** panel (`Cmd+Shift+U` on macOS, `Ctrl+Shift+U` on Windows and Linux) and select **MCP Logs** in the dropdown. Check that the URL is exactly `https://api.social-api.ai/mcp`.
+  </Accordion>
+  <Accordion title="The server shows Needs login">
+    Click **Needs login** to run the sign-in. Authorization has not happened yet, or the session expired.
+  </Accordion>
+  <Accordion title="Tool calls fail with HTTP 401">
+    The OAuth session expired. Remove the SocialAPI server from Cursor and add it again to sign in again.
+  </Accordion>
+</AccordionGroup>
 
-## Settings UI
+## Related
 
-1. Open **Cursor Settings** (gear icon)
-2. Go to **Tools & Integrations** in the left sidebar
-3. Under **MCP Tools**, click **Add Custom MCP**
-4. Enter the URL: `https://api.social-api.ai/mcp`
-5. Click the **Needs login** button to start the OAuth flow
-6. Authorize in the browser window that opens
-
-<img
-  src="/images/mcp-cursor-settings.png"
-  alt="Cursor MCP Tools settings"
-/>
-
-## Using in chat
-
-Open **Agent** mode in Cursor. [SocialAPI](https://social-api.ai) tools appear under **Available Tools** and are invoked automatically when relevant. You can also mention a tool by name in your prompt.
-
-## Debugging
-
-If the connection fails, open the **Output** panel (`Cmd+Shift+U` / `Ctrl+Shift+U`) and select **MCP Logs** from the dropdown.
+- [SocialAPI MCP server](/integrations/overview): the server URL and the other supported clients.
+- [MCP tools reference](/integrations/tools): every tool Cursor can call.
+- [OAuth for MCP clients](/integrations/oauth): how the sign-in works.
+- [Errors](/guides/errors): every error code a tool can return.

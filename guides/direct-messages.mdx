@@ -1,0 +1,370 @@
+---
+title: Direct messages
+description: List DM conversations, read messages, send text, attachments, and buttons, react to messages, and respect each platform's messaging window through one API.
+---
+
+SocialAPI's direct message (DM) API lists the conversations of your connected accounts, reads their messages, and sends replies. A conversation is one person talking to one connected account. The endpoints are the same on every platform that supports DMs: Instagram, Facebook, X, WhatsApp, Telegram, Zalo, and Bluesky. A send on any other platform returns `501 resource.not_supported`.
+
+A DM request costs 1 interaction credit, however many messages it sends. Reads and reactions cost nothing. Each platform decides when you can message a person: see [The messaging window](#the-messaging-window).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/conversations` | List conversations |
+| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read |
+| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message |
+| `POST` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | React to a message |
+| `DELETE` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | Remove your reaction |
+
+`{id}` is the conversation `id` that `GET /v1/inbox/conversations` returns. It is a UUID, not a `sapi_dm_` ID. `{messageId}` is a message's `platform_id`. See [IDs](/guides/ids#what-each-endpoint-accepts).
+
+## Your first message
+
+List the conversations of one connected account:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "instagram",
+      "platform_id": "aGVsbG8gd29ybGQ",
+      "participant_id": "17841405793187218",
+      "participant_name": "Jane Smith",
+      "participant_picture": "https://scontent.cdninstagram.com/v/t51/jane.jpg",
+      "last_message": "Is the blue one in stock?",
+      "last_message_at": "2026-10-13T14:30:00Z",
+      "status": "active",
+      "unread_count": 1,
+      "created_at": "2026-10-13T14:30:00Z",
+      "updated_at": "2026-10-13T14:30:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": "2026-10-13T14:31:00Z"
+}
+```
+
+Send a reply into that conversation:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Yes, the blue one ships today."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+  "message_ids": ["sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I"]
+}
+```
+
+`message_ids` lists the SocialAPI ID (`sapi_dm_`) of every message the request sent, in send order. `message_id` is the first one and is deprecated. On Zalo, `message_id` is empty and each entry of `message_ids` is an empty string. To get the platform ID of a sent message, read it from [the message list](#read-messages) (`platform_id`). A conversation that belongs to another connected account than `account_id` returns `404 conversation.not_found`.
+
+## Conversations
+
+`GET /v1/inbox/conversations` lists conversations, most recent activity first.
+
+| Parameter | Description |
+|---|---|
+| `account_id` | Only conversations of this connected account |
+| `brand_id` | Only conversations of accounts in this brand |
+| `page_id` | Only conversations of this Facebook Page, for an account with more than 1 Page |
+| `platform` | Only this platform, for example `instagram` |
+| `status` | `active` (default) or `archived` |
+| `limit` | Conversations per page. The default is 25. A value above 100 is treated as 100, and a value of 0 or less, or one that is not an integer, is treated as 25 |
+| `cursor` | The `next_cursor` of the previous page |
+
+| Field | Description |
+|---|---|
+| `id` | The conversation ID |
+| `user_id` | The ID of your SocialAPI account |
+| `account_id` | The connected account that owns the conversation |
+| `page_id` | Facebook only: the SocialAPI ID of the Page. Absent elsewhere |
+| `platform` | The platform slug |
+| `platform_id` | The platform's ID of the conversation |
+| `participant_id`, `participant_name`, `participant_picture` | The other person. The name and picture are empty when the platform gives none |
+| `last_message`, `last_message_at` | The latest message text and its time |
+| `status` | `active` or `archived` |
+| `unread_count` | Messages received since you last marked the conversation as read |
+| `created_at`, `updated_at` | When SocialAPI created and last updated the conversation, in ISO 8601 UTC |
+| `sync_state`, `last_synced_at` | `idle`, `syncing`, or `failed`, and when the list last completed a refresh. `sync_state` is set only when you pass `account_id`: see [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually) |
+
+`PATCH /v1/inbox/conversations/{id}` with `{ "status": "archived" }` or `{ "status": "active" }` changes the status and returns `{ "success": true }`. Any other value returns `400 validation.field_invalid`. `POST /v1/inbox/conversations/{id}/read` sets `unread_count` to 0 and returns `{ "success": true }`. It does not send a read receipt to the person.
+
+## Read messages
+
+`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first.
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages?limit=25" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "0e4d2f6a-5b1c-4c7e-9a3d-8f2b6c1d4e7a",
+      "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "platform_id": "m_AbCdEf123",
+      "direction": "outgoing",
+      "text": "Yes, the blue one ships today.",
+      "sender_id": "17841400000000001",
+      "sender_name": "acmecorp",
+      "attachment_type": null,
+      "attachment_url": null,
+      "reply_to": null,
+      "status": "sent",
+      "status_updated_at": "2026-10-13T14:32:00Z",
+      "created_at": "2026-10-13T14:32:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": "2026-10-13T14:32:05Z"
+}
+```
+
+| Field | Description |
+|---|---|
+| `id` | The message ID in SocialAPI |
+| `platform_id` | The platform's message ID. It is the `{messageId}` of the reaction endpoints |
+| `direction` | `incoming` (the person wrote it) or `outgoing` (a connected account sent it) |
+| `text` | The message text. An attachment-only outgoing message holds `[Attachment]` |
+| `sender_id`, `sender_name` | Who sent it |
+| `attachment_type`, `attachment_url` | The attachment, or `null`. For WhatsApp and Telegram the URL is a SocialAPI URL: see [Fetch an inbound attachment](/guides/inbox#fetch-an-inbound-attachment) |
+| `reply_to` | `{ "platform_id": "..." }` when the message replies to an earlier message, otherwise `null` |
+| `status` | Outgoing messages only: `pending`, `sent`, `delivered`, `read`, or `failed`. It advances as the platform reports delivery |
+| `status_updated_at` | When `status` last changed. Outgoing messages only |
+| `created_at` | When the message was sent or received |
+
+`limit` is 25 by default. A value above 200 is treated as 200, and a value of 0 or less, or one that is not an integer, is treated as 25. See [Pagination](/guides/pagination#paginated-endpoints).
+
+## Send a message
+
+`POST /v1/inbox/conversations/{id}/messages` sends a message into a conversation. A request must hold `text`, an attachment, or interactive content, and can hold all three. A request with none returns `400 validation.field_required`.
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected account that sends the message |
+| `text` | The message text. Required with `quick_replies` and `buttons` |
+| `attachments` | A list of attachments, described below |
+| `attachment_url` | Deprecated shorthand for one attachment, ignored when `attachments` is set. A public media URL |
+| `reply_to_message_id` | Facebook and Zalo: make the first message a reply to the message with this `platform_id`. On Instagram, the send fails with `422 platform.instagram.invalid_parameter`. Other platforms ignore the field |
+| `message_tag` | Instagram: `HUMAN_AGENT`, see [The messaging window](#the-messaging-window) |
+| `quick_replies`, `buttons`, `cards` | Interactive content, described in [Interactive messages](#interactive-messages). Set 1 of the 3. A Facebook send delivers only `text` and ignores these fields |
+| `list_sections`, `list_button` | WhatsApp only: a list menu. See [WhatsApp](/platforms/whatsapp) |
+
+SocialAPI sends text first, then each attachment in order, as separate messages. Text plus 2 images arrives as 3 messages, and the request still costs 1 credit.
+
+### Attachments
+
+Each item of `attachments` names a media source:
+
+| Field | Description |
+|---|---|
+| `source_type` | Required. `url` (a public media URL), `media_id` (a file of your [media library](/guides/media)), or `platform_attachment_id` (media already uploaded to the platform). Another value, or none, returns `400 validation.attachment_invalid` |
+| `source` | Required. The URL, media ID, or platform attachment ID |
+| `type` | `image`, `video`, `audio`, or `file`. SocialAPI infers it from the file extension for `url` and from the stored file for `media_id`, and treats an unknown extension as `file`. It is required for `platform_attachment_id`: without it the call returns `400 validation.attachment_type_required` |
+| `caption` | Text shown with the attachment instead of as a separate message. WhatsApp (not on audio) and Telegram. Every other platform ignores it |
+| `voice` | `true` sends audio as a voice note. WhatsApp only, for Ogg audio with the OPUS codec |
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Here is your receipt",
+    "attachments": [
+      { "source_type": "url", "source": "https://cdn.example.com/receipt.jpg" },
+      { "source_type": "media_id", "source": "550e8400-e29b-41d4-a716-446655440000" }
+    ]
+  }'
+```
+
+The platform fetches a `url` attachment from your URL, so it must be reachable without a login. Facebook accepts files up to 25 MB. Instagram accepts images up to 8 MB and video, audio, and PDF files up to 25 MB. SocialAPI resolves every `media_id` before it sends anything, so an unknown or unfinished `media_id` returns `400 validation.media_unresolved` and sends no message. If a send fails part way, the earlier messages stay delivered. The error carries `error.meta.sent_count` (messages sent) and `error.meta.failed_index` (the item that failed, counting text as item 0 when present), so you can retry from there.
+
+Some platforms accept less. X sends text only and rejects an attachment with `400 validation.attachment_unsupported`. Bluesky sends only `text`. Zalo sends a `url` or `media_id` attachment as an image unless its `type` is `gif` or `sticker`. Telegram accepts attachments with captions. See [X](/platforms/twitter#direct-messages), [Bluesky](/platforms/bluesky#direct-messages), [Zalo](/platforms/zalo#direct-messages), and [Telegram](/platforms/telegram).
+
+### Interactive messages
+
+Instagram sends structured, tappable content. A Facebook DM send delivers only `text` and ignores `quick_replies`, `buttons`, and `cards`, so the rules in this section apply to Instagram. Buttons do work on a Facebook [private reply](/guides/comments#send-a-private-reply). Set at most 1 of `quick_replies`, `buttons`, or `cards` per message. More than 1 returns `400 validation.interactive_conflict`. When the person taps a quick reply or a `postback` button, SocialAPI sends a [`dm.postback`](/guides/webhook-events#dm-postback) event with the `payload` you set. To answer taps without your own handler, use an [Automation](/guides/automations#buttons-and-multi-step-flows). Interactive content follows the messaging window like any message.
+
+#### Quick replies
+
+Quick replies are up to 13 tappable chips above the keyboard. They need `text`.
+
+| Field | Description |
+|---|---|
+| `quick_replies[].title` | Required. The chip label, 20 characters at most |
+| `quick_replies[].payload` | Optional. The value returned in the `dm.postback` event |
+
+More than 13 returns `400 validation.too_many_quick_replies`. A title over 20 characters returns `400 validation.quick_reply_title_too_long`.
+
+#### Buttons
+
+Buttons are a text bubble with 1 to 3 buttons. `text` is the body and holds 640 characters at most (`400 validation.text_too_long`).
+
+| Field | Description |
+|---|---|
+| `buttons[].type` | Required. `url` or `postback`. Another value returns `400 validation.invalid_button_type` |
+| `buttons[].title` | Required. The label, 20 characters at most. An empty or longer title returns `400 validation.invalid_button_title` |
+| `buttons[].url` | Required when `type` is `url`. The destination |
+| `buttons[].payload` | Required when `type` is `postback`. The value returned in the `dm.postback` event |
+
+More than 3 buttons returns `400 validation.invalid_button_count`.
+
+#### Cards
+
+Cards are a carousel of up to 10 cards, each with an image, a title, a subtitle, and up to 3 buttons.
+
+| Field | Description |
+|---|---|
+| `cards[].title` | Required. 80 characters at most |
+| `cards[].subtitle` | Optional. 80 characters at most |
+| `cards[].image_url` | Optional. The image URL |
+| `cards[].buttons` | Optional. Up to 3 buttons, with the fields of `buttons` above |
+
+More than 10 cards returns `400 validation.too_many_cards`. More than 3 buttons on a card returns `400 validation.too_many_buttons`. A title or subtitle over 80 characters returns `400 validation.card_text_too_long`.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Your order has shipped.",
+    "buttons": [
+      { "type": "url", "title": "Track order", "url": "https://shop.example.com/orders/123" },
+      { "type": "postback", "title": "Talk to support", "payload": "SUPPORT" }
+    ]
+  }'
+```
+
+WhatsApp has buttons with its own rules and list menus, and Zalo takes buttons and 1 card. Their pages describe both: [WhatsApp](/platforms/whatsapp), [Zalo](/platforms/zalo#direct-messages). Telegram, X, and Bluesky do not support interactive content.
+
+## React to a message
+
+`POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` adds your emoji reaction to a message, and replaces your earlier one. It works on Instagram and Facebook. Other platforms return `501 resource.not_supported`.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages/m_AbCdEf123/reaction" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "reaction": "🎉" }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+`reaction` is the emoji character itself, a single emoji. Anything else returns `400 validation.invalid_reaction`. `DELETE` on the same path, with `account_id` as a query parameter, removes the reaction. A reaction costs no credit.
+
+## The messaging window
+
+Most platforms let you message a person only for a limited time after their last message. A send outside the window fails, and SocialAPI sends nothing.
+
+- **Instagram and Facebook:** 24 hours from the person's last message. Outside it, the send returns `400 platform.instagram.window_closed` or `400 platform.facebook.window_closed`. On Instagram, `message_tag: "HUMAN_AGENT"` extends the window to 7 days. Instagram accepts no other tag: any other value returns `400 validation.invalid_message_tag`.
+- **WhatsApp:** a free-form message needs the 24-hour service window, and outside it the send returns `400 whatsapp.window_closed`. An approved template is the way to reach the person: see [WhatsApp](/platforms/whatsapp#the-24-hour-service-window).
+- **Zalo:** the person must have interacted with the Official Account in the last 7 days. Outside it, the send returns `422 platform.zalo.not_deliverable`: see [Zalo](/platforms/zalo#the-7-day-messaging-window).
+- **Telegram:** the person must have messaged the bot first. Before that, the send returns `403 telegram.cannot_message`: see [Telegram](/platforms/telegram).
+
+After Instagram or Facebook refuses a conversation for a closed window, SocialAPI refuses further sends on it with the same code until the person messages you again or 24 hours pass. These refusals cost no credit. An Instagram send with `message_tag` is not refused this way. A [private reply](/guides/comments#send-a-private-reply) does not clear the refusal. The person's next message does.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Conversations per page | Default 25, up to 100 |
+| Messages per page | Default 25, up to 200 |
+| Messages per minute per sender | 10 on Instagram, Facebook, and WhatsApp. Each message counts, so a request that sends 3 messages counts 3. More returns `429 messaging.velocity_limit` and sends nothing: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap) |
+| Quick replies | 13 per message, 20 characters per title |
+| Buttons | 3 per message or card, 20 characters per title, 640 characters of body text |
+| Cards | 10 per message, 80 characters per title and subtitle |
+| Text on Facebook | 2,000 characters |
+| Text on Instagram | 1,000 bytes of UTF-8 |
+| Text through the MCP tool | 1,000 bytes |
+
+Each DM request costs 1 interaction credit. When the allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction) lists what costs a credit.
+
+## Platform support
+
+Which platform supports DMs, attachments, interactive content, and reactions is in the [capability matrix](/platforms/overview). Each platform page lists its own rules: [Instagram](/platforms/instagram#direct-messages-and-the-messaging-window), [Facebook](/platforms/facebook#direct-messages-and-the-messaging-window), [X](/platforms/twitter#direct-messages), [WhatsApp](/platforms/whatsapp), [Telegram](/platforms/telegram), [Zalo](/platforms/zalo#direct-messages), and [Bluesky](/platforms/bluesky#direct-messages). Threads, YouTube, Pinterest, and Google Business Profile have no DMs.
+
+## Errors and debugging
+
+Check these in order when a send fails:
+
+1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks `dms:send`.
+2. **`404 conversation.not_found`, `404 account.not_found`, `403 account.reconnection_required`.** The conversation is not yours or belongs to another connected account than `account_id`, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `messages.write` to send a message or a reaction, and `messages.read` to start or read an inbox sync. `error.meta.permission` names it. The conversation and message lists return what SocialAPI stored and never return this error: an account without `messages.read` stores no new messages.
+4. **`400 validation.*`.** The body is wrong. `error.meta.field` names the field. The codes are in [Send a message](#send-a-message) and [Interactive messages](#interactive-messages).
+5. **`400 platform.instagram.window_closed`, `400 platform.facebook.window_closed`, `400 whatsapp.window_closed`, `422 platform.zalo.not_deliverable`, `403 telegram.cannot_message`.** The messaging window is closed: see [The messaging window](#the-messaging-window).
+6. **`422 platform.instagram.thread_unavailable`, `422 platform.facebook.thread_unavailable`.** The platform refused to deliver to this conversation, which can be restricted or unavailable.
+7. **`403 platform.instagram.permission_denied`, `403 platform.facebook.permission_denied`.** The platform scopes granted at connect do not cover the action. Reconnect the account and approve every scope.
+8. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.{platform}.rate_limit`.** Your allowance, the sender's messages per minute, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
+9. **`501 resource.not_supported`.** The platform has no DMs, or no reactions.
+
+When a conversation or a message is missing from a list, force a refresh with [`POST /v1/inbox/sync`](/guides/inbox#refresh-the-inbox-manually). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `dms:read` | List and get conversations, list messages, start or read an inbox sync |
+| `dms:send` | Send a message, add or remove a reaction |
+
+## Events
+
+SocialAPI sends DM events to your [webhook endpoint](/guides/webhooks): [`dm.received`](/guides/webhook-events#dm-received), `dm.sent`, `dm.postback`, `dm.referral`, `dm.deleted`, and `dm.status.*`. Each is described, with the platforms that emit it, on [Webhook events](/guides/webhook-events#direct-messages). An account without the `messages.read` [permission](/guides/permissions) receives none of the `dm.*` events, except that, with `messages.write` alone, the account still receives `dm.status.read` on Instagram, `dm.status.delivered` and `dm.status.read` on Facebook, and every `dm.status.*` event on WhatsApp. It receives no `dm.sent` and no `dm.status.sent` on Instagram or Facebook.
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_conversations` | List conversations, most recent activity first |
+| `social_api_get_conversation` | Get one conversation |
+| `social_api_list_messages` | List the messages of a conversation, newest first |
+| `social_api_send_dm` | Send a text message with optional quick replies or buttons. On Facebook the tool delivers only the text. The text is 1,000 bytes at most. The tool sends no attachments and no cards: use the REST endpoint for them |
+| `social_api_update_conversation` | Archive a conversation, or set it back to `active` |
+| `social_api_mark_conversation_read` | Mark a conversation as read |
+
+There is no tool for reactions or for inbox sync. See [MCP tools](/integrations/tools#direct-messages).
+
+## Related
+
+- [Comments](/guides/comments): private replies start a DM conversation from a comment.
+- [Automations](/guides/automations): send DMs and answer button taps without your own handler.
+- [Webhook events](/guides/webhook-events#direct-messages): the DM event payloads.
+- [Rate limits](/guides/rate-limits#messaging-velocity-cap): the messages-per-minute cap.
+- [Platform support](/platforms/overview): which platform supports which DM feature.
+- [Account permissions](/guides/permissions): the permissions an account needs to read and send messages.
+- [Unified inbox](/guides/inbox): inbound attachments and manual sync.

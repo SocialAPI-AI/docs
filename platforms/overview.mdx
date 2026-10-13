@@ -1,0 +1,136 @@
+---
+title: Supported platforms
+description: Which operations each SocialAPI platform supports for the inbox, Automations, publishing, analytics, and webhook events, in one matrix per feature area.
+---
+
+SocialAPI connects Instagram, Facebook, Threads, Google Business Profile, TikTok, LinkedIn, X / Twitter, Telegram, WhatsApp, Zalo, Bluesky, Pinterest, and YouTube through one API. Trustpilot is marked Coming soon and cannot be connected. Most platforms connect through SocialAPI's own platform app, so you register nothing with the platform. Telegram connects with a bot token from @BotFather, Bluesky with an app password, and X / Twitter through an X developer app that you create. See [Platform apps](/guides/platform-credentials) for who owns the app for each platform.
+
+Every platform and every operation is available on every plan, except WhatsApp template messages, which need a paid plan (`403 whatsapp.paid_plan_required` on the Free plan). Plans otherwise differ only in resource limits: see [Plans](/guides/plans). Each platform page holds a Capabilities table with the condition behind every cell below.
+
+When you call an operation a platform does not support, SocialAPI returns `501 resource.not_supported`. That is a platform limit, not a mistake in your integration, so handle the 501 instead of branching per platform. An Automation on an account that does not support Automations returns `422 automation.platform_unsupported`, and a reviews call on a platform without reviews returns `422 account.platform_unsupported`.
+
+The cells have 5 values:
+
+| Value | Meaning |
+|---|---|
+| Yes | Supported |
+| No | Not supported. The call returns an error, or the feature does not exist on the platform |
+| Partial | Supported with a limit on what it covers |
+| Conditional | Supported only when a condition holds, such as an action on your own comment |
+| Beta | Supported for accounts where the platform has granted the scope |
+
+The condition behind every Partial, Conditional, and Beta cell is on the platform page. Each comment returned by the inbox also carries a `capabilities` object that tells you which actions the platform allows for it: see [Comments](/guides/comments).
+
+## Inbox
+
+Comments, replies, moderation, private replies, direct messages, mentions, and reviews. Guides: [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [Mentions](/guides/mentions), [Reviews](/guides/reviews).
+
+| Platform | Comments | Reply | Hide | Delete | Like | Private reply | DMs | Mentions | Reviews |
+|---|---|---|---|---|---|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | Yes | Yes | Yes | No | Yes | Yes | Partial | No |
+| [Facebook](/platforms/facebook) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Partial | No |
+| [Threads](/platforms/threads) | Yes | Yes | Beta | Conditional | No | No | No | Beta | No |
+| [Google Business Profile](/platforms/google) | No | No | No | No | No | No | No | No | Yes |
+| [TikTok](/platforms/tiktok) | Yes | Yes | Conditional | Conditional | Yes | No | No | Conditional | No |
+| [LinkedIn](/platforms/linkedin) | No | No | No | No | No | No | No | No | No |
+| [X / Twitter](/platforms/twitter) | Yes | Yes | Yes | Conditional | No | No | Yes | Yes | No |
+| [Telegram](/platforms/telegram) | No | No | No | No | No | No | Conditional | No | No |
+| [WhatsApp](/platforms/whatsapp) | No | No | No | No | No | No | Yes | No | No |
+| [Zalo](/platforms/zalo) | No | No | No | No | No | No | Yes | No | No |
+| [Bluesky](/platforms/bluesky) | Yes | Yes | Yes | Partial | No | No | Partial | Yes | No |
+| [Pinterest](/platforms/pinterest) | No | No | No | No | No | No | No | No | No |
+| [YouTube](/platforms/youtube) | Yes | Yes | Yes | Partial | No | No | No | No | No |
+| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No | No | No | No | No | No | No |
+
+## Automations
+
+[Automations](/guides/automations) run on Instagram and Facebook accounts.
+
+| Platform | Comment trigger | DM trigger | Postback buttons | Follow gate |
+|---|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | Yes | Yes | Yes |
+| [Facebook](/platforms/facebook) | Yes | Yes | Partial | No |
+| [Threads](/platforms/threads) | No | No | No | No |
+| [Google Business Profile](/platforms/google) | No | No | No | No |
+| [TikTok](/platforms/tiktok) | No | No | No | No |
+| [LinkedIn](/platforms/linkedin) | No | No | No | No |
+| [X / Twitter](/platforms/twitter) | No | No | No | No |
+| [Telegram](/platforms/telegram) | No | No | No | No |
+| [WhatsApp](/platforms/whatsapp) | No | No | No | No |
+| [Zalo](/platforms/zalo) | No | No | No | No |
+| [Bluesky](/platforms/bluesky) | No | No | No | No |
+| [Pinterest](/platforms/pinterest) | No | No | No | No |
+| [YouTube](/platforms/youtube) | No | No | No | No |
+| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No | No |
+
+## Publishing
+
+Publish, schedule, update, and delete posts, and add a first comment. Guides: [Publishing](/guides/publishing), [Scheduling](/guides/scheduling), [Media](/guides/media). The media columns show the types a post can carry. Counts, sizes, and formats are on each platform's publishing page.
+
+| Platform | Publish | Text only | Single image | Video | Multiple images | Schedule | Update | Delete | First comment |
+|---|---|---|---|---|---|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | No | Yes | Yes | Yes | Yes | No | No | Yes |
+| [Facebook](/platforms/facebook) | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
+| [Threads](/platforms/threads) | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
+| [Google Business Profile](/platforms/google) | Yes | Yes | Yes | No | No | Yes | No | Yes | No |
+| [TikTok](/platforms/tiktok) | Yes | No | No | Yes | Yes | Yes | No | No | No |
+| [LinkedIn](/platforms/linkedin) | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
+| [X / Twitter](/platforms/twitter) | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
+| [Telegram](/platforms/telegram) | No | No | No | No | No | No | No | No | No |
+| [WhatsApp](/platforms/whatsapp) | No | No | No | No | No | No | No | No | No |
+| [Zalo](/platforms/zalo) | Yes | Yes | No | No | No | Yes | No | Yes | No |
+| [Bluesky](/platforms/bluesky) | Yes | Yes | Yes | No | Yes | Yes | No | Yes | No |
+| [Pinterest](/platforms/pinterest) | Yes | No | Yes | No | No | Yes | No | Yes | No |
+| [YouTube](/platforms/youtube) | Yes | No | No | Yes | No | Yes | Yes | Yes | Yes |
+| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No | No | No | No | No | No | No |
+
+Update and Delete describe a post that is already published.
+
+## Analytics
+
+Live post metrics, a live account summary, and the history SocialAPI stores. Guide: [Analytics](/guides/analytics).
+
+| Platform | Post metrics | Live account summary | Stored history |
+|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | Yes | Yes |
+| [Facebook](/platforms/facebook) | Yes | No | Yes |
+| [Threads](/platforms/threads) | Beta | Beta | Yes |
+| [Google Business Profile](/platforms/google) | No | Yes | No |
+| [TikTok](/platforms/tiktok) | Yes | Yes | Yes |
+| [LinkedIn](/platforms/linkedin) | No | No | No |
+| [X / Twitter](/platforms/twitter) | Yes | No | Partial |
+| [Telegram](/platforms/telegram) | No | No | No |
+| [WhatsApp](/platforms/whatsapp) | No | No | No |
+| [Zalo](/platforms/zalo) | Partial | No | Yes |
+| [Bluesky](/platforms/bluesky) | Yes | No | Yes |
+| [Pinterest](/platforms/pinterest) | No | Yes | No |
+| [YouTube](/platforms/youtube) | Yes | Yes | Yes |
+| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No |
+
+## Webhook events
+
+Which event groups each platform emits. The events, their payloads, and the platforms behind each one are on [Webhook events](/guides/webhook-events), the canonical home of this list. Setup is in [Webhooks](/guides/webhooks).
+
+| Platform | Comment events | Mention events | DM events | Review events | Post events | Account events |
+|---|---|---|---|---|---|---|
+| [Instagram](/platforms/instagram) | Yes | Yes | Yes | No | Yes | Yes |
+| [Facebook](/platforms/facebook) | Yes | Yes | Yes | No | Yes | Yes |
+| [Threads](/platforms/threads) | Yes | Beta | No | No | Yes | Yes |
+| [Google Business Profile](/platforms/google) | No | No | No | Yes | Yes | Yes |
+| [TikTok](/platforms/tiktok) | Yes | Partial | No | No | Yes | Yes |
+| [LinkedIn](/platforms/linkedin) | No | No | No | No | Yes | Yes |
+| [X / Twitter](/platforms/twitter) | No | Partial | No | No | Yes | Yes |
+| [Telegram](/platforms/telegram) | No | No | Yes | No | No | Yes |
+| [WhatsApp](/platforms/whatsapp) | No | No | Yes | No | No | Yes |
+| [Zalo](/platforms/zalo) | No | No | Partial | No | Yes | Yes |
+| [Bluesky](/platforms/bluesky) | No | Partial | No | No | Yes | Yes |
+| [Pinterest](/platforms/pinterest) | No | No | No | No | Yes | Yes |
+| [YouTube](/platforms/youtube) | No | No | No | No | Yes | Yes |
+| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No | No | No | No |
+
+## Related
+
+- [Platform apps](/guides/platform-credentials): who owns the app behind each connection
+- [Connect accounts](/guides/connect-accounts): the connect flow and the account object
+- [Plans](/guides/plans): resource limits and storage per plan
+- [Errors](/guides/errors): every error code

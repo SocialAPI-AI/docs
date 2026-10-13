@@ -1,73 +1,75 @@
 ---
-title: Hermes Agent
-description: Connect SocialAPI to Nous Research's Hermes Agent with one mcp_servers entry, then publish and reply from any chat Hermes is connected to.
+title: "Hermes Agent"
+description: "Connect SocialAPI to Nous Research's Hermes Agent with one mcp_servers entry, then publish and reply from any chat Hermes is connected to."
 ---
 
-**MCP Server URL:** `https://api.social-api.ai/mcp`
-
-[Hermes Agent](https://hermes-agent.nousresearch.com) reads MCP servers from `~/.hermes/config.yaml`. Add SocialAPI once and the tools are available in `hermes chat` and in every messaging channel your Hermes gateway runs.
+Connect SocialAPI to [Hermes Agent](https://hermes-agent.nousresearch.com) and ask it to list your connected accounts, reply to comments, send direct messages (DMs), and publish posts from `hermes chat` or from any messaging channel your Hermes gateway runs. Hermes reads MCP servers from `~/.hermes/config.yaml`. The server is `https://api.social-api.ai/mcp`.
 
 ## Prerequisites
 
-- Hermes Agent installed, with MCP support (included in the standard install; see [Troubleshooting](#troubleshooting) if you installed from PyPI)
-- A [SocialAPI](https://social-api.ai) account with at least one connected social account
+- Hermes Agent installed with MCP support. The standard install includes it: see [Troubleshooting](#troubleshooting) if you installed from PyPI.
+- A SocialAPI account with at least one connected account.
+- For a gateway with no browser: an [API key](/integrations/custom).
 
-## 1. Add the server
+## Set up with OAuth
 
-Add this to `~/.hermes/config.yaml`:
+<Steps>
+  <Step title="Add the server">
+    Add this to `~/.hermes/config.yaml`:
 
-```yaml
-mcp_servers:
-  socialapi:
-    url: "https://api.social-api.ai/mcp"
-    auth: oauth
-```
+    ```yaml
+    mcp_servers:
+      socialapi:
+        url: "https://api.social-api.ai/mcp"
+        auth: oauth
+    ```
+  </Step>
+  <Step title="Sign in">
+    ```bash
+    hermes mcp login socialapi
+    ```
 
-## 2. Sign in
+    Hermes opens your browser on the SocialAPI authorization page. Log in and click **Authorize**. When the callback arrives, Hermes prints `Authenticated` with the number of tools available. Hermes caches the token in `~/.hermes/mcp-tokens/socialapi.json` and refreshes it automatically.
 
-```bash
-hermes mcp login socialapi
-```
+    If Hermes runs on a remote host, the browser callback cannot reach it. Paste the redirect URL into the prompt that `hermes mcp login` shows, or authorize from Hermes Desktop, which relays the callback.
+  </Step>
+  <Step title="Start using it">
+    Start a new session with `hermes chat`, or type `/reload-mcp` in a running one. A running messaging gateway (`hermes gateway run`) watches `config.yaml` and connects the new server, so the same tools work from Telegram, Discord, or any other channel routed to Hermes.
+  </Step>
+</Steps>
 
-Hermes opens your browser on the SocialAPI authorization page. Log in and click **Authorize**. When the callback comes back, Hermes prints `Authenticated — 88 tool(s) available`. The token is cached in `~/.hermes/mcp-tokens/socialapi.json` and refreshed automatically.
+Hermes registers the tools with an `mcp_socialapi_` prefix, for example `mcp_socialapi_social_api_list_accounts`. You never need to call a tool by name.
 
-<Note>
-  If Hermes runs on a remote host, the browser callback cannot reach it. Paste the redirect URL into the prompt `hermes mcp login` shows, or authorize from Hermes Desktop, which relays the callback for you.
-</Note>
+## Set up a headless gateway with an API key
 
-## 3. Use it
+For a gateway with no browser, authenticate with an API key instead of OAuth.
 
-Start a new session (`hermes chat`) or type `/reload-mcp` in a running one. Hermes registers the tools with an `mcp_socialapi_` prefix (for example `mcp_socialapi_social_api_list_accounts`), but you never have to call them by name. Ask in plain language:
+<Steps>
+  <Step title="Store the key">
+    Put the key in `~/.hermes/.env`:
 
-```text
-Reply to every unanswered Google review from this week with a short thank-you.
-```
+    ```bash
+    SOCAPI_KEY=sapi_key_xxxxxxxxxxxxxxxx
+    ```
+  </Step>
+  <Step title="Reference the key">
+    Reference it from `config.yaml`, without `auth: oauth`:
 
-A running messaging gateway (`hermes gateway run`) watches `config.yaml` and connects the new server within about a minute, so the same tools work from Telegram, Discord or any other channel you routed to Hermes.
+    ```yaml
+    mcp_servers:
+      socialapi:
+        url: "https://api.social-api.ai/mcp"
+        headers:
+          Authorization: "Bearer ${SOCAPI_KEY}"
+    ```
 
-## Headless: use an API key
-
-For a gateway with no browser at all, authenticate with an [API key](/integrations/custom) instead of OAuth. Put the key in `~/.hermes/.env`:
-
-```bash
-SOCIALAPI_API_KEY=sapi_key_xxxxxxxxxxxxxxxx
-```
-
-and reference it from the config, without `auth: oauth`:
-
-```yaml
-mcp_servers:
-  socialapi:
-    url: "https://api.social-api.ai/mcp"
-    headers:
-      Authorization: "Bearer ${SOCIALAPI_API_KEY}"
-```
-
-Hermes substitutes `${SOCIALAPI_API_KEY}` at runtime, so the key never sits in `config.yaml`.
+    Hermes substitutes `${SOCAPI_KEY}` when it runs, so the key never sits in `config.yaml`. To limit what the agent can do, create a [scoped API key](/guides/scoped-keys).
+  </Step>
+</Steps>
 
 ## Limit the tools
 
-SocialAPI exposes 88 tools. Keep a subset with `tools.include`, or hide some with `tools.exclude`:
+Keep a subset of tools with `tools.include`, or hide some with `tools.exclude`:
 
 ```yaml
 mcp_servers:
@@ -82,20 +84,35 @@ mcp_servers:
         - social_api_revoke_key
 ```
 
-You can also toggle tools interactively with `hermes mcp configure socialapi`.
+You can also switch tools on and off interactively with `hermes mcp configure socialapi`. See [MCP tools reference](/integrations/tools) for every tool name.
 
-## Verify
+## Try it
 
-```bash
-hermes mcp test socialapi
+Run `hermes mcp test socialapi` to check that Hermes connects, authenticates, and counts the tools. Then ask Hermes:
+
+```text
+Reply to every unanswered Google review from this week with a short thank-you.
 ```
 
-It connects, authenticates and reports the tool count.
+Hermes lists your Google Business Profile reviews, finds the ones without a reply, and posts a reply to each.
 
 ## Troubleshooting
 
-**`mcp.client.streamable_http is not available`** - Hermes was installed without its MCP dependencies (for example `uv tool install hermes-agent`). Reinstall with the extra: `uv tool install --force 'hermes-agent[mcp]'`.
+<AccordionGroup>
+  <Accordion title="mcp.client.streamable_http is not available">
+    Hermes was installed without its MCP dependencies, for example with `uv tool install hermes-agent`. Reinstall with the extra: `uv tool install --force 'hermes-agent[mcp]'`.
+  </Accordion>
+  <Accordion title="non-interactive environment and no cached tokens found">
+    The first OAuth sign-in needs a terminal. Run `hermes mcp login socialapi` interactively once, or use the API key setup.
+  </Accordion>
+  <Accordion title="401 Unauthorized">
+    The token or key is wrong or revoked. Run `hermes mcp login socialapi` again, or check the key in the [dashboard](https://app.social-api.ai/api-configuration?tab=keys).
+  </Accordion>
+</AccordionGroup>
 
-**`non-interactive environment and no cached tokens found`** - The first OAuth login needs a terminal. Run `hermes mcp login socialapi` interactively once, or use the API key setup above.
+## Related
 
-**`401 Unauthorized`** - The token or key is wrong or revoked. Run `hermes mcp login socialapi` again, or check the key in the [dashboard](https://app.social-api.ai/settings/keys).
+- [SocialAPI MCP server](/integrations/overview): the server URL and the other supported clients.
+- [MCP tools reference](/integrations/tools): every tool Hermes can call.
+- [Custom MCP clients](/integrations/custom): API key setup in detail.
+- [Reviews](/guides/reviews): read and reply to Google Business Profile reviews.

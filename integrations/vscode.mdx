@@ -1,53 +1,80 @@
 ---
-title: VS Code + GitHub Copilot
-description: Connect SocialAPI to VS Code with GitHub Copilot via config file or Command Palette.
+title: "VS Code + GitHub Copilot"
+sidebarTitle: "VS Code"
+description: "Connect SocialAPI to VS Code with GitHub Copilot using a config file or the Command Palette so Agent mode can manage comments, DMs, and posts."
 ---
 
-**MCP Server URL:** `https://api.social-api.ai/mcp`
+Connect SocialAPI to VS Code and ask Copilot Chat in Agent mode to list your connected accounts, reply to comments, send direct messages (DMs), and publish posts. VS Code connects to SocialAPI's MCP server at `https://api.social-api.ai/mcp` and signs in with OAuth 2.1, so you create no API key.
 
 ## Prerequisites
 
-- [VS Code](https://code.visualstudio.com) (1.101+) with [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) extension
-- A GitHub Copilot subscription (Individual, Business, or Enterprise)
-- A [SocialAPI](https://social-api.ai) account with at least one connected social account
+- [VS Code](https://code.visualstudio.com) 1.101 or later with the [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) extension.
+- A GitHub Copilot subscription: Individual, Business, or Enterprise.
+- A SocialAPI account with at least one connected account.
 
-## Config file
+## Set up with the config file
 
-Create or edit `.vscode/mcp.json` in your workspace (or add to your user profile for global access):
+<Steps>
+  <Step title="Add the server">
+    Create or edit `.vscode/mcp.json` in your workspace, or add the entry to your user profile for all workspaces:
 
-```json
-{
-  "servers": {
-    "SocialAPI": {
-      "type": "http",
-      "url": "https://api.social-api.ai/mcp"
+    ```json
+    {
+      "servers": {
+        "SocialAPI": {
+          "type": "http",
+          "url": "https://api.social-api.ai/mcp"
+        }
+      }
     }
-  }
-}
+    ```
+  </Step>
+  <Step title="Authorize">
+    VS Code shows a CodeLens above the server entry. Click **Auth** and authorize in the browser window that opens.
+  </Step>
+</Steps>
+
+## Set up with the Command Palette
+
+<Steps>
+  <Step title="Add the server">
+    Open the Command Palette (`Ctrl+Shift+P` on Windows and Linux, `Cmd+Shift+P` on macOS) and run **MCP: Add Server**. Select **HTTP** as the server type and enter `https://api.social-api.ai/mcp`.
+  </Step>
+  <Step title="Choose a scope">
+    Choose **Global** for your user profile or **Workspace** for this workspace.
+  </Step>
+  <Step title="Authorize">
+    Click the **Auth** CodeLens and authorize in the browser window that opens.
+  </Step>
+</Steps>
+
+## Try it
+
+Open **Copilot Chat**, switch to Agent mode, and ask:
+
+```text
+List my connected social accounts
 ```
 
-VS Code will show a **CodeLens** action above the server entry. Click **Auth** to start the OAuth flow and authorize in the browser.
-
-<Note>
-  VS Code supports OAuth 2.1 with Dynamic Client Registration. It auto-discovers the authorization server via `/.well-known/oauth-protected-resource`.
-</Note>
-
-## Command Palette
-
-1. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-2. Run **MCP: Add Server**
-3. Select **HTTP** as the server type
-4. Enter the URL: `https://api.social-api.ai/mcp`
-5. Choose **Global** (user profile) or **Workspace** scope
-6. Click the **Auth** CodeLens to complete the OAuth flow
-
-<img
-  src="/images/mcp-vscode-settings.png"
-  alt="VS Code MCP server configuration"
-/>
-
-[SocialAPI](https://social-api.ai) tools are then available in **Copilot Chat** (Agent mode).
+Copilot calls `social_api_list_accounts` and answers with your connected accounts and their platforms.
 
 ## Troubleshooting
 
-**"Auth" button not showing** - Make sure you're on VS Code 1.101+ and the GitHub Copilot extension is installed and active. The CodeLens appears above the server entry in `.vscode/mcp.json`.
+<AccordionGroup>
+  <Accordion title="The Auth CodeLens does not appear">
+    Check that VS Code is version 1.101 or later and that the GitHub Copilot extension is installed and active. The CodeLens appears above the server entry in `.vscode/mcp.json`.
+  </Accordion>
+  <Accordion title="The server does not connect">
+    Check that the `url` is exactly `https://api.social-api.ai/mcp` and that `type` is `http`.
+  </Accordion>
+  <Accordion title="Tool calls fail with HTTP 401">
+    The OAuth session expired. Click **Auth** above the server entry again to sign in again.
+  </Accordion>
+</AccordionGroup>
+
+## Related
+
+- [SocialAPI MCP server](/integrations/overview): the server URL and the other supported clients.
+- [MCP tools reference](/integrations/tools): every tool Copilot can call.
+- [OAuth for MCP clients](/integrations/oauth): how the sign-in works.
+- [Errors](/guides/errors): every error code a tool can return.

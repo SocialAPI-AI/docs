@@ -1,0 +1,237 @@
+---
+title: "MCP tools reference"
+sidebarTitle: "Tools reference"
+description: "Look up every SocialAPI MCP tool by area: what each tool does and the REST endpoint that runs the same operation."
+---
+
+The [SocialAPI MCP server](/integrations/overview) gives an AI agent one tool per operation it can run on your SocialAPI account. Every tool name starts with `social_api_`. A tool runs the same operation as its REST equivalent, so the same [scopes](/guides/scoped-keys), plan allowances, platform support, and error codes apply.
+
+An agent calls a tool with a JSON-RPC `tools/call` request. The arguments are the tool's input fields:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "tools/call",
+  "params": {
+    "name": "social_api_reply_to_comment",
+    "arguments": {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "post_id": "17895695668004550",
+      "comment_id": "17858893269000001",
+      "text": "Thanks for watching! The full recipe is in our bio."
+    }
+  }
+}
+```
+
+A tool that fails returns a result with `isError: true`. When the failure comes from the operation itself, the text is a JSON object with the same `code` the REST endpoint returns, the message in `error`, and any `meta` fields at the top level. This result comes from an API key without the `inbox:write` scope:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"code\":\"auth.insufficient_scope\",\"error\":\"This API key does not have the required scope: inbox:write\",\"required_scope\":\"inbox:write\"}"
+      }
+    ],
+    "isError": true
+  }
+}
+```
+
+A missing or malformed argument returns a plain-text message instead, for example `account_id is required`.
+
+## Accounts and brands
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_list_accounts` | List your connected accounts, optionally for one brand. Returns the `id` that every other tool takes as `account_id` | `GET /v1/accounts` |
+| `social_api_connect_account` | Start connecting an account. On OAuth platforms it returns the `auth_url` the person opens to authorize access. On Telegram and Bluesky it connects the account at once and returns its `account_id`. Accepts `permissions`: see [Account permissions](/guides/permissions) | `POST /v1/accounts/connect` |
+| `social_api_exchange_oauth` | Finish a connection by exchanging the authorization code | `POST /v1/oauth/exchange` |
+| `social_api_list_pending_profiles` | List the Google Business Profiles a pending connection can connect | `GET /v1/accounts/pending/{connection_id}` |
+| `social_api_select_pending_profile` | Connect the chosen Google Business Profile from a pending connection | `POST /v1/accounts/pending/{connection_id}/select` |
+| `social_api_update_account_permissions` | Replace a connected account's permissions, or send `unrestricted: true` to give it every permission. Removing a permission deletes the data it covered: see [Account permissions](/guides/permissions#removing-a-permission-deletes-data) | `PATCH /v1/accounts/{id}` |
+| `social_api_disconnect_account` | Disconnect a connected account | `DELETE /v1/accounts/{id}` |
+| `social_api_get_creator_info` | Get a TikTok account's posting options: whether it can post, the allowed privacy level, maximum video duration, and comment, duet, and stitch settings | `GET /v1/accounts/{id}/creator-info` |
+| `social_api_list_account_pages` | List the pages of a connected account, such as Facebook Pages | `GET /v1/accounts/{id}/pages` |
+| `social_api_update_account_page` | Set a page as the default, or deactivate it | `PATCH /v1/accounts/{id}/pages/{pageId}` |
+| `social_api_list_pinterest_boards` | List the boards of a Pinterest account | `GET /v1/accounts/{id}/boards` |
+| `social_api_list_brands` | List your brands | `GET /v1/brands` |
+| `social_api_create_brand` | Create a brand | `POST /v1/brands` |
+| `social_api_update_brand` | Rename a brand | `PATCH /v1/brands/{id}` |
+| `social_api_delete_brand` | Delete a brand and disconnect its accounts | `DELETE /v1/brands/{id}` |
+| `social_api_create_invite` | Create an invite link that lets someone connect an account to a brand. Accepts `permissions` | `POST /v1/invites` |
+| `social_api_list_invites` | List a brand's invites, active, expired, and used | `GET /v1/invites` |
+| `social_api_revoke_invite` | Revoke an invite link | `DELETE /v1/invites/{id}` |
+
+## Comments
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_list_inbox_posts` | List your posts with their comment counts | `GET /v1/inbox/comments` |
+| `social_api_list_post_comments` | List the comments on one post | `GET /v1/inbox/comments/{postId}` |
+| `social_api_get_comment_replies` | List the replies to one comment | `GET /v1/inbox/comments/{postId}/{commentId}/replies` |
+| `social_api_reply_to_comment` | Reply publicly to a post or a comment. The text is 2,200 bytes at most | `POST /v1/inbox/comments/{postId}` |
+| `social_api_private_reply_to_comment` | Send a private reply to the person who wrote a comment. The text is 1,000 bytes at most | `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` |
+| `social_api_hide_comment` | Hide a comment from public view | `POST /v1/inbox/comments/{postId}/{commentId}/hide` |
+| `social_api_unhide_comment` | Show a hidden comment again | `DELETE /v1/inbox/comments/{postId}/{commentId}/hide` |
+| `social_api_like_comment` | Like a comment as the connected account | `POST /v1/inbox/comments/{postId}/{commentId}/like` |
+| `social_api_unlike_comment` | Remove the connected account's like from a comment | `DELETE /v1/inbox/comments/{postId}/{commentId}/like` |
+| `social_api_delete_comment` | Delete a comment from the platform | `DELETE /v1/inbox/comments/{postId}/{commentId}` |
+| `social_api_moderate_comment` | Hide, unhide, or delete a comment by its `sapi_cmt_` ID, with `action` set to `hide`, `unhide`, or `delete` | The hide, unhide, and delete endpoints above |
+
+See [Comments](/guides/comments) for platform support and limits.
+
+## Direct messages
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_list_conversations` | List DM conversations, ordered by their latest activity, newest first | `GET /v1/inbox/conversations` |
+| `social_api_get_conversation` | Get one conversation | `GET /v1/inbox/conversations/{id}` |
+| `social_api_list_messages` | List the messages in a conversation, newest first | `GET /v1/inbox/conversations/{id}/messages` |
+| `social_api_send_dm` | Send a DM in an existing conversation. The text is 1,000 bytes at most. Instagram also accepts `quick_replies` and `buttons`: see [Direct messages](/guides/direct-messages) | `POST /v1/inbox/conversations/{id}/messages` |
+| `social_api_update_conversation` | Archive a conversation, or restore it to `active` | `PATCH /v1/inbox/conversations/{id}` |
+| `social_api_mark_conversation_read` | Mark every message in a conversation as read | `POST /v1/inbox/conversations/{id}/read` |
+
+See [Direct messages](/guides/direct-messages) for platform support and the messaging window.
+
+## Reviews
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_list_review_accounts` | List the connected accounts that support reviews, each with its rating summary | `GET /v1/inbox/reviews` |
+| `social_api_get_reviews` | List the reviews of one connected account | `GET /v1/inbox/reviews/{account_id}` |
+| `social_api_reply_to_review` | Reply to a review as the business. On Google Business Profile, replying again replaces the existing reply | `POST /v1/inbox/reviews/{id}/reply` |
+| `social_api_update_review_reply` | Always returns an error: no platform supports editing a review reply. Use `social_api_reply_to_review` to replace a Google Business Profile reply | None |
+| `social_api_delete_review_reply` | Always returns an error: no platform supports deleting a review reply | None |
+
+See [Reviews](/guides/reviews).
+
+## Mentions
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_get_mentions` | List the posts and comments that mention or tag a connected account | `GET /v1/accounts/{id}/mentions` |
+| `social_api_reply_to_mention` | Reply publicly to a mention, including on a post the account does not own | `POST /v1/accounts/{id}/mentions/reply` |
+
+See [Mentions](/guides/mentions).
+
+## Automations
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_list_automations` | List your Automations, optionally for one account | `GET /v1/automations` |
+| `social_api_get_automation` | Get one Automation with its steps and counters | `GET /v1/automations/{id}` |
+| `social_api_create_automation` | Create an Automation, with `steps` or `follow_gate` | `POST /v1/automations` |
+| `social_api_update_automation` | Change an Automation's fields, or pause and resume it | `PATCH /v1/automations/{id}` |
+| `social_api_delete_automation` | Delete an Automation and its run history | `DELETE /v1/automations/{id}` |
+| `social_api_list_automation_firings` | List an Automation's runs from the last 30 days, with each action's outcome | `GET /v1/automations/{id}/firings` |
+
+See [Automations](/guides/automations).
+
+## Posts
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_list_posts` | List your posts (drafts, scheduled, published, and failed), with filters | `GET /v1/posts` |
+| `social_api_get_post` | Get one post with its per-platform delivery details | `GET /v1/posts/{pid}` |
+| `social_api_create_post` | Create a draft, schedule a post with `scheduled_at`, or publish it with `publish_now` | `POST /v1/posts` |
+| `social_api_update_post` | Update a draft, scheduled, or failed post | `PATCH /v1/posts/{pid}` |
+| `social_api_publish_post` | Publish a draft or scheduled post immediately | `POST /v1/posts/{pid}/publish` |
+| `social_api_retry_post` | Retry the failed platform deliveries of a `failed` or `partial` post | `POST /v1/posts/{pid}/retry` |
+| `social_api_unpublish_post` | Remove a published post from one platform or from all, and keep the post in SocialAPI. Posts on Instagram and TikTok stay on the platform | `POST /v1/posts/{pid}/unpublish` |
+| `social_api_delete_post` | Delete a post. A published post is also removed from each platform, except Instagram and TikTok posts | `DELETE /v1/posts/{pid}` |
+| `social_api_validate_post` | Check a post against each platform's rules before you create it | `POST /v1/posts/validate` |
+| `social_api_get_constraints` | Get each platform's content rules: text length, media count, media types, file sizes | `GET /v1/posts/validate` |
+| `social_api_get_post_metrics` | Fetch a published post's current engagement from each platform | `GET /v1/posts/{pid}/metrics` |
+| `social_api_list_instagram_stories` | List the active Stories of an Instagram account | `GET /v1/platforms/instagram/accounts/{id}/stories` |
+
+See [Publishing](/guides/publishing).
+
+## Media
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_get_media_upload_url` | Get an upload URL and a `media_id` for one file | `GET /v1/media/upload-url` |
+| `social_api_verify_media_upload` | Confirm that the file reached the upload URL, so the `media_id` can be attached to a post | `POST /v1/media/{id}/verify` |
+| `social_api_list_media` | List the files in your media library | `GET /v1/media` |
+| `social_api_delete_media` | Delete a file from your media library | `DELETE /v1/media/{id}` |
+| `social_api_get_storage_usage` | Get your media storage use and quota | `GET /v1/media/storage` |
+
+See [Media](/guides/media) for the upload flow.
+
+## Analytics and exports
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_get_account_analytics` | Get one connected account's daily metric history | `GET /v1/accounts/{id}/analytics` |
+| `social_api_get_brand_analytics` | Get a brand's daily metric history, summed across its accounts | `GET /v1/brands/{id}/analytics` |
+| `social_api_get_post_analytics` | Get one published post's daily engagement history | `GET /v1/posts/{pid}/analytics` |
+| `social_api_create_export` | Start an analytics export for a connected account | `POST /v1/accounts/{id}/export` |
+| `social_api_get_export` | Get an export's status and, once it completes, its download links | `GET /v1/exports/{id}` |
+| `social_api_list_exports` | List your 50 most recent exports, newest first | `GET /v1/exports` |
+| `social_api_get_export_videos` | Get the per-video data of a completed export | `GET /v1/exports/{id}/videos` |
+
+See [Analytics](/guides/analytics).
+
+## Webhooks
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_list_webhooks` | List your webhook endpoints | `GET /v1/webhooks` |
+| `social_api_get_webhook` | Get one webhook endpoint with its delivery counts | `GET /v1/webhooks/{id}` |
+| `social_api_create_webhook` | Register a webhook endpoint for a list of events | `POST /v1/webhooks` |
+| `social_api_update_webhook` | Change an endpoint's URL or events, or turn it on or off | `PATCH /v1/webhooks/{id}` |
+| `social_api_delete_webhook` | Delete a webhook endpoint | `DELETE /v1/webhooks/{id}` |
+| `social_api_test_webhook` | Send a test event to an endpoint and return the HTTP status it answered with | `POST /v1/webhooks/{id}/test` |
+| `social_api_list_webhook_deliveries` | List an endpoint's deliveries | `GET /v1/webhooks/{id}/deliveries` |
+| `social_api_get_webhook_delivery` | Get one delivery with its payload and each attempt's response | `GET /v1/webhooks/{id}/deliveries/{did}` |
+| `social_api_retry_webhook_delivery` | Send a failed delivery again | `POST /v1/webhooks/{id}/deliveries/{did}/retry` |
+
+See [Webhooks](/guides/webhooks).
+
+## Events, usage, and your SocialAPI account
+
+| Tool | What it does | REST equivalent |
+|---|---|---|
+| `social_api_list_events` | List the events log: publishing attempts, webhook deliveries, inbound platform events, API calls, and account changes | `GET /v1/events` |
+| `social_api_events_summary` | Get event and failure counts for a time window | `GET /v1/events/summary` |
+| `social_api_get_usage` | Get your usage and plan allowances for the current billing period | `GET /v1/usage` |
+| `social_api_get_account_limits` | Get a connected account's remaining quotas, as the platform reports them | `GET /v1/accounts/{id}/limits` |
+| `social_api_get_me` | Get your SocialAPI profile, including your plan | `GET /v1/users/me` |
+| `social_api_patch_me` | Update your profile settings | `PATCH /v1/users/me` |
+| `social_api_list_keys` | List your API keys, without their secrets | `GET /v1/keys` |
+| `social_api_revoke_key` | Revoke an API key | `DELETE /v1/keys/{id}` |
+
+## What tools do not cover
+
+No tool creates, rotates, or edits an API key, and no tool deletes your SocialAPI account. Create keys in the [dashboard](https://app.social-api.ai) or with `POST /v1/keys` (see [Authentication](/guides/authentication)).
+
+Among the operations available only through the REST API are:
+
+- Uploading a file in the request body (`POST /v1/media/upload`). An agent uploads with `social_api_get_media_upload_url` instead.
+- Inbox sync, inbound attachments, and message reactions (`/v1/inbox/sync`, `/v1/inbox/media/{id}`, `/v1/inbox/conversations/{id}/messages/{messageId}/reaction`).
+- Creating, editing, and deleting Pinterest boards.
+- The webhook event catalog (`GET /v1/webhooks/events`). The `social_api_create_webhook` description lists the event names.
+- Importing posts (`POST /v1/posts/import`), refreshing an account's posts (`POST /v1/accounts/{id}/sync`), announcements (`GET /v1/announcements`), and the plan catalog (`GET /v1/billing/plans`).
+- Every endpoint under `/v1/platforms/` except Instagram Stories: WhatsApp templates and phone numbers, Google Business Profile locations, platform summaries and insights.
+
+## Errors and limits
+
+- **Timeout**: a request to the MCP server that runs longer than 5 minutes is stopped.
+- **Errors**: a failed tool returns `isError: true` with the same error code as its REST equivalent. Codes are listed in [Errors](/guides/errors).
+- **Scopes**: an agent connected with a scoped API key can run only the tools its scopes allow. A tool outside them returns `auth.insufficient_scope` with the missing scope in `required_scope`. `required_scope` is absent for tools that need a full-access key. See [Scoped API keys](/guides/scoped-keys).
+- **Cost**: a tool call consumes the same credits and plan allowances as its REST equivalent. See [Plans](/guides/plans).
+- **Rate limits**: tools that publish or send messages are subject to the same posting and messaging caps as the REST API. See [Rate limits](/guides/rate-limits).
+- **Annotations**: every tool declares `readOnlyHint`, `destructiveHint`, and `openWorldHint`. Clients read them to decide which calls need your confirmation.
+
+## Related
+
+- [SocialAPI MCP server](/integrations/overview): connect an AI client to these tools.
+- [Custom MCP clients](/integrations/custom): call the tools over HTTP with an API key.
+- [Scoped API keys](/guides/scoped-keys): limit which tools an agent can run.
+- [API reference](/api-reference/introduction): request and response schemas for each REST equivalent.

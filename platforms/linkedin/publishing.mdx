@@ -1,0 +1,297 @@
+---
+title: LinkedIn publishing
+sidebarTitle: "Publishing"
+description: Full reference for publishing LinkedIn posts via SocialAPI, including images, videos, multi-image posts, link posts, text formatting, and visibility.
+---
+
+## 1. Overview
+
+LinkedIn posts publish as the connected member (`linkedin`).
+
+| Field | Value |
+|---|---|
+| Platform slug | `linkedin` |
+| Auth type | OAuth 2.0 (LinkedIn) |
+| API | LinkedIn Posts API |
+| Create post | Yes |
+| Update post | No (`409 post.state_invalid` on a published post) |
+| Delete post | Yes |
+| Schedule | Yes (deferred publish via `scheduled_at`) |
+| First comment | No (`first_comment` is ignored) |
+| Posting caps | 25 posts per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Text only | No `media` | `text` is the post commentary |
+| Single image | One image in `media` | JPEG, PNG, or GIF |
+| Single video | One video in `media` | MP4 |
+| Multi-image | 2 to 20 images in `media` | Images only |
+| Link post | `platform_data.article_url` | The first attached image becomes the link thumbnail. Other media is ignored |
+
+A post cannot mix a video with images. A `media_id` video among 2 or more `media` items returns `400 publishing.validation_failed`. A `platform_attachment_id` video among 2 or more items fails the target at publish time with `400 validation.media_type`. A video sent by `url` among 2 or more items is refused by LinkedIn at upload.
+
+**File limits for media you upload to SocialAPI** (`source_type: "media_id"`): images at most 10 MB. Videos at most 500 MB, 3 seconds to 30 minutes long, and at most 30 frames per second. Text holds at most 3,000 characters. SocialAPI checks these limits before it publishes, and a violation returns `400 publishing.validation_failed`.
+
+<Warning>
+  Attach media through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, `url` for a public `http(s)` URL SocialAPI fetches at publish time, or `platform_attachment_id` for an asset URN you created through LinkedIn yourself. A multi-image post can mix all three. To upload first, see [Media](/guides/media).
+</Warning>
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `targets` pointing at a LinkedIn account and `publish_now: true`. The `text` field becomes the post commentary. The platform comes from the account, so a target has no `platform` field.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "Big news from our team! #hiring",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "visibility": "public",
+    "publish_now": true,
+    "platform_data": {
+      "linkedin": {
+        "alt_text": "The team at our spring offsite",
+        "disable_reshare": false
+      }
+    }
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "Big news from our team! #hiring",
+  "status": "publishing",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "linkedin",
+      "status": "publishing"
+    }
+  ]
+}
+```
+
+### Visibility
+
+`visibility` sets who sees the post. Send it on the post, or on a target to override the post. When both set it, the target's value wins.
+
+| Value | LinkedIn audience |
+|---|---|
+| `public` (default) | Anyone on or off LinkedIn |
+| `connections_only` | The member's connections |
+| `logged_in` | Any logged-in LinkedIn member |
+
+Any other value fails validation on the field `visibility`.
+
+### Text formatting
+
+Write `text` as plain text. Characters LinkedIn reserves for formatting (`| { } @ [ ] ( ) < > # \ * _ ~`) are escaped for you, so they appear on LinkedIn exactly as typed. Text you already escaped with a backslash (for example `\(`) is published unchanged.
+
+| To publish | Write |
+|---|---|
+| A hashtag | `#word` at the start of a word, for example `#hiring` |
+| A mention of a member | `@[Name](urn:li:person:...)` |
+| A mention of a company | `@[Name](urn:li:organization:...)` |
+
+A `#` inside a word (`C#`, `page#section`) and an `@` outside the mention syntax (an email address) are published as plain text.
+
+### Link post with a call to action
+
+Set `article_url` to publish a link post. Add `cta_label` and `cta_url` for a call-to-action button. An attached image becomes the link thumbnail. LinkedIn builds no preview of its own, so set `article_title` and `article_description` too.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Read our latest product update.",
+    "publish_now": true,
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "visibility": "public",
+      "platform_data": {
+        "article_url": "https://example.com/update",
+        "article_title": "Product update",
+        "article_description": "What shipped this month",
+        "cta_label": "LEARN_MORE",
+        "cta_url": "https://example.com/update"
+      }
+    }]
+  }'
+```
+
+### Platform data fields
+
+Send these keys in `platform_data.linkedin` on the post, which applies them to every LinkedIn target. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `linkedin` key). When both set the same key, the target's value wins.
+
+| Key | Type | Applies to | Notes |
+|---|---|---|---|
+| `article_url` | string | link post | An absolute `http` or `https` URL. Publishes a link post |
+| `article_title` | string | link post | Title on the link card |
+| `article_description` | string | link post | Description on the link card |
+| `cta_label` | string | link post | One of `LEARN_MORE`, `SIGN_UP`, `DOWNLOAD`, `REGISTER`, `SUBSCRIBE`, `APPLY`, `REQUEST_DEMO`, `JOIN`, `ATTEND`. Requires `article_url` |
+| `cta_url` | string | link post | Destination of the call-to-action button. Requires `article_url` |
+| `alt_text` | string | single image | Alt text for the image |
+| `alt_texts` | array of strings | multi-image | Alt text per image, matched to `media` by position |
+| `media_title` | string | single image, single video | Title of the attached file |
+| `disable_reshare` | boolean | every post | When `true`, others cannot reshare the post |
+
+SocialAPI forwards any additional keys in `platform_data.linkedin` that the table above lists, and no others. LinkedIn has no other publish options that SocialAPI passes through: an unlisted key is ignored without a warning. A malformed `article_url`, a `cta_label` outside the list, or a `cta_label` or `cta_url` without `article_url` fails validation on that field.
+
+### Scheduling
+
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) instead of `publish_now`. SocialAPI holds the post and publishes it at that time.
+
+```json
+{
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "text": "Scheduled announcement",
+  "scheduled_at": "2026-11-15T10:00:00Z"
+}
+```
+
+---
+
+## 4. Update post
+
+LinkedIn posts cannot be edited through SocialAPI once they are published. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post. To correct a published post, delete it and publish a new one.
+
+---
+
+## 5. Delete post
+
+`DELETE /v1/posts/{pid}` deletes the post from LinkedIn when its LinkedIn target is `published`. A target that is not published is removed from SocialAPI only. See [Delete a post](/guides/delivery#delete-a-post).
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+---
+
+## 6. Retrieve posts
+
+`GET /v1/posts?platform=linkedin&account_ids={id}` lists posts.
+
+The list holds the posts you published through SocialAPI. LinkedIn gives apps no read of a member's own posts, so a post published on LinkedIn directly never appears. A LinkedIn post has no metrics.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### The post ID is returned for you
+
+SocialAPI returns the LinkedIn post ID as `platform_post_id` in the post body and in `post.published` events, with a `permalink`. You do nothing to retrieve it.
+
+### Video processing
+
+LinkedIn processes a video after upload. A video LinkedIn cannot process fails the target with `422 platform.linkedin.processing_failed`. An upload or processing step that does not finish in time fails it with `504 platform.linkedin.upload_timeout` or `504 platform.linkedin.processing_timeout`. Upload a smaller or re-encoded file, then retry.
+
+### Link posts need their own preview
+
+LinkedIn builds no preview for a link post. Set `article_title`, `article_description`, and attach an image. A video, or more than one media item, on a link post is ignored apart from the first image, and validation returns a warning on the field `media`.
+
+### Errors on a failed target
+
+A publish that fails after the request returned puts a structured error on the target, in `targets[].error`, with its `code`. Every code is in [Errors](/guides/errors).
+
+- `401 platform.linkedin.auth`: the access token expired or was revoked. LinkedIn tokens last 60 days and cannot be refreshed. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
+- `403 platform.linkedin.access_denied`: LinkedIn refused the action for this account. Reconnecting does not change it. Read `message`.
+- `429 platform.linkedin.rate_limit`: LinkedIn's own limit. Wait, then retry.
+
+### Recovery
+
+- **Rate limit.** Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Auth error.** Reconnect the LinkedIn account through the OAuth flow.
+- **Media failure.** Replace the file, create the post again, or edit the failed post and retry it.
+
+---
+
+## 8. Full worked example
+
+This example publishes an image post with a mention and a hashtag, then reads the result.
+
+**Step 1: Upload media**
+
+```bash
+curl "https://api.social-api.ai/v1/media/upload-url?filename=team.jpg&media_type=image/jpeg" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Upload the file to the returned `upload_url`, then call `POST /v1/media/{media_id}/verify`. The steps and the response are in [Media](/guides/media). The result is a `media_id`, here `f47ac10b-58cc-4372-a567-0e02b2c3d479`.
+
+**Step 2: Publish the post**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "Welcome @[Acme Corp](urn:li:organization:12345678) to the team. #hiring",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "visibility": "public",
+    "publish_now": true
+  }'
+```
+
+Response (HTTP 201): the post with `status: "publishing"`, as in [Create post](#3-create-post).
+
+**Step 3: Check the status**
+
+```bash
+curl https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200) once published:
+
+```json
+{
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "text": "Welcome @[Acme Corp](urn:li:organization:12345678) to the team. #hiring",
+  "status": "published",
+  "hidden": false,
+  "retry_count": 0,
+  "published_at": "2026-10-13T09:00:06Z",
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:06Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "linkedin",
+      "status": "published",
+      "platform_post_id": "urn:li:share:7251234567890123456",
+      "permalink": "https://www.linkedin.com/feed/update/urn:li:share:7251234567890123456/",
+      "published_at": "2026-10-13T09:00:06Z"
+    }
+  ]
+}
+```
+
+---
+
+## 9. Required OAuth scopes
+
+SocialAPI's LinkedIn app requests these scopes during the OAuth flow. You configure nothing. The full list is in [LinkedIn scopes](/platforms/linkedin#scopes).
+
+| Scope | Purpose |
+|---|---|
+| `w_member_social` | Publish posts as the member |
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

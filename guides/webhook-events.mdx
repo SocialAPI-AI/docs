@@ -1,0 +1,796 @@
+---
+title: "Webhook events"
+description: "Every webhook event SocialAPI sends: when it fires, which platforms emit it, and its payload and fields, across posts, inbox, and accounts."
+---
+
+A webhook event is one JSON body that SocialAPI sends to your [webhook endpoint](/guides/webhooks) when something happens on a connected account or on a post. This page lists every event you can subscribe to, when it fires, which platforms emit it, and its payload. Match on the `event` field, never on text inside `data`.
+
+`GET /v1/webhooks/events` returns the same list of event names with a description and a `category` for each (`posts`, `inbox`, or `accounts`). You subscribe to events by name when you [register an endpoint](/guides/webhooks#register-an-endpoint).
+
+## Event envelope
+
+Every delivery is a JSON object with an `event` name, a `data` value (an object, except an array on a `mention.received` event sent when you list mentions), and, for events SocialAPI receives from a platform, a `raw_payload`:
+
+```json
+{
+  "event": "comment.received",
+  "data": {
+    "id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "platform": "instagram",
+    "type": "comment",
+    "author": {
+      "id": "17841400008460056",
+      "name": "janesmith"
+    },
+    "content": { "text": "Love this product!" },
+    "metadata": null,
+    "received_at": "2026-10-13T14:30:00Z",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform_post_id": "17895695668004550"
+  },
+  "raw_payload": {
+    "field": "comments",
+    "value": {
+      "from": { "id": "17841400008460056", "username": "janesmith" },
+      "media": { "id": "17895695668004550", "media_product_type": "FEED" },
+      "id": "17865799348089039",
+      "text": "Love this product!"
+    }
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `event` | The event name. The same value is in the `X-SocialAPI-Event` header |
+| `data` | The event payload. Its shape depends on the event, described per event below |
+| `raw_payload` | The platform's own notification for this one event, unchanged. Present on `comment.received`, `mention.received`, `dm.received`, `dm.sent`, `dm.referral`, `dm.postback`, and `dm.deleted` when the platform sent the event to SocialAPI. Absent on every other event. Its shape belongs to the platform and changes with the platform's API versions, so read `data` when it has the field you need |
+
+The body carries no event ID and no sent-at time. The `X-SocialAPI-Delivery` header identifies the delivery, and `X-SocialAPI-Timestamp` holds the time of the attempt.
+
+SocialAPI delivers each event at least once, and events can arrive in a different order than they happened. [Deduplicate and order](/guides/webhooks#respond-to-a-webhook) on your side.
+
+## Platform coverage
+
+Which platforms emit an event is stated under each event as **Emitted for**. These groups hold across the page:
+
+- **Instagram, Facebook, Threads, WhatsApp, Telegram, Zalo, and Google Business Profile** send comments, direct messages, mentions, or reviews to SocialAPI as they happen, so those events arrive as webhook events. Each platform's page has a Capabilities table, and [Supported platforms](/platforms/overview) compares them.
+- **X / Twitter, YouTube, Bluesky, Pinterest, and LinkedIn** push nothing to SocialAPI. They emit no comment, DM, or review events, and no mention event from the platform: read those with the inbox endpoints. Listing mentions on X and Bluesky sends `mention.received` (see [Mentions you list](#mentions-you-list)).
+- **TikTok** sends new comments to SocialAPI, so it emits `comment.received`. It has no DM events or review events. Listing TikTok mentions sends `mention.received` (see [Mentions you list](#mentions-you-list)). TikTok accounts also emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect an account, and `account.disconnected` when SocialAPI flags the account for reconnection.
+- **Trustpilot** is not available, so it emits no events.
+
+## Posts
+
+Post events carry the post's SocialAPI ID, which is a UUID (see [IDs](/guides/ids)). They report the state changes of posts you create through SocialAPI. The `post.published`, `post.partial`, and `post.failed` events fire once when the post settles, including a scheduled post and a post on a platform that finishes publishing later.
+
+**Emitted for:** every platform you can publish to through SocialAPI, for every event in this section.
+
+### `post.scheduled`
+
+Fires when you create a post with a future `scheduled_at` and it enters the `scheduled` state.
+
+```json
+{
+  "event": "post.scheduled",
+  "data": {
+    "post_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "status": "scheduled",
+    "scheduled_at": "2026-10-20T14:00:00Z",
+    "targets": [
+      { "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "platform": "instagram" },
+      { "account_id": "acc_02HZ9X3Q4R5M6N7P8V2K0W1K", "platform": "facebook" }
+    ]
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `post_id` | The post's ID |
+| `status` | `scheduled` |
+| `scheduled_at` | When the post publishes, in ISO 8601 UTC |
+| `targets` | One item per destination, each with `account_id` and `platform` |
+
+### `post.published`, `post.partial`, and `post.failed`
+
+`post.published` fires when the post published on every target. `post.partial` fires when it published on some targets and failed on others. `post.failed` fires when it failed on every target. All 3 share one payload.
+
+```json
+{
+  "event": "post.partial",
+  "data": {
+    "post_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "status": "partial",
+    "results": [
+      {
+        "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+        "platform": "instagram",
+        "status": "published",
+        "platform_post_id": "17895695668004550",
+        "permalink": "https://www.instagram.com/p/C8xY2AbC/"
+      },
+      {
+        "account_id": "acc_02HZ9X3Q4R5M6N7P8V2K0W1K",
+        "platform": "facebook",
+        "status": "failed",
+        "error": {
+          "code": "platform.facebook.publish_failed",
+          "message": "Facebook rejected the post."
+        }
+      }
+    ]
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `post_id` | The post's ID |
+| `status` | `published`, `partial`, or `failed`, matching the event name |
+| `results` | One item per target |
+| `results[].account_id` | The connected account |
+| `results[].page_id` | The SocialAPI page ID, when the target is a page of the account. Omitted otherwise |
+| `results[].platform` | The platform slug |
+| `results[].status` | `published` or `failed` |
+| `results[].platform_post_id` | The platform's ID of the published post. Omitted when the target failed |
+| `results[].permalink` | The public URL. Omitted when the platform returns none |
+| `results[].error` | On a failed target: `code` and `message` only. The same failure on `GET /v1/posts/{pid}` is in `targets[].error`, which also holds `category` and `caused_by`. Codes are described on [Track post delivery](/guides/delivery#target-errors) |
+
+### `post.updated`
+
+Fires when you edit a draft, scheduled, or failed post.
+
+```json
+{
+  "event": "post.updated",
+  "data": {
+    "post_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "status": "scheduled",
+    "changed_fields": ["text", "scheduled_at"]
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `status` | The post's status after the edit |
+| `changed_fields` | The fields the edit changed: `text`, `title`, `visibility`, `media`, `scheduled_at`, `hidden`, `targets`, `first_comment`, `segments`. It never lists `platform_data`, even when the edit changed it |
+
+### `post.deleted`
+
+Fires when you delete a post.
+
+```json
+{
+  "event": "post.deleted",
+  "data": {
+    "post_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "was_status": "published"
+  }
+}
+```
+
+`was_status` is the post's status before deletion. A published or partial post is removed from the platforms on a best-effort basis and stays in SocialAPI while any target is still published (see [Delete a post](/guides/delivery#delete-a-post)). In that case this event does not fire.
+
+### `post.unpublished`
+
+Fires when `POST /v1/posts/{pid}/unpublish` removes at least one target of a published post from its platform.
+
+```json
+{
+  "event": "post.unpublished",
+  "data": {
+    "post_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "unpublished_count": 1
+  }
+}
+```
+
+`account_id` is the account the request limited the removal to. It is `null` when the request did not name an account. `unpublished_count` is the number of targets removed from their platform.
+
+### `post.retried`
+
+Fires when a failed or partial post is retried with `POST /v1/posts/{pid}/retry`. A `post.published`, `post.partial`, or `post.failed` event follows when the retry settles.
+
+```json
+{
+  "event": "post.retried",
+  "data": {
+    "post_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "retried_count": 2
+  }
+}
+```
+
+`retried_count` is the number of failed targets sent again.
+
+## Comments
+
+### `comment.received`
+
+Fires when a person comments on a post of a connected account. Facebook sends the event again when the person edits the comment.
+
+**Emitted for:** Instagram, Facebook, Threads (replies to the account's posts), and TikTok.
+
+The example is the Instagram comment shown in the [envelope](#event-envelope). The `data` object is the shared shape in [Interaction payload](#interaction-payload): nested `author` and `content` objects. It is not the flat shape (`author_id`, `text`) that `GET /v1/inbox/comments/{postId}` returns. Per platform:
+
+| Platform | What is in `data` |
+|---|---|
+| Instagram | `author.id` and `author.name` (the person's username), and `author.avatar_url` when SocialAPI can read it. `platform_post_id` is the media ID. `metadata` is `null` |
+| Facebook | `author.id`, `author.name`, and `page_id` (the SocialAPI page that received the comment). `platform_post_id` is the Facebook post ID |
+| Threads | `author.username` only. `platform_post_id` is the root post's ID, `permalink` is the reply's URL, and `metadata` holds `parent_id` (the post or reply being answered) and `is_verified`. `account_id` is the Threads user ID, not an `acc_` ID. `raw_payload` is the `values` object of the Threads event |
+| TikTok | `author.id` (TikTok's unique identifier for the person), `author.name`, `author.username`, and `author.avatar_url`. `platform_post_id` is the TikTok video ID. A reply under a comment is also `comment.received`. `post_id` and `permalink` are not set, and `metadata` is `null`. Comments written by the connected account are not sent. `raw_payload` is TikTok's notification: see [TikTok](/platforms/tiktok#webhook-events) |
+
+`post_id` is set on Instagram and Facebook when the post was published through SocialAPI.
+
+## Direct messages
+
+Direct message events share the [interaction payload](#interaction-payload). A DM event carries the SocialAPI `conversation_id` and, except on Zalo, the `platform_id` of the message. Join `platform_id` to the `platform_id` of a row from `GET /v1/inbox/conversations/{id}/messages`. Do not join on `id`: the message endpoint returns its own record ID, which differs from the event's interaction ID.
+
+### `dm.received`
+
+Fires when a person sends a message to a connected account.
+
+**Emitted for:** Instagram, Facebook, WhatsApp, Telegram, and Zalo. Zalo delivers text messages only.
+
+```json
+{
+  "event": "dm.received",
+  "data": {
+    "id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "platform": "instagram",
+    "type": "dm.received",
+    "author": { "id": "17846744073097661", "name": "Jane Smith" },
+    "recipient": { "id": "17841405793187218" },
+    "content": { "text": "Is this still in stock?" },
+    "metadata": null,
+    "received_at": "2026-10-13T14:30:00Z",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+    "platform_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA1"
+  },
+  "raw_payload": {
+    "sender": { "id": "17846744073097661" },
+    "recipient": { "id": "17841405793187218" },
+    "timestamp": 1792161000000,
+    "message": { "mid": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA1", "text": "Is this still in stock?" }
+  }
+}
+```
+
+What differs per platform:
+
+| Platform | Differences |
+|---|---|
+| Instagram | `recipient` is the connected account. `story` is set when the message replies to one of the account's stories. A story mention arrives as `dm.received` with `metadata.attachments[].type` of `story_mention`, not as `mention.received`. A message shared from a post carries the post in `metadata.attachments` (`media_id`, and `post_id` when the post was published through SocialAPI) and sets `platform_post_id` |
+| Facebook | Adds `page_id`. Has no profile picture for the sender: `author.avatar_url` is absent |
+| WhatsApp | `type` is `dm`. `author.id` is the sender's phone number and `author.name` the contact name WhatsApp reports. `metadata` holds `platform_id` and `phone_number_id`. A tap on a reply button or list item also sets `metadata.interactive_type` and `metadata.payload` |
+| Telegram | `type` is `dm`. `metadata` holds `platform_id` and `chat_id` |
+| Zalo | `author.id` only. No `conversation_id` and no `platform_id` |
+
+On Telegram, Instagram, and Facebook a message that replies to an earlier one carries `reply_to`, for example `"reply_to": { "platform_id": "20" }`, with the replied-to message's `platform_id`. `reply_to` is absent when the message is not a reply.
+
+### `dm.sent`
+
+Fires when a connected account sent a message. The sender is `author` and the person who received it is `recipient`.
+
+**Emitted for:** Instagram, Facebook, and WhatsApp.
+
+On Instagram and Facebook the event fires for every message the platform reports as sent from the account: messages sent through the API, replies typed in the platform's own app or inbox, and DMs your [Automations](/guides/automations) send. The event carries nothing that separates an Automation's DM from one you sent. On Facebook, `raw_payload` carries `app_id`, the ID of the app that sent the message, which tells API sends from replies typed in the Page inbox.
+
+On WhatsApp there is no message echo. The event fires once per message, when WhatsApp reports it as `sent`, for messages sent with `POST /v1/inbox/conversations/{id}/messages` or the `send-template` endpoint. It also fires for each message sent from the phone on a number that stays on the WhatsApp Business app (see [WhatsApp](/platforms/whatsapp)). A redelivered receipt does not raise it again, and neither do the later `delivered` and `read` receipts. `received_at` is WhatsApp's send time, `author.id` is the sending phone number ID, and `recipient.id` is the contact's WhatsApp ID.
+
+```json
+{
+  "event": "dm.sent",
+  "data": {
+    "id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1J",
+    "platform": "instagram",
+    "type": "dm.sent",
+    "author": { "id": "17841405793187218" },
+    "recipient": { "id": "17846744073097661", "name": "Jane Smith" },
+    "content": { "text": "Yes, 3 left." },
+    "metadata": null,
+    "received_at": "2026-10-13T14:31:00Z",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+    "platform_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA2"
+  }
+}
+```
+
+`dm.status.sent` fires alongside `dm.sent` for the same message.
+
+### `dm.referral`
+
+Fires when a person opens a conversation from an ad or referral link without sending a message. `content.text` is empty and `metadata.referral` is always present. The event has no `platform_id`.
+
+**Emitted for:** Instagram and Facebook.
+
+```json
+{
+  "event": "dm.referral",
+  "data": {
+    "id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1K",
+    "platform": "instagram",
+    "type": "dm.referral",
+    "author": { "id": "17846744073097661" },
+    "recipient": { "id": "17841405793187218" },
+    "content": { "text": "" },
+    "metadata": {
+      "referral": {
+        "ad_id": "120210572164750432",
+        "source": "ADS",
+        "type": "OPEN_THREAD",
+        "ads_context_data": {
+          "ad_title": "Spring Sale 25% Off",
+          "photo_url": "https://example.com/ads/spring-sale.jpg"
+        }
+      }
+    },
+    "received_at": "2026-10-13T14:32:00Z",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067"
+  }
+}
+```
+
+A person who opens the conversation from an ad and sends a message produces `dm.received` with the same `metadata.referral`. The `referral` object holds only the fields the platform sent: `ad_id`, `ref`, `source`, `type`, and `ads_context_data` (`ad_title`, `photo_url`, `video_url`).
+
+### `dm.postback`
+
+Fires when a person taps a quick reply or a `postback` button in a DM. `metadata.payload` is the payload you set when you sent the button and `metadata.title` is the button's title. When the tap arrives through an ig.me link or an icebreaker, `metadata.referral` is also set. URL buttons open the link in the person's browser and raise no event.
+
+**Emitted for:** Instagram and Facebook. WhatsApp sends a tap as `dm.received` with `metadata.interactive_type` and `metadata.payload`.
+
+```json
+{
+  "event": "dm.postback",
+  "data": {
+    "id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1L",
+    "platform": "instagram",
+    "type": "dm.postback",
+    "author": { "id": "17846744073097661" },
+    "recipient": { "id": "17841405793187218" },
+    "content": { "text": "" },
+    "metadata": {
+      "title": "Track my order",
+      "payload": "TRACK_ORDER"
+    },
+    "received_at": "2026-10-13T14:33:00Z",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+    "platform_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA3"
+  }
+}
+```
+
+Taps on buttons an Automation sends also arrive as `dm.postback`. Their `metadata.payload` starts with `sa1.` and the Automation answers the tap itself, so skip payloads that start with `sa1.`. Do not start the payloads of your own buttons with `sa1.`. Buttons are described in [Direct messages](/guides/direct-messages).
+
+### `dm.deleted`
+
+Fires when the sender unsends a message. `platform_id` names the removed message, which no longer appears in the conversation. `content.text` is empty.
+
+**Emitted for:** Instagram.
+
+```json
+{
+  "event": "dm.deleted",
+  "data": {
+    "id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "platform": "instagram",
+    "type": "dm.deleted",
+    "author": { "id": "17846744073097661" },
+    "recipient": { "id": "17841405793187218" },
+    "content": { "text": "" },
+    "metadata": null,
+    "received_at": "2026-10-13T14:34:00Z",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+    "platform_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA1"
+  }
+}
+```
+
+### `dm.status.sent`, `dm.status.delivered`, `dm.status.read`, and `dm.status.failed`
+
+These events report the progress of a message you sent. Their `data` is a short status object, not an interaction, and has no `account_id`: match the message by its IDs.
+
+| Event | Fires when | Emitted for |
+|---|---|---|
+| `dm.status.sent` | The platform accepted the message | Instagram, Facebook, WhatsApp |
+| `dm.status.delivered` | The message reached the recipient | Facebook, WhatsApp. Instagram sends no delivery receipts |
+| `dm.status.read` | The recipient read the message | Instagram, Facebook, WhatsApp |
+| `dm.status.failed` | The platform could not deliver the message | WhatsApp |
+
+On Instagram and Facebook:
+
+```json
+{
+  "event": "dm.status.read",
+  "data": {
+    "status": "read",
+    "mids": ["aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA2"],
+    "recipient_id": "17846744073097661"
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `status` | `sent`, `delivered`, or `read` |
+| `mids` | The platform message IDs the receipt covers |
+| `recipient_id` | The platform ID of the person who received or read the message |
+| `page_id` | Facebook only: the SocialAPI page ID |
+| `raw_payload` | The platform's notification, inside `data`. Present on Instagram `read` and on Facebook `delivered` and `read`. Absent on `sent` |
+
+On WhatsApp:
+
+```json
+{
+  "event": "dm.status.failed",
+  "data": {
+    "id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1J",
+    "message_id": "wamid.HBgLMTU1NTAxMjM0NTYVAgARGBI5QTNDQTVCM0Q0Q0Q2RkE4RjUA",
+    "recipient_id": "15550123456",
+    "status": "failed",
+    "error_code": 131026,
+    "error_title": "Message undeliverable",
+    "error_message": "Unable to deliver the message. The recipient may not be a WhatsApp user."
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `id` | The SocialAPI message ID, the same value the send response returned. Empty when WhatsApp sent no `recipient_id` |
+| `message_id` | The WhatsApp message ID |
+| `recipient_id` | The recipient's WhatsApp ID |
+| `status` | `sent`, `delivered`, `read`, or `failed` |
+| `error_code`, `error_title`, `error_message` | WhatsApp's error. Present only when WhatsApp reports one, which is how `failed` explains itself, because the send had already succeeded |
+
+## Mentions
+
+### `mention.received`
+
+Fires in two cases: the platform tells SocialAPI that a connected account was @mentioned in a comment or in a post caption, or you list mentions with `GET /v1/accounts/{id}/mentions` (see [Mentions you list](#mentions-you-list)).
+
+**Emitted for:** Instagram, Facebook, and Threads when the platform reports a mention, and every platform that lists mentions when you list them. Instagram story mentions are not `mention.received`: they arrive as `dm.received` (see above).
+
+```json
+{
+  "event": "mention.received",
+  "data": {
+    "id": "sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "platform": "instagram",
+    "type": "mention",
+    "author": { "id": "17846744073097661", "name": "Jane Smith", "username": "janesmith" },
+    "content": { "text": "Loving the new range from @acmecorp" },
+    "metadata": {
+      "mention_type": "caption",
+      "permalink": "https://www.instagram.com/p/C8xY2AbC/"
+    },
+    "received_at": "2026-10-13T14:35:00Z",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform_post_id": "17895695668004550"
+  },
+  "raw_payload": {
+    "field": "mentions",
+    "value": { "media_id": "17895695668004550" }
+  }
+}
+```
+
+SocialAPI reads the mention's text and author from the platform before sending. When that read fails, the event is still delivered with `content`, `author`, and `metadata.permalink` missing or empty.
+
+| Platform | What is in `data` |
+|---|---|
+| Instagram | `metadata.mention_type` is `comment` or `caption`. `platform_post_id` is the media ID |
+| Facebook | `metadata.mention_type` is `comment` or `post`. Adds `page_id` |
+| Threads | `author.username` only. `platform_post_id` is the mentioning post's ID, `permalink` is its URL, and there is no `mention_type`. `account_id` is the Threads user ID, not an `acc_` ID |
+
+On Threads, `GET /v1/accounts/{id}/mentions` returns the same mention with the same `id`, so the event and the list can be matched. Mentions are described on [Mentions](/guides/mentions).
+
+#### Mentions you list
+
+Every `GET /v1/accounts/{id}/mentions` call that returns at least one item also sends one `mention.received` event, on every platform that lists mentions. A call that returns no items sends none. SocialAPI sends the event on every such call, including a repeated call that returns the same items.
+
+For this event, `data` is an array: the items of that response's `data`, in the same order, each with the fields of the item in the list. The event has no `raw_payload`. The event a platform notification triggers has an object in `data`, so a handler for `mention.received` must accept both an object and an array.
+
+```json
+{
+  "event": "mention.received",
+  "data": [
+    {
+      "id": "sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "platform": "instagram",
+      "type": "mention",
+      "author": { "id": "17846744073097661", "name": "Jane Smith", "username": "janesmith" },
+      "content": { "text": "Loving the new range from @acmecorp" },
+      "metadata": {
+        "mention_type": "caption",
+        "permalink": "https://www.instagram.com/p/C8xY2AbC/"
+      },
+      "received_at": "2026-10-13T14:35:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_post_id": "17895695668004550"
+    }
+  ]
+}
+```
+
+Repeated list calls send the same mention again, so deduplicate on `data[].id`.
+
+## Reviews
+
+Review events do not follow the interaction payload. Google sends only the name of the changed review, so `data` holds identifiers and a `review` object that SocialAPI reads for you. The `review` object has the same fields as an item of `GET /v1/inbox/reviews/{account_id}`, so one parser handles both.
+
+**Emitted for both review events:** Google Business Profile.
+
+### `review.received`
+
+Fires when a customer posts a new review on a connected location.
+
+```json
+{
+  "event": "review.received",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "review_id": "sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "change": "new_review",
+    "review": {
+      "id": "sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "rating": 4,
+      "text": "Friendly staff, quick service.",
+      "author": { "name": "Jane Smith", "avatar_url": "https://lh3.googleusercontent.com/a/abc" },
+      "created_at": "2026-10-13T14:30:00Z",
+      "updated_at": "2026-10-13T14:30:00Z"
+    }
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | The connected Google Business Profile account |
+| `review_id` | The review's interaction ID |
+| `change` | `new_review` |
+| `review` | The review. Omitted when SocialAPI could not read it (the review was deleted in the meantime, or the account's access was revoked). Fall back to `GET /v1/inbox/reviews/{account_id}` |
+| `review.rating` | Integer from 1 to 5. 0 when the platform gave no rating |
+| `review.text` | The review text. Empty for a rating-only review |
+| `review.reply` | Your reply, with `text`, `updated_at`, `state` (`PENDING`, `APPROVED`, or `REJECTED`), and `policy_violation` on a rejected reply. Omitted when there is no reply |
+| `review.reply_url` | A Google-hosted URL for replying to the review. Omitted when empty |
+| `review.media` | Photos or videos the reviewer attached, each with `thumbnail_url` and optionally `thumbnail_label` and `video_url`. Omitted when there are none |
+
+When more than 1 SocialAPI account has connected the same Google location, each of them receives the event.
+
+### `review.updated`
+
+Fires when a review changes. Branch on `change`, because one event covers every kind of change.
+
+| `change` | Meaning | Extra fields |
+|---|---|---|
+| `review_edited` | The reviewer edited their review | None |
+| `reply_approved` | A reply you posted passed Google's moderation and is public | `state`: `APPROVED` |
+| `reply_rejected` | Google rejected the reply and it will never publish | `state`: `REJECTED`. `review.reply.policy_violation` holds Google's reason, so you can rewrite and send again without another call |
+
+```json
+{
+  "event": "review.updated",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "review_id": "sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "change": "reply_approved",
+    "state": "APPROVED",
+    "review": {
+      "id": "sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "rating": 4,
+      "text": "Friendly staff, quick service.",
+      "author": { "name": "Jane Smith", "avatar_url": "https://lh3.googleusercontent.com/a/abc" },
+      "reply": {
+        "text": "Thank you, Jane.",
+        "updated_at": "2026-10-13T15:00:00Z",
+        "state": "APPROVED"
+      },
+      "created_at": "2026-10-13T14:30:00Z",
+      "updated_at": "2026-10-13T14:30:00Z"
+    }
+  }
+}
+```
+
+The fields of `review` are in the `review.received` table. Reviews are described on [Reviews](/guides/reviews).
+
+## Accounts
+
+### `account.connected`
+
+Fires when an account finishes connecting, including when you reconnect it. Use it to show the connected profile or start work that needs the account.
+
+**Emitted for:** every platform.
+
+```json
+{
+  "event": "account.connected",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
+    "platform": "instagram",
+    "platform_user_id": "17841405793187218",
+    "username": "acmecorp",
+    "display_name": "ACME Corp",
+    "profile_picture_url": "https://example.com/avatars/acmecorp.jpg",
+    "bio": "Official ACME account",
+    "profile_url": "https://www.instagram.com/acmecorp/",
+    "user_email": "owner@acme.com",
+    "connected_at": "2026-10-13T14:30:00Z"
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | The connected account's ID |
+| `brand_id` | The brand the account belongs to |
+| `platform` | The platform slug |
+| `platform_user_id` | The platform's ID for the account |
+| `username`, `display_name`, `profile_picture_url`, `bio` | The profile as the platform reports it. Empty strings when the platform gives none |
+| `profile_url` | The public profile URL. Built from `username` on Instagram, Threads, TikTok, and X, and from `platform_user_id` on Facebook, LinkedIn, YouTube, and Google Business Profile. Empty on every other platform |
+| `user_email` | The email address of your SocialAPI account |
+| `connected_at` | When the connection finished, in ISO 8601 UTC |
+
+### `account.disconnected`
+
+Fires when a connected account is removed or needs reconnecting. It has 2 forms.
+
+**The person revoked access on the platform.** The account is deleted from SocialAPI. The payload has no `reason` and no `reconnect_required`.
+
+```json
+{
+  "event": "account.disconnected",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform": "instagram",
+    "platform_user_id": "17841405793187218"
+  }
+}
+```
+
+**Emitted for:** Instagram, Facebook, and Threads, when the person removes the app in the platform's settings. TikTok sends no notice of a removal: see [When TikTok authorization ends](/platforms/tiktok#when-tiktok-authorization-ends).
+
+**SocialAPI flagged the account for reconnection.** The account still exists. Its `status` changes so that calls on it signal that it needs reconnecting (see [Connect accounts](/guides/connect-accounts)). The payload has `reconnect_required: true` and a `reason`.
+
+```json
+{
+  "event": "account.disconnected",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform": "facebook",
+    "reason": "all_pages_removed",
+    "reconnect_required": true
+  }
+}
+```
+
+| `reason` | Platforms | Meaning |
+|---|---|---|
+| `all_pages_removed` | Facebook | The last remaining Page of the account was removed |
+| `access_revoked` | Instagram, Facebook, Threads, WhatsApp | The account's token or scopes were revoked, which fails every page at once. On WhatsApp it also means Meta no longer serves the number |
+| `page_access_lost` | Facebook | A Page assigned to the account is no longer available after a reconnect |
+| `number_banned` | WhatsApp | Meta banned the number. Reconnecting is refused until the ban is lifted on appeal |
+| `posts_sync_auth_failed` | Every platform except Pinterest, LinkedIn, WhatsApp, and X | The platform refused SocialAPI's periodic read of the account's posts because the login needs renewing |
+| `youtube_account_suspended` | YouTube | YouTube suspended or closed the account or its channel. Reconnecting does not clear it |
+
+**Emitted for:** the platforms listed in the table.
+
+The event's `reason` can differ from the account's `reconnect_reason`. When a token check finds a revoked Instagram, Facebook, or Threads login, the event says `access_revoked` while `reconnect_reason` holds the specific cause, such as `password_changed`. On WhatsApp, `reconnect_reason` is `whatsapp_number_unavailable` or `whatsapp_number_banned` where the event says `access_revoked` or `number_banned`. Treat `reason` as the event's own value.
+
+### `account.updated`
+
+Fires when something changes on the account. Branch on `change`.
+
+**Emitted for:** every platform for `permissions_reduced`. Google Business Profile for every other `change`.
+
+| `change` | Meaning | Extra fields |
+|---|---|---|
+| `customer_media_added` | A customer added media to the location | `media_id`: the media item's Google resource name |
+| `google_update_pending` | Google has updates to the location waiting for review | None |
+| `voice_of_merchant_changed` | The location's Voice of Merchant status changed | None |
+| `duplicate_location` | Google flagged the location as a duplicate | None |
+| `permissions_reduced` | The account lost [permissions](/guides/permissions) that you did not remove yourself | `permissions`: the list of permissions it lost |
+
+```json
+{
+  "event": "account.updated",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "change": "customer_media_added",
+    "media_id": "accounts/123456789/locations/987654321/media/customers/AF1QipN"
+  }
+}
+```
+
+`permissions_reduced` fires when X refused a media upload because the account's access lacks `media.write`, or when a reconnect granted less than the account had. It does not fire when you remove a permission with `PATCH /v1/accounts/{id}`. Reconnect the account to ask for the permissions again.
+
+```json
+{
+  "event": "account.updated",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "change": "permissions_reduced",
+    "permissions": ["messages.read", "messages.write"]
+  }
+}
+```
+
+### `page.removed`
+
+Fires when a Page of a multi-page account is found removed. SocialAPI deactivates the page, and it stops appearing in page listings. Other pages of the account stay active.
+
+**Emitted for:** Facebook.
+
+```json
+{
+  "event": "page.removed",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "platform_page_id": "102938475610293",
+    "name": "ACME Storefront",
+    "platform": "facebook",
+    "reason": "page_not_found"
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `platform_page_id` | The platform's Page ID |
+| `name` | The Page's name |
+| `reason` | `page_not_found` (SocialAPI found the Page gone during its periodic refresh) or `page_access_lost` (a reconnect no longer has access to the Page) |
+
+## Interaction payload
+
+Comments, direct messages, and mentions share one `data` shape. Fields marked optional are omitted when empty.
+
+| Field | Description |
+|---|---|
+| `id` | The SocialAPI interaction ID, with the `sapi_cmt_`, `sapi_dm_`, or `sapi_mnt_` prefix. See [IDs](/guides/ids) |
+| `platform` | The platform slug |
+| `type` | The interaction type, in the table below |
+| `account_id` | The connected account that received or sent the interaction |
+| `page_id` | Optional. Facebook only: the SocialAPI page ID of the Page that received the event |
+| `author` | Who wrote it: `id`, `name`, `username`, and `avatar_url`, each omitted when the platform gives none |
+| `recipient` | Optional. The other party of a DM event on Instagram, Facebook, and WhatsApp, in the shape of `author` |
+| `content` | `text` (empty for attachment-only messages and referrals) and `media`, a list of `url` and `type` items, omitted when there is none |
+| `metadata` | Platform-specific keys, described per event. `null` when the event has none |
+| `received_at` | When the interaction happened in ISO 8601 UTC. On Instagram comments and on Instagram and Facebook mentions it is the time SocialAPI received the event |
+| `post_id` | Optional. The SocialAPI post ID, when the post was published through SocialAPI |
+| `platform_post_id` | Optional. The platform's ID of the post the interaction belongs to |
+| `permalink` | Optional. Threads replies and mentions, and TikTok mentions: the URL of the reply or mention |
+| `conversation_id` | Optional. The SocialAPI conversation ID of a DM on Instagram, Facebook, WhatsApp, and Telegram |
+| `platform_id` | Optional. The platform's message ID of a DM. Not set on `dm.referral` and on Zalo |
+| `story` | Optional. Instagram only: the story a message replies to, with `id`, `media_url`, and `expires_at` |
+| `reply_to` | Optional. The earlier message a DM replies to, as `{ "platform_id": "..." }` |
+
+| Event | `type` value |
+|---|---|
+| `comment.received` | `comment` |
+| `mention.received` | `mention` |
+| `dm.received` | `dm.received` on Instagram, Facebook, and Zalo. `dm` on WhatsApp and Telegram |
+| `dm.sent`, `dm.referral`, `dm.postback`, `dm.deleted` | The event name |
+
+Match on `event`, not on `type`.
+
+## Use events with Automations
+
+Every inbound Instagram and Facebook event goes both to the webhook endpoints subscribed to it and to your [Automations](/guides/automations). An Automation removes nothing from your webhook stream. A comment or DM that an Automation answers still arrives as `comment.received` or `dm.received`, and if your own handler also replies, the person gets both replies. No webhook event reports an Automation run: read an Automation's Firings instead.
+
+## Related
+
+- [Webhooks](/guides/webhooks): register endpoints, verify signatures, and handle retries.
+- [Direct messages](/guides/direct-messages): send the messages and buttons that produce `dm.sent`, `dm.postback`, and `dm.status.*`.
+- [Comments](/guides/comments): read and answer the comments behind `comment.received`.
+- [Reviews](/guides/reviews): read and reply to the reviews behind `review.received`.
+- [Track post delivery](/guides/delivery): the post statuses and target errors behind the `post.*` events.
+- [Supported platforms](/platforms/overview): the capability matrix for each platform.

@@ -1,0 +1,159 @@
+---
+title: "Bluesky API"
+sidebarTitle: "Overview"
+description: "Connect a Bluesky account with an app password to publish posts, read and reply to comments and mentions, and send direct messages through one API."
+icon: "bluesky"
+---
+
+SocialAPI connects a Bluesky account with an app password. It publishes posts with up to 4 images, reads and answers replies and mentions, hides replies on your posts, and reads and sends direct messages (DMs) when the app password allows it. Bluesky has no consent screen: you create an app password in Bluesky, send it to SocialAPI in one request, and there is no OAuth redirect and no app to register. [Platform apps](/guides/platform-credentials) lists which app connects each platform.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `bluesky` |
+| Auth | App password. No OAuth |
+| Platform API | AT Protocol (Bluesky) |
+| Status | Available on every plan |
+
+## Capabilities
+
+An unsupported call returns `501 resource.not_supported`. Read the `capabilities` object on each comment instead of assuming (`can_reply`, `can_delete`, `can_hide`).
+
+| Feature | Status | Condition |
+|---|---|---|
+| Publish a text post | Yes | Up to 300 characters. See [Bluesky publishing](/platforms/bluesky/publishing) |
+| Publish a post with images | Yes | 1 to 4 images, each at most 2 MB |
+| Publish a video | No | A `media_id` video returns `400 publishing.validation_failed`. A video sent as a `url` is skipped and the post publishes without it |
+| Schedule a post | Yes | `scheduled_at` on the post |
+| First comment on a post | No | `first_comment` is ignored |
+| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
+| Delete a published post | Yes | |
+| List posts | Yes | |
+| List comments and replies | Yes | Replies up to 6 levels below the post, as one flat list with no cursor |
+| Reply to a comment | Yes | |
+| Hide, unhide a comment | Yes | Only replies on a thread you started. At most 300 hidden replies per thread |
+| Delete a comment | Partial | Only your own replies. A reply from another account cannot be deleted: hide it |
+| Like a comment | No | `501 resource.not_supported`. `can_like` is `false` on every comment |
+| Private reply to a comment | No | `501 resource.not_supported`. Bluesky has no comment-to-DM path |
+| Mentions | Yes | Posts that mention the account |
+| Reply to a mention | Yes | |
+| DMs: list, read, send | Partial | Text only. Needs an app password with direct message access: see [Direct messages](#direct-messages) |
+| React to a DM | No | `501 resource.not_supported` |
+| Reviews | No | Bluesky has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
+| Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
+| Platform quota | Yes | `GET /v1/accounts/{id}/limits` returns `write_points_per_hour` and `write_points_per_day`: see [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
+| Webhook events | Partial | No comment or DM events. `mention.received` only when you list mentions. See [Webhook events](#webhook-events) |
+
+The capability matrix for every platform is on [Supported platforms](/platforms/overview).
+
+## Connect an account
+
+A Bluesky account connects in one request: you send its handle and an app password, and SocialAPI returns the connected account.
+
+<Steps>
+  <Step title="Create an app password">
+    Sign in to Bluesky in a browser and open [App passwords](https://bsky.app/settings/app-passwords) in **Settings**. Click **Add app password** and name it, for example `socialapi`. Never send your account password.
+  </Step>
+  <Step title="Allow direct messages (optional)">
+    Tick **Allow access to your direct messages** before you create the password if SocialAPI must read and send DMs. You can set this option only when you create the app password. To add DM access later, create a second app password with the option on and connect again with it.
+  </Step>
+  <Step title="Copy the password">
+    Bluesky shows the app password once, in the form `xxxx-xxxx-xxxx-xxxx`. Copy it.
+  </Step>
+  <Step title="Connect the account">
+    Send the handle as `metadata.identifier` and the password as `metadata.app_password`:
+
+    ```bash
+    curl -X POST https://api.social-api.ai/v1/accounts/connect \
+      -H "Authorization: Bearer $SOCAPI_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "platform": "bluesky",
+        "metadata": {
+          "identifier": "yourhandle.bsky.social",
+          "app_password": "xxxx-xxxx-xxxx-xxxx"
+        }
+      }'
+    ```
+
+    Response (HTTP 201):
+
+    ```json
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "bluesky",
+      "username": "yourhandle.bsky.social",
+      "display_name": "Your Name"
+    }
+    ```
+  </Step>
+</Steps>
+
+`identifier` is the account's handle or its DID. Without `brand_id` in the request, SocialAPI creates a brand for the account. SocialAPI also sends `account.connected` to your webhook endpoints. A custom-domain handle works the same way.
+
+A missing `identifier` or `app_password` returns `400 validation.field_required`, with `meta.field` naming it. A handle Bluesky cannot resolve, or an app password Bluesky rejects, returns `400 validation.field_invalid`.
+
+### Two-factor accounts
+
+When the account has email two-factor authentication on, the first connect request returns `400 platform.bluesky.auth_factor_required` and Bluesky emails a confirmation code. Send the same request again with that code as `metadata.auth_factor_token`.
+
+### Disconnect and revoke
+
+Disconnecting the account (`DELETE /v1/accounts/{account_id}`) deletes the app password from SocialAPI. Bluesky offers no way to revoke an app password from outside, so the password stays valid on Bluesky. To cut off access completely, delete the app password in **Settings** on Bluesky.
+
+## Direct messages
+
+DMs work only with an app password that has direct message access. SocialAPI checks this when you connect. Without it, every DM call returns `403 platform.bluesky.dm_scope_missing`, and posts, comments, and mentions keep working. The fix is a new app password with **Allow access to your direct messages** on, then a new connect request. Reconnecting with the old password does not help.
+
+You list conversations with `GET /v1/inbox/conversations`, read a conversation with `GET /v1/inbox/conversations/{conversation_id}/messages`, and reply with `POST /v1/inbox/conversations/{conversation_id}/messages`. The request fields are on [Direct messages](/guides/direct-messages).
+
+These rules are specific to Bluesky:
+
+- **Text only.** A Bluesky message carries text. SocialAPI sends only the `text` of a send request. It does not send attachments, `buttons`, `quick_replies`, `cards`, or `list_sections`.
+- **No `message_tag`.** Bluesky has no message tags: `message_tag` is ignored.
+
+## Comments and replies
+
+You read the replies to a post with `GET /v1/inbox/comments/{postId}` and answer with the reply endpoints on [Comments](/guides/comments).
+
+- **One flat list.** Bluesky returns a thread as a tree with no cursor. SocialAPI flattens it, the pagination object is always empty, and replies deeper than 6 levels below the post are not returned. A very large thread can be cut off.
+- **Hide, not delete.** Only the author of the original post can hide a reply to it: another account gets `403 platform.bluesky.not_thread_owner`. A thread holds at most 300 hidden replies: the 301st returns `422 platform.bluesky.hidden_replies_full`. A hidden reply is not removed: Bluesky no longer shows it by default.
+- **Delete only your own replies.** `platform.bluesky.not_own_record` is returned when you try to delete a reply from another account.
+- **No likes and no private replies.** `can_like` and `can_private_reply` are `false` on every comment.
+
+## Mentions
+
+`GET /v1/accounts/{account_id}/mentions` returns the posts that mention the account, from Bluesky's mention notifications. It covers the whole account, not one post. You answer a mention with a reply to that post. See [Mentions](/guides/mentions).
+
+## Webhook events
+
+Bluesky sends SocialAPI no notification of its own, so there is no `comment.received` or `dm.received` event: read comments and DMs with the inbox endpoints. Listing mentions with `GET /v1/accounts/{id}/mentions` sends a `mention.received` event for the listed items: see [Mentions you list](/guides/webhook-events#mentions-you-list). Bluesky does emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect the account, `account.disconnected` when SocialAPI flags the account for reconnection, and `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself. See [Webhook events](/guides/webhook-events).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Post text | 300 characters |
+| Images per post | 4 |
+| Image size | 2 MB |
+| Replies read per post | 6 levels deep |
+| Hidden replies per thread | 300 |
+| Writes per account (Bluesky) | 5,000 points per hour and 35,000 per day. A new post or reply costs 3 points, an update 2, a delete 1 |
+| Sign-ins per account (Bluesky) | 30 per 5 minutes |
+| Posts (SocialAPI) | 25 per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+
+When Bluesky's own limit is used up, the call fails with `429 platform.bluesky.rate_limit`. Wait, then retry. `GET /v1/accounts/{id}/limits` returns the 2 write budgets.
+
+## Scopes
+
+Bluesky has no OAuth scopes. An app password gives SocialAPI the access of the account itself, except direct messages, which need the option you tick when you create the password. SocialAPI uses it to publish posts, read and reply to comments and mentions, and read and send DMs. The account supports the `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, and `messages.write` [permissions](/guides/permissions), which SocialAPI alone enforces.
+
+## Related
+
+- [Bluesky publishing](/platforms/bluesky/publishing): text, images, scheduling, and deleting posts
+- [Direct messages](/guides/direct-messages): the request fields for sending DMs
+- [Comments](/guides/comments): reading, replying to, and hiding comments
+- [Platform apps](/guides/platform-credentials): which app connects each platform
+- [Errors](/guides/errors): every Bluesky error code
+- [Supported platforms](/platforms/overview): what each platform supports

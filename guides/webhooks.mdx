@@ -1,15 +1,32 @@
 ---
-title: Webhooks
-description: Receive real-time notifications when interactions arrive on your connected accounts.
+title: "Webhooks"
+description: "Register an HTTPS endpoint, verify each request signature, and handle retries to receive real-time comments, DMs, mentions, reviews, and post events."
 ---
 
-SocialAPI.ai webhooks deliver real-time social media events (new comments, direct messages, and mentions) across every connected network through one signed, retried webhook stream, so you do not poll each platform separately.
+A webhook endpoint is an HTTPS URL on your server. SocialAPI sends it a signed JSON `POST` each time an event you subscribed to occurs: a new comment, direct message (DM), mention, or review, a post changing state, or a connected account changing connection state. Webhooks replace polling each platform for new activity. Managing endpoints costs no credits.
 
-Instead of polling the API, register a webhook endpoint and SocialAPI will POST a signed payload to your server whenever a new comment, DM, review, or mention arrives, or whenever one of your posts changes lifecycle state (scheduled, published, deleted, etc.).
+Each event, its platforms, and its payload are on [Webhook events](/guides/webhook-events). While your SocialAPI account is past due, SocialAPI delivers no events (see [Past-due accounts](/guides/plans#past-due-accounts)).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/webhooks/events` | List the event names you can subscribe to |
+| `POST` | `/v1/webhooks` | Register an endpoint |
+| `GET` | `/v1/webhooks` | List your endpoints |
+| `GET` | `/v1/webhooks/{id}` | Get an endpoint with its delivery counts |
+| `PATCH` | `/v1/webhooks/{id}` | Change the URL, the events, or the active state |
+| `DELETE` | `/v1/webhooks/{id}` | Delete an endpoint |
+| `GET` | `/v1/webhooks/{id}/deliveries` | List an endpoint's deliveries |
+| `GET` | `/v1/webhooks/{id}/deliveries/{did}` | Get one delivery with its payload and attempts |
+| `POST` | `/v1/webhooks/{id}/deliveries/{did}/retry` | Send a delivery again |
+| `POST` | `/v1/webhooks/{id}/test` | Send a test payload to an endpoint |
+
+You can also manage endpoints in the dashboard under **Webhooks**.
 
 ## Register an endpoint
 
-Endpoints can be registered in the dashboard under **Webhooks** → **Add Endpoint**, or via the API:
+Subscribe an endpoint to 3 events:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/webhooks \
@@ -25,7 +42,7 @@ Response (HTTP 201):
 
 ```json
 {
-  "id": "wh_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "id": "3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90",
   "url": "https://app.example.com/webhooks/socapi",
   "events": ["comment.received", "dm.received", "review.received"],
   "secret": "a3f8c2e1b9d4f7a6c5e0b3d2f1a8e7c4b9d6f3a2e5c8b1d4f7a0e3c6b9d2f5a8",
@@ -33,567 +50,454 @@ Response (HTTP 201):
 }
 ```
 
-The `secret` is returned **once**. Store it immediately in your environment. It cannot be retrieved again. You use it to verify incoming signatures.
-
-<Warning>
-  Endpoint URLs must use HTTPS. HTTP URLs are rejected with `400`.
-</Warning>
-
-<Note>
-  The `events` array is required. Sending an empty array or omitting it returns `400 field_invalid`.
-</Note>
-
-<Info>
-  When you create an endpoint, SocialAPI sends a verification ping to your URL. Your server must respond with a `2xx` status code or the endpoint will not be saved. Make sure your server is running and reachable before registering.
-</Info>
-
-<Warning>
-  The verification ping arrives as a `webhook.test` event, signed with the endpoint's new secret. Because the secret is only revealed to you after verification succeeds, your endpoint cannot verify this first signature. Respond `2xx` to requests with `X-SocialAPI-Event: webhook.test` without checking the signature, or registration will fail with `webhook_verification_failed`.
-</Warning>
-
-## Event types
-
-Events are grouped into three categories: **inbox** (incoming interactions), **posts** (post lifecycle transitions), and **accounts** (connection state).
-
-| Event | Category | When it fires |
+| Field | Required | Description |
 |---|---|---|
-| `comment.received` | inbox | A new comment arrives on any connected account |
-| `dm.received` | inbox | A new direct message arrives (may include `metadata.referral` if the DM originated from an ad) |
-| `dm.sent` | inbox | Your account sent a direct message. On Instagram and Facebook this is the echo confirmation from Meta, and fires for every echo the platform delivers, including replies sent from the native app or Meta Business Suite and DMs your [Automations](/guides/automations) send, not only messages sent through the API; on Facebook the echo's `raw_payload` carries `app_id`, which lets you tell the two apart. On WhatsApp it fires when WhatsApp accepts a DM or template message sent through the API and, on a number that stays on the WhatsApp Business app, for each message sent from the phone app (see [WhatsApp](#whatsapp-dm-sent)) |
-| `dm.referral` | inbox | A user clicked an ad or referral link without sending a message. The interaction has empty content and includes `metadata.referral` |
-| `dm.postback` | inbox | A user tapped a quick reply or a `postback` button in a DM (Instagram, Facebook), including a button an [Automation](/guides/automations) sent. The interaction carries the button `payload` and `title` in `metadata` |
-| `dm.deleted` | inbox | A message was unsent by its sender (Instagram). `platform_id` names the removed message, which no longer appears in the conversation. The interaction has empty content |
-| `review.received` | inbox | A new review arrives (Google Business Profile). The payload carries the full review in `data.review`: rating, text, author, and any photos the reviewer attached |
-| `review.updated` | inbox | Something about a review changed (Google Business Profile). The payload's `change` field names what: `reply_approved` (a reply you posted passed moderation and is now public) or `reply_rejected` (it was rejected and will never publish). Branch on `change`, since one event covers every kind of review update. On a rejection, `data.review.reply.policy_violation` carries the reason inline, so you can rewrite and send it again without a follow-up call |
-| `mention.received` | inbox | Your account is @mentioned in a comment or a post caption (`metadata.mention_type` is `comment` or `caption`). Instagram story mentions are delivered as `dm.received` with an attachment of type `story_mention`, not as this event |
-| `dm.status.sent` | inbox | A direct message you sent was accepted by the platform (Instagram, Facebook, WhatsApp) |
-| `dm.status.delivered` | inbox | A direct message you sent was delivered to the recipient (Facebook and WhatsApp; Instagram sends no delivery receipts) |
-| `dm.status.read` | inbox | A direct message you sent was read by the recipient (Instagram, Facebook, WhatsApp) |
-| `dm.status.failed` | inbox | A direct message you sent failed to deliver (WhatsApp only) |
-| `post.scheduled` | posts | A post was created with a future `scheduled_at` and entered the `scheduled` state |
-| `post.published` | posts | A post finished publishing successfully on all targets |
-| `post.partial` | posts | A post published on some targets but failed on others |
-| `post.failed` | posts | A post failed to publish on all targets |
-| `post.updated` | posts | A draft, scheduled, or failed post was edited |
-| `post.deleted` | posts | A post was deleted. The payload includes `was_status` so you know what state the post was in before removal |
-| `post.unpublished` | posts | A published post was removed from one or more platforms (the post row stays unless every target is unpublished) |
-| `post.retried` | posts | A failed or partial post is being retried. A subsequent `post.published`, `post.partial`, or `post.failed` event fires once the retry completes |
-| `account.connected` | accounts | A social account finished connecting. Payload includes username, display name, profile picture, bio, and a public profile link |
-| `account.disconnected` | accounts | A connected account was revoked by the user on the platform side (Meta deauthorize webhook, TikTok deauthorize webhook), or flagged for reconnection because all of its pages were removed or its access was revoked. When the payload includes `reconnect_required: true`, the account still exists but needs to be reconnected |
-| `account.updated` | accounts | Something changed on the account. On Google Business Profile it covers a customer adding media, Google having pending updates to review, a Voice of Merchant status change, and the location being flagged as a duplicate. On every platform, `permissions_reduced` means the account lost [permissions](/guides/permissions) that you did not remove yourself. Branch on the `change` field to tell them apart |
-| `page.removed` | accounts | A page on a multi-page account (for example a Facebook Page) was detected as removed during a periodic refresh and was deactivated. Other pages on the same account are unaffected |
+| `url` | Yes | The URL that receives events. It must use `https` |
+| `events` | Yes | A non-empty array of event names from [Webhook events](/guides/webhook-events) |
 
-You can subscribe to any combination. Fetch the authoritative list with `GET /v1/webhooks/events` and subscribe to everything by passing the full set.
+The `secret` is a 64-character string. It is returned once, in this response. `GET /v1/webhooks/{id}` returns only a hint made of `whsec_...` and the last 4 characters. To replace a lost secret, register a new endpoint and delete the old one.
 
-<Tip>
-  The authoritative list of event types is available at `GET /v1/webhooks/events`. It returns each event's description and category, so dashboard UIs and integrations can render the catalog without hard-coding it.
-</Tip>
+SocialAPI does not call your URL when you register it, so registration succeeds even when the server is not running. Send a test delivery to check the endpoint.
 
-### Post lifecycle payloads
+An invalid request returns `400 validation.field_required` (no `url`), `400 validation.field_invalid` (`url` is not an HTTPS URL, `events` is empty, or an event name is unknown), or `400 validation.body_invalid` (the body is not valid JSON).
 
-Each post lifecycle event carries a small payload with the `post_id` and event-specific fields.
+An endpoint receives events for every connected account and brand of your SocialAPI account. There is no filter by account or brand.
 
-```json
-{
-  "event": "post.scheduled",
-  "data": {
-    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "status": "scheduled",
-    "scheduled_at": "2026-06-01T14:00:00Z",
-    "targets": [
-      { "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "platform": "instagram" },
-      { "account_id": "acc_02HZ9X3Q4R5M6N7P8V2K0W1J", "platform": "facebook" }
-    ]
-  }
-}
-```
+## What SocialAPI sends
 
-```json
-{
-  "event": "post.updated",
-  "data": {
-    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "status": "scheduled",
-    "changed_fields": ["text", "scheduled_at"]
-  }
-}
-```
-
-```json
-{
-  "event": "post.deleted",
-  "data": {
-    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "was_status": "published"
-  }
-}
-```
-
-```json
-{
-  "event": "post.unpublished",
-  "data": {
-    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "unpublished_count": 1
-  }
-}
-```
-
-When `account_id` is `null` on a `post.unpublished` event, the post was unpublished from every target.
-
-```json
-{
-  "event": "post.retried",
-  "data": {
-    "post_id": "post_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "retried_count": 2
-  }
-}
-```
-
-`post.published`, `post.partial`, and `post.failed` share a `{ post_id, status, results }` payload, where `results` is the same per-target outcome array returned by `POST /v1/posts`.
-
-### `account.connected` payload
-
-Fires once per connected account after a successful OAuth exchange or direct connection. Use this to render the connected profile in your UI or kick off post-connect work.
-
-```json
-{
-  "event": "account.connected",
-  "data": {
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "brand_id": "br_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "platform": "instagram",
-    "platform_user_id": "17841405793187218",
-    "username": "acmecorp",
-    "display_name": "ACME Corp",
-    "profile_picture_url": "https://scontent.cdninstagram.com/...",
-    "bio": "Official ACME account",
-    "profile_url": "https://www.instagram.com/acmecorp/",
-    "user_email": "owner@acme.com",
-    "connected_at": "2026-05-25T14:30:00Z"
-  }
-}
-```
-
-`profile_url` is built per platform from `username` (Instagram, Threads, TikTok, X) or `platform_user_id` (Facebook, LinkedIn, YouTube, Google Business Profile). It is empty when neither is available.
-
-### `page.removed` payload
-
-Fires when a single page on a multi-page account (for example a Facebook Page) is detected as removed during a periodic refresh. The page is deactivated and stops appearing in page listings. Other pages on the same account stay active.
-
-```json
-{
-  "event": "page.removed",
-  "data": {
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "platform_page_id": "102938475610293",
-    "name": "ACME Storefront",
-    "platform": "facebook",
-    "reason": "page_not_found"
-  }
-}
-```
-
-### `account.updated` lost permissions payload
-
-Fires when an account loses a [permission](/guides/permissions) that you did not remove yourself, for example when the person who connected it withdraws access on the platform. `change` is `permissions_reduced` and `permissions` lists the permissions the account lost. It does not fire when you remove a permission with `PATCH /v1/accounts/{id}`. Reconnect the account to ask for the permissions again.
-
-```json
-{
-  "event": "account.updated",
-  "data": {
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "change": "permissions_reduced",
-    "permissions": ["messages.read", "messages.write"]
-  }
-}
-```
-
-### `account.disconnected` payload
-
-Fires in two cases. A platform-side revocation (the user removes the app) carries no `reconnect_required` flag and the account is deleted. A reconnection prompt carries `reconnect_required: true`: the account row still exists but its status is set so that calls signal it needs reconnecting. The `reason` is `all_pages_removed` (the last remaining page was removed), `access_revoked` (the account token or permissions were revoked, which fails every page at once), or `number_banned` (WhatsApp only: Meta banned the number, and reconnecting is refused until the ban is lifted on appeal).
-
-```json
-{
-  "event": "account.disconnected",
-  "data": {
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "platform": "facebook",
-    "reason": "all_pages_removed",
-    "reconnect_required": true
-  }
-}
-```
-
-## Payload format
-
-Every webhook POST has a JSON body with an `event` field and a `data` field containing the full interaction object:
-
-```json
-{
-  "event": "comment.received",
-  "data": {
-    "id": "sapi_cmt_aW5zdGFncmFtOjE3ODQxNDA1",
-    "type": "comment",
-    "platform": "instagram",
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "author": {
-      "id": "10215054824",
-      "name": "Jane Smith",
-      "avatar_url": "https://example.com/avatar.jpg"
-    },
-    "content": {
-      "text": "Love this product!",
-      "media": []
-    },
-    "received_at": "2026-03-01T14:30:00Z",
-    "metadata": {}
-  }
-}
-```
-
-The `data` object is the same `Interaction` shape returned by `GET /accounts/{id}/comments` (and the equivalent DM and mention endpoints). Google review events are the exception: see [Review event payloads](#review-event-payloads). The `id` field is a stable SocialAPI interaction ID - see [Interaction IDs](/guides/interaction-ids).
-
-### Matching a DM event to a stored message
-
-`dm.received`, `dm.sent`, `dm.postback` and `dm.deleted` carry a `platform_id` field on `data`: the platform's own message ID, byte-identical to the `platform_id` of the matching row from `GET /v1/inbox/conversations/{id}/messages`. Join on that field when you need to line a delivered event up against the stored conversation.
-
-Do not try to match on `id`. The `id` on a webhook is a SocialAPI interaction ID, while the `id` returned by the messages endpoint is that message's own record ID, so the two are different values by design and will never be equal. `platform_id` is the field the two sides share.
-
-`dm.referral` has no `platform_id`, because a referral with no message attached has no platform message ID to report.
-
-For platform-originated events, the body also includes a top-level `raw_payload` field alongside `data`: the verbatim per-event webhook fragment as the platform sent it to us. Use it when you need a platform detail the normalized `data` object does not carry (for example, `app_id` on Facebook message echoes to distinguish API-sent messages from replies typed in the Page inbox). The shape of `raw_payload` is defined by the platform and can change with platform API versions, so prefer `data` whenever it has what you need.
-
-### `dm.sent` on WhatsApp [#whatsapp-dm-sent]
-
-WhatsApp has no message echo, so `dm.sent` is raised when WhatsApp accepts the message rather than when a copy comes back. The payload is the same full interaction object the other platforms send: `author` is the sending phone number ID, `recipient` is the contact's `wa_id`, `content` and `conversation_id` describe the message you sent, and `received_at` is WhatsApp's own send timestamp. It covers both `POST /v1/inbox/conversations/{id}/messages` and the `send-template` endpoint.
-
-Two differences from Instagram and Facebook are worth designing around. It reports only messages sent through the API, since a message WhatsApp never accepted from us produces no receipt. The exception is a number that stays on the WhatsApp Business app, where a message sent from the phone app raises `dm.sent` too, with the same payload (see [Keep using the WhatsApp Business app](/connectors/whatsapp#keep-using-the-whatsapp-business-app)). And it fires once per message, on the transition to `sent`, so a redelivered webhook does not repeat it and the later `delivered` and `read` receipts do not either. `dm.status.sent` still fires alongside it and is unchanged, so an integration built on the receipts keeps working as-is.
-
-The `dm.status.*` events use a smaller payload instead of the full interaction object. On Instagram and Facebook, `data` contains `status`, `mids` (the platform message IDs the receipt covers), and `recipient_id`. On WhatsApp, `data` contains `status`, `recipient_id`, `message_id` (the WhatsApp `wamid`), and `id`: the same SocialAPI message ID returned by `POST /v1/inbox/conversations/{id}/messages` and by the `send-template` endpoint's `message_id`, so you can match a receipt to the row you stored without guessing by recency when several messages are in flight.
-
-### Review event payloads
-
-Google Business Profile review events do not follow the full-interaction shape above. Google's notification carries only a resource name, never the review's content, so `data` holds the identifiers plus a `review` object we read for you:
-
-```json
-{
-  "event": "review.received",
-  "data": {
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "review_id": "sapi_rev_Z29vZ2xlOmFjY291bnRz",
-    "change": "new_review",
-    "review": {
-      "id": "sapi_rev_Z29vZ2xlOmFjY291bnRz",
-      "rating": 4,
-      "text": "Friendly staff, quick service.",
-      "author": { "name": "Jane Smith", "avatar_url": "https://lh3.googleusercontent.com/a/abc" },
-      "reply": null,
-      "created_at": "2026-08-31T14:30:00Z",
-      "updated_at": "2026-08-31T14:30:00Z"
-    }
-  }
-}
-```
-
-The `review` object is the same shape as an item in `GET /v1/inbox/reviews/{account_id}`, so one parser handles both. On `review.updated` with `change: "reply_rejected"`, `review.reply.policy_violation` explains why the reply was refused.
-
-<Note>
-  `review` is best-effort and can be absent. It is read while the notification is handled, so a review deleted in between, or an account whose access has since been revoked, leaves nothing to send. The event is still delivered with `account_id`, `review_id`, and `change`, so treat `review` as optional and fall back to `GET /v1/inbox/reviews/{account_id}` when it is missing.
-</Note>
-
-### Post permalink
-
-Instagram `comment.received` events include a `permalink` field inside `data`: the public URL of the post the comment was left on. It is resolved while the webhook is being handled, so the first comment on a newly published post normally carries the link too.
-
-The field is best-effort. If the post cannot be fetched (it was deleted, or the fetch times out), the event is still delivered with `permalink` omitted. Other platforms do not set it: on Facebook, comment webhooks carry no permalink, and a post's URL must be read from the posts API.
-
-### Fields that are not always present
-
-`platform_post_id` is not sent on every comment event. Instagram, Facebook and Threads comments include it; Threads replies also carry the id of the post or reply they answer as `parent_id` inside `metadata`. Treat the field as optional.
-
-On `comment.received`, `raw_payload` is the verbatim Meta event for that one comment, never the whole request: the single object from the `changes` array on Instagram and Facebook, and the `values` object on Threads, which sends one event per request. It sits at the top level of the body, alongside `data` rather than inside it.
-
-### Replies
-
-On Telegram, Instagram and Facebook, a `dm.received` for a message that replies to an earlier one carries `data.reply_to` (on Instagram and Facebook, so does `dm.sent`), the same value as `reply_to` on that message's row in `GET /v1/inbox/conversations/{id}/messages`:
-
-```json
-"reply_to": { "platform_id": "20" }
-```
-
-`platform_id` is the replied-to message's `platform_id`. The field is absent when the message is not a reply.
-
-### Referral metadata
-
-When a DM originates from an ad click (Instagram CTD or Facebook CTM ads), the interaction includes referral context in `metadata.referral`:
-
-```json
-{
-  "event": "dm.received",
-  "data": {
-    "id": "sapi_dm_aW5zdGFncmFtOm1pZC5yZWYx",
-    "type": "dm",
-    "platform": "instagram",
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
-    "author": { "id": "17846744073097661" },
-    "content": { "text": "I saw your ad!" },
-    "received_at": "2026-03-01T14:30:00Z",
-    "metadata": {
-      "referral": {
-        "ad_id": "120210572164750432",
-        "source": "ADS",
-        "type": "OPEN_THREAD",
-        "ads_context_data": {
-          "ad_title": "Spring Sale 25% Off",
-          "photo_url": "https://scontent.xx.fbcdn.net/..."
-        }
-      }
-    }
-  }
-}
-```
-
-Only non-empty referral fields are included. `dm.referral` events (standalone ad clicks without a message) have empty `content.text` and always include `metadata.referral`.
-
-### Postback metadata
-
-When a user taps a quick reply or a `postback` button you sent (see [interactive messages](/guides/inbox#interactive-messages)), you receive a `dm.postback` event. The `payload` you defined and the tapped button's `title` are carried in `metadata`:
-
-```json
-{
-  "event": "dm.postback",
-  "data": {
-    "id": "sapi_dm_aW5zdGFncmFtOm1pZC5wYjE",
-    "type": "dm",
-    "platform": "instagram",
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "author": { "id": "17846744073097661" },
-    "content": { "text": "" },
-    "received_at": "2026-03-01T14:31:00Z",
-    "metadata": {
-      "title": "Track my order",
-      "payload": "TRACK_ORDER"
-    }
-  }
-}
-```
-
-When the tap arrives through an ig.me link or icebreaker, `metadata.referral` is also included. URL buttons (`type: url`) open the link in the in-app browser and do not generate a webhook.
-
-Taps on the buttons an [Automation](/guides/automations) sends arrive as `dm.postback` too. Their `metadata.payload` is an opaque signed value that starts with `sa1.`, and the Automation answers the tap itself, so skip those payloads in your handler. Do not start the payloads of your own buttons with `sa1.`.
-
-### Events and Automations
-
-Every inbound Instagram and Facebook event goes both to the webhook endpoints subscribed to it and to your [Automations](/guides/automations), so configuring an Automation removes nothing from your webhook stream. A comment or DM an Automation answers is still delivered as `comment.received` or `dm.received`, and if your own handler also replies to it, the person gets both replies. A DM the Automation sends arrives as the same `dm.sent` echo as a DM you send through the API, with nothing that tells the two apart. There are no webhook events for Automation runs: read an Automation's [Firings](/guides/automations#firings) to see what it did.
-
-## Request headers
-
-Every webhook request includes:
+Every delivery is a `POST` with a JSON body that holds an `event` name and a `data` value: an object, except an array on a `mention.received` event sent when you list mentions (see the [event envelope](/guides/webhook-events#event-envelope)). These headers are on every request:
 
 | Header | Value |
 |---|---|
 | `Content-Type` | `application/json` |
-| `X-SocialAPI-Signature` | `sha256=<hmac-sha256-hex>` of the raw body (v1, kept for backward compatibility) |
-| `X-SocialAPI-Signature-V2` | `sha256=<hmac-sha256-hex>` of `<timestamp>.<raw body>`, for replay protection |
-| `X-SocialAPI-Timestamp` | Unix timestamp (seconds) of when the delivery attempt was sent |
-| `X-SocialAPI-Delivery` | Unique delivery ID, stable across retries of the same delivery. Use it for idempotency |
-| `X-SocialAPI-Event` | The event type, e.g. `comment.received` |
+| `X-SocialAPI-Event` | The event name, for example `comment.received` |
+| `X-SocialAPI-Timestamp` | Unix time in seconds when SocialAPI sent this attempt |
+| `X-SocialAPI-Signature-V2` | `sha256=` followed by the hex HMAC-SHA256 of `<timestamp>.<raw body>`. Use this one |
+| `X-SocialAPI-Signature` | `sha256=` followed by the hex HMAC-SHA256 of the raw body alone. It has no freshness check |
+| `X-SocialAPI-Delivery` | The delivery's ID. It is the same on every retry of the delivery. A test delivery has none |
 
-<Note>
-  `X-SocialAPI-Delivery` is present on real event deliveries. Verification pings and test deliveries carry the signature, timestamp, and event headers but no delivery ID.
-</Note>
+## Verify signatures
 
-## Verifying signatures
+Verify `X-SocialAPI-Signature-V2` on every request before you act on it. The signature proves the request came from SocialAPI and that nobody changed the body. Follow these rules:
 
-Always verify the `X-SocialAPI-Signature` header before processing a webhook. This confirms the payload came from SocialAPI and was not tampered with.
+1. Read the raw request body. Do not parse it and serialize it again, because that changes the bytes.
+2. Use the endpoint `secret` exactly as returned, as the key. Do not decode it from hex.
+3. Compute the HMAC-SHA256 of the timestamp header value, a literal `.`, and the raw body. Prefix the hex digest with `sha256=`.
+4. Compare it with `X-SocialAPI-Signature-V2` in constant time.
+5. Reject the request when the timestamp is more than 5 minutes from your clock (see [Replay protection](#replay-protection)).
 
-The signature is HMAC-SHA256 of the raw request body, using your endpoint secret as the key, prefixed with `sha256=`.
+<CodeGroup>
 
-<Tabs>
-  <Tab title="Node.js">
-```javascript
-import crypto from "crypto";
+```javascript Node.js
+import crypto from "node:crypto";
+import express from "express";
 
-function verifySignature(secret, rawBody, signatureHeader) {
-  const expected = "sha256=" + crypto
-    .createHmac("sha256", secret)
-    .update(rawBody)
-    .digest("hex");
-  return crypto.timingSafeEqual(
-    Buffer.from(expected),
-    Buffer.from(signatureHeader)
-  );
+const app = express();
+
+function verify(secret, rawBody, headers, toleranceSeconds = 300) {
+  const timestamp = headers["x-socialapi-timestamp"];
+  const received = headers["x-socialapi-signature-v2"];
+  if (!timestamp || !received) return false;
+
+  const age = Math.abs(Date.now() / 1000 - Number(timestamp));
+  if (!Number.isFinite(age) || age > toleranceSeconds) return false;
+
+  const expected =
+    "sha256=" +
+    crypto
+      .createHmac("sha256", secret)
+      .update(`${timestamp}.`)
+      .update(rawBody)
+      .digest("hex");
+  const a = Buffer.from(expected);
+  const b = Buffer.from(received);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-// Express example
 app.post("/webhooks/socapi", express.raw({ type: "application/json" }), (req, res) => {
-  const sig = req.headers["x-socialapi-signature"];
-  if (!verifySignature(process.env.SOCAPI_WEBHOOK_SECRET, req.body, sig)) {
-    return res.status(401).send("Invalid signature");
+  if (!verify(process.env.SOCAPI_WEBHOOK_SECRET, req.body, req.headers)) {
+    return res.sendStatus(401);
   }
-  const event = JSON.parse(req.body);
-  // handle event.event and event.data
+  const payload = JSON.parse(req.body.toString("utf8"));
+  // Store payload, then process it after you respond.
   res.sendStatus(200);
 });
 ```
-  </Tab>
-  <Tab title="Python">
-```python
-import hmac
+
+```python Python
 import hashlib
+import hmac
+import os
+import time
 
-def verify_signature(secret: str, raw_body: bytes, signature_header: str) -> bool:
+from flask import Flask, abort, request
+
+app = Flask(__name__)
+
+
+def verify(secret: str, raw_body: bytes, headers, tolerance_seconds: int = 300) -> bool:
+    timestamp = headers.get("X-SocialAPI-Timestamp", "")
+    received = headers.get("X-SocialAPI-Signature-V2", "")
+    try:
+        age = abs(time.time() - int(timestamp))
+    except ValueError:
+        return False
+    if age > tolerance_seconds:
+        return False
+
     expected = "sha256=" + hmac.new(
-        secret.encode(), raw_body, hashlib.sha256
+        secret.encode(), timestamp.encode() + b"." + raw_body, hashlib.sha256
     ).hexdigest()
-    return hmac.compare_digest(expected, signature_header)
+    return hmac.compare_digest(expected, received)
 
-# Flask example
-@app.route("/webhooks/socapi", methods=["POST"])
+
+@app.post("/webhooks/socapi")
 def webhook():
-    sig = request.headers.get("X-SocialAPI-Signature", "")
-    if not verify_signature(os.environ["SOCAPI_WEBHOOK_SECRET"], request.data, sig):
+    if not verify(os.environ["SOCAPI_WEBHOOK_SECRET"], request.get_data(), request.headers):
         abort(401)
-    event = request.json
-    # handle event["event"] and event["data"]
+    payload = request.get_json()
+    # Store payload, then process it after you respond.
     return "", 200
 ```
-  </Tab>
-  <Tab title="Go">
-```go
-func verifySignature(secret string, body []byte, sigHeader string) bool {
-    mac := hmac.New(sha256.New, []byte(secret))
-    mac.Write(body)
-    expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
-    return hmac.Equal([]byte(expected), []byte(sigHeader))
+
+```go Go
+package main
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
+	"math"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
+)
+
+func verify(secret string, rawBody []byte, h http.Header) bool {
+	timestamp := h.Get("X-SocialAPI-Timestamp")
+	received := h.Get("X-SocialAPI-Signature-V2")
+	sent, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil || math.Abs(float64(time.Now().Unix()-sent)) > 300 {
+		return false
+	}
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(timestamp + "."))
+	mac.Write(rawBody)
+	expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(expected), []byte(received))
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil || !verify(os.Getenv("SOCAPI_WEBHOOK_SECRET"), body, r.Header) {
+		http.Error(w, "invalid signature", http.StatusUnauthorized)
+		return
+	}
+	// Store body, then process it after you respond.
+	w.WriteHeader(http.StatusOK)
+}
+
+func main() {
+	http.HandleFunc("/webhooks/socapi", handler)
+	http.ListenAndServe(":8080", nil)
 }
 ```
-  </Tab>
-</Tabs>
 
-<Note>
-  Use a constant-time comparison (`timingSafeEqual` / `compare_digest` / `hmac.Equal`) to prevent timing attacks. A simple string equality check is not safe.
-</Note>
+```php PHP
+<?php
+function verify(string $secret, string $rawBody, array $headers, int $tolerance = 300): bool {
+    $timestamp = $headers['X-SocialAPI-Timestamp'] ?? '';
+    $received = $headers['X-SocialAPI-Signature-V2'] ?? '';
+    if (!ctype_digit($timestamp) || abs(time() - (int) $timestamp) > $tolerance) {
+        return false;
+    }
+    $expected = 'sha256=' . hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret);
+    return hash_equals($expected, $received);
+}
+
+$rawBody = file_get_contents('php://input');
+if (!verify(getenv('SOCAPI_WEBHOOK_SECRET'), $rawBody, getallheaders())) {
+    http_response_code(401);
+    exit;
+}
+$payload = json_decode($rawBody, true);
+// Store $payload, then process it after you respond.
+http_response_code(200);
+```
+
+</CodeGroup>
+
+Use a constant-time comparison (`timingSafeEqual`, `compare_digest`, `hmac.Equal`, `hash_equals`). A plain string comparison leaks timing information.
+
+`X-SocialAPI-Signature` (v1) is the HMAC-SHA256 of the raw body alone, prefixed with `sha256=`. It is kept for existing integrations. It proves authenticity but not freshness, so a captured request still verifies later.
 
 ## Replay protection
 
-The v1 signature proves authenticity but not freshness: a captured request could be replayed later and would still verify. To bound replay, use the v2 scheme:
+`X-SocialAPI-Signature-V2` covers the timestamp, so an attacker cannot move a captured request into a later time window by editing the header. Reject any request whose `X-SocialAPI-Timestamp` is more than 5 minutes from your clock. The timestamp is the time of the attempt, so a retry of an old event carries a new timestamp and passes the check.
 
-1. Read `X-SocialAPI-Timestamp` and reject the request if it is older than your tolerance window (5 minutes is a sensible default).
-2. Compute HMAC-SHA256 over the string `<timestamp>.<raw body>` (the timestamp header value, a literal dot, then the raw request body) with your endpoint secret, prefix with `sha256=`, and compare it to `X-SocialAPI-Signature-V2` in constant time.
+To process each event once, store the `X-SocialAPI-Delivery` IDs you handled and skip repeats. A manual retry (`POST .../retry`) creates a new delivery with a new ID, so also deduplicate on the event's own identity: `data.id` for comment and DM events, `data.id` or each `data[].id` for `mention.received`, and `data.post_id` with the event name for post events.
 
-Because the timestamp is inside the signed message, an attacker cannot extend the window by editing the header.
+## Respond to a webhook
 
-```javascript
-function verifySignatureV2(secret, rawBody, timestampHeader, signatureHeader, toleranceSec = 300) {
-  const age = Math.abs(Date.now() / 1000 - Number(timestampHeader));
-  if (!Number.isFinite(age) || age > toleranceSec) return false;
-  const expected = "sha256=" + crypto
-    .createHmac("sha256", secret)
-    .update(timestampHeader + "." + rawBody)
-    .digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
-}
-```
+Your endpoint must return an HTTP `2xx` status within 10 seconds. Any other status, a timeout, or a connection error counts as a failed attempt. Return `200` once you have stored the body, and do the real work afterward.
 
-For exact once-only processing, additionally record `X-SocialAPI-Delivery` IDs you have already handled and skip duplicates. The ID is stable across retries of the same delivery, so this also deduplicates legitimate retries after a timeout.
+SocialAPI delivers each event at least once. The same event can arrive more than once, and events can arrive in a different order than they happened. Make your handler idempotent, and read the current state from the API when order matters.
 
-<Note>
-  The timestamp reflects the current delivery attempt, so a retry of an old event carries a fresh timestamp and still passes the window check. Use the delivery ID for deduplication; use the timestamp to reject replays of captured requests.
-</Note>
+While an endpoint's `is_active` is `false`, SocialAPI sends it nothing. It does not send those events later when you turn the endpoint on again. To recover what you missed, read `GET /v1/events` (within your plan's event history) or the inbox and post endpoints.
 
-## Responding to webhooks
+## Retries
 
-Your endpoint must return an HTTP `2xx` status within **10 seconds**. The webhook HTTP client enforces a 10-second timeout per delivery attempt. Any non-2xx response or a timeout is treated as a delivery failure.
+A failed attempt is retried until the delivery has used 5 attempts. The wait before each retry grows:
 
-Return `200` immediately and process the event asynchronously if your handler does heavier work.
-
-## Retry behavior
-
-Failed deliveries are automatically retried up to **5 attempts** with exponential backoff:
-
-| Attempt | Delay |
+| Attempt | Sent |
 |---|---|
-| 1 | Immediate |
-| 2 | ~30 seconds |
-| 3 | ~5 minutes |
-| 4 | ~30 minutes |
-| 5 | ~3 hours |
+| 1 | When the event occurs |
+| 2 | About 1 second after attempt 1 fails |
+| 3 | About 16 seconds after attempt 2 fails |
+| 4 | About 81 seconds after attempt 3 fails |
+| 5 | About 256 seconds after attempt 4 fails |
 
-After 5 failed attempts, the delivery is marked `failed` and no further retries occur.
+Each wait varies by up to 10 percent either way. After the fifth failed attempt, about 6 minutes after the first, the delivery's `status` becomes `failed` and SocialAPI makes no further attempts. Send a failed delivery again yourself with `POST /v1/webhooks/{id}/deliveries/{did}/retry`.
 
-## Past-due accounts
+When an attempt ends in a connection error, a `429`, or a `5xx` other than `501`, SocialAPI sends the same request one more time within the same attempt. Your endpoint can therefore receive the same delivery twice, seconds apart. Both requests carry the same `X-SocialAPI-Delivery`.
 
-Outbound delivery stops entirely while a subscription is past due. Events that
-occur during the block are dropped: no delivery is attempted, no delivery record
-is created, and nothing is replayed once the invoice is paid.
+## Manage endpoints
 
-Ingestion continues throughout, so the underlying comments, messages, and other
-events are still recorded. Query `GET /v1/events` after access is restored to see
-what happened during the gap.
-
-See [`billing.past_due`](/guides/errors#past-due-accounts) for the full behavior.
-
-## Managing endpoints
-
-### List endpoints
+List your endpoints:
 
 ```bash
 curl https://api.social-api.ai/v1/webhooks \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-### Get endpoint details
+Response (HTTP 200):
 
-Retrieve a single endpoint with delivery statistics (delivered/failed counts for the last 24 hours and 7 days). The secret is shown as a hint (last 4 characters only).
-
-```bash
-curl https://api.social-api.ai/v1/webhooks/{id} \
-  -H "Authorization: Bearer $SOCAPI_KEY"
+```json
+{
+  "data": [
+    {
+      "id": "3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90",
+      "url": "https://app.example.com/webhooks/socapi",
+      "events": ["comment.received", "dm.received", "review.received"],
+      "is_active": true,
+      "created_at": "2026-10-13T09:00:00Z"
+    }
+  ],
+  "count": 1
+}
 ```
 
-### Update an endpoint
+`GET /v1/webhooks/{id}` returns the same fields plus `secret_hint` and delivery counts:
 
-Change the URL, subscribed events, or toggle delivery on/off. All fields are optional; provide at least one.
+```json
+{
+  "id": "3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90",
+  "url": "https://app.example.com/webhooks/socapi",
+  "events": ["comment.received", "dm.received", "review.received"],
+  "is_active": true,
+  "secret_hint": "whsec_...f5a8",
+  "created_at": "2026-10-13T09:00:00Z",
+  "stats": {
+    "last_24h": { "delivered": 142, "failed": 3 },
+    "last_7d": { "delivered": 980, "failed": 11 }
+  }
+}
+```
+
+Change an endpoint with `PATCH`. Send at least 1 of `url`, `events`, and `is_active`. `events` replaces the whole list. The `url` and `events` rules are the same as at registration, and a body with no fields returns `400 validation.body_invalid`.
 
 ```bash
-curl -X PATCH https://api.social-api.ai/v1/webhooks/{id} \
+curl -X PATCH https://api.social-api.ai/v1/webhooks/3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90 \
   -H "Authorization: Bearer $SOCAPI_KEY" \
   -H "Content-Type: application/json" \
   -d '{"is_active": false}'
 ```
 
-### Delete an endpoint
+The response (HTTP 200) is the updated endpoint, in the shape of the list items.
+
+Delete an endpoint:
 
 ```bash
-curl -X DELETE https://api.social-api.ai/v1/webhooks/{id} \
+curl -X DELETE https://api.social-api.ai/v1/webhooks/3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90 \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Deleting an endpoint stops all future deliveries immediately. In-flight jobs already queued may still attempt delivery once.
+Response (HTTP 200):
 
-## Delivery monitoring
+```json
+{ "ok": true }
+```
 
-Every webhook delivery is recorded with its status, HTTP response code, and duration. You can inspect delivery history, view individual attempts, send test payloads, and retry failed deliveries.
+Deleting stops future deliveries. A delivery already in progress can still reach your URL once. An unknown endpoint ID returns `404 resource.not_found`.
 
-| Endpoint | Description |
+## Monitor deliveries
+
+SocialAPI records every delivery with its status, the HTTP status of your response, and how long your endpoint took. A delivery's `status` is `pending` (not finished), `delivered` (your endpoint returned `2xx`), or `failed` (5 attempts used).
+
+```bash
+curl "https://api.social-api.ai/v1/webhooks/3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90/deliveries?status=failed&limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "b1d4e7a2-6c3f-4a90-8e15-2f7c9d0a3b68",
+      "event_type": "comment.received",
+      "status": "failed",
+      "response_status_code": 500,
+      "response_duration_ms": 412,
+      "attempt_count": 5,
+      "description": "Instagram comment received",
+      "created_at": "2026-10-13T14:30:00Z"
+    }
+  ],
+  "next_cursor": "2026-10-13T14:12:00Z",
+  "count": 1
+}
+```
+
+| Parameter | Description |
 |---|---|
-| `GET /v1/webhooks/{id}/deliveries` | List deliveries (filterable by `status` and `event_type`, cursor-paginated) |
-| `GET /v1/webhooks/{id}/deliveries/{did}` | Full delivery detail including payload and all retry attempts |
-| `POST /v1/webhooks/{id}/deliveries/{did}/retry` | Re-enqueue a failed delivery |
-| `POST /v1/webhooks/{id}/test` | Send a test payload to verify your endpoint is working |
+| `status` | Filter by `pending`, `delivered`, or `failed` |
+| `event_type` | Filter by event name |
+| `limit` | Page size from 1 to 100. The default is 50. A value outside the range uses 50 |
+| `cursor` | The `next_cursor` of the previous page. See [Pagination](/guides/pagination) |
 
-See the [API Reference](/api-reference) for full request and response schemas.
+`count` is the number of deliveries that match the filters across all pages. `next_cursor` is absent on the last page. Deliveries are sorted newest first.
 
-## Security best practices
+`GET /v1/webhooks/{id}/deliveries/{did}` returns the delivery with the exact `payload` that was sent and every attempt:
 
-- **Always verify signatures** - never trust a webhook payload without checking `X-SocialAPI-Signature` (or, preferably, `X-SocialAPI-Signature-V2`)
-- **Bound replay** - prefer the v2 signature with a timestamp tolerance window (see [Replay protection](#replay-protection))
-- **Store your secret in an environment variable** - never hardcode it or commit it to source control
-- **Use HTTPS** - HTTP endpoints are rejected at registration time
-- **Respond quickly** - return `200` before doing heavy processing to avoid timeouts and spurious retries
-- **Make handlers idempotent** - retries mean the same event may arrive more than once; use `X-SocialAPI-Delivery` (stable across retries) or the interaction `id` to deduplicate
+```json
+{
+  "id": "b1d4e7a2-6c3f-4a90-8e15-2f7c9d0a3b68",
+  "endpoint_id": "3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90",
+  "event_type": "comment.received",
+  "status": "failed",
+  "response_status_code": 500,
+  "response_duration_ms": 412,
+  "attempt_count": 5,
+  "description": "Instagram comment received",
+  "payload": { "event": "comment.received", "data": { "id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I" } },
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status_code": 500,
+      "response_body": "Internal Server Error",
+      "duration_ms": 412,
+      "created_at": "2026-10-13T14:30:01Z"
+    }
+  ],
+  "created_at": "2026-10-13T14:30:00Z"
+}
+```
+
+Each attempt holds the first 10,240 bytes of your response body. An attempt that ended in a connection error has an `error_message` in place of a response. The example `payload` is shortened. The real one is the full body that was sent.
+
+`POST /v1/webhooks/{id}/deliveries/{did}/retry` creates a new delivery with the same event and payload and the description `Retry of {did}`. It returns the new delivery with `status` `pending`. The new delivery gets 5 attempts of its own. The original delivery is unchanged.
+
+SocialAPI keeps deliveries for the number of days your plan allows (see [History and export allowances](/guides/plans#history-and-export-allowances)).
+
+## Test an endpoint
+
+`POST /v1/webhooks/{id}/test` sends one request to the endpoint and returns the result. You choose the event name and the body:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/webhooks/3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90/test \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_type": "comment.received",
+    "payload": { "event": "comment.received", "data": { "text": "Test comment" } }
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "delivery_id": "c8a2f5d1-9e47-4b63-a1d0-7e3b5c2f8a94",
+  "status": "delivered",
+  "response_status_code": 200,
+  "response_body": "ok",
+  "response_duration_ms": 87
+}
+```
+
+SocialAPI sends `payload` exactly as you give it, as the request body. It does not wrap it. The request carries the signature headers and `X-SocialAPI-Event` set to `event_type`, but no `X-SocialAPI-Delivery`. `status` is `delivered` for a `2xx` response and `failed` otherwise, and `response_status_code` is `0` when the connection failed. SocialAPI does not retry a failed test. The delivery appears in the delivery list with the description `Test delivery`. `event_type` and `payload` are both required (`400 validation.field_required`). `event_type` can be any string, including names that are not subscribable.
+
+## Security
+
+- **Verify every signature** with `X-SocialAPI-Signature-V2` and reject stale timestamps.
+- **Keep the secret out of source control.** Store it in an environment variable or a secret manager.
+- **Use HTTPS only.** SocialAPI rejects any other scheme at registration.
+- **Return `200` fast** and process afterward, to avoid timeouts and duplicate retries.
+- **Make handlers idempotent.** SocialAPI delivers each event at least once.
+- **Rotate by replacement.** There is no rotate call: register a new endpoint, switch your handler to its secret, then delete the old endpoint.
+
+## Platform support
+
+Which platforms emit each event is listed under the event on [Webhook events](/guides/webhook-events). Platforms that push nothing to SocialAPI have no comment, DM, mention, or review events: read those with the inbox endpoints.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Response time per request | 10 seconds |
+| Attempts per delivery | 5 |
+| Response body kept per attempt | 10,240 bytes |
+| Deliveries per list page | 1 to 100, default 50 |
+| Delivery history | Per plan: [History and export allowances](/guides/plans#history-and-export-allowances) |
+| Endpoint URL scheme | `https` only |
+
+## Errors and debugging
+
+When an event does not arrive, check in this order:
+
+1. **Endpoint state.** `GET /v1/webhooks/{id}` must show `is_active: true` and the event name in `events`. An event is delivered only to endpoints subscribed to it when it occurs.
+2. **Past due.** While your SocialAPI account is past due, SocialAPI sends no events and records no deliveries. Calls to the API return `402 billing.past_due`.
+3. **Platform support.** Check **Emitted for** under the event on [Webhook events](/guides/webhook-events). A platform that does not emit the event never sends it.
+4. **Deliveries.** `GET /v1/webhooks/{id}/deliveries?status=failed` lists failures. Read the attempts of one delivery: `status_code` is your endpoint's response, and `error_message` explains a connection error or timeout.
+5. **Signature.** When your handler returns `401` on every request, check that you hash the raw body, key the HMAC with the secret string as returned, and compare against `X-SocialAPI-Signature-V2`.
+6. **Test.** Send `POST /v1/webhooks/{id}/test` to separate your endpoint's behavior from SocialAPI's event delivery.
+
+Other codes on these endpoints: `401 auth.invalid_key` and its siblings for a missing or invalid key, `403 auth.insufficient_scope` when the key lacks `webhooks:manage`, and `404 resource.not_found` for an unknown endpoint or delivery. Every code is in [Errors](/guides/errors).
+
+## Scopes
+
+| Scope | Grants |
+|---|---|
+| `webhooks:manage` | Every endpoint on this page except `GET /v1/webhooks/events` |
+
+A brand-restricted key cannot hold `webhooks:manage`, because endpoints belong to your SocialAPI account and not to one brand. See [Scoped API keys](/guides/scoped-keys).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_webhooks` | List endpoints |
+| `social_api_create_webhook` | Register an endpoint. Returns the secret once |
+| `social_api_update_webhook` | Change the URL, events, or `is_active` |
+| `social_api_delete_webhook` | Delete an endpoint |
+| `social_api_get_webhook` | Get an endpoint with its delivery counts |
+| `social_api_list_webhook_deliveries` | List deliveries, with filters |
+| `social_api_get_webhook_delivery` | Get one delivery with its attempts |
+| `social_api_retry_webhook_delivery` | Send a delivery again |
+| `social_api_test_webhook` | Send a test payload |
+
+See [MCP tools](/integrations/tools) for the full list.
+
+## Related
+
+- [Webhook events](/guides/webhook-events): every event, its platforms, and its payload.
+- [Track post delivery](/guides/delivery): the post statuses and target errors that the `post.*` events report.
+- [Scoped API keys](/guides/scoped-keys): restrict a key to `webhooks:manage` for a webhook-only integration.
+- [Plans and usage](/guides/plans): delivery history length, and what happens while an account is past due.
+- [Errors](/guides/errors): every error code and how to handle it.
+- [Automations](/guides/automations): answer Instagram and Facebook comments and DMs without running a webhook handler.

@@ -1,68 +1,95 @@
 ---
-title: ChatGPT
-description: Connect SocialAPI to ChatGPT on web, desktop, and mobile.
+title: "ChatGPT"
+description: "Connect SocialAPI to ChatGPT on web, desktop, and mobile with a custom connector to manage comments, DMs, and posts in plain language."
 ---
 
-**MCP Server URL:** `https://api.social-api.ai/mcp`
+Connect SocialAPI to ChatGPT and ask it to list your connected accounts, reply to comments, send direct messages (DMs), and publish posts. ChatGPT connects to SocialAPI's MCP server at `https://api.social-api.ai/mcp` and signs in with OAuth 2.1, so you create no API key.
 
-## Web & Desktop
+## Prerequisites
 
-### Prerequisites
+- A SocialAPI account with at least one connected account.
+- A ChatGPT Plus, Pro, Business, Enterprise, or Education plan. Developer mode is not available on the Free plan.
+- A desktop browser at [chatgpt.com](https://chatgpt.com). You can create a connector only on the web. The desktop and mobile apps use a connector you created there.
 
-- A [SocialAPI](https://social-api.ai) account with at least one connected social account
-- A ChatGPT Plus, Pro, Business, Enterprise, or Education account. Developer Mode is not available on the Free plan.
-- A desktop browser at [chatgpt.com](https://chatgpt.com). Connectors can only be created on the web, not from the mobile or desktop apps (see [Mobile](#mobile-ios--android) below for using them afterwards).
+## Set up on web
 
-### 1. Enable Developer Mode
+<Steps>
+  <Step title="Turn on Developer mode">
+    Go to **Settings** → **Security and login** and switch **Developer mode** on. The toggle is not under **Apps & Connectors** → **Advanced settings**.
+  </Step>
+  <Step title="Create the connector">
+    Go to **Settings** → **Connectors** and click **Create**. The **Create** button appears only while Developer mode is on. Fill in:
 
-Go to **Settings → Security and login** and toggle **Developer mode** on.
+    - **Name:** `SocialAPI`
+    - **Description:** `Manage social media accounts, posts, comments, DMs, reviews, and mentions`
+    - **Connector URL:** `https://api.social-api.ai/mcp`
 
-<Warning>
-  OpenAI moved this toggle in July 2026. It used to live under **Settings → Apps & Connectors → Advanced settings**, and older guides (including earlier versions of this page) still point there. If you cannot find it, look under **Security and login**.
-</Warning>
+    ChatGPT tests the connection and lists the available tools.
 
-### 2. Create a connector
+    <img
+      src="/images/mcp-chatgpt-create.png"
+      alt="ChatGPT create connector dialog"
+    />
+  </Step>
+  <Step title="Authorize with your SocialAPI account">
+    The first time you use a SocialAPI tool, a browser window opens on the SocialAPI authorization page. Log in and click **Authorize**. ChatGPT finds the authorization server on its own, so you enter no authentication settings.
 
-Go to **Settings → Connectors** and click **Create**. The **Create** button only appears once Developer Mode is on, so enable it first. Fill in:
+    <img
+      src="/images/mcp-chatgpt-add-server.png"
+      alt="ChatGPT authorization screen for SocialAPI"
+    />
+  </Step>
+  <Step title="Turn the connector on in a conversation">
+    Open a new conversation, click **+** near the message box, select **More**, and switch the SocialAPI connector on. ChatGPT shows connectors as apps in parts of its interface: they are the same thing.
+  </Step>
+</Steps>
 
-- **Name:** `SocialAPI`
-- **Description:** `Manage social media accounts, posts, comments, DMs, reviews, and mentions`
-- **Connector URL:** `https://api.social-api.ai/mcp`
+## Use it on desktop and mobile
 
-ChatGPT will test the connection and display the available tools if successful.
+A connector you created on chatgpt.com is also available in the ChatGPT desktop and mobile apps (iOS and Android). You cannot create a connector in those apps.
 
-<img
-  src="/images/mcp-chatgpt-create.png"
-  alt="ChatGPT create connector dialog"
-/>
+<Steps>
+  <Step title="Create the connector on the web">
+    Follow [Set up on web](#set-up-on-web).
+  </Step>
+  <Step title="Open the app">
+    Open the ChatGPT desktop or mobile app. The connector is already there.
+  </Step>
+  <Step title="Turn the connector on in a conversation">
+    Open the **+** menu and switch the SocialAPI connector on.
+  </Step>
+</Steps>
 
-### 3. Authorize with your account
+## Try it
 
-When you first use a [SocialAPI](https://social-api.ai) tool, ChatGPT initiates an OAuth 2.1 flow with PKCE. A browser window opens to the [SocialAPI](https://social-api.ai) authorization page. Log in and click **Authorize**.
+Ask ChatGPT:
 
-<img
-  src="/images/mcp-chatgpt-add-server.png"
-  alt="ChatGPT OAuth authorization for SocialAPI"
-/>
+```text
+List my connected social accounts
+```
 
-<Note>
-  ChatGPT supports OAuth 2.1 with PKCE and Dynamic Client Registration. It auto-discovers your authorization server via `/.well-known/oauth-protected-resource` - no manual auth configuration is needed.
-</Note>
+ChatGPT calls `social_api_list_accounts` and answers with your connected accounts and their platforms.
 
-### 4. Enable in a conversation
+## Troubleshooting
 
-Open a new conversation, click the **+** button near the message composer, select **More**, and toggle your [SocialAPI](https://social-api.ai) connector on.
+<AccordionGroup>
+  <Accordion title="There is no Developer mode toggle">
+    Developer mode needs a paid ChatGPT plan: Plus, Pro, Business, Enterprise, or Education. On those plans, look under **Settings** → **Security and login**.
+  </Accordion>
+  <Accordion title="There is no Create button under Connectors">
+    **Create** appears only while Developer mode is on. Switch Developer mode on first.
+  </Accordion>
+  <Accordion title="ChatGPT cannot reach the server">
+    Use the URL exactly as shown: `https://api.social-api.ai/mcp`.
+  </Accordion>
+  <Accordion title="Tool calls fail with HTTP 401">
+    The OAuth session expired. Remove the SocialAPI connector and create it again to sign in again.
+  </Accordion>
+</AccordionGroup>
 
-<Tip>
-  As of December 2025, OpenAI renamed "connectors" to "apps" in parts of the UI. The functionality is the same.
-</Tip>
+## Related
 
----
-
-## Mobile (iOS / Android)
-
-Connectors created on ChatGPT web are available on the ChatGPT mobile apps (iOS and Android). You cannot create new connectors from the mobile app - set them up on the web first.
-
-1. Add [SocialAPI](https://social-api.ai) as a connector on [chatgpt.com](https://chatgpt.com) (see [Web & Desktop](#web--desktop) above)
-2. Open the ChatGPT mobile app - the connector is already available
-3. Enable it in a conversation via the **+** menu
+- [SocialAPI MCP server](/integrations/overview): the server URL and the other supported clients.
+- [MCP tools reference](/integrations/tools): every tool ChatGPT can call.
+- [OAuth for MCP clients](/integrations/oauth): how the sign-in works.
+- [Errors](/guides/errors): every error code a tool can return.

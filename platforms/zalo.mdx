@@ -1,0 +1,104 @@
+---
+title: "Zalo API"
+sidebarTitle: "Overview"
+description: "Connect a Zalo Official Account to read and answer direct messages and to publish, schedule, and delete articles through one API, with no Zalo app to register."
+icon: "comment"
+---
+
+SocialAPI connects a Zalo Official Account (OA), the business account on Zalo, Vietnam's messaging app. It reads and answers the direct messages (DMs) that people send to the OA, and it publishes and deletes OA articles. SocialAPI's own Zalo app connects the account, so you register no Zalo app and complete no step in the Zalo developer portal: see [Platform apps](/guides/platform-credentials).
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `zalo` |
+| Auth | OAuth 2.0 with PKCE. An administrator of the Official Account signs in to Zalo and approves |
+| Platform API | Zalo Official Account Open API |
+| Status | Available on every plan |
+
+## Capabilities
+
+An unsupported call returns `501 resource.not_supported`.
+
+| Feature | Status | Condition |
+|---|---|---|
+| Publish an article | Yes | Text only. See [Zalo publishing](/platforms/zalo/publishing) |
+| Publish a video | No | A `url` or `media_id` item on a Zalo target is ignored, and the article publishes with `text` only. A `platform_attachment_id` item fails the target with `422 publishing.media.unsupported_source` |
+| Schedule a post | Yes | `scheduled_at` on the post |
+| First comment on a post | No | `first_comment` is ignored |
+| Update a published article | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published article. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct an article, delete it and publish a new one |
+| Delete a published article | Yes | |
+| List posts | Yes | Articles of type `normal`. See [List posts](/platforms/zalo/publishing#6-retrieve-posts) |
+| DMs: list, read, send | Yes | Sending needs the person to have interacted with the OA within 7 days: see [The 7-day messaging window](#the-7-day-messaging-window) |
+| DM attachments | Partial | A `url` or `media_id` attachment is sent as an image unless its `type` is `gif` or `sticker`. A `platform_attachment_id` attachment with `type: "file"` sends a file |
+| Buttons and a card | Partial | SocialAPI sends `buttons` and the first entry of `cards`. It ignores `quick_replies` and `list_sections` |
+| Quote a message in a DM | Yes | `reply_to_message_id` on the send request. It applies to the first message sent |
+| React to a DM | No | `501 resource.not_supported` |
+| Private reply to a comment | No | Zalo has no comments |
+| Comments | No | Zalo has no public comments API |
+| Mentions | No | Zalo has no public mentions API |
+| Reviews | No | Zalo has no public reviews API |
+| Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
+| Platform quota | No | `GET /v1/accounts/{id}/limits` returns `remain` and `total`: Zalo no longer reports its message quota, so do not rely on them. See [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
+| Webhook events | Partial | `dm.received` for text messages only. See [Webhook events](#webhook-events) |
+
+The capability matrix for every platform is on [Supported platforms](/platforms/overview).
+
+## Connect an account
+
+A Zalo Official Account connects through the shared OAuth flow in [Connect accounts](/guides/connect-accounts): send `platform: "zalo"` to `POST /v1/accounts/connect`, send the administrator to the returned authorization URL, and read the connected account's ID from your redirect.
+
+Each Zalo authorization covers exactly one Official Account. The connected account's `username` is the Official Account's ID and its `display_name` is the OA's name. To connect a second Official Account, run the flow again.
+
+SocialAPI renews Zalo's access tokens (valid for 25 hours) for you. When renewal fails, the first call that fails returns `401 platform.zalo.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. Reconnect with the same `brand_id`.
+
+## The 7-day messaging window
+
+Zalo lets an Official Account send a customer service message only to a person who interacted with the OA within the last 7 days. Messages sent within 48 hours of the person's last interaction are free of Zalo's per-message fee. Messages sent after 48 hours but within 7 days can carry a fee on Zalo's side.
+
+A send outside the window, or to a person who is not eligible (for example, a person who does not follow the OA or who blocked it), fails with `422 platform.zalo.not_deliverable`. SocialAPI does not check the window before it sends: Zalo's refusal is the signal. The person's next message to the OA reopens the window.
+
+## Direct messages
+
+You list conversations with `GET /v1/inbox/conversations`, read a conversation with `GET /v1/inbox/conversations/{conversation_id}/messages`, and reply with `POST /v1/inbox/conversations/{conversation_id}/messages`. The request fields are on [Direct messages](/guides/direct-messages).
+
+These rules are specific to Zalo:
+
+- **Zalo returns 10 at most.** One read returns the 10 most recent conversations or the 10 most recent messages of a conversation.
+- **A conversation is one person.** The conversation's participant ID is the person's Zalo user ID.
+- **Images by URL.** A `url` or `media_id` attachment is sent as an image unless its `type` is `gif` or `sticker`.
+- **One card.** SocialAPI sends the first entry of `cards` as one card and drops the others.
+- **No message ID in the send response.** `message_id` is empty and each entry of `message_ids` is an empty string. Read the message's `platform_id` from `GET /v1/inbox/conversations/{conversation_id}/messages`.
+- **No `message_tag`.** Zalo has no message tags: `message_tag` is ignored.
+- **Cost.** A send costs 1 interaction credit, the same as on every platform: see [Plans and usage](/guides/plans).
+
+## Webhook events
+
+Zalo delivers a person's text message to SocialAPI as it happens, and SocialAPI sends it to your webhook endpoints as `dm.received`. The event carries `author.id` (the person's Zalo user ID) and `content.text`. It has no `conversation_id` and no `platform_id`: read the conversation with `GET /v1/inbox/conversations` to find the message. Images, files, stickers, follows, and read receipts raise no event. The full payload is on [Webhook events](/guides/webhook-events).
+
+Zalo also emits the `post.*` events for articles you publish through SocialAPI, `account.connected` when you connect the account, `account.disconnected` when SocialAPI flags the account for reconnection, and `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Conversations or messages per read | 10 |
+| Articles imported when you connect or sync an account | 20 most recent |
+| Article title | 150 characters |
+| Posts | 25 per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Customer service window | 7 days from the person's last interaction |
+
+Zalo applies its own quotas per app and per Official Account. When one is used up, the call fails with `429 platform.zalo.rate_limit`. Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then retry.
+
+## Scopes
+
+SocialAPI sends no scope list to Zalo. The administrator of the Official Account approves the scopes that Zalo's consent screen lists for SocialAPI's Zalo app. Disconnecting the account from SocialAPI does not revoke that authorization on Zalo: the administrator removes it on Zalo. The account supports the `posts.read`, `posts.write`, `messages.read`, and `messages.write` [permissions](/guides/permissions), which SocialAPI alone enforces.
+
+## Related
+
+- [Zalo publishing](/platforms/zalo/publishing): articles, drafts, and asynchronous creation
+- [Direct messages](/guides/direct-messages): the request fields for sending DMs
+- [Connect accounts](/guides/connect-accounts): brands, reconnecting, and disconnecting
+- [Webhook events](/guides/webhook-events): the `dm.received` payload
+- [Errors](/guides/errors): every Zalo error code
+- [Supported platforms](/platforms/overview): what each platform supports

@@ -1,125 +1,289 @@
 ---
-title: Error Handling
-description: Error response format and the catalog of error codes returned by the API.
+title: Errors
+description: Look up every error code the SocialAPI REST API and MCP server return, with its HTTP status, what triggers it, and how to handle it.
 ---
 
-All errors return JSON with a consistent shape:
+Every failed request to the SocialAPI REST API returns a JSON error with an HTTP status, a stable `error.code`, a human-readable `error.message`, and a `request_id`. Branch on `error.code`, never on `error.message`: messages change, codes do not. This page lists every code a client using an API key or the MCP server can receive.
 
 ```json
 {
   "error": {
-    "code": "namespace.specific_code",
-    "message": "human-readable message",
-    "meta": { "field": "..." }
+    "code": "validation.field_required",
+    "message": "Required field is missing: platform",
+    "meta": { "field": "platform" }
   },
   "request_id": "a1b2c3d4"
 }
 ```
 
-Use `error.code` for programmatic handling; use `error.message` for logging and display. Some errors include an `error.meta` object with structured context (for example `meta.field` for a validation failure, `meta.plan` and `meta.max` for billing limits). Codes are stable and namespaced with dot-separated segments, so you can match on a prefix (for example `platform.*` for any upstream platform failure, or `byok.*` for any bring-your-own-key issue).
+| Field | Description |
+|---|---|
+| `error.code` | A dot-separated code, stable across releases. Match the whole code, or a prefix such as `platform.` or `billing.` |
+| `error.message` | A description for logs and display |
+| `error.meta` | Structured context, present on some errors. `meta.field` names the invalid input, `meta.max` is set on `automation.limit_reached` and `meta.plan` on `whatsapp.paid_plan_required`, `meta.retry_after_seconds` is how long to wait |
+| `request_id` | Identifies the request. It equals the `X-Request-ID` response header |
 
-The `request_id` field is present on every error response. The same value appears in the `X-Request-ID` response header. Include it when reporting an issue to support. See [Debugging with request IDs](/guides/debugging) for details on how to supply your own correlation ID.
+`request_id` is the `X-Request-ID` request header you sent when it matches `^[a-zA-Z0-9_-]{1,64}$`. Otherwise it is 8 lowercase hexadecimal characters that SocialAPI generates. Quote it in support requests: see [Debugging](/guides/debugging).
+
+A `429` response carries `Retry-After` (in seconds) whenever `error.meta.retry_after_seconds` is present.
+
+**MCP server.** A failed tool call returns `isError: true` and a text result holding JSON: `{"error": "<message>", "code": "<error.code>"}`, with the `error.meta` fields added at the top level. The `code` values are the ones on this page. A request refused before the tool runs, such as an expired token, returns an HTTP error: see [Authentication](/guides/authentication).
 
 ## Code namespaces
 
-The first segment of the code tells you where the failure originated.
+The first segment of a code tells you which part of the system refused the request.
 
 | Namespace | Meaning |
 |---|---|
-| `auth.*` | Authentication and authorization at the SocialAPI layer |
-| `account.*` | Connected account issues (linking, state, supported features) |
-| `platform.<name>.*` | The upstream platform (Instagram, TikTok, etc.) returned an error |
-| `validation.*` | Request body, query parameter, or path parameter is invalid |
-| `resource.*` | Generic resource lookup, conflict, or capability error |
-| `billing.*` | Plan limit reached or feature gated by tier |
-| `brand.*`, `media.*`, `post.*`, `conversation.*`, `invite.*`, `automation.*` | Resource-specific errors on those object types |
-| `byok.*` | Bring-your-own-key credentials (Twitter app, etc.) |
-| `publishing.delivery.*` | Publishing to a platform failed mid-delivery |
-| `whatsapp.*` | WhatsApp Cloud API specific failures (window, frequency, template state) |
-| `telegram.*` | Telegram Bot API specific failures (e.g. the bot cannot message a user who has not started it) |
-| `system.internal` | Unexpected server error; safe to retry idempotent requests |
-| `http.<status>` | Transport-level HTTP error (for example, `http.404` for an unknown route). Not returned by application logic. |
+| `auth.*` | Authentication and authorization |
+| `account.*`, `accounts.*` | Connected accounts: lookup, state, Pages, sync |
+| `brand.*` | Brand lookup |
+| `platform.<name>.*` | The platform (Instagram, TikTok, and the rest) refused the request, or SocialAPI refused it for a platform-specific reason |
+| `validation.*` | A request field, parameter, or media item is invalid |
+| `resource.*` | Generic lookup, conflict, and capability errors |
+| `billing.*` | A plan allowance or plan feature |
+| `byok.*` | Your own platform app credentials |
+| `publishing.*` | Publishing a post |
+| `post.*`, `conversation.*`, `media.*`, `board.*` | Errors on those objects |
+| `automation.*` | Automations |
+| `whatsapp.*`, `telegram.*`, `google.*` | Errors specific to those platforms |
+| `messaging.*`, `inbox.*` | Messaging and sync rate limits |
+| `system.internal` | The request failed on SocialAPI's side |
+| `http.<status>` | A routing or transport error, such as an unknown path |
 
-## Authentication
+One code has no namespace: `ambiguous_post_id`.
 
-| HTTP | Code | When it occurs |
-|---|---|---|
-| 401 | `auth.missing_header` | `Authorization` header is absent |
-| 401 | `auth.empty_token` | `Authorization: Bearer` with no token value |
-| 401 | `auth.invalid_key` | API key does not match any active key |
-| 401 | `auth.invalid_token` | Bearer JWT or OAuth access token is invalid or expired |
-| 403 | `auth.invalid_secret` | Provided client secret does not match |
-| 401 | `auth.not_authenticated` | Caller is unauthenticated for an endpoint that requires it |
-| 401 | `auth.not_provisioned` | Dashboard user has no `users` row yet; call `POST /v1/users/provision` first |
-| 401 | `auth.user_not_found` | Token resolves to a user that no longer exists |
-| 403 | `auth.dashboard_only` | Endpoint accepts only dashboard JWTs (raw API keys are rejected) |
-| 403 | `auth.requires_dashboard_auth` | Same as above for endpoints behind brand-level UI |
-| 403 | `auth.insufficient_scope` | A [scoped API key](/guides/scoped-keys) lacks the required scope, or a restricted key called an admin operation. `meta.required_scope` names the scope when applicable |
-| 403 | `auth.state_mismatch` | OAuth callback `state` does not match the issued value |
-| 400 | `auth.oauth.invalid_client` | OAuth 2.1 client lookup failed during MCP token exchange |
-| 400 | `auth.oauth.invalid_redirect` | `redirect_uri` is not in the client's whitelist |
-| 400 | `auth.oauth.request_expired` | Authorization request expired before exchange |
-| 401 | `auth.oauth.user_missing` | OAuth grant references a user that does not exist |
+## Authentication and access
 
-## Accounts
+Every `/v1` request needs `Authorization: Bearer <API key>`. See [Authentication](/guides/authentication) and [Scoped API keys](/guides/scoped-keys).
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 404 | `account.not_found` | The account ID does not belong to your workspace |
-| 409 | `account.already_linked` | This social account is already connected to a workspace |
-| 403 | `account.reconnection_required` | OAuth token is no longer usable; rerun the OAuth flow |
-| 400 | `account.unsupported_platform` | Platform value is not recognized |
-| 400 | `account.no_active_page` | Account has no active Page (Facebook, LinkedIn) selected |
-| 400 | `account.page_inactive` | The requested Page is currently disabled |
-| 400 | `account.pages_not_supported` | Pages do not apply to this platform |
-| 403 | `account.permission_missing` | The account does not have the [permission](/guides/permissions) this call needs. `meta.permission` names it. Add it with `PATCH /v1/accounts/{id}` or reconnect the account |
-| 409 | `account.different_login` | Brand's Facebook account is tied to a different login (shared credential); disconnect it before connecting a new one |
+| 401 | `auth.missing_header` | The `Authorization` header is absent |
+| 401 | `auth.empty_token` | The header is `Authorization: Bearer` with no token |
+| 401 | `auth.invalid_key` | The API key does not exist, was revoked, or was rotated away |
+| 401 | `auth.invalid_token` | The bearer token is neither a valid API key nor a valid OAuth 2.1 access token, or it has expired |
+| 401 | `auth.user_not_found` | The token belongs to a SocialAPI account that no longer exists |
+| 403 | `auth.insufficient_scope` | A [scoped API key](/guides/scoped-keys) lacks the scope the request needs, or a scoped key called an admin operation (managing keys, brands, invites, or `PATCH /v1/users/me`). `meta.required_scope` names the scope when one applies |
+| 402 | `billing.past_due` | Your subscription payment failed twice. Every endpoint returns it except every method of `/v1/users/me` and every `/v1/billing/*` endpoint. See [Past-due accounts](/guides/plans#past-due-accounts) for how access returns |
+| 403 | `auth.state_mismatch` | The `state` you passed to a connect step belongs to a different API key |
+| 403 | `account.permission_missing` | The connected account does not have the [permission](/guides/permissions) the call needs. `meta.permission` names it. Add it with `PATCH /v1/accounts/{id}`, or reconnect the account when the platform has not granted it. Publishing, post removal, live post metrics, and the stored inbox lists answer differently: see [Account permissions](/guides/permissions#what-an-account-can-do-right-now) |
+| 400 | `auth.oauth.invalid_client` | The MCP client's `client_id` is unknown. See [OAuth for MCP clients](/integrations/oauth) |
+| 400 | `auth.oauth.invalid_redirect` | The MCP client's `redirect_uri` is not registered for its `client_id` |
 
-## Validation
+The `/oauth/token` endpoint answers errors in the OAuth format (`error`, `error_description`) instead of this envelope: see [OAuth for MCP clients](/integrations/oauth#token-endpoint-errors).
 
-| HTTP | Code | When it occurs |
-|---|---|---|
-| 400 | `validation.field_required` | A required field is missing from the request |
-| 400 | `validation.field_invalid` | A field has the wrong type, format, or value |
-| 400 | `validation.body_invalid` | Request body could not be parsed as JSON |
-| 400 | `validation.redirect_uri_duplicate` | Redirect URI is already registered for this client |
-| 400 | `validation.scope_invalid` | A [key](/guides/scoped-keys) was created or edited with an unknown scope; the message names it |
-| 400 | `validation.brand_invalid` | A key's `brand_ids` references a brand that does not exist or that you do not own |
-| 400 | `validation.permission_unknown` | A value in `permissions` is not a [permission](/guides/permissions). `meta.permission` names it |
-| 400 | `validation.permissions_empty` | `permissions` is an empty list. Send at least one permission, or omit the field |
-| 400 | `validation.permission_missing` | An [Automation](/guides/automations) needs a permission the account does not have. `meta.permission` names it |
+## Request validation
 
-The `code` always starts with `validation.`. The specific sub-code after the dot identifies the field or rule that failed; `error.meta.field` in the response points to the offending field name when applicable.
-
-## Resources
+These codes apply to any endpoint. `error.meta.field` names the offending input when the input is a single field.
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 404 | `resource.not_found` | Generic resource lookup miss; check the `error.meta.resource` and `error.meta.id` fields |
-| 409 | `resource.conflict` | Resource is in a state that conflicts with the requested action |
-| 410 | `resource.gone` | Resource existed but was permanently removed |
-| 501 | `resource.not_supported` | Operation does not apply to this platform |
-| 404 | `brand.not_found`, `media.not_found`, `conversation.not_found`, `post.not_found` | Specific lookups failed |
-| 409 | `media.in_use` | Cannot delete media that is still referenced by a post |
-| 410 | `invite.expired` | Brand invite token is past its expiry |
-| 400 | `invite.invalid` | Brand invite token is malformed or already consumed |
-| 409 | `post.state_invalid` | Action does not apply to a post in this state (e.g. retry on a `published` post) |
-| 400 | `post.no_retryable_deliveries` | No failed deliveries on this post to retry |
+| 400 | `validation.body_invalid` | The request body is not valid JSON, or has the wrong shape |
+| 400 | `validation.field_required` | A required field is missing. `meta.field` names it |
+| 400 | `validation.field_invalid` | A field or parameter has the wrong type, format, or value. `meta.field` names it. Examples: `from` is not RFC 3339, `cursor` is malformed, a webhook `url` is not an `https` URL, a webhook event type is unknown, a media `url` is not a public `http` or `https` address, `scheduled_at` is in the past on a post with targets |
+| 400 | `validation.id_invalid` | A comment or review ID in the path is neither a platform ID nor a SocialAPI ID |
+| 400 | `validation.id_platform_mismatch` | A comment or review ID belongs to a different platform than the `account_id` |
 
-### Invite conflicts and validation
+## Not found, conflicts, and unsupported operations
 
-`POST /v1/invites` returns `409 resource.conflict` for two different situations, distinguished by the `message`:
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 404 | `resource.not_found` | The object does not exist or is not visible to your key. `meta.resource` names the type (for example `post`, `automation`, `brand`) and `meta.id` the ID |
+| 404 | `account.not_found` | The `acc_` ID is not a connected account of your SocialAPI account |
+| 404 | `brand.not_found` | The brand is outside the brands your [brand-restricted key](/guides/scoped-keys) can reach |
+| 404 | `conversation.not_found` | The conversation does not exist or is not yours |
+| 404 | `media.not_found` | The media item does not exist or is not yours |
+| 409 | `resource.conflict` | The request conflicts with current state. Duplicate post content and invite creation use it: see below |
+| 409 | `ambiguous_post_id` | The platform post ID you passed matches more than one post. Use the SocialAPI post ID |
+| 501 | `resource.not_supported` | The operation does not exist on this account's platform. `meta.platform` names it. See the [capability matrix](/platforms/overview) |
+| 422 | `account.platform_unsupported` | The account's platform has no reviews, and the request was for reviews |
+| 4xx, 5xx | `http.<status>` | A routing or transport error. `http.404` is an unknown path. `GET /v1/inbox/media/{id}` also returns `http.404` (unknown media), `http.410` (media expired), `http.503` (too many waiting requests, retry after 1 second), and `http.504` (media still being fetched, send the request again until you get 200 or 410) |
 
-- `an active invite already exists for this brand and platform`
-- `brand already has a connected account for this platform`
+## Rate limits
 
-Both share the `resource.conflict` code. Note that `GET /v1/invites` and `GET /v1/accounts` query different objects, so an empty invite list does not guarantee that a create will succeed: the brand may already have a connected account for that platform. Check both before treating a create as safe.
+Rate-limit codes are `429` and are covered in [Rate limits](/guides/rate-limits), which says what each limit counts and how to retry.
 
-`expires_in_days` is required on invite creation and must be one of `1`, `3`, `7`, `14`, or `30`. Any other value (including omitting it) returns `400 validation.field_invalid` with the message `expires_in_days must be one of: 1, 3, 7, 14, 30`.
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 429 | `publishing.velocity_limit` | A publish target reached its post cap per hour or per 24 hours. `meta.window` is `hour` or `day` |
+| 429 | `messaging.velocity_limit` | A sender (Instagram account, Facebook Page, or WhatsApp phone number) reached its cap of messages per minute. Nothing was sent |
+| 429 | `platform.<name>.rate_limit` | The platform's own limit. Wait, then retry with backoff. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
+| 429 | `inbox.sync_rate_limited` | `POST /v1/inbox/sync` ran again before the wait for the same target ended. `meta.retry_after_seconds` is set |
+| 429 | `accounts.sync_rate_limited` | `POST /v1/accounts/{id}/sync` ran again before the wait for the same account ended. `meta.retry_after_seconds` is set |
+
+## Billing and plan allowances
+
+Allowances and billing periods are defined in [Plans and usage](/guides/plans).
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 429 | `validation.post_limit_exhausted` | The post allowance for the billing period is used up. It resets at the start of the next period |
+| 429 | `validation.interaction_limit_exhausted` | The interaction allowance for the billing period is used up |
+| 429 | `billing.post_limit` | `POST /v1/posts/import` holds more posts than the allowance has credits left. `error.message` gives the credits needed and remaining |
+| 403 | `billing.brands_limit` | Creating the brand would exceed your plan's brand allowance |
+| 403 | `billing.platform_not_available` | The platform slug is not one of the connectable platform slugs, such as `trustpilot` |
+| 413 | `billing.storage_quota` | The upload would exceed your plan's media storage |
+| 429 | `billing.export_limit` | You reached your plan's number of exports per billing period |
+| 429 | `billing.export_cooldown` | The account was exported within your plan's cooldown period |
+| 429 | `billing.export_concurrent` | Another export is still pending or processing |
+| 403 | `whatsapp.paid_plan_required` | Sending a WhatsApp template needs a paid plan. Replies to people who messaged you do not |
+| 402 | `billing.past_due` | See [Authentication and access](#authentication-and-access) |
+
+## Connect an account
+
+These codes come from `POST /v1/accounts/connect`, the steps that follow the consent screen, and the Page and location pickers. See [Connect accounts](/guides/connect-accounts) for the flow.
+
+A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as `status=error` and `error=<code>`, with `error_description`.
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.customer_state_too_long` | `state` is longer than 512 characters |
+| 400 | `validation.permission_unknown` | A value in `permissions` is not a [permission](/guides/permissions#the-permissions). `meta.permission` names it. `POST /v1/accounts/connect`, `POST /v1/invites`, and `PATCH /v1/accounts/{id}` return it |
+| 400 | `validation.permissions_empty` | `permissions` is an empty list. Send at least one permission, or omit the field. `PATCH /v1/accounts/{id}` also returns it, where `null` gives the account every permission |
+| 400 | `validation.redirect_uri_invalid_format` | `redirect_uri` is malformed |
+| 400 | `validation.redirect_uri_not_whitelisted` | `redirect_uri` is not registered. Register it in the dashboard first |
+| 400 | `validation.state_invalid` | A connection `state` is unknown or expired |
+| 400 | `validation.profile_not_in_set` | The `platform_account_id` you selected is not one of the candidates for this connection |
+| 400 | `validation.page_not_in_set` | The `page_id` you selected is not one of the candidates for this connection |
+| 400 | `validation.page_already_assigned` | The Facebook Page already belongs to another brand |
+| 400 | `validation.page_not_granted` | The Facebook Page is not accessible with this login |
+| 400 | `validation.location_not_granted` | The Google location is not accessible with this login |
+| 400 | `validation.location_already_assigned` | The Google location already belongs to another brand |
+| 400 | `validation.invalid_account_id` | The Google account ID has an invalid format |
+| 400 | `validation.invalid_location_id` | The Google location ID is not valid |
+| 400 | `validation.auth_code_expired` | The TikTok authorization code expired or was already used. Start the connection again |
+| 409 | `account.already_linked` | The brand already holds a different account on this platform. Telegram, Bluesky, and choosing a Google location with `POST /v1/accounts/pending/{connection_id}/select` return the 409. On a platform with a consent screen it reaches your `redirect_uri` as `error=account.already_linked` |
+| 409 | `account.different_login` | The brand's Facebook is connected through a different login. Disconnect it first. During a connection it reaches your `redirect_uri` as `error=account.different_login`; assigning a Page returns the 409 |
+| 403 | `account.reconnection_required` | The platform token is no longer usable. Reconnect with `POST /v1/accounts/connect`, passing the existing connected account's brand and platform: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account) |
+| 400 | `account.unsupported_platform` | The platform value is not recognized |
+| Redirect | `platform.facebook.no_pages` | The Facebook login has no Pages |
+| Redirect | `platform.google.no_locations` | The Google login has no Business Profile locations |
+| Redirect | `platform.youtube.no_channels` | The Google login has no YouTube channels |
+| 404 | `platform.youtube.no_uploads_playlist` | The YouTube channel has no uploads playlist |
+| Redirect | `platform.facebook.no_assignable_pages` | Every Page on the login already belongs to another brand |
+| 409 | `platform.google.brand_has_account` | Assigning a location when the brand already has a Google Business Profile connected. Disconnect it first, or choose another brand |
+| 502 | `platform.instagram.api_error` | Instagram's token exchange failed during connection |
+| 400 | `account.page_not_found` | The `page_id` matches no Page of the account |
+| 400 | `account.no_active_page` | The account has no active default Page |
+| 400 | `account.page_inactive` | The Page is deactivated |
+| 400 | `account.pages_not_supported` | The platform has no Pages |
+| 400 | `account.use_boards_endpoint` | A Pinterest account has boards, not Pages. Use `/v1/accounts/{id}/boards` |
+| 400 | `account.boards_not_supported` | The account is not Pinterest, which is the only platform with boards |
+| 403 | `whatsapp.number_banned` | Meta banned the WhatsApp number, so it cannot be connected |
+| 400 | `whatsapp.ambiguous_phone_number` | The WhatsApp Business account has more than one phone number. Pass `phone_number_id` |
+| 400 | `whatsapp.no_phone_number` | The WhatsApp Business account has no phone number. Add one, then connect again |
+| 409 | `whatsapp.business_app_number` | The number is still in the WhatsApp Business app and is already registered. Do not call register for it |
+| 400 | `platform.bluesky.auth_factor_required` | The Bluesky account has email two-factor authentication on. Retry with the emailed code as `metadata.auth_factor_token` |
+
+## BYOK app credentials
+
+Platforms that use [your own app](/guides/platform-credentials) (X) return these codes.
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 412 | `byok.credentials_missing` | You saved no app credentials for the platform. `POST /v1/accounts/connect` returns it |
+| 401 | `byok.credentials_invalid` | The platform rejected the saved app credentials. When you connect an account, it arrives as the `error` parameter on your redirect URI |
+| 412 | `byok.app_access_denied` | The platform's app tier does not allow the call. Upgrade the app's access on the platform. When you connect an account, it arrives as the `error` parameter on your redirect URI |
+
+## Brands, invites, and keys
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.field_required` | `name` is missing when creating a brand or a key, or `brand_id` is missing when creating an invite |
+| 400 | `validation.field_invalid` | `expires_in_days` is not one of 1, 3, 7, 14, or 30 (including when it is omitted) |
+| 409 | `resource.conflict` | `POST /v1/invites` found an active invite for the brand and platform, or a connected account for that platform on the brand. Only `error.message` tells the two apart |
+| 400 | `validation.scope_invalid` | A key was created or edited with an unknown scope. The message names it |
+| 400 | `validation.brand_invalid` | A key's `brand_ids` names a brand that does not exist or that you do not own |
+| 403 | `billing.brands_limit` | Creating the brand would exceed your plan's allowance |
+
+An empty `GET /v1/invites` list does not mean `POST /v1/invites` succeeds: the brand can already hold a connected account for the platform. Check `GET /v1/accounts` as well.
+
+## Publish a post
+
+These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post lifecycle endpoints, and the post media fields. Platform-specific media rules are under [Platform-specific codes](#platform-specific-codes). See [Publishing](/guides/publishing) and [Delivery](/guides/delivery).
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `publishing.validation_failed` | The post failed validation. `error.meta.issues` lists each issue. Fix them, or send `skip_validation` |
+| 400 | `publishing.no_targets` | The post has no publishable targets |
+| 400 | `publishing.duplicate_target` | One account appears twice in the request with the same Page |
+| 400 | `validation.field_required` | `text` or another required post field is missing |
+| 400 | `validation.board_id_required` | A Pinterest target has no `board_id` |
+| 400 | `validation.duplicate_board_id` | A Pinterest target sets both `board_id` and `page_id`. Use `board_id` |
+| 400 | `validation.use_board_id` | A Pinterest board was set in `platform_data.board_id`. Set `board_id` on the target |
+| 400 | `validation.use_page_id` | `board_id` was set on a non-Pinterest target. Use `page_id` |
+| 409 | `resource.conflict` | The same account has a post with the same title and text that was created in the last 24 hours and is now `published`. Send `skip_duplicate_check: true` to publish the content again |
+| 409 | `post.state_invalid` | The post's status does not allow the call. Edit works on `draft`, `scheduled`, or `failed`. Publish works on `draft` or `scheduled`. Retry works on `failed` or `partial`. Delete does not work on a `publishing` post. `meta.state` is the current status |
+| 400 | `post.no_retryable_deliveries` | The post has no failed targets to retry |
+| 422 | `publishing.media.missing_source` | A media item has no source |
+| 422 | `publishing.media.invalid_source_type` | `source_type` is not `url`, `media_id`, or `platform_attachment_id` |
+| 422 | `publishing.media.missing_type` | A `platform_attachment_id` item has no `type` (`image`, `video`, `audio`, or `file`) |
+| 422 | `publishing.media.untyped_url` | The media type cannot be read from the `url`. Use a URL with an extension such as `.jpg` or `.mp4`, or upload the file |
+| 422 | `publishing.media.unsupported_source` | The platform does not accept `platform_attachment_id` media. Only Instagram, Threads, LinkedIn, and X do |
+| 422 | `publishing.media.mixing_unsupported` | Instagram or Threads cannot combine a `platform_attachment_id` with other media. It must be the only item |
+| 500 | `publishing.media.proxy_unavailable` | SocialAPI could not prepare the media for the platform. Retry the request |
+| 429 | `publishing.velocity_limit` | See [Rate limits](#rate-limits) |
+
+`POST /v1/posts` can also return the `billing.*` and `validation.post_limit_exhausted` codes in [Billing and plan allowances](#billing-and-plan-allowances). Publishing failures that happen after the request returns appear on the post: see [Delivery failures](#delivery-failures).
+
+## Delivery failures
+
+A target that fails after `POST /v1/posts` returned is a failed delivery. It does not return an HTTP error. Its code is in `targets[].error.code` on the post (`GET /v1/posts/{pid}`) and in `results[].error.code` of the `post.failed` and `post.partial` webhooks. `GET /v1/events` has no error code. See [Delivery](/guides/delivery#target-errors).
+
+| Code | When it occurs |
+|---|---|
+| `publishing.delivery.account_load_failed` | SocialAPI could not load the connected account when the delivery ran |
+| `account.permission_missing` | The account did not have the `posts.write` [permission](/guides/permissions) when the delivery ran |
+| `publishing.delivery.page_resolve_failed` | SocialAPI could not resolve the target's Facebook Page |
+| `publishing.delivery.timeout` | Sending did not finish within 15 minutes |
+| `validation.publish` | The post failed validation when the delivery ran, after the request had been accepted |
+| `platform.<name>.publish_failed` | The platform failed the publish and gave no code SocialAPI maps |
+| `platform.<name>.<code>` | Any [platform error](#platform-errors) the platform raised during the publish |
+| `system.internal` | The target never finished, or a SocialAPI error stopped it |
+
+## Inbox: comments, messages, and reviews
+
+See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [Reviews](/guides/reviews), and [Mentions](/guides/mentions). Messages and replies spend interaction credits, so they can also return `validation.interaction_limit_exhausted`.
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `platform.instagram.window_closed`, `platform.facebook.window_closed` | The 24-hour messaging window is closed. The person must message you first |
+| 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: it is older than 7 days, or already received one |
+| 422 | `platform.instagram.thread_unavailable`, `platform.facebook.thread_unavailable` | The platform refused to deliver to this conversation. It can be restricted or unavailable |
+| 422 | `platform.instagram.invalid_parameter` | Instagram rejected a parameter. Retrying unchanged will not help |
+| 403 | `platform.instagram.permission_denied`, `platform.facebook.permission_denied`, `platform.whatsapp.permission_denied` | The scopes granted to the connected account do not cover the action |
+| 400 | `platform.whatsapp.invalid_parameter` | WhatsApp rejected a parameter. `error.message` carries WhatsApp's reason |
+| 400 | `validation.field_required` | The message has no `text`, attachment, or interactive content. A review ID or a comment path parameter is missing |
+| 400 | `validation.field_invalid` | `status` is not `active` or `archived`, `moderation_status` is not an allowed value, or `order` is not `newest`, `rating_asc`, or `rating_desc` |
+| 400 | `validation.attachment_invalid` | An attachment has no `source_type` |
+| 400 | `validation.attachment_type_required` | An attachment of source `platform_attachment_id` has no `type` |
+| 400 | `validation.media_unresolved` | A `media_id` attachment could not be resolved |
+| 400 | `validation.invalid_message_tag` | The `message_tag` is not supported. Instagram accepts only `HUMAN_AGENT` |
+| 400 | `validation.message_required` | `message_id` is missing when reacting to a message |
+| 400 | `validation.participant_required` | `participant_id` is missing when reacting to a message, or the conversation's X participant is unknown |
+| 400 | `validation.invalid_reaction` | The reaction is not a single emoji character |
+| 400 | `validation.interactive_conflict` | More than one of `quick_replies`, `buttons`, and `cards` (Instagram), or of `buttons` and `list_sections` (WhatsApp), was sent |
+| 400 | `validation.too_many_quick_replies`, `validation.too_many_buttons`, `validation.too_many_cards`, `validation.too_many_sections`, `validation.too_many_rows` | An interactive message exceeds a count limit. Instagram: 13 quick replies, 3 buttons per card, 10 cards. WhatsApp: 3 buttons, 10 sections, 10 rows across all sections |
+| 400 | `validation.invalid_button_count` | A button template has more than 3 buttons: on an Instagram DM, or on an Instagram or Facebook private reply |
+| 400 | `validation.invalid_button_title`, `validation.title_too_long`, `validation.quick_reply_title_too_long`, `validation.card_text_too_long`, `validation.description_too_long`, `validation.text_too_long` | A title or text is empty or too long. Limits: button title 20 characters, quick reply title 20, card title 80, card subtitle 80, button template text 640 (Instagram DMs, and private replies on Instagram and Facebook), WhatsApp interactive text 1,024, WhatsApp `list_button` 20, WhatsApp section title 24, WhatsApp row title 24, WhatsApp row description 72 |
+| 400 | `validation.invalid_button_type` | A button `type` is not `url` or `postback` |
+| 400 | `validation.button_type_unsupported` | A WhatsApp interactive button is not `postback`. URL buttons exist only in templates |
+| 400 | `validation.cards_unsupported`, `validation.quick_replies_unsupported` | WhatsApp has no carousel or quick replies. Use buttons or `list_sections` |
+| 400 | `validation.duplicate_payload` | WhatsApp button payloads are not unique |
+| 400 | `validation.attachment_unsupported` | X direct messages cannot carry attachments through the API. Send text only |
+| 400 | `validation.text_required` | X requires message text |
+| 403 | `platform.bluesky.not_own_record` | Bluesky lets you delete only your own replies. Hide the reply instead |
+| 403 | `platform.bluesky.not_thread_owner` | Only the author of the original Bluesky post can hide replies to it |
+| 422 | `platform.bluesky.hidden_replies_full` | The Bluesky thread already holds 300 hidden replies |
+| 409 | `platform.bluesky.stale_record` | The Bluesky record changed during the request. Retry |
+| 404 | `resource.not_found`, `platform.<name>.<code>` | The comment's post was deleted on the platform. Later requests for the same post return the same 404 |
+
+WhatsApp messaging errors are in [WhatsApp](#whatsapp). Telegram's are in [Telegram](#telegram).
 
 ## Automations
 
-Returned by `POST /v1/automations` and `PATCH /v1/automations/{id}`. See [Automations](/guides/automations) for the rules behind each code.
+Returned by `POST /v1/automations` and `PATCH /v1/automations/{id}`. The rules behind each code are in [Automations](/guides/automations).
 
 | HTTP | Code | When it occurs |
 |---|---|---|
@@ -129,7 +293,7 @@ Returned by `POST /v1/automations` and `PATCH /v1/automations/{id}`. See [Automa
 | 404 | `account.not_found` | `account_id` is not an active account your key can reach |
 | 403 | `auth.insufficient_scope` | The key lacks `automations:write`, or the scope one of the actions needs (`inbox:write` or `dms:send`). `meta.required_scope` names it |
 
-A definition that breaks a rule returns `400` with one of these `validation.*` codes, and `error.meta.field` points at the offending field (for example `steps[1].buttons`):
+A definition that breaks a rule returns `400` with one of these codes, and `error.meta.field` points at the offending field (for example `steps[1].buttons`).
 
 | Code | When it occurs |
 |---|---|
@@ -149,229 +313,282 @@ A definition that breaks a rule returns `400` with one of these `validation.*` c
 | `validation.match_invalid` | `match` is not `contains` or `exact` |
 | `validation.actions_invalid` | A step has no actions |
 | `validation.action_invalid` | Unknown action type |
-| `validation.action_not_allowed` | The action is not available on that step: see the trigger's allowed actions, and steps after `start` may only use `send_dm` |
+| `validation.action_not_allowed` | The action is not available on that step: steps after `start` accept only `send_dm`, and each trigger has its own allowed actions |
 | `validation.action_duplicate` | The same action type appears twice on a step |
 | `validation.texts_invalid` | An action has no texts or more than 10, a text is empty or over 1,000 characters, or over 640 characters on a `private_reply` or `send_dm` whose step has buttons |
 | `validation.buttons_invalid` | More than 3 buttons, buttons on a step without a `private_reply` or `send_dm`, a title that is missing or over 20 characters, a `url` button without an `http` or `https` URL, a `postback` button without `next_step`, a button carrying the other type's field, or an unknown button type |
 | `validation.permission_missing` | The trigger or an action needs a [permission](/guides/permissions#automations) the account does not have. `error.meta.permission` names it |
 | `validation.follow_gate_invalid` | `follow_gate` sent together with `steps`, or with the `dm` trigger |
 
-Actions that fail when an Automation runs are not returned as errors. They are recorded on the run with the same code the API call would have returned: see [Firings](/guides/automations#firings).
+An action that fails when an Automation runs is not returned as an error. It is recorded on the run with the same code the API call would have returned: see [Firings](/guides/automations#firings).
 
-## Billing and plan limits
+## Webhooks
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 403 | `billing.brands_limit`, `brand.limit_reached` | Brand count would exceed your plan's allowance |
-| 403 | `billing.profile_units_limit` | Profile unit count would exceed your plan's allowance (creating a new brand) |
-| 429 | `billing.post_limit` | Monthly post allowance is exhausted |
-| 413 | `billing.storage_quota` | Media upload would exceed your storage limit |
-| 403 | `billing.platform_not_available` | Platform requires a higher plan tier |
-| 429 | `billing.export_limit` | Daily export allowance is exhausted |
-| 429 | `billing.export_concurrent` | Too many exports running at once for this plan |
-| 429 | `billing.export_cooldown` | Cooldown active between exports |
-| 402 | `billing.past_due` | Subscription is past due after two failed payment attempts. See below |
+| 400 | `validation.field_required` | `url` is missing |
+| 400 | `validation.field_invalid` | `url` is not a valid `https` URL, or an event type in `events` is unknown |
+| 400 | `validation.body_invalid` | A `PATCH` set no fields |
+| 400 | `validation.webhook_verification_failed` | `POST /v1/webhooks/{id}/test` could not build a request to the endpoint URL |
 
-Limit responses include `error.meta.plan` and `error.meta.max` so clients can prompt the user to upgrade.
+## Media library and exports
 
-### Past-due accounts
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 413 | `billing.storage_quota` | The upload would exceed your plan's storage. Check `GET /v1/media/storage`, delete unused media, or change plan |
+| 400 | `account.exports_not_supported` | The account is a Pinterest account. Pinterest data is read live and cannot be exported |
+| 400 | `account.export_enrichment_not_supported` | `include_transcript` or `include_vision` on a TikTok account. TikTok exports hold captions and metrics only. Export again without those options |
+| 400 | `validation.field_invalid` | The export is not completed yet, so its videos cannot be read |
+| 429 | `billing.export_limit`, `billing.export_cooldown`, `billing.export_concurrent` | See [Billing and plan allowances](#billing-and-plan-allowances) |
 
-When a subscription's payment fails twice (the initial charge plus one automatic
-retry), API access is paused. Every `/v1` endpoint returns `402` with code
-`billing.past_due` until the invoice is paid.
+## Analytics and insights
 
-Three things stay reachable so the account can be recovered:
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.from_invalid`, `validation.to_invalid` | `from` or `to` is not formatted `YYYY-MM-DD` |
+| 400 | `validation.range_inverted` | The end of a date or time range is before its start |
+| 400 | `validation.range_too_wide` | The analytics range is longer than 400 days |
+| 403 | `account.permission_missing` | The account does not have the `analytics.read` [permission](/guides/permissions). Account analytics and the platform insight endpoints return it, and so does post analytics when no target of the post has the permission |
+| 403 | `platform.instagram.insights_scope_missing` | Instagram withdrew the insights access. Reconnect the account |
+| 422 | `platform.instagram.insights_unavailable` | Instagram has no insights of the requested kind for this media |
+| 400 | `validation.metric_required` | No metric was passed to a Threads or Google Business Profile insights request |
+| 400 | `validation.metric_invalid` | A metric is not valid for the request (and, on Threads, for the `level`) |
+| 400 | `validation.level_invalid` | Threads insights `level` is not `media` or `account` |
+| 400 | `validation.post_id_required` | Threads insights at `level=media` has no `post_id` |
+| 400 | `validation.range_not_supported` | `since` or `until` was sent at Threads `level=media`, which returns lifetime totals |
+| 400 | `validation.since_invalid`, `validation.until_invalid` | Threads `since` or `until` is not a Unix timestamp in seconds |
+| 400 | `validation.since_too_early`, `validation.until_too_early` | Threads `since` or `until` is before 2024-04-13 |
+| 400 | `validation.breakdown_required`, `validation.breakdown_unknown`, `validation.breakdown_multiple`, `validation.breakdown_not_applicable`, `validation.breakdown_range_unsupported` | A Threads `follower_demographics` request has a missing, unknown, repeated, misplaced breakdown, or sends `since` or `until`. The breakdowns are `country`, `city`, `age`, and `gender` |
+| 400 | `validation.start_date_required`, `validation.start_date_invalid`, `validation.end_date_required`, `validation.end_date_invalid` | A Google insights date is missing or not formatted `YYYY-MM-DD` |
+| 400 | `validation.start_month_required`, `validation.start_month_invalid`, `validation.end_month_required`, `validation.end_month_invalid` | A Google search keywords month is missing or not formatted `YYYY-MM` |
+| 400 | `validation.page_size_invalid` | Google search keywords `limit` is negative or above 100 |
+| 400 | `validation.username_required` | `username` is missing from a Threads profile lookup |
 
-- `GET /v1/users/me` and `PATCH /v1/users/me`
-- every `/v1/billing/*` endpoint
-- inbound platform webhooks, which are unaffected
+## Google Business Profile
 
-`GET /v1/users/me` reports the state in two fields: `billing_blocked` (boolean)
-and `billing_blocked_at` (when the block began, or null).
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 422 | `google.media.single_item_required` | A media upload carried other than exactly one media item |
+| 422 | `google.media.invalid_category` | The media `category` is not an allowed value |
+| 422 | `google.media.unresolvable` | The media item could not be resolved |
+| 400 | `validation.invalid_media_category` | The media `category` is not an allowed value |
+| 400 | `validation.invalid_media_source` | The media source is not a `url`, a stored media ID, or a Google upload reference |
+| 400 | `validation.missing_media_source` | A media source is required |
+| 400 | `validation.media_not_in_account` | The media item does not belong to this location |
+| 400 | `validation.media_not_updatable` | A Google post's media cannot change after publishing. Delete the post and create a new one |
+| 400 | `validation.invalid_call_to_action` | The call to action is not valid. `error.message` gives the reason |
+| 400 | `validation.no_fields_to_update` | A location update set no updatable field |
+| 503 | `platform.google.service_disabled` | Google's API is temporarily unavailable. Retry the request |
+| 403 | `platform.google.access_denied` | Google denied access to the location |
 
-**Outbound webhooks are not delivered while an account is past due.** Events that
-occur during this window are dropped, not queued, and are not replayed after
-payment. Ingestion is unaffected, so the underlying data is still recorded and
-remains queryable through `GET /v1/events` once access is restored.
+## Platform-specific codes
 
-Access is restored automatically within seconds of a successful payment. There is
-no endpoint to call and no support ticket to open: paying the invoice, whether
-through the dashboard's Stripe portal or an automatic retry, lifts the block.
+### Instagram and Facebook
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 422 | `platform.instagram.container_failed` | Instagram could not process the media. Check the file against Instagram's specifications |
+| 422 | `platform.instagram.container_expired` | The media container expired before publishing. Create the post again |
+| 504 | `platform.instagram.container_timeout` | The media was still processing after about 5 minutes |
+| 503 | `platform.instagram.1`, `platform.instagram.2` | Instagram reported a temporary failure. Retry the request |
+| 403 | `platform.instagram.200` | Instagram says the connected account has not granted a scope the call needs. Reconnect the account to grant it |
+| 404 | `platform.instagram.100` | Instagram says the object does not exist, or does not accept the request. Check the ID |
+| 404 | `platform.instagram.9010` | Instagram has no account for the participant ID, for example because the person deleted or deactivated the account |
+| 409 | `platform.instagram.9007` | Instagram is not ready to publish the media yet. Retry the publish |
+| 403 | `platform.instagram.230` | Instagram withholds the participant profile: the person has not messaged the account or tapped an icebreaker or the persistent menu |
+| 404 | `platform.facebook.100` | Facebook says the object does not exist, or the Page lacks a scope the call needs. Check the ID and the Page scopes |
+| 403 | `platform.facebook.230` | Facebook requires the user's consent to access the resource. Reconnect the account |
+| 504 | `platform.facebook.reel_timeout`, `platform.facebook.story_timeout` | Facebook did not finish processing the Reel or Story video within the time allowed |
+| 422 | `platform.facebook.reel_processing_failed`, `platform.facebook.story_processing_failed` | Facebook could not process the Reel or Story video |
+| 400 | `validation.media_invalid` | A Facebook Reel does not have exactly one video, and the post was sent with `skip_validation: true`. Without it, the post returns `400 publishing.validation_failed` |
+| 400 | `validation.media_mixed` | A Facebook multi-photo post includes a video, and the post was sent with `skip_validation: true`. Without it, the post returns `400 publishing.validation_failed` |
+| 400 | `validation.media_too_many` | A Facebook multi-photo post has more than 10 images, and the post was sent with `skip_validation: true`. Without it, the post returns `400 publishing.validation_failed` |
+
+### Threads
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 422 | `platform.threads.THREADS_API__LINK_LIMIT_EXCEEDED` | The post holds more than 5 unique links |
+| 422 | `platform.threads.ERROR`, `platform.threads.EXPIRED` | Threads rejected the media, or the media expired before publishing |
+| 504 | `platform.threads.container_timeout` | Threads did not finish processing the media after about 4 minutes |
+| 422 | `platform.threads.801` | `follower_demographics` was requested for an account with fewer than 100 followers |
+| 429 | `platform.threads.rate_limit` | Threads' own rate limit. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
+| 403 | `platform.threads.<code>` | A call needs a Threads scope that the account lacks, such as hiding a reply without `threads_manage_replies`. `<code>` is Meta's error code |
+| 404 | `resource.not_found` | The post, reply, or profile does not exist, or a profile is not discoverable |
+
+### TikTok
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.media_required` | A video post has no media URL |
+| 400 | `validation.media_count` | A photo post does not hold 2 to 35 images |
+| 400 | `validation.media_type_mismatch` | An image was sent as a video. Set `media_type` to `photo` and attach 2 or more JPEG or WebP images |
+| 400 | `validation.unsupported_photo_format` | A photo post includes an image that is not JPEG or WebP |
+| 400 | `validation.unsupported_media_type` | `media_type` is not `video` or `photo` |
+| 400 | `validation.post_mode` | `post_mode` is neither `direct` nor `inbox` |
+| 400 | `validation.privacy_level_required` | A photo carousel has no `privacy_level` |
+| 400 | `validation.privacy_level_unsupported` | A video post sets a `privacy_level` other than `PUBLIC_TO_EVERYONE`, or a `privacy_level` that is not a string. `meta.privacy_level` is the value you sent |
+| 400 | `validation.invalid_privacy_level` | A photo carousel sets a `privacy_level` the account does not allow. `meta.privacy_level` is the value you sent |
+| 400 | `validation.branded_content_private` | A photo carousel sets `brand_content_toggle: true` with `privacy_level: "SELF_ONLY"` |
+| 400 | `validation.comment_id_invalid` | A comment ID is a bare TikTok comment ID. Hide, unhide, reply, and list replies need the `id` or `platform_id` returned by the comments endpoint. `meta.comment_id` is the value you sent |
+| 400 | `validation.mention_reply_unsupported` | A reply to a TikTok mention names no comment. TikTok replies only to mentions made in a comment |
+| 400 | `platform.tiktok.40000`, `platform.tiktok.40002`, `platform.tiktok.40011`, `platform.tiktok.40904`, `platform.tiktok.40905`, `platform.tiktok.40906`, `platform.tiktok.40907`, `platform.tiktok.40908`, `platform.tiktok.40914`, `platform.tiktok.40915` | TikTok refused a parameter or a media file. `error.message` carries TikTok's reason. Fix the field it names |
+| 403 | `platform.tiktok.40001`, `platform.tiktok.40118`, `platform.tiktok.40125` | The account's authorization lacks a scope the call needs. Reconnect the account to grant it |
+| 422 | `platform.tiktok.publish_failed` | TikTok rejected the post while processing it, or could not report its outcome. `error.message` carries TikTok's reason. Check the account in the TikTok app before retrying |
+| 401 | `platform.tiktok.auth` | TikTok's authorization for the account ended. Later calls return `403 account.reconnection_required` until you reconnect |
+| 401 | `platform.tiktok.unauthorized` | TikTok refused the call as unauthorized without saying the authorization ended. The account stays usable. Reconnect if it repeats |
+| 429 | `platform.tiktok.rate_limit` | TikTok's own request limit of 40 requests per minute for each account and each TikTok call. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back). Wait 1 minute, then retry |
+| 502 | `platform.tiktok.api_error` | TikTok returned no usable answer, or accepted a post without returning its publish ID. Check the account in the TikTok app before retrying a post |
+
+A TikTok code that this table does not list returns `502` with the code after `platform.tiktok.`.
+
+### X, LinkedIn, YouTube, and Zalo
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.media_count` | An X post has more media items than X accepts |
+| 400 | `validation.media_type` | X does not accept the media type, or a LinkedIn multi-image post includes a video |
+| 400 | `validation.media_size` | An X media file is too large to upload in the chunks X allows |
+| 402 | `platform.twitter.usage_capped` | Your own X developer app is out of API credits or reached its X usage cap. Add credits or raise the spending limit in the X Developer Console. Waiting does not clear it |
+| 422 | `platform.linkedin.processing_failed` | LinkedIn failed to process the media |
+| 504 | `platform.linkedin.upload_timeout`, `platform.linkedin.processing_timeout` | A LinkedIn image upload or video processing timed out |
+| 403 | `platform.linkedin.access_denied` | LinkedIn denied access |
+| 400 | `validation.video_url` | A YouTube video URL is not accessible |
+| 400 | `validation.video_size` | The size of the YouTube video file could not be determined |
+| 403 | `platform.youtube.insufficientPermissions` | The connection lacks a scope the call needs. Reconnect the account to grant it |
+| 403 | `platform.youtube.account_suspended` | YouTube suspended or closed the account or its channel. Reconnecting does not restore access. Resolve the suspension with YouTube. SocialAPI stops background sync for the account |
+| 422 | `platform.youtube.processing_failure` | YouTube refused to delete the comment: only comments your channel wrote can be deleted |
+
+### WhatsApp
+
+WhatsApp has the most codes because of its messaging window, frequency caps, and template states. See [WhatsApp](/platforms/whatsapp).
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `whatsapp.window_closed` | The 24-hour customer service window is closed. Send an approved template |
+| 429 | `whatsapp.frequency_cap` | The recipient reached the daily marketing message limit |
+| 429 | `whatsapp.pair_rate_limit` | Too many messages to the same recipient |
+| 429 | `whatsapp.throughput_exceeded` | The account's messaging throughput limit is exceeded |
+| 403 | `whatsapp.user_opted_out` | The recipient opted out of messages |
+| 400 | `whatsapp.undeliverable` | The recipient is not on WhatsApp |
+| 404 | `whatsapp.template_not_found` | The template does not exist for this WhatsApp Business account |
+| 400 | `whatsapp.template_paused` | The template is paused because of quality issues |
+| 400 | `validation.template_invalid` | A template failed validation. `meta.errors` lists the issues |
+| 400 | `validation.body_empty` | A template update set no fields |
+| 400 | `whatsapp.not_registered` | The number is not registered for the WhatsApp Cloud API. Register it before sending |
+| 400 | `whatsapp.pin_mismatch` | The number has a two-step verification PIN SocialAPI does not hold. Turn two-step verification off for the number, then retry |
+| 400 | `whatsapp.media_download_failed` | WhatsApp could not download the media from the URL. Check that it is publicly reachable |
+| 400 | `whatsapp.media_upload_failed` | WhatsApp rejected the media file |
+| 400 | `validation.attachment_id_unsupported` | WhatsApp does not accept `platform_attachment_id`. Send the media as a `url` or `media_id` |
+| 400 | `validation.caption_unsupported` | A WhatsApp audio message cannot carry a caption |
+| 400 | `validation.image_format_unsupported` | A WhatsApp image is not JPEG or PNG |
+| 400 | `validation.voice_unsupported` | `voice` was set on an attachment that is not audio |
+| 404 | `whatsapp.no_account` | No WhatsApp account is connected |
+| 502 | `whatsapp.unknown` | WhatsApp returned an error SocialAPI does not map. Retry with backoff |
+
+### Telegram
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 403 | `telegram.cannot_message` | The bot cannot message this chat. The person must start the bot first, or the bot was blocked or removed. There is no 24-hour window once the bot is started |
+| 400 | `validation.telegram_bad_request` | Telegram rejected the request. Common causes are text over 4,096 characters and an attachment URL Telegram could not fetch. `error.message` carries Telegram's description |
+
+### Zalo
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 422 | `platform.zalo.not_deliverable` | The message is outside the customer service messaging window, or the recipient is not eligible |
+| 401 | `platform.zalo.auth` | The access token expired or was revoked, or the Official Account is no longer authorized |
+| 202 | `platform.zalo.article_processing` | Zalo is still processing the article when the request stopped waiting. The article can still publish: check before retrying |
+| 429 | `platform.zalo.rate_limit` | The per-app or per-Official Account quota is used up |
+| 400 | `validation.platform_param` | Zalo rejected a parameter. `error.message` carries Zalo's reason |
+| 404 | `resource.not_found` | The Zalo account or object does not exist |
+| 502 | `platform.zalo.e<N>` | Zalo returned an error SocialAPI does not map. `<N>` is the absolute value of Zalo's numeric code (Zalo `-105` becomes `platform.zalo.e105`) |
+| 502 | `platform.zalo.api_error` | The request failed before Zalo answered with an error |
+
+`platform.zalo.not_deliverable` is the most common: Zalo allows a customer service message within 7 days of the person's last interaction with your Official Account (free within 48 hours), and refuses later sends with `422`.
+
+### Bluesky
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `platform.bluesky.auth_factor_required` | See [Connect an account](#connect-an-account) |
+| 403 | `platform.bluesky.dm_scope_missing` | The app password has no direct message access. Create a new app password with the option on, then reconnect. Posts, comments, and mentions keep working |
+| 403 | `platform.bluesky.account_takedown` | Bluesky suspended the account. Reconnecting does not restore access |
+| 429 | `platform.bluesky.rate_limit` | Bluesky's quota is used up. Sign-in is limited to 30 requests per 5 minutes per account |
+| 400 | `validation.field_invalid` | Bluesky could not resolve the handle, or an image is larger than 2 MB. `meta.field` names the field |
+| 400 | `validation.platform_param` | Bluesky rejected a parameter. `error.message` carries Bluesky's reason |
+
+`platform.bluesky.dm_scope_missing` affects only the DM endpoints. Treat it as a failure of one capability, not a dead connection.
+
+### Pinterest
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `board.name_required` | A board has no name |
+| 400 | `board.privacy_invalid` | A board's privacy can be changed only to `PUBLIC` or `SECRET` |
+| 400 | `board.update_empty` | A board update set no field |
+| 403 | `platform.pinterest.403` | Pinterest refused the request for this account or board. `error.message` carries Pinterest's reason. Reconnecting does not clear it |
+| 404 | `platform.pinterest.404` | Pinterest reports that the board or Pin does not exist |
 
 ## Platform errors
 
-When the upstream platform (Meta, TikTok, Google, etc.) rejects a call, the error code has the form `platform.<name>.<reason>`. The HTTP status is forwarded when possible; otherwise it is `502 Bad Gateway`.
+When a platform refuses a call, the code is `platform.<name>.<reason>`, where `<name>` is the platform slug. SocialAPI forwards the platform's HTTP status when it maps one, and returns `502` otherwise.
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 401 | `platform.<name>.auth` | Platform rejected the stored OAuth token; the account needs to be reconnected |
-| 403 | `platform.<name>.insufficient_scope` | The platform refused the call because the account's access lacks a scope. `meta.scope` names the scope when the platform does. Reconnect the account to grant it |
-| 429 | `platform.<name>.rate_limit` | Upstream platform rate limit hit. This does **not** consume your SocialAPI quota |
-| 502 | `platform.<name>.api_error` | Generic upstream API failure; check the `error` message for detail |
-| 400 | `platform.tiktok.media_required` | TikTok requires media for this post type |
-| 403 | `platform.instagram.permission_denied`, `platform.facebook.permission_denied`, `platform.whatsapp.permission_denied` | OAuth scopes do not include the action |
-| 403 | `platform.instagram.insights_scope_missing`, `platform.facebook.insights_scope_missing` | The account's access does not include insights. Reconnect the account to grant it. Account insights on Instagram also return `account.permission_missing` when the account does not have `analytics.read` |
-| 400 | `platform.instagram.window_closed`, `platform.facebook.window_closed` | The 24-hour messaging window has closed; the user must message you first to reopen it. After the first refusal SocialAPI answers further sends on that thread itself, adding `blocked_locally` to the error meta (see [Inbox](/guides/inbox)) |
-| 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: the 7-day window has expired, or the comment already received one |
-| 404 | `platform.facebook.no_pages`, `platform.linkedin.no_pages`, `platform.google.no_locations`, `platform.youtube.no_channels`, `platform.youtube.no_uploads_playlist` | The connected account exposes no usable target |
-| 403 | `platform.facebook.page_cap` | Brand already has the maximum of 5 Facebook Pages; this is a hard cap, not billed |
-| 403 | `platform.youtube.account_suspended` | YouTube has suspended or closed the account, or its channel. The token is still valid, so reconnecting does not restore access: the suspension has to be resolved with YouTube directly. SocialAPI stops background sync for the account and sets `reconnect_reason` to `youtube_account_suspended` |
+| 401 | `platform.<name>.auth` | The platform rejected the saved token. Reconnect the account |
+| 403 | `platform.twitter.insufficient_scope` | X refused the call because the account's access lacks a scope. `meta.scope` names it for a media upload. The account does not become `token_expired`. Reconnect the account to grant it |
+| 401 | `platform.<name>.unauthorized` | The platform answered 401 without saying the token is bad. A healthy account keeps working. Reconnect if it persists |
+| 429 | `platform.<name>.rate_limit` | The platform's own limit. See [Rate limits](#rate-limits) |
+| 422 | `platform.<name>.publish_failed` | A publish failed with an error SocialAPI does not map. Appears in [Delivery failures](#delivery-failures) |
+| 502 | `platform.<name>.api_error` | A failure reaching the platform, or a response with no usable error |
+| 502 | `platform.<name>.<code>` | The platform returned its own error code. The status is `502` unless the code has its own row above, such as `404 platform.facebook.100` |
 
-## BYOK (bring-your-own-key)
+Branch on the prefix and suffix: `platform.` with `.auth` means reconnect, with `.rate_limit` means back off.
 
-For platforms that require a customer-supplied OAuth app (currently Twitter / X).
+## System errors
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 412 | `byok.credentials_missing` | No credentials configured for the user or brand; show the BYOK setup modal |
-| 401 | `byok.credentials_invalid` | Stored credentials were rejected by the platform |
-| 403 | `byok.credentials_forbidden` | Caller does not own the brand they are configuring |
-| 429 | `byok.test_rate_limited` | Too many credential test calls within a minute |
+| 500 | `system.internal` | The request failed on SocialAPI's side. Retry idempotent requests. If it persists, send the `request_id` to support |
+| 503 | `system.internal` | The host of a media URL in the request could not be looked up at that moment. `meta.field` is `media`. Nothing was created or changed. Retry the request |
 
-## Publishing delivery
+## Handling errors
 
-These arise during post delivery and surface in the inbox / events stream rather than as direct HTTP responses, but they appear in `event.error_code` for `post.failed` and `post.partial` events.
-
-| Code | Meaning |
-|---|---|
-| `publishing.delivery.account_load_failed` | Could not load the connected account at delivery time |
-| `publishing.delivery.page_resolve_failed` | Could not resolve the target Page (Facebook, LinkedIn) |
-| `publishing.delivery.timeout` | Delivery exceeded the per-platform timeout |
-| `publishing.duplicate_target` | Two deliveries targeting the same destination were queued |
-
-## WhatsApp
-
-WhatsApp Cloud API has a richer error surface than other platforms because of its messaging window, frequency caps, and template state machine.
-
-| HTTP | Code | When it occurs |
-|---|---|---|
-| 400 | `whatsapp.window_closed` | 24-hour customer service window is closed; send an approved template instead |
-| 429 | `whatsapp.frequency_cap` | Per-user marketing cap reached |
-| 429 | `whatsapp.pair_rate_limit` | Per phone-number-pair rate limit hit |
-| 429 | `whatsapp.throughput_exceeded` | Account-level throughput exhausted |
-| 403 | `whatsapp.user_opted_out` | Recipient has opted out of marketing messages |
-| 400 | `whatsapp.undeliverable` | Message could not be delivered (cold number, region block, etc.) |
-| 404 | `whatsapp.template_not_found` | Referenced template does not exist for this WABA |
-| 409 | `whatsapp.template_paused` | Template is paused due to quality drop |
-| 409 | `whatsapp.business_app_number` | The number stays on the WhatsApp Business app and is already registered; do not call register for it |
-| 404 | `whatsapp.no_account` | No WhatsApp account is connected for this request |
-| 500 | `whatsapp.unknown` | Unmapped WhatsApp error; check the message for raw detail |
-
-## Telegram
-
-| HTTP | Code | When it occurs |
-|---|---|---|
-| 403 | `telegram.cannot_message` | The bot cannot message this chat. The user must start the bot first, or the bot was blocked or removed. There is no 24-hour window once started. |
-| 400 | `validation.telegram_bad_request` | Telegram rejected the request as invalid. Common causes: text over 4,096 characters, or an attachment URL Telegram could not fetch. The message carries Telegram's own description. Fix the request before retrying. |
-
-## Zalo
-
-Zalo uses the generic `platform.zalo.*` namespace (see the `platform.<name>.*` row above), not a dedicated top-level namespace.
-
-| HTTP | Code | When it occurs |
-|---|---|---|
-| 422 | `platform.zalo.not_deliverable` | Outside the customer service messaging window, or the recipient is not eligible |
-| 401 | `platform.zalo.auth` | Access token expired or revoked, or the Official Account is no longer authorized |
-| 202 | `platform.zalo.article_processing` | Article creation is still processing on Zalo when the request gave up waiting; the article may still publish, so check before retrying |
-| 429 | `platform.zalo.rate_limit` | Zalo per-app or per-OA quota exhausted |
-| 400 | `validation.platform_param` | Zalo rejected a parameter |
-| 404 | `resource.not_found` | The referenced Zalo object or account does not exist |
-| 502 | `platform.zalo.e<N>` | Zalo returned an error code SocialAPI does not map explicitly, `<N>` is the absolute value of Zalo's numeric code (Zalo `-105` becomes `platform.zalo.e105`) |
-| 502 | `platform.zalo.api_error` | Transport or malformed-response failure reaching Zalo, with no Zalo error envelope to read a code from |
-
-`platform.zalo.not_deliverable` is the one you're most likely to hit: Zalo only allows a customer service message within 7 days of the user's last interaction with your Official Account (free within 48 hours), and rejects sends outside that window with a 422 instead of queuing them.
-
-## Bluesky
-
-Bluesky uses the generic `platform.bluesky.*` namespace (see the `platform.<name>.*` row above), not a dedicated top-level namespace.
-
-| Status | Code | Meaning |
-|---|---|---|
-| 401 | `platform.bluesky.auth_factor_required` | The account has email two-factor authentication enabled. Bluesky emailed a confirmation code; retry the connect request with it as `metadata.auth_factor_token` |
-| 403 | `platform.bluesky.dm_scope_missing` | The app password was created without direct message access. DM access cannot be added to an existing app password: create a new one with the option enabled and reconnect. Posts, comments, and mentions keep working |
-| 429 | `platform.bluesky.rate_limit` | Bluesky quota exhausted. Sign-in is limited to 30 requests per 5 minutes per account |
-
-`platform.bluesky.dm_scope_missing` only affects the DM endpoints, so treat it as a per-capability failure rather than a dead connection.
-
-## System
-
-| HTTP | Code | When it occurs |
-|---|---|---|
-| 500 | `system.internal` | Unexpected server error. Retry idempotent requests; if persistent, contact support |
-| 503 | `system.internal` | The host of a media URL in the request could not be looked up at that moment. Nothing was created or changed; retry the request |
-
-## Handling common cases
-
-### Reconnect when a token dies
-
-`account.reconnection_required` and `platform.<name>.auth` both mean the stored OAuth token is no longer usable. Send the user back through `GET /v1/oauth/url`.
-
-```python
-err = response.json()["error"]
-code = err["code"]
-if code == "account.reconnection_required" or \
-   (code.startswith("platform.") and code.endswith(".auth")):
-    redirect_to_reconnect(account_id)
-```
-
-### Storage quota
-
-`billing.storage_quota` (HTTP 413) means the upload would push you past your plan's storage limit. Check current usage with `GET /v1/media/storage` and delete unused media or upgrade.
-
-### Monthly post or interaction limit
-
-`billing.post_limit` (HTTP 429) means your monthly allowance is exhausted. Limits reset at the start of your next billing period. The free plan uses a rolling 30-day window from your account anniversary.
-
-### Platform throttling
-
-`platform.<name>.rate_limit` (HTTP 429) is the upstream platform throttling you, not SocialAPI. It does not consume your quota. Wait a few minutes and retry with backoff.
-
-### Validation failures
-
-Any `validation.*` code includes an `error.meta.field` pointing to the offending input. Surface the field name to the user.
-
-## Example error handling
+Read `error.code` from the response, then branch. Reconnect on a dead token, back off on a throttle, show the field on a validation failure, and log `request_id` for anything else.
 
 ```typescript
-const resp = await fetch(`https://api.social-api.ai/v1/accounts/${accountId}/comments`, {
-  headers: { Authorization: `Bearer ${apiKey}` }
+const resp = await fetch("https://api.social-api.ai/v1/accounts", {
+  headers: { Authorization: `Bearer ${process.env.SOCAPI_KEY}` },
 });
 
 if (!resp.ok) {
-  const body = await resp.json();
-  const { code, message, meta } = body.error;
-  const requestId = body.request_id; // include in support reports
+  const { error, request_id } = await resp.json();
+  const { code, message, meta } = error;
 
-  // Reconnect dead OAuth tokens
   if (code === "account.reconnection_required" ||
       (code.startsWith("platform.") && code.endsWith(".auth"))) {
-    await reconnectAccount(accountId);
-    return;
+    return reconnect(); // POST /v1/accounts/connect
   }
-
-  // Upstream platform throttling: retry with backoff
-  if (code.startsWith("platform.") && code.endsWith(".rate_limit")) {
-    await sleep(60_000);
+  if (resp.status === 429 && meta?.retry_after_seconds) {
+    await sleep(meta.retry_after_seconds * 1000);
     return retry();
   }
-
-  // Plan limits: prompt to upgrade
-  if (code.startsWith("billing.")) {
-    throw new Error(`Plan limit hit: ${message}`);
+  if (code.startsWith("validation.")) {
+    return showFieldError(meta?.field, message);
   }
-
-  // BYOK setup needed
-  if (code === "byok.credentials_missing") {
-    showByokSetupModal(meta?.platform);
-    return;
-  }
-
-  // Operation not supported on this platform
-  if (code === "resource.not_supported") {
-    console.warn(`Not supported: ${message}`);
-    return null;
-  }
-
-  throw new Error(`API error: ${message} (${code}) [request_id: ${requestId}]`);
+  throw new Error(`${code}: ${message} (request_id ${request_id})`);
 }
 ```
+
+For a `429` without `meta.retry_after_seconds` (a platform limit), wait and retry with backoff. A plan allowance such as `validation.post_limit_exhausted` does not clear until the billing period ends: check `GET /v1/usage`.
+
+## Related
+
+- [Debugging](/guides/debugging) for `X-Request-ID` and what to send to support
+- [Rate limits](/guides/rate-limits) for every 429 code, its window, and how to retry
+- [Plans and usage](/guides/plans) for allowances and past-due accounts
+- [Track post delivery](/guides/delivery) for target errors on a post
+- [Scoped API keys](/guides/scoped-keys) for `auth.insufficient_scope`
+- [Authentication](/guides/authentication) for API keys and OAuth 2.1 access tokens

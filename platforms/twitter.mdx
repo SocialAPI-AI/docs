@@ -1,0 +1,133 @@
+---
+title: X / Twitter API
+sidebarTitle: "Overview"
+description: Connect X accounts through your own X app to publish posts and threads with media, read and moderate replies, send DMs, and read mentions.
+icon: "x-twitter"
+---
+
+The X / Twitter API in SocialAPI connects an X account through an X developer app that you create. It publishes posts and threads with images, video, or a GIF, reads and moderates replies, reads and sends direct messages (DMs), and reads mentions. SocialAPI has no shared X app: X bills usage to the developer account that owns the app, so every call on your X accounts is billed to you by X. See [Why X uses your own app](/guides/platform-credentials#why-x-uses-your-own-app).
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `twitter`. `x` is accepted as the same slug |
+| Auth | OAuth 2.0 with PKCE, through your own X app |
+| Platform API | X API v2 |
+| Status | Available |
+
+## Capabilities
+
+An unsupported call returns `501 resource.not_supported`.
+
+| Feature | Status | Condition |
+|---|---|---|
+| Publish a post | Yes | Text, up to 4 images, 1 video, or 1 GIF. See [X publishing](/platforms/twitter/publishing) |
+| Publish a thread | Yes | `segments`. Continuation posts are text only |
+| Publish a reply to a post | Yes | `platform_data.twitter.in_reply_to_tweet_id` |
+| Schedule a post | Yes | `scheduled_at` on the post |
+| First comment on a post | No | `first_comment` is ignored. Publish a thread or a reply instead |
+| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post |
+| Delete a published post | Yes | |
+| List posts | Yes | The account's posts and replies, without reposts, with like and reply counts |
+| List comments and replies | Yes | Replies to a post from the last 7 days. Older replies are not returned |
+| Reply to a comment | Yes | |
+| Hide or unhide a comment | Yes | A reply to the account's own post |
+| Delete a comment | Conditional | Only a reply the account wrote. X refuses to delete anyone else's post |
+| Like a comment | No | X refuses like writes for apps on self-serve access. `can_like` is `false` |
+| Private reply to a comment | No | `501 resource.not_supported` |
+| DMs: list, read, send | Yes | Text only. See [Direct messages](#direct-messages) |
+| Mentions | Yes | Posts that mention the account. See [Mentions](/guides/mentions) |
+| Reply to a mention | No | `501 resource.not_supported` |
+| Reviews | No | X has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
+| Automations | No | `422 automation.platform_unsupported` |
+| Analytics | Partial | Post metrics: Yes. Stored history: Partial. Live account summary: No. See [Analytics](/guides/analytics) |
+| Webhook events | Partial | `account.connected`, `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself, and the `post.*` events. X sends SocialAPI no comment or DM events: read them with the inbox endpoints. Listing mentions sends `mention.received` ([Mentions you list](/guides/webhook-events#mentions-you-list)) |
+
+The cross-platform matrix is on [Platforms](/platforms/overview).
+
+## Connect an account
+
+Save your X app's OAuth 2.0 Client ID and Client Secret in the SocialAPI dashboard first: [Use your own X app](/platforms/twitter/own-app). Then connect with `POST /v1/accounts/connect` and `"platform": "twitter"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "twitter",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
+  }'
+```
+
+Response (HTTP 202):
+
+```json
+{
+  "auth_url": "https://x.com/i/oauth2/authorize?response_type=code&client_id=Zk1hYmNkZWY&state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Open this link to connect your twitter account. Once you've authorized, the account will be connected automatically."
+}
+```
+
+X-specific rules:
+
+- **Saved app credentials.** Without them, `POST /v1/accounts/connect` returns `412 byok.credentials_missing`. When X rejects the saved credentials, or refuses your app access to its API, the connection ends on your redirect URI with the `error` parameter set to `byok.credentials_invalid` or `byok.app_access_denied`.
+- **One app per brand.** A brand can use a different X app from your default one: see [Use your own X app](/platforms/twitter/own-app#use-a-different-app-for-one-brand).
+- **Reconnect.** X access tokens last 2 hours and SocialAPI renews them. If renewal fails, for example because the person revoked access, the first call that fails returns `401 platform.twitter.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **Media scope.** Uploading media needs the `media.write` scope. An account connected without it fails an upload with `403 platform.twitter.insufficient_scope` until the person reconnects.
+
+## Comments
+
+List replies to a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID (`targets[].platform_post_id`). Reply, hide, unhide, and delete work as described in [Comments](/guides/comments). X-specific rules:
+
+- **7-day window.** X returns replies posted in the last 7 days. A reply to a post older than that does not appear.
+- **Hide.** Hide and unhide work on replies to the connected account's own posts.
+- **Delete.** Deleting works only on a reply the connected account wrote.
+- **Like.** X removed like writes for self-serve apps. Read `can_like` on each comment rather than assuming.
+
+## Direct messages
+
+List conversations with `GET /v1/inbox/conversations`, read one with its messages, and send with the DM endpoints in [Direct messages](/guides/direct-messages). X-specific rules:
+
+- **Text only.** A DM sends text. An attachment is rejected before anything is sent.
+- **Recipient.** A send goes to the other person in the conversation. A group conversation has no single recipient, so a send to it is refused.
+- **X's own limit.** X allows 15 DM read requests per 15 minutes for each connected account. Past it, calls return `429 platform.twitter.rate_limit`.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Post text | 280 characters |
+| Media per post | 4 images, or 1 video, or 1 GIF |
+| Image | 5 MB. JPEG, PNG, GIF, or WebP |
+| Video | 512 MB and 140 seconds. MP4 |
+| Thread | Up to 25 continuation posts, each up to 280 characters |
+| Posts | 25 per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| X's own rate limit | `429 platform.twitter.rate_limit`. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
+| X credits and spending cap | `402 platform.twitter.usage_capped` when your X app is out of credits or reached its spending limit. Add credits in the X Developer Console |
+
+## Scopes
+
+You choose the app permissions (Read and write, and Direct message) on your own X app, as described in [Use your own X app](/platforms/twitter/own-app). SocialAPI requests these scopes when the person connects the account. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected.
+
+| Scope | Used for | Permissions |
+|---|---|---|
+| `tweet.read` | Read posts, replies, and mentions | Every account |
+| `tweet.write` | Publish and delete posts, reply to comments | `posts.write`, `comments.write` |
+| `tweet.moderate.write` | Hide and unhide replies | `comments.write` |
+| `users.read` | Read profiles | Every account |
+| `dm.read` | Read DM conversations and messages | `messages.read` |
+| `dm.write` | Send DMs | `messages.write` |
+| `like.write` | Like and unlike posts. X refuses these calls for self-serve apps | `comments.write` |
+| `media.write` | Upload images, video, and GIFs for a post | `posts.write` |
+| `offline.access` | Keep the connection without asking the person again | Every account |
+
+## Related
+
+- [X publishing](/platforms/twitter/publishing): fields, media rules, threads, and quirks for publishing
+- [Use your own X app](/platforms/twitter/own-app): create the X app and save its credentials
+- [Platform apps](/guides/platform-credentials): which platforms use SocialAPI's app and which use yours
+- [Platforms](/platforms/overview): the capability matrix
+- [Errors](/guides/errors): every error code

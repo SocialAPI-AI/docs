@@ -1,411 +1,80 @@
 ---
 title: Unified inbox
-description: Read and respond to comments, DMs, reviews, and mentions across platforms through a single social media inbox API.
+description: Read and answer comments, direct messages, reviews, and mentions from every connected platform through one inbox API with one set of IDs and cursors.
 ---
 
-The inbox is a unified social inbox API: a single endpoint that returns comments, direct messages, mentions, and reviews from every connected platform in one normalized `Interaction` shape, so you build inbox logic once instead of per platform.
+The unified inbox is SocialAPI's REST API for reading and answering what people send to your connected accounts: comments, direct messages (DMs), reviews, and mentions. Each area has its own endpoints. All of them use the same API key, the same [IDs](/guides/ids), the same cursor [pagination](/guides/pagination), and the same `501 resource.not_supported` answer when a platform lacks a feature.
 
-SocialAPI provides a unified inbox API for reading and responding to all inbound engagement across your connected accounts. Comments, DMs, reviews, and mentions are accessed through consistent endpoints with the same response shape regardless of platform.
+Replies and DMs cost interaction credits, and reads cost nothing. Which platforms support which action is in the [capability matrix](/platforms/overview).
 
-Comments, reviews, and mentions always reflect the latest state on the platform. DM conversations and messages are retained by SocialAPI to support threading and pagination.
+An account needs the matching [permission](/guides/permissions) for each area: `comments.read` and `comments.write`, `messages.read` and `messages.write`, or `reviews.read` and `reviews.write`. A call without it returns `403 account.permission_missing` (the lists of stored comments, conversations, and messages and `GET /v1/inbox/reviews` are the exceptions: see [Account permissions](/guides/permissions#what-an-account-can-do-right-now)), and the account's events for that area do not arrive.
 
-## Comments
+## The four areas
 
-List comments across all connected accounts, reply, and moderate.
+| Area | What it covers | Guide |
+|---|---|---|
+| Comments | Comments and replies on your posts: list, reply, private reply, hide, delete, like | [Comments](/guides/comments) |
+| Direct messages | Conversations and messages: list, send text, attachments, and buttons, react, mark as read | [Direct messages](/guides/direct-messages) |
+| Reviews | Reviews of a business location and the business's public reply | [Reviews](/guides/reviews) |
+| Mentions | Posts and comments that tag your account, and replies to them | [Mentions](/guides/mentions) |
 
-### Endpoints
+Answer Instagram and Facebook comments and DMs that match keywords without running a webhook handler by using an [Automation](/guides/automations).
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/inbox/comments` | List posts that received comments across accounts |
-| `GET` | `/v1/inbox/comments/:postId` | List comments on a specific post |
-| `GET` | `/v1/inbox/comments/:postId/:commentId/replies` | List replies to a specific comment |
-| `POST` | `/v1/inbox/comments/:postId` | Reply to a comment on a post |
-| `DELETE` | `/v1/inbox/comments/:postId/:commentId` | Delete a comment |
-| `POST` | `/v1/inbox/comments/:postId/:commentId/hide` | Hide a comment |
-| `DELETE` | `/v1/inbox/comments/:postId/:commentId/hide` | Unhide a comment |
-| `POST` | `/v1/inbox/comments/:postId/:commentId/like` | Like a comment |
-| `DELETE` | `/v1/inbox/comments/:postId/:commentId/like` | Unlike a comment |
-| `POST` | `/v1/inbox/comments/:postId/:commentId/private-reply` | Send a private DM in reply to a comment |
+## The interaction shape
 
-`:postId` accepts a platform post ID (e.g., `17895695668004550`). `:commentId` accepts a SocialAPI interaction ID (`sapi_cmt_...`). See [Interaction IDs](/guides/interaction-ids) for the encoding.
+An `Interaction` is the one object that webhook events and `GET /v1/accounts/{id}/mentions` use for a comment, DM, or mention. This is one item of that mentions list:
 
-Comment likes are supported on Facebook, LinkedIn Page and TikTok only (see the matrix below); other platforms return `501` with code `resource.not_supported`. Private replies (Instagram and Facebook) are limited by Meta to one per comment, within 7 days of the comment. Add `buttons` (1 to 3, same shape as when sending a DM) to send the reply as a button template, for example a "continue" button that starts a comment-to-DM flow; a postback tap arrives as a `dm.postback` event. You cannot message the commenter again until they respond; once they do, the conversation continues within the standard 24-hour messaging window.
-
-<Tip>
-  To run a comment-to-DM flow without hosting any code, use [Automations](/guides/automations): SocialAPI matches the comment's keywords, sends the private reply with its buttons, and handles each tap itself, including a [Follow gate](/guides/automations#the-follow-gate) on Instagram.
-</Tip>
-
-### Platform capabilities
-
-| Platform | Reply | Hide | Like | Delete | Private reply |
-|----------|-------|------|------|--------|---------------|
-| Instagram | Yes | Yes | No | Yes | Yes |
-| Facebook | Yes | Yes | Yes | Yes | Yes |
-| Threads | Yes | Conditional | No | Conditional | No |
-| Google | Yes | No | No | No | No |
-| LinkedIn Page | Yes | No | Yes | Yes | No |
-| LinkedIn | Soon | No | No | No | No |
-| YouTube | Yes | Yes | No | Yes | No |
-| X / Twitter | Yes | No | No | No | No |
-| TikTok | Yes | Yes | Yes | Yes | No |
-
-For TikTok, comments are available on accounts connected or reconnected since October 13, 2026, and Delete applies only to the account's own comments. For Threads, Hide is available on comments not owned by the user; Delete is available on own replies. LinkedIn Page (`linkedin_page`) is the organization page connector and is available in beta. Each comment in the response includes a `capabilities` object so your code can check what is actually allowed for that specific item.
-
-### Example: list and reply
-
-```bash
-# List posts that have comments
-curl https://api.social-api.ai/v1/inbox/comments \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-
-# List comments on one post
-curl "https://api.social-api.ai/v1/inbox/comments/17895695668004550" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-
-# Reply to a specific comment on a post (postId is the platform post ID)
-curl -X POST "https://api.social-api.ai/v1/inbox/comments/17895695668004550" \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "comment_id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U",
-    "text": "Thanks for the feedback!"
-  }'
-
-# Hide a comment
-curl -X POST "https://api.social-api.ai/v1/inbox/comments/{postId}/{commentId}/hide" \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```json
+{
+  "id": "sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+  "platform": "instagram",
+  "type": "mention",
+  "author": { "username": "janesmith" },
+  "content": {
+    "text": "Loving the new range from @acmecorp",
+    "media": [{ "url": "https://scontent.cdninstagram.com/v/t51/range.jpg", "type": "image" }]
+  },
+  "metadata": {
+    "media_id": "17895695668004550",
+    "permalink": "https://www.instagram.com/p/C8xY2AbC/",
+    "media_type": "IMAGE",
+    "like_count": 12,
+    "comments_count": 3
+  },
+  "received_at": "2026-10-13T14:35:00Z",
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+}
 ```
 
-## Direct messages
+`id` starts with `sapi_cmt_`, `sapi_dm_`, or `sapi_mnt_` by type. Every field is in [Interaction payload](/guides/webhook-events#interaction-payload). The list endpoints of the other areas return their own item shapes, described in each guide: comments with a `capabilities` object, conversations and messages, and reviews with a `reply`. IDs have one format everywhere: see [IDs](/guides/ids).
 
-Read conversations and send messages across platforms that support DMs.
+## Receive new items
 
-### Endpoints
+SocialAPI sends new inbound items to your server as [webhook events](/guides/webhook-events) when the platform reports them to SocialAPI.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/inbox/conversations` | List DM conversations |
-| `GET` | `/v1/inbox/conversations/:id` | Get a single conversation |
-| `PATCH` | `/v1/inbox/conversations/:id` | Update a conversation (set status to `active` or `archived`) |
-| `POST` | `/v1/inbox/conversations/:id/read` | Mark a conversation as read |
-| `GET` | `/v1/inbox/conversations/:id/messages` | Get messages in a conversation |
-| `POST` | `/v1/inbox/conversations/:id/messages` | Send a message |
+| Area | Events |
+|---|---|
+| Comments | `comment.received` |
+| Direct messages | `dm.received`, `dm.sent`, `dm.deleted`, `dm.referral`, `dm.postback`, and `dm.status.sent`, `dm.status.delivered`, `dm.status.read`, `dm.status.failed` |
+| Reviews | `review.received`, `review.updated` |
+| Mentions | `mention.received` |
 
-### List conversations query parameters
+Which platform emits which event is stated per event on [Webhook events](/guides/webhook-events). X, YouTube, Bluesky, Pinterest, and LinkedIn send nothing to SocialAPI. Where they support comments, DMs, or mentions, read them with the list endpoints. [Register an endpoint](/guides/webhooks#register-an-endpoint) once to receive the events of the other platforms.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `account_id` | string | | Filter by connected account ID |
-| `platform` | string | | Filter by platform (e.g., `instagram`, `facebook`) |
-| `status` | string | `active` | Conversation status: `active` or `archived` |
-| `limit` | integer | `25` | Page size (1-100) |
-| `cursor` | string | | Pagination cursor from the previous response |
+## Costs
 
-### Platform support
+Interaction credits count the replies and DMs you send. A plan with an interaction allowance returns `429 validation.interaction_limit_exhausted` when it is used up.
 
-| Platform | DMs supported | Notes |
-|----------|---------------|-------|
-| Instagram | Yes | 24-hour messaging window for non-followers |
-| Facebook | Yes | Via Messenger Send API, 24-hour response window |
-| LinkedIn | No | Platform API does not expose DMs |
-| TikTok | No | Not available via API |
-| Google | No | Not applicable |
-| Threads | No | Not available via API |
-| YouTube | No | Not available via API |
+- **1 credit:** a public reply to a comment, a reply to a review, a reply to a mention, and one DM request, however many messages it sends.
+- **No credit:** every read, private replies, hiding, liking, and deleting a comment, message reactions, and a manual sync.
 
-### When the messaging window is closed
+[Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction) is the home of these rules. Replies and DMs also count toward the [messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 
-Instagram and Facebook only let you message someone inside a window that their last message to you opened. Once it closes, a send returns HTTP `400` with `platform.instagram.window_closed` or `platform.facebook.window_closed`.
+## Fetch an inbound attachment
 
-After the platform refuses a thread for this reason, SocialAPI remembers it and answers further sends on that thread itself, with the same status and code plus `"blocked_locally": true` in the error meta. Nothing is sent to the platform, so the call returns immediately, costs no interaction credit, and does not count against your platform rate limits. The block lifts as soon as the person messages you again, on the webhook or the next message sync, and in any case after 24 hours, so a webhook that never arrives cannot leave a thread permanently unreachable.
+`GET /v1/inbox/media/{id}` returns the bytes of an attachment that arrived with a WhatsApp or Telegram message. On every other platform, the attachment URL on a message is the platform's own URL: you fetch it directly, and it expires when the platform says.
 
-A send that carries a `message_tag` is never blocked this way, since tags are how a message legitimately reaches someone outside the standard window.
-
-### Sending text and attachments
-
-A message can carry text, an attachment, interactive content, or a combination. Provide `text`, `attachment_url`, or interactive content (`quick_replies`, `buttons`, or `cards`): at least one is required.
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `account_id` | Yes | Connected account that owns the conversation |
-| `text` | Conditional | Message body. Required unless `attachment_url` or interactive content is set |
-| `attachments` | Conditional | One or more media attachments. Required unless `text` or interactive content is set. See Attachments below |
-| `attachment_url` | Conditional | Single-attachment shorthand, superseded by `attachments`. Publicly reachable URL of a media file |
-| `quick_replies` | No | Tappable reply chips (Instagram, Facebook). See Interactive messages below |
-| `buttons` | No | Button template with 1 to 3 call-to-action buttons (Instagram, Facebook) |
-| `cards` | No | Carousel of cards, each with an image and buttons (Instagram, Facebook) |
-
-On Facebook and Instagram, `attachment_url` is delivered as a Messenger attachment. The attachment type (image, video, audio, or file) is inferred from the URL file extension, so use a direct media link with the correct extension (for example `.jpg`, `.mp4`, `.mp3`). URLs without a recognized media extension are sent as a generic file. The media must be hosted on a publicly reachable URL (max 25 MB); the platform fetches it directly.
-
-### Attachments
-
-Each entry in `attachments` names a media source and how to read it:
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `source_type` | Yes | `url` (a publicly reachable media URL), `media_id` (a file in your media library), or `platform_attachment_id` (media already uploaded to the platform) |
-| `source` | Yes | The reference, as named by `source_type` |
-| `type` | Conditional | `image`, `video`, `audio`, or `file`. Inferred from the file for `url` and `media_id`; required for `platform_attachment_id` |
-| `caption` | No | Text shown with this attachment. WhatsApp and Telegram only |
-
-Text and attachments are delivered as separate messages, the text first, then each attachment in order. So text plus two images arrives as three messages.
-
-```bash
-curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
-  -H "Authorization: Bearer $SOCIALAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "account_id": "acc_abc123",
-    "text": "Here is what we found",
-    "attachments": [
-      { "source_type": "media_id", "source": "{media_id}", "caption": "The damaged panel" },
-      { "source_type": "url", "source": "https://cdn.example.com/report.pdf" }
-    ]
-  }'
-```
-
-`caption` attaches text to the media message itself rather than sending it separately. Instagram, Facebook, and Zalo have no caption in their Send APIs and ignore it; on WhatsApp a caption on an audio attachment is rejected, since WhatsApp has no caption there.
-
-A `media_id` is resolved to a temporary signed URL before sending, so the platform can always fetch it. All media ids in a request are resolved before any message is sent: an unknown id fails the whole request rather than delivering some of the messages.
-
-If a message fails partway through a multi-attachment send, the earlier messages stay delivered. The error carries `sent_count` and `failed_index` so you can retry from where it stopped.
-
-### Interactive messages
-
-On Instagram and Facebook you can send structured, tappable content alongside or instead of plain text. Set at most one of `quick_replies`, `buttons`, or `cards` per message. When the recipient taps a quick reply or a `postback` button, you receive a [`dm.postback` webhook](/guides/webhooks#event-types) carrying the `payload` you defined, so you can drive automated flows from your own code. For flows that only answer with set messages, an [Automation](/guides/automations#buttons-and-multi-step-flows) sends the buttons and answers each tap for you.
-
-These features require the recipient to be inside the 24 hour messaging window, the same as any other message.
-
-**Quick replies** render up to 13 tappable chips above the keyboard. They require `text` and are plain text only.
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `quick_replies[].title` | Yes | Chip label (20 characters or fewer) |
-| `quick_replies[].payload` | No | Value echoed back to your webhook when the chip is tapped |
-
-**Buttons** render a text bubble with 1 to 3 call-to-action buttons. They use `text` as the bubble body (640 characters or fewer).
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `buttons[].type` | Yes | `url` (opens a link) or `postback` (sends a `dm.postback` webhook) |
-| `buttons[].title` | Yes | Button label (20 characters or fewer) |
-| `buttons[].url` | Conditional | Destination URL. Required when `type` is `url` |
-| `buttons[].payload` | Conditional | Value echoed back to your webhook. Required when `type` is `postback` |
-
-**Cards** render a horizontally scrollable carousel of up to 10 cards, each with an image, title, subtitle, and up to 3 buttons. (Carousels are not available in the MCP `send_dm` tool; use the REST endpoint.)
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `cards[].title` | Yes | Card title (80 characters or fewer) |
-| `cards[].subtitle` | No | Card subtitle (80 characters or fewer) |
-| `cards[].image_url` | No | Card image URL |
-| `cards[].buttons` | No | Up to 3 buttons, same shape as `buttons` above |
-
-### Example: list conversations and send a message
-
-```bash
-# List conversations
-curl https://api.social-api.ai/v1/inbox/conversations \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-
-# Send a text message in a conversation (use the conversation "id" from the list above)
-curl -X POST https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "account_id": "acc_abc123", "text": "Your order has shipped!" }'
-
-# Send an image attachment (text optional)
-curl -X POST https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "account_id": "acc_abc123", "text": "Here is your receipt", "attachment_url": "https://cdn.example.com/receipt.jpg" }'
-
-# Send quick replies (Instagram, Facebook)
-curl -X POST https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "account_id": "acc_abc123",
-        "text": "How can we help?",
-        "quick_replies": [
-          { "title": "Track my order", "payload": "TRACK_ORDER" },
-          { "title": "Talk to support", "payload": "SUPPORT" }
-        ]
-      }'
-
-# Send a button template (Instagram, Facebook)
-curl -X POST https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "account_id": "acc_abc123",
-        "text": "Your order has shipped.",
-        "buttons": [
-          { "type": "url", "title": "Track order", "url": "https://shop.example.com/orders/123" },
-          { "type": "postback", "title": "Talk to support", "payload": "SUPPORT" }
-        ]
-      }'
-```
-
-### Manual sync
-
-Conversations and messages are normally refreshed on a staleness window: a read that finds stale data syncs before serving it. Use `/v1/inbox/sync` when you want to trigger a refresh independently of a read, for example to warm a thread before opening it.
-
-There are two targets. With only `account_id`, the job refreshes that account's conversation list, not every thread's messages: refreshing 200 threads on one button press is a rate-limit incident waiting to happen, so a list sync stays scoped to the list. Add `conversation_id` to instead refresh one thread's messages.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/v1/inbox/sync` | Start a sync for an account's conversation list, or one thread |
-| `GET` | `/v1/inbox/sync` | Get the current sync state for a target |
-
-**POST body**
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `account_id` | Yes | Connected account to sync |
-| `conversation_id` | No | Thread to sync instead of the conversation list |
-
-**GET query parameters**
-
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `account_id` | Yes | Connected account to check |
-| `conversation_id` | No | Thread to check instead of the conversation list |
-
-**Response**
-
-| Field | Description |
-|-------|--------------|
-| `state` | `idle`, `syncing`, or `failed` |
-| `started_at` | When the current or most recent job started |
-| `finished_at` | When the current or most recent job finished (null while syncing) |
-| `last_synced_at` | When this target last completed a sync. GET only: a POST response is the job that just started, so the value worth reading is the one you poll back |
-| `error` | Error message if the last job failed |
-| `synced` | Count from the last completed job: conversations upserted for a list sync, messages inserted for a thread sync. Display only |
-
-POST returns immediately (`202`) with the job's starting state. Calling it again for the same target while a job is already running returns that running job rather than starting a second one.
-
-**Rate limit.** Each target accepts one forced sync every 5 minutes. A second attempt inside that window returns `429` with a `Retry-After` header carrying the seconds to wait, and the error code `inbox.sync_rate_limited`. Wait that long rather than retrying sooner: the limit exists because the platforms have their own, stricter limits, and burning them affects every sync for that account.
-
-The limit applies only to syncs you trigger. Ordinary reads of the inbox refresh data on their own schedule and never consume it, so opening the inbox does not make the next manual refresh fail.
-
-A sync that is already running is not rate-limited: polling `POST` for a target you are already waiting on returns that job's state rather than a `429`.
-
-The poll pattern is: `POST /v1/inbox/sync`, then poll `GET /v1/inbox/sync` until `state` is no longer `syncing`, then refetch the conversation or message list.
-
-If you want a fast cold open on a slow platform (Instagram in particular), sync the thread first and read it once it is warm, rather than opening it cold: the read path still blocks on a cold open, so reading first gets you the same wait either way.
-
-`GET /v1/inbox/conversations` and `GET /v1/inbox/conversations/:id/messages` also return `sync_state` and `last_synced_at` on the list response itself, so a client already polling those lists can watch sync state without a separate call to `/v1/inbox/sync`. Both fields are additive: a client that ignores them sees exactly the response it saw before.
-
-```bash
-# Start a conversation-list sync
-curl -X POST https://api.social-api.ai/v1/inbox/sync \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
-
-# Start a sync for one thread
-curl -X POST https://api.social-api.ai/v1/inbox/sync \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067" }'
-
-# Poll status for the thread
-curl "https://api.social-api.ai/v1/inbox/sync?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&conversation_id=7f1c4e2b-2841-41a8-85d7-27b0f37ac067" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-## Reviews
-
-Read and reply to reviews on platforms that support them.
-
-### Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/inbox/reviews` | List reviews |
-| `POST` | `/v1/inbox/reviews/:id/reply` | Reply to a review |
-
-### Platform support
-
-| Platform | Reviews |
-|----------|---------|
-| Google | Yes (Google Business Profile) |
-| All others | No |
-
-### Example
-
-```bash
-# List reviews
-curl https://api.social-api.ai/v1/inbox/reviews \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-
-# Reply to a review
-curl -X POST https://api.social-api.ai/v1/inbox/reviews/sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U/reply \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "text": "Thank you for the review!" }'
-```
-
-## Mentions
-
-Read mentions of a connected account, and reply to them as a public comment.
-
-### Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/accounts/:id/mentions` | List mentions for a connected account |
-| `POST` | `/v1/accounts/:id/mentions/reply` | Reply to a mention as a public comment |
-
-Mentions are scoped to a single connected account, not the workspace.
-
-What `GET /mentions` returns differs by platform, and on Instagram it is narrower than the name suggests. It returns media your account was tagged in, which is the only mention-like collection Meta exposes as a list. @mentions written inside a post caption or inside a comment are not included: Meta provides no endpoint to poll them on either Instagram connection flow, and they reach applications only as webhooks. Those webhooks are not currently delivered for Instagram either (see [`mention.received`](/guides/webhooks)), so an @mention of your account in a comment on someone else's post will not appear through this endpoint today.
-
-Replying works even when the mention is on someone else's post, where the normal
-comment-reply endpoint is not allowed. Pass `media_id` (the post the mention is
-on, or the `sapi_mnt_` id from the list response) and `text`. Set `comment_id`
-only when the mention was inside a comment; omit it to reply to a mention in the
-post caption. A reply consumes 1 interaction credit.
-
-### Platform support
-
-| Platform | List mentions | Reply to mention |
-|----------|----------|----------|
-| Instagram | Tagged media only | Yes |
-| Facebook | Yes | Yes |
-| Threads | Beta | Beta |
-| Bluesky | Yes | Yes |
-| X / Twitter | Yes | No |
-| All others | No | No |
-
-### Example
-
-```bash
-# List mentions
-curl "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-
-# Reply to a comment mention as a public comment
-curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions/reply \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"media_id": "17895695668004550", "comment_id": "17858893269577012", "text": "Thanks for the shout-out!"}'
-```
-
-## Media
-
-Some inbound messages carry an attachment. For most platforms `messages.attachment_url` is the platform's own URL and you fetch it directly (subject to whatever expiry the platform applies). WhatsApp and Telegram are the exceptions: their files can only be downloaded with the connected account's own credentials, which your API key cannot present. For those two, `attachment_url` on the message and `content.media[].url` on the `dm.received` webhook are a SocialAPI URL that you retrieve with your API key. It stays available for 30 days after the message arrives, then returns `410`.
-
-### Endpoint
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/inbox/media/:id` | Retrieve an inbound attachment |
+WhatsApp and Telegram files can be downloaded only with the connected account's own credentials, which your API key cannot present. For those two platforms, `attachment_url` on the message and `content.media[].url` on the `dm.received` event are a SocialAPI URL of the form `https://api.social-api.ai/v1/inbox/media/{id}`. SocialAPI starts fetching the file when the message arrives. It stays available for 30 days, then returns `410`.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/media/7f3c1e2a-9b4d-4e5f-8a6b-1c2d3e4f5a6b" \
@@ -413,41 +82,81 @@ curl "https://api.social-api.ai/v1/inbox/media/7f3c1e2a-9b4d-4e5f-8a6b-1c2d3e4f5
   -o attachment
 ```
 
-### Responses
-
 | Status | Meaning |
-|--------|---------|
+|---|---|
 | `200` | The attachment bytes, with `Content-Type` set to the original media type |
-| `404` | Unknown media ID, or it belongs to a different account than your key |
-| `410` | Gone for good: expired, or the platform reported the source unrecoverable. Retrying will not help |
-| `503` | Too many concurrent fetches in progress. Retry shortly |
-| `504` | The fetch from the platform is still in progress. Retry shortly, this is not a failure |
+| `404` | The media ID is unknown, or it belongs to another SocialAPI account |
+| `410` | The file is gone for good: it expired, or the platform reported the source unrecoverable. Stop retrying |
+| `503` | Too many requests are waiting for files. The response carries `Retry-After: 1`. Retry after 1 second |
+| `504` | SocialAPI is still fetching the file. Send the request again until you get `200` or `410`: this is not a failure |
 
-A `410` and a `504` mean opposite things and are not interchangeable: `410` means stop retrying, `504` means keep retrying. There is nothing to trigger: the attachment is made available automatically when the inbound message arrives, and this endpoint only reads it back.
+A request for a file that is still being fetched waits up to 15 seconds for it before it returns `504`. `410` and `504` mean opposite things: `410` means stop, `504` means keep retrying. A file that cannot be downloaded at all, such as a Telegram file over 20 MB, returns `410`.
 
-## Interaction IDs
+## Refresh the inbox manually
 
-Every interaction returned by the inbox has a stable ID with a type prefix:
+Use `POST /v1/inbox/sync` to refresh conversations and messages on demand, for example to load a thread before you open it.
 
-| Prefix | Type |
-|--------|------|
-| `sapi_cmt_` | Comment |
-| `sapi_dm_` | DM |
-| `sapi_rev_` | Review |
-| `sapi_mnt_` | Mention |
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/inbox/sync` | Start a sync for one account's conversation list, or for one thread |
+| `GET` | `/v1/inbox/sync` | Read the sync state of a target |
 
-The suffix encodes the platform and the platform-native ID, so you can route actions without a database lookup. See [Interaction IDs](/guides/interaction-ids) for the full encoding scheme.
+With only `account_id`, the sync refreshes that account's conversation list, then loads the messages of up to 20 of its most recent conversations that were never loaded. Add `conversation_id` to refresh that one thread's messages instead.
 
-## Webhooks
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/sync \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```
 
-SocialAPI can notify your server when new inbound interactions arrive (new comment, new DM, new review). Register a webhook endpoint and subscribe to the event types you care about. See [Webhooks](/guides/webhooks) for setup and event reference.
+Response (HTTP 202):
 
-To answer Instagram and Facebook comments and DMs that match keywords without running a webhook handler, configure an [Automation](/guides/automations) instead.
+```json
+{
+  "data": {
+    "state": "syncing",
+    "started_at": "2026-10-13T14:30:00Z",
+    "finished_at": null,
+    "last_synced_at": null,
+    "error": "",
+    "synced": 0
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | Request body and `GET` query parameter. Required. The connected account to sync |
+| `conversation_id` | Request body and `GET` query parameter. Optional. The thread to sync instead of the conversation list |
+| `state` | `idle`, `syncing`, or `failed` |
+| `started_at` | When the current or most recent job started |
+| `finished_at` | When the job finished. `null` while `state` is `syncing` |
+| `last_synced_at` | When this target last completed a sync. `null` in the `POST` response: read it from `GET` |
+| `error` | The reason the last job failed. Empty otherwise |
+| `synced` | Conversations added for a list sync, or messages added for a thread sync. For display only |
+
+To wait for the result, poll `GET /v1/inbox/sync` with the same `account_id` and `conversation_id` until `state` is no longer `syncing`, then read the conversation or message list again:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/sync?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+A `POST` for a target that is already syncing returns that running job and starts no second one. Each target accepts 1 sync you start every 5 minutes. A second attempt inside that time returns `429 inbox.sync_rate_limited` with a `Retry-After` header holding the seconds to wait, and `error.meta.retry_after_seconds` repeats it. Reads of the inbox never use this allowance.
+
+`GET /v1/inbox/conversations` and `GET /v1/inbox/conversations/{id}/messages` also return `sync_state` and `last_synced_at`, so a client that already polls them does not need `GET /v1/inbox/sync`. An unknown `account_id` or `conversation_id` returns `404`, and a missing `account_id` returns `400 validation.field_required`.
+
+## Scopes
+
+A scoped key needs the scope that each guide lists for an operation: `inbox:read`, `inbox:write`, `dms:read`, or `dms:send`. Starting or reading a sync needs `dms:read`. [Scoped API keys](/guides/scoped-keys#scopes) lists what each scope grants.
 
 ## Related
 
-- [Automations](/guides/automations) for keyword replies and comment-to-DM flows with no code on your side
-- [Platform support](/guides/platforms) for the full capability matrix
-- [Interaction IDs](/guides/interaction-ids) for the ID encoding scheme
-- [Webhooks](/guides/webhooks) for real-time event delivery
-- [API Reference](/api-reference/introduction) for complete endpoint schemas
+- [Comments](/guides/comments): list, reply to, moderate, and privately answer comments.
+- [Direct messages](/guides/direct-messages): conversations, messages, attachments, and buttons.
+- [Reviews](/guides/reviews): read Google Business Profile reviews and reply.
+- [Mentions](/guides/mentions): list the posts that tag your account and reply.
+- [Webhook events](/guides/webhook-events): every inbox event and its payload.
+- [Account permissions](/guides/permissions): limit what a connected account can read and send.
+- [Plans and usage](/guides/plans): interaction credits and allowances.

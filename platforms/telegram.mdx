@@ -1,0 +1,165 @@
+---
+title: "Telegram API"
+sidebarTitle: "Telegram"
+description: "Connect a Telegram bot with its BotFather token, then read and answer the direct messages people send to your bot through one REST API."
+icon: "telegram"
+---
+
+SocialAPI connects a Telegram bot that you create with @BotFather and reads and answers the direct messages (DMs) people send to it. You connect the bot with its token: there is no OAuth, no Telegram developer account, and no app to register. Telegram bots receive DMs only, so SocialAPI offers no posts, comments, reviews, or mentions for Telegram. [Platform apps](/guides/platform-credentials) lists which app connects each platform.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `telegram` |
+| Auth | Bot token from @BotFather |
+| Platform API | Telegram Bot API |
+| Status | Available on every plan |
+
+## Capabilities
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Receive DMs | Yes | Messages people send to your bot arrive as `dm.received` webhooks and in the inbox |
+| Send DMs | Conditional | Only to a person who has messaged the bot first. Otherwise the send fails with `403 telegram.cannot_message` |
+| DM attachments | Yes | One file per message bubble, sent as a photo or a document. `platform_attachment_id` is not supported |
+| Buttons, quick replies, cards, and lists | No | SocialAPI sends only the text of a Telegram message |
+| Message history | No | The inbox starts when you connect the bot |
+| Message reactions | No | Returns `501 resource.not_supported` |
+| Comments | No | SocialAPI reads no Telegram comments |
+| Mentions | No | Returns `501 resource.not_supported` |
+| Reviews | No | Telegram has no reviews |
+| Publishing | No | A post that targets a Telegram account fails with `501 resource.not_supported` |
+| Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
+
+The capability matrix for every platform is on [Supported platforms](/platforms/overview).
+
+## Connect a bot
+
+A Telegram bot connects in one request: you send its token, and SocialAPI returns the connected account.
+
+<Steps>
+  <Step title="Create the bot">
+    Open Telegram and message [@BotFather](https://t.me/BotFather). Send `/newbot`, choose a display name, then choose a username that ends in `bot`.
+  </Step>
+  <Step title="Copy the token">
+    BotFather replies with a token of the form `123456789:ABCdefGhIjKlMnOpQrStUvWxYz-1234`. Anyone who holds the token controls the bot, so keep it secret.
+  </Step>
+  <Step title="Connect the bot">
+    Send the token as `metadata.bot_token`:
+
+    ```bash
+    curl -X POST https://api.social-api.ai/v1/accounts/connect \
+      -H "Authorization: Bearer $SOCAPI_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "platform": "telegram",
+        "metadata": { "bot_token": "123456789:ABCdefGhIjKlMnOpQrStUvWxYz-1234" }
+      }'
+    ```
+
+    Response (HTTP 201):
+
+    ```json
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "telegram",
+      "username": "acme_support_bot",
+      "display_name": "Acme Support"
+    }
+    ```
+  </Step>
+</Steps>
+
+`username` is the bot's username and `display_name` is its name. Without `brand_id` in the request, SocialAPI creates a brand for the bot. SocialAPI also sends `account.connected` to your webhook endpoints.
+
+A missing `bot_token` returns `400 validation.field_required`. A token Telegram rejects returns `401 platform.telegram.auth`.
+
+### One bot, one receiver
+
+Connecting the bot points its Telegram webhook at SocialAPI and replaces any webhook the bot already had. Telegram delivers a bot's updates to one receiver only: while the bot is connected to SocialAPI, another service cannot receive its messages by webhook or with `getUpdates`.
+
+Disconnecting the account (`DELETE /v1/accounts/{account_id}`) removes the webhook, so Telegram stops sending the bot's messages to SocialAPI. The token itself stays valid until you revoke it with `/revoke` in @BotFather. A bot token has no expiry date; after a revoke, connect the bot again with the new token.
+
+## Receive messages
+
+Each message a person sends to your bot arrives as a `dm.received` event and is stored in the inbox. Telegram offers no message history to bots, so the inbox holds only messages received after you connected the bot.
+
+The `dm.received` data carries the fields you need to reply and to match the stored message:
+
+| Field | Description |
+|---|---|
+| `conversation_id` | The SocialAPI conversation to reply into |
+| `platform_id` | Telegram's message ID, the same value as `platform_id` on the message in `GET /v1/inbox/conversations/{conversation_id}/messages` |
+| `reply_to.platform_id` | Set when the person replied to an earlier message: that message's `platform_id` |
+| `content.text` | The message text, or the caption of a file |
+| `content.media` | The file the person sent, as `{ "url", "type" }`. `type` is `image`, `audio`, `video`, `document`, or `sticker` |
+
+Photos, documents, voice notes, audio, videos, video notes, animations, and stickers all arrive in `content.media`. The `url` is a SocialAPI URL of the form `https://api.social-api.ai/v1/inbox/media/{id}`: Telegram files can be downloaded only with the bot's token, so SocialAPI keeps a copy for you. Fetch the URL with your API key. The same URL appears as `attachment_url` on the stored message, and it stays available for 30 days. Telegram does not let bots download files larger than 20 MB, so the URL of such a file returns `410`. [Fetch an inbound attachment](/guides/inbox#fetch-an-inbound-attachment) lists every status this URL returns.
+
+Edited and deleted messages raise no event. The full event payload is on [Webhook events](/guides/webhook-events).
+
+## Send messages
+
+You reply with `POST /v1/inbox/conversations/{conversation_id}/messages`, the same endpoint as every other platform. The request fields are on [Direct messages](/guides/direct-messages).
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/conversations/{conversation_id}/messages \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Your order shipped this morning. Here is the invoice.",
+    "attachments": [
+      { "source_type": "url", "source": "https://example.com/invoices/A1234.pdf", "caption": "Invoice A1234" }
+    ]
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL",
+  "message_ids": [
+    "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL",
+    "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVM"
+  ]
+}
+```
+
+The text and each attachment are sent as separate messages, in that order. Omitting `account_id` returns `400 validation.field_required`.
+
+These rules are specific to Telegram:
+
+- **The person writes first.** Telegram does not let a bot start a conversation. Until the person sends `/start` or any message to the bot, a send fails with `403 telegram.cannot_message`. The same code is returned when the person blocked the bot. Once the person has written, there is no reply window: the bot can answer at any time.
+- **Photo or document.** SocialAPI sends a file whose name ends in `.jpg`, `.jpeg`, `.png`, `.gif`, or `.webp` as a photo, and any other file as a document. The `type` field of the attachment does not change this choice.
+- **Captions.** An attachment's `caption` is shown under the file. The message `text` is always a separate message, also with the single-file shorthand `attachment_url`.
+- **Interactive content is not sent.** Telegram messages carry no `buttons`, `quick_replies`, `cards`, or `list_sections`. SocialAPI sends the `text` and ignores those fields. `reply_to_message_id` and `message_tag` are ignored as well.
+- **No `platform_attachment_id`.** Send files as `url` or `media_id` attachments.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Message text | 4,096 characters |
+| Caption | 1,024 characters |
+| Photo sent by URL | 5 MB |
+| Other file sent by URL | 20 MB |
+| File a person sends that SocialAPI can copy | 20 MB |
+| Inbound file URL availability | 30 days |
+
+Telegram enforces the text, caption, and file limits. A request over one of them, or a file URL Telegram cannot fetch, fails with `400 validation.telegram_bad_request`, whose message carries Telegram's own description. When Telegram rate-limits the bot, the send fails with `429 platform.telegram.rate_limit`: wait the number of seconds in the `Retry-After` header before you retry.
+
+## Scopes
+
+A Telegram bot has no OAuth scopes. The bot token gives full control of the bot, and SocialAPI uses it to receive the bot's messages and to send replies. The account supports the `messages.read` and `messages.write` [permissions](/guides/permissions), which SocialAPI alone enforces.
+
+## Related
+
+- [Direct messages](/guides/direct-messages): the request fields for sending DMs and attachments
+- [Webhook events](/guides/webhook-events): the full `dm.received` payload
+- [Connect accounts](/guides/connect-accounts): brands, reconnecting, and disconnecting
+- [Errors](/guides/errors): every Telegram error code
+- [Supported platforms](/platforms/overview): what each platform supports

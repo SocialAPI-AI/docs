@@ -1,0 +1,102 @@
+---
+title: LinkedIn API
+sidebarTitle: "Overview"
+description: Connect a LinkedIn member profile to publish text, image, video, multi-image, and link posts as the person through one API.
+icon: "linkedin"
+---
+
+The LinkedIn API in SocialAPI connects a LinkedIn member profile (`linkedin`). A connection publishes text, image, video, multi-image, and link posts as the person. SocialAPI's own LinkedIn app connects the profile, so you register nothing: see [Platform apps](/guides/platform-credentials).
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `linkedin` |
+| Auth | OAuth 2.0 with LinkedIn Sign In (OpenID Connect) |
+| Platform API | LinkedIn Posts API |
+| Status | Available |
+
+## Capabilities
+
+An unsupported call returns `501 resource.not_supported`.
+
+| Feature | Status | Condition |
+|---|---|---|
+| Publish text, image, video, multi-image, link posts | Yes | See [LinkedIn publishing](/platforms/linkedin/publishing) |
+| Schedule a post | Yes | `scheduled_at` on the post |
+| First comment on a post | No | `first_comment` is ignored |
+| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
+| Delete a published post | Yes | |
+| List posts | Partial | Returns the posts you published through SocialAPI, not a live read from LinkedIn |
+| Comments, DMs, mentions | No | `501 resource.not_supported` |
+| Reviews | No | LinkedIn has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
+| Automations | No | `422 automation.platform_unsupported` |
+| Webhook events | Partial | `account.connected` and the `post.*` events |
+
+The cross-platform matrix is on [Platforms](/platforms/overview).
+
+## Connect an account
+
+Connect with `POST /v1/accounts/connect` and `"platform": "linkedin"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "linkedin",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
+  }'
+```
+
+Response (HTTP 202):
+
+```json
+{
+  "auth_url": "https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=77abc123&state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Open this link to connect your linkedin account. Once you've authorized, the account will be connected automatically."
+}
+```
+
+LinkedIn-specific rules:
+
+- **Member connection.** The connected account is the person who signed in. Posts publish to that person's feed.
+- **Token lifetime.** LinkedIn access tokens last 60 days and cannot be refreshed. When one expires, the first call that fails returns `401 platform.linkedin.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **Disconnect.** LinkedIn offers apps no way to end an authorization. Disconnecting an account removes it from SocialAPI, and the person removes SocialAPI's app in their LinkedIn settings.
+
+## Webhook events
+
+| Event | When it fires |
+|---|---|
+| `account.connected` | The account was connected |
+| `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
+| `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
+
+Every event is described in [Webhook events](/guides/webhook-events).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Post text | 3,000 characters |
+| Multi-image post | 2 to 20 images |
+| Posts | 25 per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| LinkedIn's own rate limit | `429 platform.linkedin.rate_limit`. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
+
+## Scopes
+
+SocialAPI's LinkedIn app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected.
+
+| Scope | Used for | Permissions |
+|---|---|---|
+| `openid`, `profile` | Identify the member: name, picture, and ID | Every account |
+| `w_member_social` | Publish posts as the member | `posts.write` |
+
+## Related
+
+- [LinkedIn publishing](/platforms/linkedin/publishing): fields, media rules, text formatting, and quirks for publishing
+- [Connect accounts](/guides/connect-accounts): the shared connect flow
+- [Platforms](/platforms/overview): the capability matrix
+- [Errors](/guides/errors): every error code

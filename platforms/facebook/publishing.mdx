@@ -1,0 +1,590 @@
+---
+title: Facebook publishing
+sidebarTitle: "Publishing"
+description: Publish text, link, photo, video, album, Reel, and Story posts to Facebook Pages through SocialAPI, with platform fields, limits, and error recovery.
+---
+
+## 1. Overview
+
+A Facebook post goes to one Facebook Page. SocialAPI picks the format from the `media` you send: no media gives a text or link post, one image a photo post, one video a video post, and 2 to 10 images a multi-photo album. Two richer formats are opt-in with `platform_data.content_type`: `"reel"` publishes a Reel, and `"stories"` publishes a 24-hour Story. Every format is described below.
+
+| Field | Value |
+|---|---|
+| Platform slug | `facebook` |
+| Auth type | OAuth 2.0 (Meta) |
+| Platform API | Meta Graph API (Facebook Pages) |
+| Create post | Yes |
+| Update post | Not after publishing (`409 post.state_invalid`). `draft`, `scheduled`, and `failed` posts can be edited |
+| Delete post | Yes |
+| Schedule | Yes (deferred publish via `scheduled_at`) |
+| First comment | Yes (best-effort; not on Stories) |
+| Posting caps | 100 posts per 24 hours and 25 per hour for each Page: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Carousel (multi-photo) | Yes (2 to 10 photos; images only) |
+| Reel | Yes (`content_type: "reel"`; one vertical video) |
+| Story | Yes (`content_type: "stories"`; one photo or video, expires after 24 hours) |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Text only | No `media`; no `link` in `platform_data` | Publishes a plain text status update |
+| Link preview | No `media`; include `link` in the target's `platform_data` | Facebook generates an Open Graph preview card |
+| Single photo | One image entry in `media` | Publishes a Page photo; accepts `alt_text` and the targeting and place fields, see "Platform data fields" below |
+| Single video | One video entry in `media` | Publishes a Page video. SocialAPI treats a file whose name ends in `.mp4`, `.mov`, `.avi`, `.mkv`, or `.webm` as a video. Accepted formats for uploaded files are in File limits below. Accepts `title` and the video, targeting, and place fields, see "Platform data fields" below |
+| Reel | One vertical video entry in `media` plus `content_type: "reel"` in the target's `platform_data` | Publishes a Page Reel; accepts `content_type`, `share_to_feed` (default `true`), `title`, and `place` |
+| Story | One photo or video entry in `media` plus `content_type: "stories"` in the target's `platform_data` | Publishes a Page Story that expires after 24 hours. Captions, links, and audience targeting are ignored |
+| Multi-photo album | 2 to 10 image entries in `media` | Publishes one post containing every photo, with one caption. Accepts `link`, the CTA fields, age and country targeting, and `place`. |
+
+The format follows the `media` you pass:
+
+- `media` is empty: a text or link post.
+- `media` has one entry: a photo or a video, by the file extension.
+- `media` has 2 to 10 entries: a multi-photo album.
+
+Reels and Stories override that routing. Set `content_type` in the target's `platform_data` to `"reel"` (one vertical video) or `"stories"` (one photo or video), and that intent takes precedence over the rules above. The value is case-insensitive; any other value publishes a standard feed post and returns a warning naming it.
+
+**Text limit:** 63,206 characters. More returns `400 publishing.validation_failed`.
+
+**File limits for media you upload to SocialAPI** (`source_type: "media_id"`): images must be JPEG, PNG, GIF, or WebP and at most 10 MB. Videos must be MP4, QuickTime, or AVI, at most 4 GB, and at most 240 minutes. A file outside these limits fails validation with `400 publishing.validation_failed`. A `url` item is not checked in advance.
+
+**Multi-photo album rules:**
+
+- 2 to 10 photos per post. Passing more than 10 entries returns a validation error.
+- Images only. Mixing images and videos in the same album is rejected with a validation error. Facebook's Graph API does not support mixed-media albums; publish separate posts.
+- If publishing the album fails, no partial post appears on the Page, and you can retry the whole post.
+- For best rendering, use consistent 1,080 by 1,080 px (1:1) images.
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `targets` targeting a Facebook Page account. The `text` field becomes the post message.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Exciting news from our team. Read the full announcement on our website.",
+    "publish_now": true,
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "link": "https://example.com/announcement"
+      }
+    }]
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "Exciting news from our team. Read the full announcement on our website.",
+  "status": "publishing",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "facebook",
+      "status": "pending",
+      "text": "Exciting news from our team. Read the full announcement on our website."
+    }
+  ]
+}
+```
+
+SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
+
+### Platform data fields
+
+Send these keys flat in the target's `platform_data` (`targets[].platform_data`), or in `platform_data.facebook` on the post, which applies them to every Facebook target. When both set the same key, the target's value wins. Which keys apply depends on the content type, shown in the "Applies to" column.
+
+| Key | Type | Applies to | Notes |
+|---|---|---|---|
+| `content_type` | string | reel, stories | Set to `"reel"` or `"stories"` to publish those formats. Omit it for standard feed, photo, video, or album routing. Case-insensitive; any other value publishes a standard post and returns a warning naming it. |
+| `link` | string (URL) | text/link posts, multi-photo albums | Attaches a link preview card. Facebook generates the Open Graph preview. |
+| `cta_type` | string | text/link posts, multi-photo albums | Call-to-action button type, for example `SHOP_NOW` or `LEARN_MORE`. Must be set together with `cta_link`. |
+| `cta_link` | string (URL) | text/link posts, multi-photo albums | Destination URL for the call-to-action button. Must be set together with `cta_type`. |
+| `min_age` | number, 13 to 65 | text/link posts, photo, video, multi-photo albums | Minimum audience age. |
+| `max_age` | number, 13 to 65 | text/link posts, photo, video, multi-photo albums | Maximum audience age. Must be greater than or equal to `min_age`. |
+| `countries` | array of ISO 3166-1 alpha-2 codes | text/link posts, photo, video, multi-photo albums | Restricts the audience to these countries, for example `["FR", "BE"]`. |
+| `place` | string (numeric Page ID) | text/link posts, photo, video, multi-photo albums, reel | Tags a location on the post. |
+| `alt_text` | string | single photo | Accessibility text for the photo. |
+| `title` | string | single video, reel | Title shown with the video or Reel. |
+| `share_to_feed` | boolean | reel | Default `true`: the Reel also appears in the Page feed, not just the Reels tab. Send `false` to keep it in the Reels tab only. |
+| `no_story` | boolean | single photo, single video | When `true`, the photo or video is added without posting a separate update to the Page feed. |
+| `content_category` | string | single video | One of Facebook's video categories: `BEAUTY_FASHION`, `BUSINESS`, `CARS_TRUCKS`, `COMEDY`, `CUTE_ANIMALS`, `ENTERTAINMENT`, `FAMILY`, `FOOD_HEALTH`, `HOME`, `LIFESTYLE`, `MUSIC`, `NEWS`, `POLITICS`, `SCIENCE`, `SPORTS`, `TECHNOLOGY`, `VIDEO_GAMING`, or `OTHER`. |
+| `content_tags` | array of numeric Facebook Page or profile IDs | single video | Tags Pages or profiles in the video. |
+| `embeddable` | boolean | single video | Allows the video to be embedded on other sites. |
+| `secret` | boolean | single video | Hides the video from the Page's public video list and search. |
+| `social_actions` | boolean | single video | Enables like, comment, and share actions on embeds of the video. |
+| `child_attachments` | array of 2 to 10 `{link, name?, description?, picture?}` | text/link posts with no media attached | Cards of a link carousel. Each card needs a `link`; `name`, `description`, and `picture` are optional. Returns an error when the post has media. See "Link carousel" below. |
+| `multi_share_optimized` | boolean | with `child_attachments` | When `true`, Facebook orders the cards for best performance instead of the order sent. |
+| `multi_share_end_card` | boolean | with `child_attachments` | When `true`, an end card promoting the Page appears after the last link card. |
+
+SocialAPI forwards any additional keys in `platform_data` that the table above lists for the post type you publish, and no others. Any other key, including a key listed for another post type, is not sent, and the response lists each one as a validation warning naming the key. For example, `link` on a single photo returns a warning and the photo publishes without it. Facebook has no AI-generated label: `is_ai_generated` returns a warning and is not sent.
+
+### Photo post
+
+Provide a single image entry in `media`. Photo posts also accept `alt_text`, `min_age`, `max_age`, `countries`, `place`, and `no_story`; see the table above.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "publish_now": true,
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "Our new product is here.",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }]
+  }'
+```
+
+### Multi-photo album
+
+Provide 2 to 10 image entries in `media` to publish a multi-photo album. The entries are published as a single album post with one caption.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "publish_now": true,
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "Highlights from this week.",
+    "media": [
+      { "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" },
+      { "source_type": "media_id", "source": "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b" },
+      { "source_type": "media_id", "source": "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17" }
+    ]
+  }'
+```
+
+Albums also accept `link`, `cta_type` plus `cta_link`, age and country targeting, and `place` in the target's `platform_data`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Shop the spring collection.",
+    "media": [
+      { "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" },
+      { "source_type": "media_id", "source": "8d5e9b2c-1a3f-4c6d-9e8b-2f7a4c1d6e0b" },
+      { "source_type": "media_id", "source": "3b1f7a90-6c2d-4e85-b9a1-0d4f8c3e2a17" },
+      { "source_type": "media_id", "source": "5e2c8a14-7b9d-4f03-a6c1-9d8e0b3f4a26" }
+    ],
+    "publish_now": true,
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "cta_type": "SHOP_NOW",
+        "cta_link": "https://example.com/spring"
+      }
+    }]
+  }'
+```
+
+**Limits:**
+- Minimum 2, maximum 10 photos per album.
+- Images only. Including a video entry (any of `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) in a 2+ item `media` list returns a validation error before any upload to Facebook.
+
+### Link carousel
+
+Publish 2 to 10 link cards in one post by setting `child_attachments` instead of `media` or `link`. This is different from a multi-photo album: no media is uploaded, and each card carries its own link, title, and description.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Top picks this week.",
+    "publish_now": true,
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "child_attachments": [
+          { "link": "https://example.com/product-1", "name": "Product one", "description": "Our best seller", "picture": "https://example.com/images/product-1.jpg" },
+          { "link": "https://example.com/product-2", "name": "Product two", "description": "New this week" }
+        ],
+        "multi_share_end_card": true
+      }
+    }]
+  }'
+```
+
+Provide 2 to 10 cards. `child_attachments` on a post with `media` returns a validation error. `link` set together with `child_attachments` is not sent and returns a validation warning.
+
+### Video post
+
+Provide a single video entry in `media`. It is published as a Page video. Video posts also accept `min_age`, `max_age`, `countries`, `place`, `no_story`, `content_category`, `content_tags`, `embeddable`, `secret`, and `social_actions`; see the table above.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "publish_now": true,
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "Watch our latest brand film.",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }]
+  }'
+```
+
+### Reel
+
+Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media`. Facebook processes Reels before they go live. SocialAPI waits up to about 10 minutes for that to finish. After that, the target fails with `504 platform.facebook.reel_timeout`. If Facebook cannot process the video, the target fails with `422 platform.facebook.reel_processing_failed`.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Behind the scenes #reels",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "content_type": "reel",
+        "share_to_feed": true
+      }
+    }]
+  }'
+```
+
+`share_to_feed` defaults to `true`. Reels also accept `title` and `place`; see the table above for every option.
+
+Requirements: exactly one video, vertical orientation (9:16), and a duration of 3 to 90 seconds. SocialAPI warns when the duration is outside that range; Facebook enforces the aspect ratio at publish time and rejects videos that do not comply.
+
+### Story
+
+Publish a 24-hour Page Story by setting `content_type: "stories"` in the target's `platform_data`. Provide exactly one photo or video entry in `media`. A video Story waits up to about 10 minutes for Facebook to process it. After that, the target fails with `504 platform.facebook.story_timeout`. If Facebook cannot process the video, the target fails with `422 platform.facebook.story_processing_failed`.
+
+Stories carry no caption, link, call-to-action, or audience targeting. `text` is ignored, and any `platform_data` key other than `content_type` is not sent and returns a validation warning.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "content_type": "stories"
+      }
+    }]
+  }'
+```
+
+Set `content_type` to `"stories"`, plural, to publish a Story. The singular `"story"` is not recognized and publishes a standard feed post instead, with a validation warning. No other `platform_data` key applies to Stories.
+
+Requirements and limits:
+
+- Exactly one media item. Passing zero or more than one entry returns a validation error before any upload to Facebook.
+- Photos: JPEG, BMP, PNG, GIF, or TIFF, up to 10 MB (keep PNGs under 1 MB).
+- Videos: 9:16 vertical, 1080 by 1920 recommended (minimum 540 by 960), 3 to 90 seconds, 24 to 60 fps.
+- The photo or video must not have been used in a previously published post. Facebook rejects a Story whose media already appeared elsewhere, so upload a fresh asset for each Story.
+- Stories are a Pages-only format and expire after 24 hours (see [Stories expire](#stories-expire)).
+
+### First comment
+
+Set `first_comment` to a string to post an automated comment immediately after publish. This is best-effort: if the comment fails (for example due to a temporary rate limit), the post is still considered published.
+
+Page Stories are the one exception: a Story has no comments edge on the Graph API, so `first_comment` is skipped for `content_type: "stories"` targets. Every other post type (text, link, single photo, multi-photo album, single video, Reel) accepts one.
+
+```json
+{
+  "publish_now": true,
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "text": "Exciting news from our team.",
+  "first_comment": "Read the full announcement: https://example.com/blog"
+}
+```
+
+### Scheduling
+
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
+
+```json
+{
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "text": "Scheduled announcement.",
+  "scheduled_at": "2026-11-15T10:00:00Z"
+}
+```
+
+---
+
+## 4. Update post
+
+A published Facebook post cannot be edited through SocialAPI. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for any post whose status is not `draft`, `scheduled`, or `failed`, with the message "Only draft, scheduled, or failed posts can be edited".
+
+A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{pid}` before it publishes.
+
+To correct a published post, delete it with `DELETE /v1/posts/{pid}` and publish a new post.
+
+---
+
+## 5. Delete post
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+To remove only the Facebook target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{pid}` always removes every target.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/unpublish \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
+```
+
+Deleting removes the post from the Page. See [Delete a post](/guides/delivery#delete-a-post) for how a cross-platform post is handled.
+
+---
+
+## 6. Retrieve posts
+
+Use `GET /v1/posts` to list posts. Filter by platform or account:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?platform=facebook&account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each post includes a `targets` array with per-platform status and engagement metrics:
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "Exciting news from our team.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "facebook",
+      "platform_post_id": "123456789012345_987654321098765",
+      "status": "published",
+      "permalink": "https://www.facebook.com/permalink/123456789012345",
+      "platform_media": [
+        { "type": "image", "url": "https://scontent.xx.fbcdn.net/v/t39.30808-6/123_n.jpg" }
+      ],
+      "metrics": {
+        "likes": 15,
+        "comments": 3,
+        "shares": 7,
+        "saves": 0,
+        "extra": null
+      },
+      "metrics_synced_at": "2026-04-10T12:00:00Z"
+    }
+  ]
+}
+```
+
+**Metrics notes:**
+- `likes` and `comments` are synced from Facebook.
+- `shares` is populated for Facebook posts.
+- `saves` is not available on Facebook and is always `0`.
+- `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Facebook.
+- A Reel reports `likes`, `comments`, and a view count under `metrics.views` (also under `metrics.extra.views`). Its `shares` stays `0`, because Facebook does not report a Reel's share count to SocialAPI.
+- A target whose metrics cannot be read is returned with a structured `error` object rather than omitted from the response. An absent target therefore means the post was never published to that platform, not that the refresh failed. Check `error.code` to tell the cases apart: `resource.not_found` means the platform did not return the post in its recent listing, and `resource.not_supported` means the platform does not expose metrics for it.
+
+### Settings on published posts
+
+A Facebook target can include a `settings` object with the options Facebook reports back for the published post:
+
+| Field | Type | Description |
+|---|---|---|
+| `place` | object | The tagged location: `id` and `name`. |
+| `countries` | array of strings | ISO 3166-1 alpha-2 countries the post is restricted to. |
+| `min_age` | number | Minimum audience age set on the post. |
+| `max_age` | number | Maximum audience age set on the post. |
+| `cta_type` | string | Call-to-action button type on the post. |
+| `cta_link` | string | Call-to-action destination URL. |
+| `child_attachments` | array | Cards of a link carousel, each with `link`, `name`, `description`, and `picture`. |
+| `multi_share_optimized` | boolean | Whether Facebook picked the card order. |
+| `multi_share_end_card` | boolean | Whether the link carousel shows an end card. |
+
+`settings` is absent when Facebook reported none of these for the post. It is also returned for posts published outside SocialAPI, since it reflects what Facebook reports at the time of the read rather than what was sent through this API.
+
+### Media on published posts
+
+A Facebook target includes `platform_media`: every photo and video on the published post, album photos in order. It is returned for posts published outside SocialAPI too, so you can read the photos and videos of a Page's existing posts.
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | string | `image` or `video`. |
+| `url` | string | Link to the file, hosted by Facebook. |
+| `thumbnail_url` | string | Link to a video's cover image. Absent on images. |
+
+Link and share posts have no `platform_media`: their image is a preview of the linked site, not media the Page posted. A Reel has none either, since Reels do not appear in the Page feed.
+
+The links expire. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{id}/sync`, then read the post again.
+
+`url` is absent when Facebook does not expose a video's file. The cover image is still included.
+
+`POST /v1/accounts/{id}/sync` covers up to the 500 most recent posts on each Page of the account. Each account can be synced once every 5 minutes; an earlier call returns `429 accounts.sync_rate_limited` with a `Retry-After` header. The account needs the `posts.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
+
+`platform_media` is separate from `media`, which lists what you sent when publishing through SocialAPI and is empty for posts published elsewhere.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### Page access
+
+A Page access token does not expire on its own. A call returns `401 platform.facebook.auth` when the person revoked access or lost their role on the Page: reconnect the account. Connection rules, including which Pages a connection holds, are in [Facebook connect](/platforms/facebook#connect-an-account).
+
+### Multi-photo album semantics
+
+A multi-photo album publishes as one post or not at all. Mixing images and videos, more than 10 images, or a Reel with more or fewer than one video fails pre-publish validation with `400 publishing.validation_failed`. With `skip_validation: true`, the target fails with `validation.media_mixed`, `validation.media_too_many`, or `validation.media_invalid`.
+
+### First comment is non-blocking
+
+If `first_comment` is set and the comment fails after publish, the post stays `published`. Nothing in the post response reports the failed comment.
+
+### Stories expire
+
+Facebook Page Stories are visible for 24 hours. The post stays in SocialAPI, so `GET /v1/posts` can return a Story that is no longer live. A photo or video that appeared in an earlier post is refused as a Story: upload a fresh file for each Story.
+
+### Posting caps
+
+SocialAPI refuses a publish that would pass 25 posts in an hour or 100 posts in 24 hours for one Page, with `429 publishing.velocity_limit`. A scheduled post is held and published when the window clears. When Facebook refuses first, the target fails with `429 platform.facebook.rate_limit`. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+
+### Errors on a failed target
+
+A publish that fails after the request returned puts a structured error on the target, in `targets[].error`:
+
+```json
+{
+  "code": "platform.facebook.reel_processing_failed",
+  "message": "reel video processing failed: error",
+  "category": "platform",
+  "caused_by": "platform"
+}
+```
+
+- `401 platform.facebook.auth`: the access token is invalid or revoked. Reconnect the account.
+- `429 platform.facebook.rate_limit`: Facebook's own limit. Wait, then retry.
+- `platform.facebook.<code>`: Facebook refused the request with its own error code and message. The HTTP status is `502` unless the code has its own mapping, such as `404 platform.facebook.100` or `403 platform.facebook.230`. Read `message`. Common causes are a missing Page scope, a post that no longer exists, and an invalid media URL.
+- `502 platform.facebook.api_error`: a failure reaching Facebook, or a response with no usable error.
+- `422 platform.facebook.reel_processing_failed` and `422 platform.facebook.story_processing_failed`: Facebook could not process the video.
+- `504 platform.facebook.reel_timeout` and `504 platform.facebook.story_timeout`: Facebook did not finish processing the video in about 10 minutes.
+
+Every code is in [Errors](/guides/errors).
+
+### Recovery
+
+- **Rate limit.** Wait, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Auth error.** Reconnect the Facebook account through the OAuth flow to get a fresh token.
+- **API error.** Read `message`, fix the cause, and retry.
+
+---
+
+## 8. Full worked example
+
+The following example publishes a link preview post, then checks the metrics after publish.
+
+**Step 1: Publish the post**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "We just launched our spring collection. Shop now and get 20% off your first order.",
+    "publish_now": true,
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "link": "https://example.com/spring-collection"
+      }
+    }]
+  }'
+```
+
+Response:
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "We just launched our spring collection. Shop now and get 20% off your first order.",
+  "status": "publishing",
+  "targets": [
+    {
+      "platform": "facebook",
+      "status": "publishing"
+    }
+  ],
+  "created_at": "2026-04-10T09:00:00Z"
+}
+```
+
+**Step 2: Check status**
+
+```bash
+curl "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response once published:
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "We just launched our spring collection. Shop now and get 20% off your first order.",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "facebook",
+      "platform_post_id": "123456789012345_987654321098765",
+      "status": "published",
+      "permalink": "https://www.facebook.com/permalink/123456789012345",
+      "metrics": {
+        "likes": 15,
+        "comments": 3,
+        "shares": 7,
+        "saves": 0,
+        "extra": null
+      },
+      "metrics_synced_at": "2026-04-10T12:00:00Z"
+    }
+  ],
+  "created_at": "2026-04-10T09:00:00Z",
+  "published_at": "2026-04-10T09:00:12Z"
+}
+```
+
+**Step 3: Refresh metrics on demand**
+
+```bash
+curl "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/metrics" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+---
+
+## 9. Required OAuth scopes
+
+SocialAPI's Meta app requests these scopes during the OAuth flow. You configure nothing. The full list, including `business_management`, is in [Facebook scopes](/platforms/facebook#scopes). Publishing uses these:
+
+| Scope | Purpose |
+|---|---|
+| `pages_show_list` | List the Pages the person manages |
+| `pages_read_engagement` | Read likes, comments, and shares on Page posts |
+| `pages_manage_engagement` | Post the first comment |
+| `pages_manage_posts` | Create, edit, and delete Page posts |
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

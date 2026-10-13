@@ -1,0 +1,314 @@
+---
+title: Bluesky publishing
+sidebarTitle: "Publishing"
+description: Publish and schedule Bluesky posts with text and up to 4 images through SocialAPI, with media limits, link and hashtag handling, and delete.
+---
+
+## 1. Overview
+
+A Bluesky post is published once Bluesky has accepted it. Publishing goes through the same `POST /v1/posts` endpoint as every other platform. A post holds text, up to 4 images, or both. Bluesky has no video publishing through SocialAPI and no way to edit a published post.
+
+| Field | Value |
+|---|---|
+| Platform slug | `bluesky` |
+| Auth type | App password |
+| Platform API | AT Protocol (Bluesky) |
+| Create post | Yes |
+| Update post | Not after publishing (`409 post.state_invalid`). `draft`, `scheduled`, and `failed` posts can be edited |
+| Delete post | Yes |
+| Schedule | Yes (deferred publish via `scheduled_at`) |
+| First comment | No (`first_comment` is not published on Bluesky) |
+| Posting caps | 25 posts per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Text only | Omit `media` | Up to 300 characters |
+| Single image | One `media` entry that is an image | JPEG, PNG, GIF, or WebP, at most 2 MB |
+| Multiple images | 2 to 4 `media` entries, all images | The images appear together in one post |
+| Video | Not supported | See "Video" in section 7 |
+
+**Text limit:** 300 characters, counted as Unicode characters. More returns `400 publishing.validation_failed`.
+
+**Image limit:** 4 images per post. More than 4 returns `400 publishing.validation_failed`.
+
+**File limits** apply to media you upload to SocialAPI (`source_type: "media_id"`). A file outside them fails validation with `400 publishing.validation_failed`. SocialAPI does not check a `url` item in advance. SocialAPI downloads the image when it publishes. An image over 2 MB fails the target with `400 validation.field_invalid`, and `meta.field` is `media`.
+
+**Alt text:** SocialAPI publishes every image with empty alt text. There is no field to set it.
+
+A `platform_attachment_id` item fails the Bluesky target with `422 publishing.media.unsupported_source`: Bluesky has no uploaded media to reference by ID. Send images as `url` or `media_id`.
+
+---
+
+## 3. Create post
+
+Use `POST /v1/posts` with `targets` that name a Bluesky account. `publish_now: true` publishes immediately. Without it and without `scheduled_at`, SocialAPI saves a draft.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Our spring release is live. Details: https://example.com/spring #release",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }]
+  }'
+```
+
+Response (HTTP 201, delivery continues after the response):
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "Our spring release is live. Details: https://example.com/spring #release",
+  "status": "publishing",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "bluesky",
+      "status": "publishing"
+    }
+  ]
+}
+```
+
+SocialAPI turns every `http://` or `https://` address in the text into a link and every `#tag` into a hashtag. It does not turn `@handle` into a mention: the text publishes as plain text and the mentioned account is not notified. SocialAPI attaches no link preview card.
+
+### Platform data fields
+
+Bluesky has no `platform_data` fields. SocialAPI forwards any additional keys in `platform_data.bluesky` only when a table in this section lists them. None does, so SocialAPI sends no key to Bluesky and returns no warning for an unlisted key.
+
+### Scheduling
+
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
+
+```json
+{
+  "text": "Big announcement coming tomorrow.",
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "scheduled_at": "2026-10-17T10:00:00Z"
+}
+```
+
+See [Scheduling](/guides/scheduling) for how scheduled posts settle.
+
+---
+
+## 4. Update post
+
+Bluesky has no way to edit a published post. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post.
+
+To correct a post, delete it and publish a new one.
+
+---
+
+## 5. Delete post
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+To remove only the Bluesky target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{pid}` always removes every target.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/unpublish \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
+```
+
+See [Delete a post](/guides/delivery#delete-a-post) for how a cross-platform post is handled.
+
+---
+
+## 6. Retrieve posts
+
+Use `GET /v1/posts` to list posts. Filter by platform or account:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?platform=bluesky&account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each post includes a `targets` array with the per-platform status and engagement metrics:
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "Our spring release is live. Details: https://example.com/spring #release",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "bluesky",
+      "platform_post_id": "at://did:plc:abc123xyz/app.bsky.feed.post/3kq2example",
+      "status": "published",
+      "permalink": "https://bsky.app/profile/did:plc:abc123xyz/post/3kq2example",
+      "metrics": {
+        "likes": 12,
+        "comments": 3,
+        "shares": 2,
+        "saves": 0,
+        "extra": null
+      },
+      "metrics_synced_at": "2026-10-17T10:30:00Z"
+    }
+  ]
+}
+```
+
+**Metrics notes:**
+
+`likes` is Bluesky's like count, `comments` its reply count, and `shares` its repost count. Bluesky reports no saves, so `saves` stays `0`. `metrics_synced_at` is when SocialAPI last read the counts from Bluesky.
+
+**Posts published outside SocialAPI:** SocialAPI imports the 25 most recent posts of the account when you connect it and when you call `POST /v1/accounts/{id}/sync`.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### No post editing
+
+Bluesky has no way to edit a published post. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one.
+
+### Video
+
+Bluesky video is not supported. A video uploaded to SocialAPI as `media_id` fails validation with `400 publishing.validation_failed`. A video sent as a `url` that SocialAPI recognizes as a video is skipped, and the post publishes without it.
+
+### Mentions are plain text
+
+An `@handle` in the text is not a mention. The mentioned account is not notified.
+
+### Image download failure
+
+SocialAPI downloads each `url` image when it publishes. When the download fails, the target fails with `500 system.internal`. Check that the URL is public and returns the image, then send `POST /v1/posts/{pid}/retry`.
+
+### Posting caps
+
+SocialAPI refuses a publish that would pass 25 posts in an hour or 50 posts in 24 hours for one account, with `429 publishing.velocity_limit`. A scheduled post is held and published when the window clears. Bluesky also limits writes per account to 5,000 points per hour and 35,000 per day, where a new post costs 3 points. When Bluesky refuses first, the target fails with `429 platform.bluesky.rate_limit`. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+
+### Errors on a failed target
+
+A publish that fails after the request returned puts a structured error on the target, in `targets[].error`:
+
+```json
+{
+  "code": "platform.bluesky.rate_limit",
+  "message": "Platform rate limit exceeded",
+  "category": "rate_limit",
+  "caused_by": "platform"
+}
+```
+
+- `401 platform.bluesky.auth`: Bluesky rejected the saved credential. Connect the account again.
+- `403 platform.bluesky.account_takedown`: Bluesky suspended the account. Connecting again does not restore access.
+- `429 platform.bluesky.rate_limit`: Bluesky's quota is used up. Wait, then retry.
+- `400 validation.platform_param`: Bluesky rejected a parameter. `error.message` carries Bluesky's reason.
+- `400 validation.field_invalid`: an image sent as a `url` is larger than 2 MB.
+
+Every code is in [Errors](/guides/errors).
+
+### Recovery
+
+- **Auth error.** Connect the account again with a working app password: `POST /v1/accounts/connect` with the same `platform` and `brand_id`. See [Connect accounts](/guides/connect-accounts).
+- **Rate limit.** Wait for the `Retry-After` header, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Image too large.** Resize the image to 2 MB or less, upload it again, and publish a new post.
+
+---
+
+## 8. Full worked example
+
+The following example uploads an image, publishes a post with it, then checks its status.
+
+**Step 1: Upload media**
+
+```bash
+# Get a presigned upload URL
+curl "https://api.social-api.ai/v1/media/upload-url?filename=release.jpg&media_type=image/jpeg" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response:
+
+```json
+{
+  "upload_url": "https://upload.example.com/media/release.jpg?X-Amz-Signature=abc123",
+  "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+}
+```
+
+Upload the file directly to the presigned URL, then verify:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/media/f47ac10b-58cc-4372-a567-0e02b2c3d479/verify \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+**Step 2: Publish the post**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Our spring release is live. Details: https://example.com/spring #release",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }]
+  }'
+```
+
+Response (HTTP 201, delivery continues after the response):
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "status": "publishing",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "bluesky",
+      "status": "publishing"
+    }
+  ]
+}
+```
+
+**Step 3: Check the status**
+
+```bash
+curl "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200) once published:
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "Our spring release is live. Details: https://example.com/spring #release",
+  "status": "published",
+  "targets": [
+    {
+      "platform": "bluesky",
+      "platform_post_id": "at://did:plc:abc123xyz/app.bsky.feed.post/3kq2example",
+      "status": "published",
+      "permalink": "https://bsky.app/profile/did:plc:abc123xyz/post/3kq2example"
+    }
+  ],
+  "created_at": "2026-10-16T09:00:00Z",
+  "published_at": "2026-10-16T09:00:03Z"
+}
+```
+
+---
+
+## 9. Required OAuth scopes
+
+Bluesky has no OAuth scopes. The app password gives SocialAPI the access it needs to publish, with no extra option. Direct messages are the only feature that needs an option on the app password: see [Bluesky scopes](/platforms/bluesky#scopes).
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

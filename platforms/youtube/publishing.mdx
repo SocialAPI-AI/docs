@@ -1,0 +1,492 @@
+---
+title: YouTube publishing
+sidebarTitle: "Publishing"
+description: Publish, schedule, edit, and delete YouTube videos with title, description, tags, visibility, a first comment, and a playlist, and read their metrics.
+---
+
+## 1. Overview
+
+A YouTube post uploads 1 video to 1 connected YouTube channel and sets its metadata: title, description, visibility, tags, and category. YouTube is the only platform where you can edit a published post's metadata through SocialAPI, and it has 2 ways to schedule. For everything outside publishing, see the [YouTube API](/platforms/youtube) page.
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Create post | Yes | 1 video per post. A title is required |
+| Update post | Yes | Before publishing: `PATCH /v1/posts/{pid}`. After publishing: `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` |
+| Delete post | Yes | Removes the video from YouTube |
+| Schedule | Yes | `scheduled_at` makes SocialAPI upload the video at that time. `platform_data.youtube.publish_at` uploads it now as private and makes YouTube publish it at that time |
+| First comment | Yes | `first_comment` is posted after the upload. A failure does not fail the post |
+| Add to playlist | Yes | `platform_data.youtube.playlist_id`. A failure does not fail the post |
+| Posting caps | Yes | 25 posts per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+
+---
+
+## 2. Supported media
+
+| Content type | How to trigger | Notes |
+|---|---|---|
+| Video | 1 video in `media`, as a `media_id` or `url` source | MP4 (`video/mp4`), MOV (`video/quicktime`), AVI (`video/x-msvideo`), or WebM (`video/webm`), up to 256 GB |
+
+- **One video.** A post takes exactly 1 video. Images are not accepted: an image fails pre-publish validation with `400 publishing.validation_failed`, and so does a second media item. Images appear only as thumbnails when you retrieve posts.
+- **Title.** A title is required and holds up to 100 characters. SocialAPI does not check the length: YouTube refuses a longer title and the target fails with `platform.youtube.api_error`.
+- **Description.** `text` becomes the description and holds up to 5,000 bytes. A longer `text` fails pre-publish validation with `400 publishing.validation_failed`.
+- **Media sources.** Use a `media_id` (a file in your [media library](/guides/media)) or a public `http(s)` `url` that SocialAPI fetches when it uploads. There is no `video_url` field. A `media_id` must be `ready`: a file you uploaded with the presigned flow stays `pending` until you call `POST /v1/media/{id}/verify`. A `platform_attachment_id` item returns `422 publishing.media.unsupported_source`.
+- **Unreachable files.** A `url` that does not answer fails the target with `validation.video_url`. A file whose size cannot be read fails it with `validation.video_size`.
+
+---
+
+## 3. Create post
+
+Send `POST /v1/posts` with a YouTube account in `targets`.
+
+- `title` is the video title. It is required. `platform_data.youtube.title` is accepted when `title` is empty, and `title` wins when both are set. SocialAPI does not derive a title from the file name or the URL.
+- `text` is the video description. It is required.
+- `visibility` is `public`, `unlisted`, or `private`. It defaults to `public`, so a published video is watchable at once. When `platform_data.youtube.publish_at` is set and `visibility` is empty, it defaults to `private`.
+- Without `publish_now` or `scheduled_at`, SocialAPI saves the post as a draft.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "title": "Our spring collection walkthrough",
+    "text": "A full tour of the new lineup. Chapters in the description below.",
+    "visibility": "public",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
+    "platform_data": {
+      "youtube": {
+        "category_id": "22",
+        "tags": ["fashion", "spring", "lookbook"],
+        "made_for_kids": false,
+        "notify_subscribers": true
+      }
+    }
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "title": "Our spring collection walkthrough",
+  "text": "A full tour of the new lineup. Chapters in the description below.",
+  "status": "publishing",
+  "visibility": "public",
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+  "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "youtube",
+      "status": "pending",
+      "title": "Our spring collection walkthrough",
+      "text": "A full tour of the new lineup. Chapters in the description below.",
+      "visibility": "public",
+      "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+      "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
+    }
+  ]
+}
+```
+
+SocialAPI uploads in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
+
+### Where to put platform data
+
+Pass the YouTube fields in 1 of 2 places:
+
+- **Post level**, keyed by platform: `platform_data.youtube`. It applies to every YouTube target in the post.
+- **Target level**, flat with no `youtube` key: the target's own `platform_data`. It applies to that target only.
+
+When both set the same field, the target-level value wins:
+
+```json
+{
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": { "notify_subscribers": false }
+    }
+  ],
+  "platform_data": {
+    "youtube": { "category_id": "22", "notify_subscribers": true }
+  }
+}
+```
+
+This target publishes with `category_id` `22` from the post level and `notify_subscribers` `false` from the target override.
+
+### Platform data fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `title` | string | none | The video title when the top-level `title` is empty |
+| `category_id` | string | YouTube's default | YouTube video category ID, for example `22` for People & Blogs. See YouTube's [category list](https://developers.google.com/youtube/v3/docs/videoCategories/list) |
+| `tags` | string or array | none | Video tags. A JSON array, a comma-separated string, or a single string |
+| `default_language` | string | none | BCP-47 language code of the title and description, such as `en` or `fr` |
+| `made_for_kids` | bool | `false` | The COPPA self-declaration that the video is made for children |
+| `embeddable` | bool | YouTube's default | Whether other sites can embed the video |
+| `license` | string | YouTube's default | `youtube` (standard license) or `creativeCommon` |
+| `public_stats_viewable` | bool | YouTube's default | Whether view and like counts are public |
+| `publish_at` | string | none | ISO 8601 timestamp at which YouTube publishes the video. Requires `private` visibility. See Native scheduling below |
+| `recording_date` | string | none | The date the video was recorded, `YYYY-MM-DD` |
+| `contains_synthetic_media` | bool | `false` | Declares that the video contains AI-generated or altered content |
+| `notify_subscribers` | bool | `true` | Whether to notify the channel's subscribers on publish |
+| `playlist_id` | string | none | A playlist to add the video to after the upload |
+
+SocialAPI forwards any additional keys in `platform_data.youtube` only when the table above lists them. YouTube has no other publish options that SocialAPI passes through: an unlisted key is not sent.
+
+### Schedule a post
+
+YouTube has 2 ways to schedule, and they do different things:
+
+| | `scheduled_at` | `platform_data.youtube.publish_at` |
+|---|---|---|
+| Who waits | SocialAPI | YouTube |
+| When the video reaches YouTube | At `scheduled_at` | At once, as a private video |
+| When viewers can watch it | At `scheduled_at`, with the `visibility` you set (public by default) | At `publish_at` |
+| Visibility | Any | `private` |
+
+Use `scheduled_at` to have SocialAPI do the waiting. See [Scheduling](/guides/scheduling).
+
+#### Native scheduling
+
+With `publish_at`, YouTube holds the uploaded video as private and makes it public at that time:
+
+```json
+{
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "title": "Launch day announcement",
+  "text": "Going live for everyone at 10am.",
+  "visibility": "private",
+  "publish_now": true,
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+  "platform_data": {
+    "youtube": { "publish_at": "2026-10-20T10:00:00Z" }
+  }
+}
+```
+
+`publish_at` with a `visibility` other than `private` fails pre-publish validation with `400 publishing.validation_failed`, with the issue on the `publish_at` field. An empty `visibility` is allowed: `publish_at` makes it `private`.
+
+### First comment
+
+Set `first_comment` to the text of a top-level comment that SocialAPI posts on the video right after the upload. A failure to post it does not change the post: the target stays `published` and carries no error.
+
+### Add to playlist
+
+Set `platform_data.youtube.playlist_id` to add the video to one of your playlists after the upload. A failure here does not change the post status either.
+
+---
+
+## 4. Update post
+
+Which endpoint you use depends on whether the post is published.
+
+### Before publishing
+
+`PATCH /v1/posts/{pid}` edits a post in `draft`, `scheduled`, or `failed` status. The change applies when the post publishes:
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Our spring collection walkthrough (updated)",
+    "text": "Updated description with corrected chapter timestamps.",
+    "visibility": "unlisted",
+    "platform_data": {
+      "youtube": { "tags": ["fashion", "spring", "lookbook", "2026"] }
+    }
+  }'
+```
+
+The response (HTTP 200) is the updated post. On a published post this call returns `409 post.state_invalid`: use the endpoint below. See [Scheduling](/guides/scheduling) for rescheduling and the editable fields.
+
+### After publishing
+
+`PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` edits the video on YouTube. `{id}` is the connected account ID and `{videoId}` is the YouTube video ID (`platform_post_id`).
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/platforms/youtube/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/videos/dQw4w9WgXcQ \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Our spring collection walkthrough (updated)",
+    "description": "Updated description with corrected chapter timestamps.",
+    "tags": ["fashion", "spring", "lookbook", "2026"]
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `title` | string | The video title |
+| `description` | string | The video description |
+| `visibility` | string | `public`, `unlisted`, or `private` |
+| `tags` | string or array | The Studio tags. A JSON array or a comma-separated string, as at create time |
+
+- **Partial edits are safe.** A field you omit keeps its current value on YouTube. An omitted field is never erased.
+- **Tags.** `tags` sets the Studio tags, which are separate from any `#hashtags` in the description. Editing the description does not change the tags, and setting tags does not change the description. Omitting `tags`, or sending an empty array, leaves the tags as they are. The API cannot clear tags.
+- **`publish_at`.** It can be set only before the video is first published. It cannot change once the video is public.
+- **Unknown video.** A `videoId` that does not exist on the channel returns `404 resource.not_found`.
+
+---
+
+## 5. Delete post
+
+`DELETE /v1/posts/{pid}` removes the video from YouTube for every published YouTube target, and removes a draft, scheduled, or failed post from SocialAPI:
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "deleted": true,
+  "results": [
+    { "platform": "youtube", "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "outcome": "deleted" }
+  ]
+}
+```
+
+If YouTube refuses the delete, or the video no longer exists on YouTube, the target's `outcome` is `failed` with the reason in `message`, and SocialAPI keeps the post (`"deleted": false`).
+
+To remove the video from 1 channel of a multi-target post and keep the post, send `POST /v1/posts/{pid}/unpublish` with that target's `account_id`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7/unpublish \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```
+
+---
+
+## 6. Retrieve posts
+
+`GET /v1/posts` lists posts, filtered by platform or account. It also returns videos uploaded outside SocialAPI:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?platform=youtube&account_ids=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "title": "Our spring collection walkthrough",
+      "text": "A full tour of the new lineup.",
+      "status": "published",
+      "hidden": false,
+      "retry_count": 0,
+      "created_at": "2026-10-13T09:00:00Z",
+      "updated_at": "2026-10-13T09:03:22Z",
+      "published_at": "2026-10-13T09:03:22Z",
+      "targets": [
+        {
+          "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+          "platform": "youtube",
+          "status": "published",
+          "platform_post_id": "dQw4w9WgXcQ",
+          "permalink": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+          "published_at": "2026-10-13T09:03:22Z",
+          "metrics": {
+            "likes": 128,
+            "comments": 17,
+            "shares": 0,
+            "saves": 0,
+            "extra": { "view_count": 5432 }
+          },
+          "metrics_synced_at": "2026-10-13T12:00:00Z"
+        }
+      ]
+    }
+  ],
+  "pagination": { "limit": 20, "has_more": false }
+}
+```
+
+- `platform_post_id` is the YouTube video ID.
+- `metrics.likes` and `metrics.comments` come from YouTube. `shares` and `saves` are always `0`: YouTube does not report them.
+- The view count is `metrics.extra.view_count` in this list. `GET /v1/posts/{pid}/metrics` reads the metrics from YouTube at request time and returns the view count as `metrics.views` and `metrics.extra.views`.
+- `metrics_synced_at` is on the target, not inside `metrics`. It is when SocialAPI last refreshed the metrics.
+- Channel-level counts are on the [YouTube API](/platforms/youtube#read-videos-and-channel-stats) page.
+
+---
+
+## 7. Quirks, errors, and recovery
+
+### Title and description are required
+
+A post without a `title` fails its YouTube target with `validation.field_required`, and `error.meta.field` is `title`. A request without `text` returns `400 validation.field_required`.
+
+### publish_at requires private visibility
+
+YouTube schedules private videos only. `publish_at` with `public` or `unlisted` visibility returns `400 publishing.validation_failed` before the upload starts.
+
+### First comment and playlist add never fail the post
+
+If the `first_comment` or the playlist add fails after a successful upload, the post stays `published` and the failure is not reported on the post. Check the video on YouTube, or post the comment with `POST /v1/inbox/comments/{postId}`.
+
+### Posting caps
+
+SocialAPI refuses a publish that would pass 25 posts in an hour or 50 posts in 24 hours for one account, with `429 publishing.velocity_limit`. A scheduled post is held and published when the window clears. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+
+### Errors on a failed target
+
+A failed target carries an `error` object:
+
+```json
+{
+  "code": "platform.youtube.api_error",
+  "message": "The request could not be completed",
+  "category": "platform",
+  "caused_by": "platform"
+}
+```
+
+- `platform.youtube.api_error`: YouTube refused the request. `message` carries YouTube's reason, for example a title over 100 characters, an unknown `category_id`, tags over YouTube's limit, or a channel over its upload limit. Fix the request and retry.
+- `platform.youtube.rate_limit`: YouTube's own limit was reached. Wait, then retry the post.
+- `platform.youtube.auth`: YouTube no longer accepts the connection. [Reconnect the account](/guides/connect-accounts).
+- `platform.youtube.insufficientPermissions`: the granted scope does not permit the action. Reconnect the account to grant it again.
+- `platform.youtube.account_suspended`: YouTube suspended or closed the account or its channel. Reconnecting does not help: the owner resolves it with YouTube.
+- `validation.video_url`, `validation.video_size`, `validation.field_required`: the video could not be fetched, its size could not be read, or the title is missing (section 2 and above).
+
+All codes, with their HTTP status, are listed in [Errors](/guides/errors).
+
+### Recovery
+
+- Retry a `failed` or `partial` post with `POST /v1/posts/{pid}/retry`. A retry costs 1 post credit. See [Delivery](/guides/delivery).
+- After an auth error, reconnect the account, then retry.
+
+---
+
+## 8. Full worked example
+
+This example uploads a video, publishes it with a title, description, tags, and a YouTube-side scheduled publish time, and checks the result.
+
+**Step 1: Upload the video**
+
+```bash
+curl "https://api.social-api.ai/v1/media/upload-url?media_type=video/mp4&filename=walkthrough.mp4" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "media_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "upload_url": "https://storage.example.com/media/walkthrough.mp4?X-Amz-Signature=abc",
+  "expires_at": "2026-10-13T09:15:00Z"
+}
+```
+
+Upload the file to `upload_url`, then verify it:
+
+```bash
+curl -X PUT "https://storage.example.com/media/walkthrough.mp4?X-Amz-Signature=abc" \
+  -H "Content-Type: video/mp4" \
+  --data-binary @walkthrough.mp4
+
+curl -X POST https://api.social-api.ai/v1/media/f47ac10b-58cc-4372-a567-0e02b2c3d479/verify \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+**Step 2: Publish the video**
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "title": "Spring collection walkthrough",
+    "text": "A full tour of the new lineup. Chapters below.",
+    "visibility": "private",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "first_comment": "Which piece is your favorite? Let us know below.",
+    "publish_now": true,
+    "platform_data": {
+      "youtube": {
+        "category_id": "22",
+        "tags": ["fashion", "spring", "lookbook"],
+        "publish_at": "2026-10-20T10:00:00Z",
+        "notify_subscribers": true,
+        "playlist_id": "PL0123456789abcdef"
+      }
+    }
+  }'
+```
+
+The response (HTTP 201) has `"status": "publishing"` and the post `id`, as in section 3.
+
+**Step 3: Check the result**
+
+```bash
+curl https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200) once the upload finishes:
+
+```json
+{
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "title": "Spring collection walkthrough",
+  "text": "A full tour of the new lineup. Chapters below.",
+  "status": "published",
+  "visibility": "private",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:03:22Z",
+  "published_at": "2026-10-13T09:03:22Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "youtube",
+      "status": "published",
+      "platform_post_id": "dQw4w9WgXcQ",
+      "permalink": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "published_at": "2026-10-13T09:03:22Z"
+    }
+  ]
+}
+```
+
+The video is on YouTube as private and becomes public at `2026-10-20T10:00:00Z`. If the target is `failed`, read `targets[].error` (section 7), fix the request, and call `POST /v1/posts/{pid}/retry`.
+
+---
+
+## 9. Required OAuth scopes
+
+Publishing uses the scope SocialAPI's Google app requests when a channel connects. You register no Google app and configure nothing.
+
+| Scope | Used for |
+|---|---|
+| `https://www.googleapis.com/auth/youtube.force-ssl` | Upload, edit, and delete videos, add them to playlists, and post the first comment |
+
+The scope is also listed in [Scopes](/platforms/youtube#scopes).
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

@@ -1,153 +1,150 @@
 ---
-title: Claude
-description: Connect SocialAPI to Claude on web, desktop, CLI, and mobile.
+title: "Claude"
+description: "Connect SocialAPI to Claude on claude.ai, Claude Desktop, Claude Code, and mobile to manage comments, DMs, and posts in plain language."
 ---
 
-**MCP Server URL:** `https://api.social-api.ai/mcp`
+Connect SocialAPI to Claude and ask it to list your connected accounts, reply to comments, send direct messages (DMs), and publish posts. Claude connects to SocialAPI's MCP server at `https://api.social-api.ai/mcp` and signs in with OAuth 2.1, so you create no API key.
 
-## Web (claude.ai)
+## Prerequisites
 
-### Prerequisites
+- A SocialAPI account with at least one connected account.
+- For claude.ai, Claude Desktop, and mobile: a Claude Free, Pro, Max, Team, or Enterprise plan.
+- For Claude Code: [Claude Code](https://docs.claude.com/en/docs/claude-code) installed and signed in.
 
-- A [SocialAPI](https://social-api.ai) account with at least one connected social account
-- Claude Free, Pro, Max, Team, or Enterprise plan (Free is limited to 1 custom connector)
+Claude Desktop, claude.ai, and the mobile app share one account. A connector you add on one surface appears on the others.
 
-### 1. Open Connectors
+## Set up claude.ai
 
-Click your **profile icon**, then go to **Settings** → **Connectors**. You can also open [claude.ai/customize/connectors](https://claude.ai/customize/connectors) directly.
+<Steps>
+  <Step title="Open Connectors">
+    Click your profile icon, then go to **Settings** → **Connectors**. You can also open [claude.ai/customize/connectors](https://claude.ai/customize/connectors).
 
-<img
-  src="/images/mcp-claude-settings.png"
-  alt="Claude Settings page with Connectors section"
-/>
+    <img
+      src="/images/mcp-claude-settings.png"
+      alt="Claude Settings page with the Connectors section"
+    />
+  </Step>
+  <Step title="Connect SocialAPI">
+    SocialAPI is in Claude's connectors directory. Search for **SocialAPI** and click **Connect**. Claude already knows the server URL, so you type nothing.
 
-### 2. Connect SocialAPI
+    <img
+      src="/images/mcp-claude-directory.png"
+      alt="SocialAPI connector in the Claude connectors directory"
+    />
 
-SocialAPI is listed in Claude's connectors directory. Search for **SocialAPI** and click **Connect**. There is nothing to type in: Claude already knows the server URL.
+    On a Team plan, a member who cannot enable connectors sees **Request** instead of **Connect**. The request goes to an organization admin, who enables the connector in **Organization settings** → **Connectors**. The member then clicks **Connect** in **Settings** → **Connectors**.
+  </Step>
+  <Step title="Authorize with your SocialAPI account">
+    A browser window opens on the SocialAPI authorization page. Log in and click **Authorize**. The window closes when the sign-in is done.
 
-<img
-  src="/images/mcp-claude-directory.png"
-  alt="[SocialAPI](https://social-api.ai) connector in Claude directory"
-/>
+    <img
+      src="/images/mcp-claude-oauth.png"
+      alt="SocialAPI authorization screen"
+    />
+  </Step>
+  <Step title="Turn the connector on in a conversation">
+    Open a new conversation, click **+** at the bottom left of the input, select **Connectors**, and switch **SocialAPI** on.
 
-<Note>
-  On a Team plan, members who cannot enable connectors themselves see **Request** instead of **Connect**. The request goes to an organization admin, who enables it from **Organization settings → Connectors**.
-</Note>
+    <img
+      src="/images/mcp-claude-conversation.png"
+      alt="Claude conversation using SocialAPI tools to list accounts"
+    />
+  </Step>
+</Steps>
 
-### 3. Authorize with your account
+## Set up Claude Desktop
 
-Claude will initiate an OAuth flow. A browser window will open to the [SocialAPI](https://social-api.ai) authorization page.
+Claude Desktop adds remote servers through **Settings** → **Connectors**, the same flow as claude.ai.
 
-<img
-  src="/images/mcp-claude-oauth.png"
-  alt="[SocialAPI](https://social-api.ai) OAuth authorization screen"
-/>
-
-Log in with your [SocialAPI](https://social-api.ai) credentials and click **Authorize**. The window closes automatically when done.
-
-<Note>
-  This uses OAuth 2.1 with PKCE. No API key is required - your session is handled automatically.
-</Note>
-
-### 4. Enable in a conversation
-
-Open a new Claude conversation. Click the **+** icon at the bottom-left of the input, select **Connectors**, and ensure **SocialAPI** is toggled on.
-
-<img
-  src="/images/mcp-claude-conversation.png"
-  alt="Claude conversation using [SocialAPI](https://social-api.ai) tools to list accounts"
-/>
-
-Try asking:
-
-> "List my connected social accounts"
-
-> "Show me the latest comments on my Instagram posts"
-
-> "Reply to comment sapi_cmt_xxx with 'Thanks for your feedback!'"
-
-<Tip>
-  **Team / Enterprise:** Organization owners add connectors via **Organization settings → Connectors**. Members then go to **Settings → Connectors** and click **Connect** on the connector the owner configured.
-</Tip>
-
----
-
-## Desktop App
-
-### Prerequisites
-
-- Claude Desktop installed ([download](https://claude.ai/download))
-- Claude Free (1 custom connector), Pro, Max, Team, or Enterprise plan
-
-### Setup via the app UI (recommended)
-
-Remote MCP servers are added through the app's **Settings → Connectors** - the same flow as claude.ai. Claude Desktop and claude.ai share the same account settings, so a connector added on either one appears on both.
-
-1. Open Claude Desktop
-2. Go to **Settings → Connectors**
-3. Search the directory for **SocialAPI** and click **Connect**. To add it by URL instead, click **Add custom connector** and enter `SocialAPI.ai` as the name and `https://api.social-api.ai/mcp` as the URL
-4. Complete the OAuth authorization in the browser window that opens
-
-{/* TODO screenshot: /images/mcp-claude-desktop-oauth.png - Claude Desktop OAuth authorization window */}
+<Steps>
+  <Step title="Open Connectors">
+    In Claude Desktop ([download](https://claude.ai/download)), go to **Settings** → **Connectors**.
+  </Step>
+  <Step title="Add SocialAPI">
+    Search the directory for **SocialAPI** and click **Connect**. To add it by URL instead, click **Add custom connector** (the Free plan allows 1 custom connector), enter `SocialAPI` as the name and `https://api.social-api.ai/mcp` as the URL.
+  </Step>
+  <Step title="Authorize">
+    Complete the sign-in in the browser window that opens.
+  </Step>
+</Steps>
 
 <Warning>
-  The `claude_desktop_config.json` file only supports **local stdio servers** (via `command` + `args`). Remote MCP servers cannot be added directly to this file - use Settings → Connectors instead.
+  `claude_desktop_config.json` holds local stdio servers only (`command` and `args`). A remote server such as SocialAPI cannot go in that file: add it in **Settings** → **Connectors**.
 </Warning>
 
-<Note>
-  **Config file locations** (for local stdio servers only):
-  - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-  - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-</Note>
+## Set up Claude Code
 
----
+<Steps>
+  <Step title="Add the server">
+    ```bash
+    claude mcp add socialapi --transport http https://api.social-api.ai/mcp
+    ```
 
-## Claude Code (CLI)
+    By default the server is added to the local scope, which is the current project only. Add `--scope user` to use it in all projects, or `--scope project` to share it through `.mcp.json`:
 
-### Add via command line
+    ```bash
+    claude mcp add socialapi --transport http --scope user https://api.social-api.ai/mcp
+    ```
+  </Step>
+  <Step title="Authorize">
+    Run `/mcp` in Claude Code, select **SocialAPI**, and complete the sign-in in your browser. You can also run `claude mcp login socialapi`. Log in and click **Authorize**. On a machine without a browser, Claude Code prints the authorization URL. Open it on another machine, then paste the full redirect URL from that browser's address bar back at the prompt.
+  </Step>
+  <Step title="Check the server">
+    ```bash
+    claude mcp list
+    ```
 
-```bash
-claude mcp add socialapi --transport http https://api.social-api.ai/mcp
+    To remove the server, run `claude mcp remove socialapi`.
+  </Step>
+</Steps>
+
+## Set up mobile (iOS and Android)
+
+<Steps>
+  <Step title="Open Connectors">
+    In the Claude app, tap your profile icon, then go to **Settings** → **Connectors**.
+  </Step>
+  <Step title="Connect SocialAPI">
+    Search for **SocialAPI** and tap **Connect**.
+  </Step>
+  <Step title="Authorize">
+    Complete the sign-in in the browser sheet that opens.
+  </Step>
+  <Step title="Turn the connector on in a conversation">
+    Open the **+** menu, select **Connectors**, and switch **SocialAPI** on.
+  </Step>
+</Steps>
+
+## Try it
+
+Ask Claude:
+
+```text
+List my connected social accounts
 ```
 
-Claude Code will open your browser for OAuth authorization on first use.
+Claude calls `social_api_list_accounts` and answers with your connected accounts and their platforms. Then try "Show me the latest comments on my Instagram posts".
 
-### Scopes
+## Troubleshooting
 
-By default, the server is added to the **local** scope (current project only). Use `--scope user` for all projects or `--scope project` to share via `.mcp.json`:
+<AccordionGroup>
+  <Accordion title="Connect shows Request instead">
+    Your Team plan does not let you enable connectors yourself. Send the request, and an organization admin enables SocialAPI in **Organization settings** → **Connectors**.
+  </Accordion>
+  <Accordion title="Claude Code does not open a browser">
+    Claude Code uses your system default browser. Set one, or run `claude mcp login socialapi --no-browser` and open the authorization URL that Claude Code prints.
+  </Accordion>
+  <Accordion title="SocialAPI tools are missing in a conversation">
+    Open **+** → **Connectors** and check that **SocialAPI** is on. A conversation does not use a connector that is off.
+  </Accordion>
+  <Accordion title="Tool calls fail with HTTP 401">
+    The OAuth session expired. Remove the SocialAPI connector and add it again to sign in again.
+  </Accordion>
+</AccordionGroup>
 
-```bash
-claude mcp add socialapi --transport http --scope user https://api.social-api.ai/mcp
-```
+## Related
 
-### Manage servers
-
-```bash
-claude mcp list              # list configured servers
-claude mcp remove socialapi  # remove a server
-```
-
-<Tip>
-  Claude Code uses its own subscription (Max plan or Claude Code subscription). No separate Pro plan is required.
-</Tip>
-
-### Troubleshooting
-
-**Authorization does not open browser** - Ensure your system default browser is configured. On headless/remote systems, Claude Code will print the authorization URL for you to open manually.
-
----
-
-## Mobile (iOS / Android)
-
-SocialAPI is in the connectors directory, so you can add it straight from the mobile app - no desktop setup required.
-
-1. Open the Claude app, tap your **profile icon**, then go to **Settings → Connectors**
-2. Search for **SocialAPI** and tap **Connect**
-3. Complete the OAuth authorization in the browser sheet that opens
-4. Enable it in a conversation via the **+** menu → **Connectors**
-
-Connectors are tied to your account, so one added on [claude.ai](https://claude.ai) is already available on mobile, and vice versa.
-
-<Note>
-  Requires Claude Free (1 connector), Pro, Max, Team, or Enterprise plan. Same plan as your web account.
-</Note>
+- [SocialAPI MCP server](/integrations/overview): the server URL and the other supported clients.
+- [MCP tools reference](/integrations/tools): every tool Claude can call.
+- [OAuth for MCP clients](/integrations/oauth): how the sign-in works.
+- [Errors](/guides/errors): every error code a tool can return.

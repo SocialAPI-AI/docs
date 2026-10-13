@@ -1,0 +1,210 @@
+---
+title: Google Business Profile API
+sidebarTitle: "Overview"
+description: Connect Google Business Profile locations to publish local posts, manage reviews, update the profile, and read performance metrics and search keywords.
+icon: "google"
+---
+
+The Google Business Profile API in SocialAPI connects a Google Business Profile location, the business listing shown on Google Search and Maps. It publishes local posts, lists and answers reviews, reads and updates the location's public profile and photos, and reads performance metrics and search keywords. SocialAPI's own Google app connects the location, so you register nothing: see [Platform apps](/guides/platform-credentials).
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `google` |
+| Auth | OAuth 2.0 with Google |
+| Platform API | Google Business Profile API |
+| Status | Available |
+
+## Capabilities
+
+An unsupported call returns `501 resource.not_supported`.
+
+| Feature | Status | Condition |
+|---|---|---|
+| Publish a local post | Yes | Update, event, offer, or alert posts. Text, plus at most 1 JPEG or PNG image. See [Google Business Profile publishing](/platforms/google/publishing) |
+| Schedule a post | Yes | `scheduled_at` on the post |
+| First comment on a post | No | Google Business Profile has no post comments. SocialAPI ignores `first_comment` on a Google target |
+| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid`. Delete the post and publish a new one |
+| Delete a published post | Yes | Removes the local post from Google |
+| List posts | Yes | The location's local posts |
+| Read a location's details | Yes | See [Locations](/platforms/google/locations) |
+| Update a location | Yes | Google moderates the edit, and allows 10 location updates per minute per Business Profile |
+| Photos and videos on the profile | Yes | List, add, and remove. Customer photos are read-only |
+| List reviews | Yes | Verified locations only. See [Reviews](/platforms/google/reviews) |
+| Reply to a review | Yes | Google moderates the reply. It is `PENDING` until Google approves it |
+| Edit or delete a reply, delete a review | No | SocialAPI has no endpoint for them. A new reply replaces the old one |
+| Comments and Q&A | No | `501 resource.not_supported`. See [Comments and Q&A](#comments-and-qa) |
+| DMs | No | `501 resource.not_supported` |
+| Mentions | No | `501 resource.not_supported` |
+| Automations | No | Automations run on Instagram and Facebook accounts. A Google account returns `422 automation.platform_unsupported` |
+| Performance metrics | Yes | Daily series per location. See [Performance metrics](#performance-metrics) |
+| Search keywords | Yes | Monthly. See [Search keywords](#search-keywords) |
+| Webhook events | Yes | Review, location, and connection events. See [Webhook events](#webhook-events) |
+
+The cross-platform matrix is on [Platforms](/platforms/overview).
+
+## Connect an account
+
+Connect with `POST /v1/accounts/connect` and `"platform": "google"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "google",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
+  }'
+```
+
+Response (HTTP 202):
+
+```json
+{
+  "auth_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&state=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Open this link to connect your google account. Once you've authorized, the account will be connected automatically."
+}
+```
+
+Google-specific rules:
+
+- **One location per account.** Each connected `google` account is 1 Business Profile location.
+- **A choice when the login manages more than 1 location.** The redirect carries `status=selection_required` and a `connection_id` instead of an `account_id`. You choose exactly 1 location: see [Choose a Google Business Profile](/guides/connect-accounts#choose-a-google-business-profile). A login with 1 location connects at once. A login with none ends with `status=error` and `error=platform.google.no_locations` on your `redirect_uri`.
+- **One Google Business Profile per brand.** Connecting a second location to the same brand ends with `status=error` and `error=account.already_linked` on your `redirect_uri`, or returns `409 account.already_linked` from the select call. Assigning a second location with the assign call returns `409 platform.google.brand_has_account`. A location that another brand already holds returns `400 validation.location_already_assigned`.
+- **More locations later, without a new consent screen.** The login stays. Assign its other locations to your other brands with [`POST /v1/platforms/google/logins/{loginId}/locations/{locationId}/assign`](/platforms/google/locations#connect-another-location-to-a-brand).
+- **Reconnect.** When Google no longer accepts the saved connection, calls return `401 platform.google.auth`. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+
+## Comments and Q&A
+
+Google Business Profile has no comments or Q&A API. Google discontinued the Business Profile Q&A API on November 3, 2025, with no replacement, and local posts never had comments. Comment, reply, hide, delete, and private-reply calls on a Google account return `501 resource.not_supported`. Customer feedback arrives as [reviews](/platforms/google/reviews).
+
+## Performance metrics
+
+`GET /v1/platforms/google/accounts/{account_id}/insights` returns how a location performed day by day: how many people saw it on Google Search and Maps, and how many then called, asked for directions, messaged, booked, ordered, or clicked through to the website. For the metrics of other platforms, see [Analytics](/guides/analytics).
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/insights?start_date=2026-08-01&end_date=2026-08-31&metric=CALL_CLICKS" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+| Parameter | Description |
+|---|---|
+| `start_date`, `end_date` | Required. Inclusive, formatted `YYYY-MM-DD`. A missing or malformed date returns `400 validation.start_date_required`, `validation.start_date_invalid`, `validation.end_date_required`, or `validation.end_date_invalid`. An `end_date` before `start_date` returns `400 validation.range_inverted` |
+| `metric` | A comma-separated list of the metrics below. The default is every metric. An unknown name returns `400 validation.metric_invalid` |
+
+Response (HTTP 200):
+
+```json
+{
+  "data": {
+    "start_date": "2026-08-01",
+    "end_date": "2026-08-31",
+    "metrics": [
+      {
+        "metric": "CALL_CLICKS",
+        "points": [
+          { "date": "2026-08-01", "value": 12 },
+          { "date": "2026-08-02", "value": 0 }
+        ],
+        "total": 12
+      }
+    ]
+  }
+}
+```
+
+A day with no activity is an explicit `0`, not a gap. Google publishes no retention window and no freshness lag for this data.
+
+| Metric | Counts |
+|---|---|
+| `BUSINESS_IMPRESSIONS_DESKTOP_MAPS`, `BUSINESS_IMPRESSIONS_DESKTOP_SEARCH`, `BUSINESS_IMPRESSIONS_MOBILE_MAPS`, `BUSINESS_IMPRESSIONS_MOBILE_SEARCH` | Times the listing was shown, by device and by Google Maps or Google Search |
+| `BUSINESS_CONVERSATIONS` | Conversations started from the listing |
+| `BUSINESS_DIRECTION_REQUESTS` | Requests for directions |
+| `CALL_CLICKS` | Clicks on the call button |
+| `WEBSITE_CLICKS` | Clicks on the website link |
+| `BUSINESS_BOOKINGS` | Bookings made from the listing |
+| `BUSINESS_FOOD_ORDERS` | Food orders placed from the listing |
+| `BUSINESS_FOOD_MENU_CLICKS` | Clicks on the food menu |
+
+## Search keywords
+
+`GET /v1/platforms/google/accounts/{account_id}/search-keywords` returns the searches people made before seeing the location, aggregated by month over an inclusive `YYYY-MM` range:
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/search-keywords?start_month=2026-06&end_month=2026-08" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": {
+    "keywords": [
+      { "keyword": "pizza near me", "value": 1420, "is_threshold": false },
+      { "keyword": "late night pizza", "threshold": 15, "is_threshold": true }
+    ],
+    "next_cursor": "CgwIvKeZyQYQwP3DzgE"
+  }
+}
+```
+
+| Parameter | Description |
+|---|---|
+| `start_month`, `end_month` | Required. Inclusive, formatted `YYYY-MM`. A missing or malformed month returns `400 validation.start_month_required`, `validation.start_month_invalid`, `validation.end_month_required`, or `validation.end_month_invalid`. An `end_month` before `start_month` returns `400 validation.range_inverted` |
+| `limit` | Keywords per page, 1 to 100. Omit it or send `0` for the default, 100. A value above 100 returns `400 validation.page_size_invalid` |
+| `cursor` | The `next_cursor` of the previous page |
+
+<Warning>
+  A keyword with `is_threshold: true` has `threshold` instead of `value`. Google withholds counts that are too low to disclose and gives an upper bound, so the real number is below `threshold`. Charting a threshold as a count overstates the keyword.
+</Warning>
+
+## Webhook events
+
+Google Business Profile events arrive as ordinary SocialAPI webhooks. You set nothing up on Google's side: the events start when you connect a location.
+
+| Event | When it fires |
+|---|---|
+| `review.received` | A customer left a new review. `data.review` holds the whole review |
+| `review.updated` | A review changed. `data.change` is `review_edited`, `reply_approved`, or `reply_rejected` |
+| `account.updated` | The location changed on Google. `data.change` is `customer_media_added`, `google_update_pending`, `voice_of_merchant_changed`, `duplicate_location`, or `permissions_reduced` (the account lost [permissions](/guides/permissions) you did not remove yourself) |
+| `account.connected` | You finished connecting or reconnecting the location |
+| `account.disconnected` | The connection needs reconnecting |
+| `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
+
+Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for this platform. The payloads are in [Webhook events](/guides/webhook-events). Google can miss a notification and does not replay it, so a gap is permanent. Read reviews on a schedule to backfill: [Reviews](/platforms/google/reviews#review-events).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Local post text | 1,500 characters |
+| Local post image | 1 image, JPEG or PNG, up to 5 MB. Video is not accepted |
+| Location updates | 10 per minute per Business Profile. The 11th returns `429 platform.google.rate_limit` |
+| Reviews per page | 1 to 50 |
+| Search keywords per page | 1 to 100. The default is 100 |
+
+## Scopes
+
+SocialAPI's Google app requests these scopes at connect. You apply for no Google app review. The consent screen is the same whichever [permissions](/guides/permissions) you select.
+
+| Scope | Used for |
+|---|---|
+| `openid` | Identifies the Google login behind the connection |
+| `https://www.googleapis.com/auth/userinfo.profile` | The login's name and picture |
+| `https://www.googleapis.com/auth/userinfo.email` | The login's email address |
+| `https://www.googleapis.com/auth/business.manage` | Everything on the Business Profile: local posts, reviews, location details, photos, performance metrics, and search keywords |
+
+Google Business Profile asks for 3 identity scopes and 1 scope, `business.manage`, that covers all of its permissions, so the consent screen shows the same scopes whatever you select. The account is still limited to the permissions you selected: an account connected with `reviews.read` alone cannot reply to reviews. Editing the location's details and photos does not depend on the account's permissions.
+
+## Related
+
+- [Google Business Profile publishing](/platforms/google/publishing): fields, media rules, and quirks for local posts
+- [Locations](/platforms/google/locations): read and update locations, and manage profile photos and videos
+- [Reviews](/platforms/google/reviews): list and reply to reviews, and the review events
+- [Connect accounts](/guides/connect-accounts#choose-a-google-business-profile): choose a location when a login manages more than 1
+- [Platforms](/platforms/overview): the capability matrix
+- [Errors](/guides/errors): every error code

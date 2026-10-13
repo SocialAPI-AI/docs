@@ -1,86 +1,73 @@
 ---
-title: Use with AI Assistants
-description: Connect the social media API for AI agents to Claude, ChatGPT, Mistral, Cursor, VS Code, Codex, Hermes Agent, OpenClaw, and other AI tools as an MCP server.
+title: "SocialAPI MCP server"
+sidebarTitle: "MCP server"
+description: "Connect Claude, ChatGPT, Cursor, and other AI clients to the SocialAPI MCP server to read comments, reply, send DMs, and publish posts."
 ---
 
-[SocialAPI](https://social-api.ai) is a social media API for AI agents, exposed as an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server. Once connected, your AI assistant can list accounts, fetch comments, reply, send DMs, publish posts, and more through natural language.
+The SocialAPI MCP server lets an AI client run SocialAPI operations on your connected accounts through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP). Once a client is connected, you can ask it in plain language to list your connected accounts, read and reply to comments, send direct messages (DMs), answer reviews, and publish or schedule posts.
 
-**MCP Server URL:** `https://api.social-api.ai/mcp`
+The server URL is the same for every client:
+
+```text
+https://api.social-api.ai/mcp
+```
+
+The server uses the Streamable HTTP transport. Every tool runs the same operation as its REST equivalent, with the same scopes, plan allowances, and platform support: see [MCP tools reference](/integrations/tools).
 
 ## Authentication
 
-The MCP endpoint accepts two credential types on the `Authorization: Bearer` header:
+An MCP client authenticates with a bearer token on the `Authorization` header. SocialAPI accepts the same two token types as the REST API:
 
-| Method | Best for | How to obtain |
+| Token | Use it for | How the client gets it |
 |---|---|---|
-| **OAuth 2.1 with PKCE** | Claude, ChatGPT, Cursor, VS Code, Le Chat, Codex, Hermes Agent, OpenClaw, and other MCP clients with built-in OAuth | Handled automatically by the client on first tool use |
-| **API key** | Custom MCP clients, headless agents, server-side scripts, CI jobs | Create one in the [dashboard](https://app.social-api.ai), prefix `sapi_key_` |
+| OAuth 2.1 access token | Interactive clients with a built-in sign-in: Claude, ChatGPT, Le Chat, Cursor, VS Code, Codex, Hermes Agent, OpenClaw | You add the server URL. The client opens a SocialAPI sign-in page, you approve, and the client keeps and refreshes the token. See [OAuth for MCP clients](/integrations/oauth) |
+| API key | Headless agents, servers, CI jobs, and clients without OAuth | You create a key in the dashboard and put it in the client's `Authorization` header. See [Custom MCP clients](/integrations/custom) |
 
-OAuth-capable clients discover the authorization server via `/.well-known/oauth-protected-resource`, so no credentials are needed in their config files. For everything else, see [Custom MCP clients](/integrations/custom).
+A full-access API key and an OAuth access token can run every tool. To give an agent less, connect it with a [scoped API key](/guides/scoped-keys): a tool outside the key's scopes returns a result with `isError: true` and `code` `auth.insufficient_scope`. `required_scope` is absent for tools that need a full-access key. See [Scoped API keys](/guides/scoped-keys) and [Authentication](/guides/authentication).
 
-## Choose your platform
+## Connect a client
 
-<CardGroup cols={2}>
-  <Card title="Claude" icon="message" href="/integrations/claude">
-    Web, Desktop, Claude Code, Mobile
-  </Card>
-  <Card title="ChatGPT" icon="comment" href="/integrations/chatgpt">
-    Web, Desktop, Mobile
-  </Card>
-  <Card title="Mistral / Le Chat" icon="bolt" href="/integrations/mistral">
-    Web, Mobile
-  </Card>
-  <Card title="Cursor" icon="code" href="/integrations/cursor">
-    Config file or Settings UI
-  </Card>
-  <Card title="VS Code + Copilot" icon="terminal" href="/integrations/vscode">
-    Config file or Command Palette
-  </Card>
-  <Card title="Codex" icon="code" href="/integrations/codex">
-    CLI, IDE extension, desktop app
-  </Card>
-  <Card title="Hermes Agent" icon="robot" href="/integrations/hermes">
-    Chat and messaging gateway
-  </Card>
-  <Card title="OpenClaw" icon="robot" href="/integrations/openclaw">
-    Every routed channel
-  </Card>
-</CardGroup>
+| Client | Surfaces | Sign-in | Setup |
+|---|---|---|---|
+| Claude | claude.ai, Claude Desktop, Claude Code, mobile | OAuth | [Claude](/integrations/claude) |
+| ChatGPT | Web, desktop, mobile | OAuth | [ChatGPT](/integrations/chatgpt) |
+| Le Chat (Mistral) | Web, mobile | OAuth | [Mistral / Le Chat](/integrations/mistral) |
+| Cursor | Config file, Settings | OAuth | [Cursor](/integrations/cursor) |
+| VS Code with GitHub Copilot | Config file, Command Palette | OAuth | [VS Code](/integrations/vscode) |
+| Codex | CLI, IDE extension, desktop app | OAuth or API key | [Codex](/integrations/codex) |
+| Hermes Agent | Chat and messaging gateway | OAuth or API key | [Hermes Agent](/integrations/hermes) |
+| OpenClaw | Every routed channel | OAuth or API key | [OpenClaw](/integrations/openclaw) |
+| Any other MCP client | Any | API key | [Custom MCP clients](/integrations/custom) |
 
-## Available tools
+## What the agent can do
 
-Your AI assistant has access to **88 tools** covering all [SocialAPI](https://social-api.ai) functionality:
+The agent gets one tool per operation: accounts and brands, comments, DMs, reviews, mentions, Automations, posts, media, analytics, exports, webhooks, events, usage, and API keys. [MCP tools reference](/integrations/tools) lists every tool by area with the REST endpoint it runs.
 
-| Category | What the assistant can do |
-|---|---|
-| **Accounts** | List connected accounts, connect new accounts, disconnect, complete OAuth exchange, list account pages, fetch creator info, get per-account limits |
-| **Brands** | List, create, update, delete brands |
-| **Posts** | List, create, get, update, delete, retry, unpublish posts; fetch metrics; validate; import |
-| **Instagram Stories** | List currently-active Instagram Stories (Instagram only) |
-| **Media** | List, delete media; get upload URLs; upload; verify; check storage usage |
-| **Comments** | List commented posts, list comments on a post, list reply threads, reply, hide/unhide, like/unlike, delete, send private reply, moderate |
-| **DMs** | List conversations, get conversation, list and send messages, mark as read |
-| **Reviews** | List reviews, reply to a review, update or delete a review reply |
-| **Mentions** | Fetch mentions for an account |
-| **Automations** | List, get, create, update, pause, and delete [Automations](/guides/automations) on Instagram and Facebook accounts; list their runs |
-| **Inbox posts** | List inbox posts |
-| **Usage** | Check workspace usage, per-account limits, storage usage, account constraints, publishing constraints |
-| **Keys** | List, revoke API keys |
-| **Webhooks** | List, create, get, update, delete webhooks; list deliveries; retry deliveries; test webhooks; list event catalog |
-| **Exports** | Create exports, get an export, list exports, fetch export videos |
-| **Events** | List events, fetch events summary |
-| **Invites** | List, create, revoke brand invites |
-| **Users** | Get/update profile |
-| **Feedback** | Send feedback to the [SocialAPI](https://social-api.ai) team |
+## Not the documentation MCP server
+
+This documentation site also exposes its own MCP server, which only searches these docs. It cannot read or change your accounts. To manage your SocialAPI accounts from an AI client, add the server at `https://api.social-api.ai/mcp`.
 
 ## Troubleshooting
 
-**Authorization fails or loops** - Make sure pop-ups are not blocked in your browser when the OAuth window opens. Some browser extensions (ad blockers, privacy tools) can interfere with the redirect.
+<AccordionGroup>
+  <Accordion title="The sign-in window does not open or loops">
+    Allow pop-ups for the client's site. Ad blockers and privacy extensions can block the redirect back to the client: pause them and retry.
+  </Accordion>
+  <Accordion title="Tool calls fail with HTTP 401">
+    The client's OAuth session expired or its API key is wrong. Remove the SocialAPI server from the client and add it again to sign in again. For an API key, check that it is active in the [dashboard](https://app.social-api.ai/api-configuration?tab=keys). The `401` body is `{"error": "<message>"}`.
+  </Accordion>
+  <Accordion title="The client reports that the server is not responding">
+    Use the URL exactly as shown: `https://api.social-api.ai/mcp`. Check [status.social-api.ai](https://status.social-api.ai) for an incident.
+  </Accordion>
+  <Accordion title="A tool returns an error result">
+    A failed tool returns `isError: true` with the same `code` the REST API returns. Look the code up in [Errors](/guides/errors).
+  </Accordion>
+</AccordionGroup>
 
-**Tool calls fail with 401** - Your OAuth session may have expired. Remove the [SocialAPI](https://social-api.ai) connection and re-add it to trigger a fresh authorization. If you authenticate with an API key, check that the key is still active in the [dashboard](https://app.social-api.ai/settings/keys).
+## Related
 
-**"MCP server not responding"** - Verify the URL is exactly `https://api.social-api.ai/mcp`. Check [status.social-api.ai](https://status.social-api.ai) for any ongoing incidents.
-
-## Still have questions?
-
-If you have any issues or want to learn more about using [SocialAPI](https://social-api.ai) with AI assistants, reach out to our support team at [support@social-api.ai](mailto:support@social-api.ai).
+- [MCP tools reference](/integrations/tools): every tool and the endpoint it runs.
+- [OAuth for MCP clients](/integrations/oauth): how the sign-in works, and how to build it for your own client.
+- [Custom MCP clients](/integrations/custom): connect with an API key.
+- [Scoped API keys](/guides/scoped-keys): limit which tools an agent can run.
+- [Errors](/guides/errors): every error code a tool can return.

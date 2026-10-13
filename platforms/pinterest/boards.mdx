@@ -1,0 +1,139 @@
+---
+title: Pinterest boards
+sidebarTitle: "Boards"
+description: List, create, rename, and delete Pinterest boards through SocialAPI, and use a board ID to publish Pins to it.
+---
+
+A Pinterest board is the collection a Pin is saved to. SocialAPI lists, creates, renames, and deletes the boards of a connected Pinterest account, and every Pin you publish names one board. Board operations cost no credits, and SocialAPI reads boards from Pinterest on every call without storing them.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/accounts/{id}/boards` | List the account's boards |
+| `POST` | `/v1/accounts/{id}/boards` | Create a board |
+| `PATCH` | `/v1/accounts/{id}/boards/{boardId}` | Change a board's name, description, or privacy |
+| `DELETE` | `/v1/accounts/{id}/boards/{boardId}` | Delete a board and every Pin on it |
+
+`{id}` is the connected Pinterest account's ID. `{boardId}` is either the `id` or the `board_id` of the board. Every endpoint returns `400 account.boards_not_supported` for an account that is not on Pinterest.
+
+## List boards
+
+```bash
+curl https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_board_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "board_id": "8828",
+      "name": "Recipes",
+      "privacy": "PUBLIC"
+    }
+  ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `id` | SocialAPI's ID for the board, prefixed `sapi_board_` |
+| `board_id` | Pinterest's own ID for the board |
+| `name` | The board name |
+| `privacy` | `PUBLIC`, `PROTECTED`, or `SECRET` |
+
+Pass either `id` or `board_id` as `board_id` on a Pinterest target when you publish a Pin: see [Pinterest publishing](/platforms/pinterest/publishing#3-create-post). Listing boards needs the `accounts:read` scope. `GET /v1/accounts/{id}/pages` refuses a Pinterest account with `400 account.use_boards_endpoint`.
+
+## Create a board
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Recipes",
+    "description": "Weeknight dinners",
+    "privacy": "PUBLIC"
+  }'
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | The board name. A request without it fails with `400 board.name_required` |
+| `description` | string | No | The board description |
+| `privacy` | string | No | `PUBLIC`, `PROTECTED`, or `SECRET`. Pinterest applies its default when you omit it |
+
+Response (HTTP 201): the board, in the shape of a list item. Creating a board needs the `accounts:manage` scope.
+
+## Rename a board or change its privacy
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards/8828 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Weeknight recipes",
+    "privacy": "SECRET"
+  }'
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | No | The new name |
+| `description` | string | No | The new description |
+| `privacy` | string | No | `PUBLIC` or `SECRET` |
+
+Send at least one field. A request with none fails with `400 board.update_empty`. Any other `privacy` value, including `PROTECTED`, fails with `400 board.privacy_invalid`: Pinterest cannot set a board to `PROTECTED` after creation, and a board that is `PROTECTED` cannot change its privacy at all. Create a new board instead. The response is the updated board (HTTP 200). This endpoint needs the `accounts:manage` scope.
+
+## Delete a board
+
+<Warning>
+  Deleting a board permanently deletes every Pin saved to it. Pinterest offers no undo and SocialAPI keeps no copy.
+</Warning>
+
+```bash
+curl -X DELETE https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/boards/8828 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response: HTTP 204 with no body. A board that no longer exists on Pinterest also returns 204. This endpoint needs the `accounts:manage` scope.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Boards per list call | Up to 100, with no cursor |
+| Privacy on create | `PUBLIC`, `PROTECTED`, `SECRET` |
+| Privacy on update | `PUBLIC`, `SECRET` |
+| Pinterest's own rate limit | `429 platform.pinterest.rate_limit` |
+
+## Errors
+
+Every code is in [Errors](/guides/errors).
+
+- `400 account.boards_not_supported`: the account is not a Pinterest account.
+- `400 board.name_required`: a create request has no `name`.
+- `400 board.update_empty`: an update request sets no field.
+- `400 board.privacy_invalid`: an update sets `privacy` to anything but `PUBLIC` or `SECRET`.
+- `401 platform.pinterest.auth`: Pinterest reported that authentication failed. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
+- `403 platform.pinterest.403`: Pinterest refused the action for this account.
+- `404 platform.pinterest.404`: Pinterest reports that the board or Pin does not exist.
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_pinterest_boards` | Lists the account's boards. Pass `id` or `board_id` as `board_id` on a Pinterest target of `social_api_create_post` |
+
+Create, rename, and delete have no tool. Use the endpoints above.
+
+## Related
+
+- [Pinterest publishing](/platforms/pinterest/publishing): publish a Pin to a board
+- [Pinterest API](/platforms/pinterest): capabilities, limits, and scopes
+- [Connect accounts](/guides/connect-accounts): connect a Pinterest account
+- [Errors](/guides/errors): every error code

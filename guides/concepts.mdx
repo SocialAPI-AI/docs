@@ -1,68 +1,33 @@
 ---
 title: Core concepts
-description: The five nouns SocialAPI's API exposes (Brand, Account, Post, Interaction, Capability) and how they fit together.
+description: Learn the five objects of the SocialAPI REST API (brand, account, post, interaction, capability) and how they relate before you build.
+icon: diagram-project
 ---
 
-SocialAPI.ai is a unified social media API: one REST endpoint and MCP server to read and respond to comments, direct messages, mentions, and reviews across Instagram, Facebook, TikTok, LinkedIn, YouTube, X, Threads, WhatsApp, Telegram, Zalo, Google Business Profile, and Pinterest. Every platform returns the same `Interaction` schema.
+SocialAPI is a REST API and MCP server that reads and answers comments, direct messages (DMs), mentions, and reviews on connected social accounts, and publishes posts to them. Five objects shape every endpoint: brand, account, post, interaction, and capability.
 
-SocialAPI's REST API is shaped around five nouns. Once you know what each one means, every endpoint slots into place: brands group accounts, accounts hold posts and interactions, and capabilities tell you which actions are valid for any given interaction.
-
-This page is a short tour. The [API Reference](/api-reference/introduction) has the exhaustive field-by-field schema for each one.
+A brand groups accounts. An account is one connected social account. You publish a post to one or more accounts. Interactions arrive on an account. Capabilities tell you which actions a platform allows on an interaction.
 
 ## Brand
 
-A **Brand** (called a *social profile* in pricing) is the top-level grouping in SocialAPI. One brand corresponds to one business, client, or location. All connected social accounts, posts, and interactions live under a brand. New accounts start with one brand named "Default", created automatically at signup. Rename it or delete it at any time.
-
-Brands matter for two reasons:
-
-1. **Billing.** Plans are sized in social profiles (brands). Free includes 2, Starter 10, Pro 50, Business 200, Enterprise unlimited.
-2. **Isolation.** Accounts under one brand cannot see accounts under another. Use brands to keep agency clients separated, or to split staging from production.
-
-### Profile units
-
-The numbers above are unit limits, not a strict brand count. Billing counts **profile units**: each brand costs one unit. Profile units track brand count only, Facebook Pages do not add units.
-
-Facebook Pages have their own limit instead: each brand can connect up to 5 Facebook Pages (see [Facebook: one login, many brands](/connectors/facebook#one-login-many-brands)), accumulated one at a time through the [Facebook logins endpoints](/connectors/facebook#managing-pages-after-connecting). This is a hard cap, not a billed allowance: there is no charge for staying under it, and assigning a Page beyond it returns `403 platform.facebook.page_cap` rather than a unit-limit error.
-
-`GET /v1/usage` reports where you stand:
+A brand is the top-level group of connected accounts: one business, client, or location. Every account belongs to exactly 1 brand. Every interaction belongs to the account that received it. A post goes to 1 or more accounts as `targets[]`.
 
 ```json
 {
-  "profile_units_used": 4,
-  "profile_units_limit": 10,
-  "page_allowance": 5,
-  "page_billing_exempt": false
-}
-```
-
-| Field | Meaning |
-|---|---|
-| `profile_units_used` | Units consumed so far: brand count. |
-| `profile_units_limit` | Your plan's total unit allowance (`-1` for unlimited, Enterprise). |
-| `page_allowance` | Facebook Pages allowed per brand before further assignment is refused (`5`). |
-| `page_billing_exempt` | Legacy flag from the earlier page-billing model. Page assignment is not billed for any account. |
-
-```json
-{
-  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
   "name": "Acme Corp",
   "created_at": "2026-04-12T09:30:00Z"
 }
 ```
 
-See [`/v1/brands`](/api-reference/introduction) for the full schema and CRUD endpoints.
-
-<Note>
-  Treat IDs as opaque strings. Brands, posts, and invites are UUIDs; accounts are prefixed with `acc_`. Do not parse them or assume a format, and store them as text. See [IDs are opaque strings](/guides/reliability#ids-are-opaque-strings).
-
-  Brand creation is not idempotent: there is no `external_id` or idempotency key, and brand names are not unique, so a retried `POST /v1/brands` creates a duplicate. Persist the returned brand ID immediately, and check for an existing brand before creating another.
-</Note>
+- **A new SocialAPI account starts with 1 brand** named "Default". Rename or delete it like any other brand.
+- **Your plan sets how many brands you can create.** Pricing pages call a brand a profile. See [Plans and usage](/guides/plans), and read your current count with `GET /v1/usage` ([Check your usage](/guides/plans#check-your-usage)).
+- **A brand-restricted API key sees only its brands.** Use brands to keep agency clients apart. See [Brand restrictions](/guides/scoped-keys#brand-restrictions).
+- **Creating a brand is not idempotent.** Brand names are not unique, so a retried `POST /v1/brands` creates a duplicate. See [Create requests are not idempotent](/guides/ids#create-requests-are-not-idempotent).
 
 ## Account
 
-An **Account** is a connected social account under a brand. One brand can hold many accounts, across any mix of platforms. SocialAPI stores the OAuth tokens (encrypted at rest) and refreshes them automatically.
-
-You connect an account by calling `POST /v1/accounts/connect` and walking the user through OAuth. After connection, the account ID (prefixed `acc_`) is what you pass to every account-scoped endpoint.
+An account is one connected social account: an Instagram account, a Facebook login with its Pages, a YouTube channel, or a Google Business Profile location. Its ID starts with `acc_`, and you pass it to every endpoint that acts on the account.
 
 ```json
 {
@@ -70,27 +35,28 @@ You connect an account by calling `POST /v1/accounts/connect` and walking the us
   "platform": "instagram",
   "name": "Acme Corp",
   "username": "acmecorp",
-  "profile_picture_url": "https://scontent.cdninstagram.com/v/...",
-  "bio": "Sustainable apparel. Shipping worldwide."
+  "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+  "status": "active",
+  "permissions": null,
+  "effective_permissions": ["posts.read", "posts.write", "comments.read", "comments.write", "messages.read", "messages.write", "analytics.read"]
 }
 ```
 
-The full Account schema, including the per-platform `metadata` object, is documented in [Connectors overview](/connectors/overview#account-object).
+You connect an account with `POST /v1/accounts/connect` and send the person through the platform's consent screen. SocialAPI's own app connects most platforms, so you register nothing. X, Telegram, and Bluesky use your own app or credentials. See [Connect accounts](/guides/connect-accounts) and [Platform apps](/guides/platform-credentials).
 
-See also: [Authentication](/guides/authentication), [OAuth](/guides/oauth).
+An account's `status` is `active`, `reconnect_recommended`, or `token_expired`. Reconnecting keeps the account's ID. See [Account status](/guides/connect-accounts#account-status).
+
+An account's `permissions` limit what it can do on its platform. `null` means every permission, and `effective_permissions` lists the ones the account can use now. See [Account permissions](/guides/permissions).
 
 ## Post
 
-A **Post** is one piece of outbound content. A post can target multiple accounts at publishing time, so a single `POST /v1/posts` call can fan out to Instagram, Facebook, and Threads in one shot.
-
-A post has two parts: the post itself (text, media, scheduled time) and a per-platform target that carries status, errors, and engagement metrics. That split is what lets a single post object report "published on Instagram, failed on Facebook" cleanly.
+A post is one piece of outbound content. One `POST /v1/posts` call can send it to 1 or more accounts. Each account it goes to is a target in `targets[]`, with its own status, `platform_post_id`, `permalink`, error, and metrics. That split lets one post report "published on Instagram, failed on Facebook".
 
 ```json
 {
   "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
   "text": "Spring collection is live.",
   "status": "published",
-  "scheduled_at": null,
   "targets": [
     {
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
@@ -98,41 +64,48 @@ A post has two parts: the post itself (text, media, scheduled time) and a per-pl
       "status": "published",
       "platform_post_id": "17895695668004550",
       "permalink": "https://www.instagram.com/p/ABC123/",
-      "metrics": { "like_count": 42, "comments_count": 5 }
+      "metrics": { "likes": 42, "comments": 5, "shares": 0, "saves": 0 }
     }
   ],
-  "created_at": "2026-04-15T11:00:00Z"
+  "created_at": "2026-10-13T11:00:00Z"
 }
 ```
 
-Posts move through a state machine: `draft`, `scheduled`, `publishing`, then `published` (or `partial`, `failed`). See the [Posts tab](/posts/overview) for per-platform field references.
-
-Targets follow the same rule: `published` and `failed` are terminal, `publishing` is not. A target at `published` carries a `platform_post_id`, so treating "`published` and a non-empty `platform_post_id`" as your success condition is correct. The one exception is a TikTok draft sent to the creator's inbox (`platform_data.tiktok.post_mode: "inbox"`), which is terminal without an ID because it is not a post until the creator finishes it in the TikTok app. While a target is `publishing`, keep polling `GET /v1/posts/{post_id}` or wait for the `post.published` / `post.partial` / `post.failed` webhook. Do not republish it: some platforms (TikTok in particular) confirm an upload minutes before they expose its post ID, so a retry at that point can duplicate a post that is already live.
+- **A request publishes only with `publish_now` or `scheduled_at`.** With neither, `POST /v1/posts` saves a draft.
+- **A post is `draft`, `scheduled`, `publishing`, `published`, `partial`, `failed`, or `cancelled`.** A target is `pending`, `publishing`, `published`, `failed`, or `unpublished`. See [Post status](/guides/delivery#post-status).
+- **An HTTP success means SocialAPI accepted the post.** Delivery to each platform finishes afterwards: read the post again or wait for a `post.*` webhook event. See [Track post delivery](/guides/delivery).
+- **Metric names are the same on every platform.** Where a platform reports a count, it uses the keys `likes`, `comments`, `shares`, and `saves`. A key the platform does not report is `0`. A Google Business Profile target has no `metrics` object, or one whose four keys are all `0`. LinkedIn and Pinterest targets return `501 resource.not_supported`. Instagram, TikTok, YouTube, and Zalo add keys such as `views`: see [Analytics](/guides/analytics#read-live-post-metrics).
 
 ## Interaction
 
-An **Interaction** is anything inbound: a comment on one of your posts, a DM, a review, or a mention. Comments, reviews, and mentions are proxied from the platform; DM conversations and messages are stored in SocialAPI's database to support threading and pagination. The API mints stable IDs so your app can reference any interaction across calls.
+An interaction is anything inbound on an account: a comment on one of your posts, a DM, a mention, or a review. You read interactions with the [inbox endpoints](/guides/inbox), and SocialAPI also sends them to your server as [webhook events](/guides/webhook-events).
 
-Interaction IDs encode their type as a prefix:
+Comments, reviews, DMs, and mentions have different IDs and different item shapes:
 
-| Prefix | Type |
-|---|---|
-| `sapi_cmt_` | Comment |
-| `sapi_dm_` | DM |
-| `sapi_rev_` | Review |
-| `sapi_mnt_` | Mention |
+| Interaction | ID prefix | Guide |
+|---|---|---|
+| Comment | `sapi_cmt_` | [Comments](/guides/comments) |
+| DM | `sapi_dm_` | [Direct messages](/guides/direct-messages) |
+| Review | `sapi_rev_` | [Reviews](/guides/reviews) |
+| Mention | `sapi_mnt_` | [Mentions](/guides/mentions) |
+
+Treat every ID as an opaque string. See [IDs](/guides/ids).
+
+A comment returned by the REST API is a flat object:
 
 ```json
 {
-  "id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U",
+  "id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+  "platform_id": "17858893269577012",
   "platform": "instagram",
-  "type": "comment",
-  "author": {
-    "id": "17841405793187218",
-    "name": "Jane Smith"
-  },
-  "content": { "text": "Love this product!" },
-  "created_at": "2026-04-15T14:30:00Z",
+  "text": "Love this product!",
+  "author_id": "17841400008460056",
+  "author_name": "Jane Smith",
+  "author_username": "janesmith",
+  "is_owner": false,
+  "is_hidden": false,
+  "parent_id": null,
+  "created_at": "2026-10-13T14:30:00Z",
   "capabilities": {
     "can_reply": true,
     "can_delete": true,
@@ -143,22 +116,23 @@ Interaction IDs encode their type as a prefix:
 }
 ```
 
-The prefix lets the API dispatch a reply without a database lookup. See [Interaction IDs](/guides/interaction-ids) for the encoding details.
+The same comment in a `comment.received` webhook event is nested: `author` holds the person and `content` holds the text. Webhook events and the mentions list share that nested shape. See [Interaction payload](/guides/webhook-events#interaction-payload).
 
 ## Capability
 
-A **Capability** is a per-platform per-feature flag returned on every interaction so your code knows which actions are valid right now. Instead of branching on platform names ("if instagram, can like; if linkedin, can not"), you read the `capabilities` object on the interaction and disable UI controls accordingly.
+A capability is what one platform lets you do with one kind of feature: reply to a comment, hide it, like it, send a private reply, send a DM, reply to a review. Platforms differ, so SocialAPI reports capabilities instead of making you branch on platform names.
 
-```json
-{
-  "capabilities": {
-    "can_reply": true,
-    "can_delete": true,
-    "can_hide": true,
-    "can_like": false,
-    "can_private_reply": true
-  }
-}
-```
+Each comment carries a `capabilities` object with `can_reply`, `can_delete`, `can_hide`, `can_like`, and `can_private_reply`. Read it before you show a button or call an action.
 
-If you call an action whose flag is `false`, the API returns `501` with `error.code: "resource.not_supported"`. Treat 501 as a permanent platform limitation, not a bug. See [Platform support](/guides/platforms) for the full per-platform breakdown.
+An action the platform does not support returns `501` with `error.code: "resource.not_supported"`. Retrying does not change that answer.
+
+For the whole picture, [Supported platforms](/platforms/overview) compares every platform, and each platform page lists its own Capabilities table.
+
+## Related
+
+- [Quickstart](/quickstart) to use all five objects in one walkthrough
+- [Connect accounts](/guides/connect-accounts) to create accounts and read their status
+- [Unified inbox](/guides/inbox) to read and answer interactions
+- [Publishing](/guides/publishing) to send posts to accounts
+- [IDs](/guides/ids) for the ID format of every object
+- [Supported platforms](/platforms/overview) for what each platform allows

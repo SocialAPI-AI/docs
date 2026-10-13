@@ -1,0 +1,164 @@
+---
+title: Mentions
+description: List the posts and comments that mention or tag a connected account, and reply to a mention as a public comment, through one mentions API.
+---
+
+A mention is a post or comment on a platform that tags or @mentions your connected account. SocialAPI's mentions API lists them for 1 account and replies to a mention as a public comment, including on a post that someone else owns, where the normal comment reply is not allowed.
+
+A reply costs 1 interaction credit, and listing costs nothing. What a platform counts as a mention differs: see [What the list returns](#what-the-list-returns).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/accounts/{id}/mentions` | List the mentions of 1 connected account, newest first |
+| `POST` | `/v1/accounts/{id}/mentions/reply` | Reply to a mention as a public comment |
+
+`{id}` is the connected account's `acc_` ID. Mentions belong to 1 account: there is no list across accounts.
+
+## Your first mention reply
+
+List the mentions of an account:
+
+```bash
+curl "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions?limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "platform": "instagram",
+      "type": "mention",
+      "author": { "username": "janesmith" },
+      "content": { "text": "Loving the new range from @acmecorp" },
+      "metadata": {
+        "media_id": "17895695668004550",
+        "permalink": "https://www.instagram.com/p/C8xY2AbC/",
+        "media_type": "IMAGE",
+        "like_count": 12,
+        "comments_count": 3
+      },
+      "received_at": "2026-10-13T14:35:00Z",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+    }
+  ],
+  "count": 1
+}
+```
+
+Reply to it. `media_id` takes the mention's `sapi_mnt_` ID or the platform's media ID:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions/reply" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "media_id": "sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "text": "Thanks for the shout-out!"
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "comment_id": "sapi_cmt_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1X"
+}
+```
+
+The reply is a public comment. `comment_id` is the new comment's `sapi_cmt_` ID.
+
+## List mentions
+
+Each item is an `Interaction`: see [The Interaction shape](/guides/inbox#the-interaction-shape) and [Interaction payload](/guides/webhook-events#interaction-payload) for every field.
+
+| Parameter | Description |
+|---|---|
+| `since` | Only mentions created after this time, in RFC 3339 format |
+| `limit` | Mentions per page. The default is 20. A value above 100 is treated as 100. A value below 1 or one that is not an integer returns `400 validation.field_invalid` |
+| `cursor` | The `next_cursor` of the previous page |
+
+A malformed `since`, `limit`, or `cursor` returns `400 validation.field_invalid`. The response holds `data`, `count` (the number of items in `data`), and `next_cursor` when more mentions exist. Paging is in [Pagination](/guides/pagination#paginated-endpoints). Each call that returns at least one item also sends a `mention.received` event: see [Events](#events).
+
+## What the list returns
+
+Each platform exposes a different slice of what people write about your account, so the list holds different things.
+
+- **Instagram:** only media in which another account tagged yours. An @mention in a caption or in a comment is not in the list. It arrives as a [`mention.received`](/guides/webhook-events#mention-received) event, with `metadata.mention_type` set to `caption` or `comment`.
+- **Facebook:** the posts that tag the Page. A mention inside a comment arrives as a `mention.received` event.
+- **Threads, in beta:** public posts that tag the account.
+- **TikTok:** public posts that mention the account in the caption, and comments that mention it. TikTok Business Accounts only, and each mention appears 24 to 48 hours after it is made.
+- **X and Bluesky:** posts that mention the account.
+
+Other platforms return `501 resource.not_supported`. Each platform's page has the rules and limits: [Instagram](/platforms/instagram#mentions), [Facebook](/platforms/facebook#mentions), [Threads](/platforms/threads#mentions), [TikTok](/platforms/tiktok#mentions), [X](/platforms/twitter), and [Bluesky](/platforms/bluesky). The [capability matrix](/platforms/overview) compares them.
+
+## Reply to a mention
+
+`POST /v1/accounts/{id}/mentions/reply` posts a public comment as the connected account.
+
+| Field | Description |
+|---|---|
+| `media_id` | Required. The post the mention is on: the `sapi_mnt_` ID from the list, or the platform's media ID |
+| `text` | Required. The reply text |
+| `comment_id` | Set only when the mention is inside a comment. Omit it to reply to a mention in the post's caption |
+
+A missing `media_id` or `text` returns `400 validation.field_required`. A reply costs 1 interaction credit. Replying works on Instagram, Facebook, Threads (beta), Bluesky, and TikTok (mentions made in a comment only: a caption mention returns `400 validation.mention_reply_unsupported`). X lists mentions but cannot reply to them: the call returns `501 resource.not_supported`. Reply to a comment on your own post with [Comments](/guides/comments) instead.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Mentions per page | Default 20, up to 100 |
+| Cost of a reply | 1 interaction credit |
+| Cost of a list | None |
+
+## Errors and debugging
+
+Check these in order when a mention call fails or returns nothing:
+
+1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
+2. **`404 account.not_found`, `403 account.reconnection_required`.** The `acc_` ID is not yours, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list mentions, and `comments.write` to reply to one. `error.meta.permission` names it.
+4. **`400 validation.field_required`, `400 validation.field_invalid`.** A required field is missing, or a query parameter is wrong.
+5. **`501 resource.not_supported`.** The platform has no mentions, or cannot reply to them.
+6. **`429 validation.interaction_limit_exhausted`.** The plan's interaction allowance is used up.
+7. **An empty list.** The platform does not list that kind of mention. On Instagram, subscribe to `mention.received` for caption and comment mentions. On Threads, the list can omit mentions until Meta grants the scope for every account: see [Threads mentions](/platforms/threads#mentions).
+
+The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `inbox:read` | List mentions |
+| `inbox:write` | Reply to a mention |
+
+## Events
+
+SocialAPI sends [`mention.received`](/guides/webhook-events#mention-received) when Instagram, Facebook, or Threads reports that your account was mentioned. The event and the list share the same `id` on Threads, so you can match them. An account without the `comments.read` [permission](/guides/permissions) receives no `mention.received` events from the platform.
+
+`GET /v1/accounts/{id}/mentions` also sends a `mention.received` event on every call that returns at least one item, on every platform that lists mentions. Its `data` is an array of the listed items and it has no `raw_payload`. A call that returns no items sends no event. See [Mentions you list](/guides/webhook-events#mentions-you-list).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_get_mentions` | List the posts and comments that mention or tag a connected account |
+| `social_api_reply_to_mention` | Reply publicly to a mention, including on a post the account does not own |
+
+See [MCP tools](/integrations/tools#mentions).
+
+## Related
+
+- [Comments](/guides/comments): answer the comments on your own posts.
+- [Webhook events](/guides/webhook-events#mentions): the `mention.received` payload per platform.
+- [Unified inbox](/guides/inbox): the Interaction shape and the other inbox areas.
+- [Account permissions](/guides/permissions): the permissions an account needs to list and answer mentions.
+- [Platform support](/platforms/overview): which platform lists and answers mentions.
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit.

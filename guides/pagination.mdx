@@ -1,41 +1,145 @@
 ---
 title: "Pagination"
-description: "Page through large result sets using cursors."
+description: "Page through SocialAPI list endpoints with limit and cursor, and look up the default page size, maximum, and next-cursor field of every paginated endpoint."
 ---
 
-## Cursor-based pagination
+SocialAPI paginates large lists with opaque cursors. Send `limit` to set the page size, read the next cursor from the response, and send it back as `cursor` until the response has no next cursor. Never build, parse, or change a cursor: pass back exactly the value the API returned.
 
-All list endpoints return paginated results. The response includes a `next_cursor` field; pass it as the `cursor` query parameter on the next call to fetch the next page.
+## Page through a list
 
-```bash
-# First page
-GET /v1/inbox/comments?limit=25
-
-# Next page (use next_cursor from previous response)
-GET /v1/inbox/comments?limit=25&cursor=eyJpZCI6IjE3ODQx...
-```
-
-When there are no more results, the response omits `next_cursor` (or returns it as an empty string).
-
-This pattern applies to all list endpoints: `/v1/inbox/comments`, `/v1/inbox/conversations`, `/v1/inbox/reviews`, `/v1/posts`, `/v1/media`, and others.
-
-## Filtering
-
-Most list endpoints support filtering parameters. For example:
+Request the first page without a cursor:
 
 ```bash
-# Posts with comments, filtered by account and platform
-GET /v1/inbox/comments?account_id=acc_01HZ...&platform=instagram&limit=25
-
-# Published posts, sorted by date descending
-GET /v1/posts?status=published&sort=created_desc&limit=25
+curl "https://api.social-api.ai/v1/posts?status=draft&limit=2" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-See the [API Reference](/api-reference) for the full set of query parameters on each endpoint.
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "text": "Spring sale starts Friday: https://example.com/spring",
+      "status": "draft",
+      "hidden": false,
+      "retry_count": 0,
+      "created_at": "2026-10-01T08:00:00Z",
+      "updated_at": "2026-10-01T08:00:00Z"
+    },
+    {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "text": "New arrivals are in the shop.",
+      "status": "draft",
+      "hidden": false,
+      "retry_count": 0,
+      "created_at": "2026-10-02T09:30:00Z",
+      "updated_at": "2026-10-02T09:30:00Z"
+    }
+  ],
+  "pagination": {
+    "limit": 2,
+    "has_more": true,
+    "next_cursor": "7Kq2xVn9RzdE4mLpWb8Ya1Tc"
+  }
+}
+```
+
+Request the next page with the same filters and the returned cursor:
+
+```bash
+curl "https://api.social-api.ai/v1/posts?status=draft&limit=2&cursor=7Kq2xVn9RzdE4mLpWb8Ya1Tc" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+The last page has no next cursor: the field is absent or an empty string, depending on the endpoint. Stop when the next cursor is absent or empty. On endpoints that return `pagination.has_more`, it is `false` on the last page.
+
+A cursor records a position, not the filters or sort order. Send the same filters, `sort`, and `limit` on every page of one list. A cursor reused with different filters continues from the same position under the new filters.
+
+## Fetch every page
+
+```javascript
+async function listAll(path, params) {
+  const items = [];
+  let cursor = "";
+  do {
+    const query = new URLSearchParams(params);
+    if (cursor) query.set("cursor", cursor);
+    const resp = await fetch(`https://api.social-api.ai${path}?${query}`, {
+      headers: { Authorization: `Bearer ${process.env.SOCAPI_KEY}` },
+    });
+    const body = await resp.json();
+    items.push(...body.data);
+    cursor = body.pagination.next_cursor || "";
+  } while (cursor);
+  return items;
+}
+
+const drafts = await listAll("/v1/posts", { status: "draft", limit: "100" });
+```
+
+Read the next cursor from the field listed for the endpoint in the table below: it is `pagination.next_cursor` on some endpoints and a top-level `next_cursor` on others.
 
 ## Parameters
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `limit` | integer | varies | Results per page. Min 1, max 100. Default varies by endpoint: most endpoints default to 25, the shared validator defaults to 20, `/v1/media` defaults to 50, and `/v1/inbox/comments/{postId}/{commentId}/replies` defaults to 10. |
-| `cursor` | string | - | Opaque pagination cursor from the previous response's `next_cursor` field. |
+| Parameter | Type | Description |
+|---|---|---|
+| `limit` | integer | Items per page. The default and the maximum differ per endpoint. See the table below |
+| `cursor` | string | The next cursor from the previous response. Omit it for the first page |
+
+## Paginated endpoints
+
+| Endpoint | Default `limit` | Maximum `limit` | Next cursor field | `limit` of 0 or less |
+|---|---|---|---|---|
+| `GET /v1/posts` | 25 | 100 | `pagination.next_cursor` | Uses the default |
+| `GET /v1/events` | 50 | 100 | `pagination.next_cursor` | Uses the default |
+| `GET /v1/inbox/conversations` | 25 | 100 | `pagination.next_cursor` | Uses the default |
+| `GET /v1/inbox/conversations/{id}/messages` | 25 | 200 | `pagination.next_cursor` | Uses the default |
+| `GET /v1/inbox/comments` | 25 | 100 | `pagination.next_cursor` | `400 validation.field_invalid` |
+| `GET /v1/inbox/comments/{postId}` | 25 | 100 | `pagination.next_cursor` | `400 validation.field_invalid` |
+| `GET /v1/inbox/comments/{postId}/{commentId}/replies` | 10 | 100 | `pagination.next_cursor` | `400 validation.field_invalid` |
+| `GET /v1/inbox/reviews/{accountId}` | 20 | 50 | `pagination.next_cursor` | `400 validation.field_invalid` |
+| `GET /v1/accounts/{id}/mentions` | 20 | 100 | `next_cursor` | `400 validation.field_invalid` |
+| `GET /v1/automations/{id}/firings` | 20 | 100 | `next_cursor` | `400 validation.field_invalid` |
+| `GET /v1/media` | 50 | 100 | `next_cursor` | Uses the default |
+| `GET /v1/webhooks/{id}/deliveries` | 50 | 100 | `next_cursor` | Uses the default |
+| `GET /v1/platforms/pinterest/accounts/{id}/pins` | 50 | 50 | None: one page only | Uses the default |
+| `GET /v1/platforms/google/accounts/{id}/media` | Set by Google | Not enforced | `next_cursor` | Ignored: Google sets the page size |
+| `GET /v1/platforms/google/accounts/{id}/search-keywords` | Set by Google | 100 | `data.next_cursor` | Ignored |
+| `GET /v1/platforms/whatsapp/accounts/{id}/templates` | Set by Meta | Not enforced | `paging.cursors.after` | Ignored: Meta sets the page size |
+
+Rules for an out-of-range `limit`:
+
+- **Above the maximum:** the API uses the maximum, except on `GET /v1/webhooks/{id}/deliveries`, where a value above 100 uses 50.
+- **Text instead of a number:** treated like 0, except on `GET /v1/inbox/reviews/{accountId}`, where text uses 20 and only a number below 1 returns `400 validation.field_invalid`.
+- **Google and WhatsApp endpoints:** positive values go to the platform unchecked, so the platform decides what it accepts. The exception is `GET /v1/platforms/google/accounts/{id}/search-keywords`, where a negative value or a value above 100 returns `400 validation.page_size_invalid`.
+- **Platform page limits:** `GET /v1/inbox/comments/{postId}` can return fewer comments than `limit`, because the platform sets its own page size. YouTube returns at most 100 per page, and Bluesky returns one page.
+
+`GET /v1/posts` rejects a malformed cursor with `400 validation.field_invalid` and `error.meta.field` set to `cursor`. Pass only values the API returned.
+
+`GET /v1/events` returns the events inside your plan's event history. See [Plans and usage](/guides/plans#history-and-export-allowances).
+
+## Lists with no pagination
+
+These endpoints return every item in one response:
+
+- `GET /v1/accounts` (filter with `brand_id`), `GET /v1/brands`, `GET /v1/keys`, `GET /v1/keys/scopes`, `GET /v1/invites`, `GET /v1/announcements`, `GET /v1/billing/plans`
+- `GET /v1/webhooks`, `GET /v1/webhooks/events`
+- `GET /v1/automations` (filter with `account_id`)
+- `GET /v1/accounts/{id}/pages`, `GET /v1/accounts/{id}/boards`
+- `GET /v1/inbox/reviews`
+- `GET /v1/platforms/facebook/logins/{loginId}/pages`, `GET /v1/platforms/google/logins/{loginId}/locations`
+- `GET /v1/platforms/instagram/accounts/{id}/media/{mediaId}/collaborators`
+- `GET /v1/exports` returns the 50 newest exports. Older exports are not listed.
+- `GET /v1/exports/{id}/videos`
+
+Analytics, metrics, and insights endpoints return a date range or a time series instead of pages. `GET /v1/usage` returns one object.
+
+## Related
+
+- [API reference](/api-reference/introduction): every query parameter on each list endpoint
+- [IDs](/guides/ids): store IDs and cursors as opaque strings
+- [Errors](/guides/errors): the `validation.*` codes list endpoints return
+- [Plans and usage](/guides/plans): how long events and webhook deliveries stay listed on each plan
+- [Rate limits](/guides/rate-limits): the limits that apply to every request, including platform limits on reads
