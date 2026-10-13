@@ -5,7 +5,7 @@ description: Read daily history for accounts, brands, and posts, fetch live post
 
 Analytics in SocialAPI has 2 parts: stored daily history that SocialAPI keeps for accounts, brands, and posts, and live reads that fetch current figures from a platform. History never calls a platform, so it answers fast and works when a token has expired. Live reads show the platform's current numbers.
 
-Analytics requests cost no credits. Platform-specific insight endpoints, such as Instagram's account summary and Google Business Profile performance metrics, are on the platform pages linked in [Platform insights](#platform-insights).
+Analytics requests cost no credits. An account needs the `analytics.read` [permission](/guides/permissions) for its history, its live post metrics, and its platform insights, and the `posts.read` permission for `POST /v1/accounts/{id}/sync`. Platform-specific insight endpoints, such as Instagram's account summary and Google Business Profile performance metrics, are on the platform pages linked in [Platform insights](#platform-insights).
 
 ## Endpoints
 
@@ -87,15 +87,15 @@ A range longer than 400 days returns `400 validation.range_too_wide`. A `from` o
 | `replies_failed` | `flow` | `owned` | Account, brand | Replies, private replies, DMs, review replies, and mention replies that failed |
 | `comments_moderated` | `flow` | `owned` | Account, brand | Comments you hid, showed again, deleted, liked, or unliked |
 
-- **Post history:** SocialAPI adds a point each time it syncs the post's account: when you connect it, and when you call `POST /v1/accounts/{id}/sync`. SocialAPI also refreshes post metrics in the background for every platform except X, LinkedIn, WhatsApp, and Pinterest. History starts when SocialAPI first tracks the post, so a post that was published long ago has no earlier points. A post with 2 or more targets returns one series per metric, summed across its targets. Pinterest posts are not synced, so they have no history.
-- **Action counts:** SocialAPI counts the replies, DMs, and moderation actions you send through the API, MCP tools, and Automations, per account and per day (UTC). Today's count can be up to 24 hours behind.
+- **Post history:** SocialAPI adds a point each time it syncs the post's account: when you connect it, and when you call `POST /v1/accounts/{id}/sync`. An account without `analytics.read` adds no points. SocialAPI also refreshes post metrics in the background for every platform except X, LinkedIn, WhatsApp, and Pinterest. History starts when SocialAPI first tracks the post, so a post that was published long ago has no earlier points. A post with 2 or more targets returns one series per metric, summed across its targets. Pinterest posts are not synced, so they have no history.
+- **Action counts:** SocialAPI counts the replies, DMs, and moderation actions you send through the API, MCP tools, and Automations, per account and per day (UTC). Today's count can be up to 24 hours behind. An account without `analytics.read` is not counted.
 - **Platform metrics:** follower, reach, and view history from the platforms is not stored. Read current figures from the platform insight endpoints below.
 
 ### Account, brand, and post history
 
-- **Account:** `GET /v1/accounts/{id}/analytics` returns the account's series and, for an account with Pages, the series of its Pages summed. Add `page_id` for one Page. An unknown account returns `404 account.not_found`, and an unknown Page returns `404 resource.not_found`.
-- **Brand:** `GET /v1/brands/{id}/analytics` sums every account and Page in the brand per metric and day. The sum includes accounts you disconnected, so history does not disappear when an account disconnects. A brand-restricted key reads only its own brands. An unknown brand returns `404 resource.not_found`. `day_tz` is `mixed` when platforms cut days differently.
-- **Post:** `GET /v1/posts/{pid}/analytics` takes the SocialAPI post ID (a UUID), not the platform's post ID. A post that does not exist, or one your key cannot see, returns `404 resource.not_found`.
+- **Account:** `GET /v1/accounts/{id}/analytics` returns the account's series and, for an account with Pages, the series of its Pages summed. Add `page_id` for one Page. An unknown account returns `404 account.not_found`, an unknown Page returns `404 resource.not_found`, and an account without `analytics.read` returns `403 account.permission_missing`.
+- **Brand:** `GET /v1/brands/{id}/analytics` sums every account and Page in the brand per metric and day. The sum includes accounts you disconnected, so history does not disappear when an account disconnects. An account without `analytics.read` is left out of the sum. A brand-restricted key reads only its own brands. An unknown brand returns `404 resource.not_found`. `day_tz` is `mixed` when platforms cut days differently.
+- **Post:** `GET /v1/posts/{pid}/analytics` takes the SocialAPI post ID (a UUID), not the platform's post ID. A post that does not exist, or one your key cannot see, returns `404 resource.not_found`. A target whose account lacks `analytics.read` is left out of the total, and a post with no target left returns `403 account.permission_missing`.
 
 ## Read live post metrics
 
@@ -158,7 +158,7 @@ Each published target has `metrics` or, when its platform cannot report them, an
 | Pinterest | Not available: the target returns `501 resource.not_supported` |
 | Google Business Profile | Local posts report no engagement counts, so every count is `0`. Use [performance metrics](/platforms/google#performance-metrics) |
 
-A figure a platform does not report is `0`, except Instagram insights, which are absent when Instagram does not report them. A target that cannot be read returns the platform's error, for example `404 resource.not_found` when the platform no longer returns the post.
+A figure a platform does not report is `0`, except Instagram insights, which are absent when Instagram does not report them. A target that cannot be read returns the platform's error, for example `404 resource.not_found` when the platform no longer returns the post. A target whose account lacks `analytics.read` returns `resource.not_found` in its `error`, with a message that says the account could not be loaded.
 
 ## Refresh an account's posts
 
@@ -181,7 +181,7 @@ Response (HTTP 200):
 - **Cooldown:** SocialAPI allows 1 sync per account every 5 minutes. The 5-minute window starts when you connect the account and on every sync request, including one that returns `501`. A request inside the window returns `429 accounts.sync_rate_limited`, with `Retry-After` and `error.meta.retry_after_seconds` set to the seconds left.
 - **Unsupported platforms:** a platform that cannot list posts, such as LinkedIn or WhatsApp, returns `501 resource.not_supported`.
 - **Pinterest:** `POST /v1/accounts/{id}/sync` returns 200 `{"success": true}` and refreshes nothing: Pins are read live.
-- **Other errors:** `404 account.not_found` for an account your key cannot reach, and `502` with a `platform.{platform}.*` code when the platform fails.
+- **Other errors:** `404 account.not_found` for an account your key cannot reach, `403 account.permission_missing` for an account without `posts.read`, and `502` with a `platform.{platform}.*` code when the platform fails.
 
 TikTok and YouTube also have their own sync routes. See [TikTok](/platforms/tiktok#sync-videos) and [YouTube](/platforms/youtube).
 
@@ -229,5 +229,6 @@ Analytics exports build a report of an account's videos and their metrics. Expor
 - [Track post delivery](/guides/delivery): post and target fields, including `metrics`
 - [Publish a post](/guides/publishing): create the posts you measure
 - [Plans and usage](/guides/plans): export allowances
+- [Account permissions](/guides/permissions): the `analytics.read` and `posts.read` permissions
 - [Scoped API keys](/guides/scoped-keys): scopes for analytics
 - [Errors](/guides/errors): every analytics error code

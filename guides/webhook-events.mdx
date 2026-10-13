@@ -688,9 +688,9 @@ The event's `reason` can differ from the account's `reconnect_reason`. When a to
 
 ### `account.updated`
 
-Fires when something changes on the account at the platform. Branch on `change`.
+Fires when something changes on the account. Branch on `change`.
 
-**Emitted for:** Google Business Profile.
+**Emitted for:** every platform for `permissions_reduced`. Google Business Profile for every other `change`.
 
 | `change` | Meaning | Extra fields |
 |---|---|---|
@@ -698,6 +698,7 @@ Fires when something changes on the account at the platform. Branch on `change`.
 | `google_update_pending` | Google has updates to the location waiting for review | None |
 | `voice_of_merchant_changed` | The location's Voice of Merchant status changed | None |
 | `duplicate_location` | Google flagged the location as a duplicate | None |
+| `permissions_reduced` | The account lost [permissions](/guides/permissions) that you did not remove yourself | `permissions`: the list of permissions it lost |
 
 ```json
 {
@@ -706,6 +707,19 @@ Fires when something changes on the account at the platform. Branch on `change`.
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
     "change": "customer_media_added",
     "media_id": "accounts/123456789/locations/987654321/media/customers/AF1QipN"
+  }
+}
+```
+
+`permissions_reduced` fires when the platform refused a call because the account's access lacks a scope, or when a reconnect granted less than the account had. It does not fire when you remove a permission with `PATCH /v1/accounts/{id}`. Reconnect the account to ask for the permissions again.
+
+```json
+{
+  "event": "account.updated",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "change": "permissions_reduced",
+    "permissions": ["messages.read", "messages.write"]
   }
 }
 ```

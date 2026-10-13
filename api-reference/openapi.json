@@ -114,7 +114,7 @@
                         }
                     },
                     "400": {
-                        "description": "Missing platform or unsupported platform",
+                        "description": "Missing platform, unsupported platform, or invalid permissions (validation.permissions_empty, validation.permission_unknown)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -290,6 +290,93 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Replaces the permissions of a connected account. Send null for every permission, including ones added later. Removing a permission takes effect at once and immediately deletes the comments, messages, analytics and posts not published through SocialAPI that it covers, and adding the permission back does not restore them. Posts published through SocialAPI are kept. Adding a permission takes effect at once when the platform already granted it, otherwise reconnect the account to ask for it. Check effective_permissions in the response.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Update an account's permissions",
+                "parameters": [
+                    {
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.UpdateAccountPermissionsRequest"
+                            }
+                        }
+                    },
+                    "description": "New permissions",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Account"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body, missing permissions field, empty list, or unknown permission (validation.body_invalid, validation.field_required, validation.permissions_empty, validation.permission_unknown)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include accounts:manage",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -813,7 +900,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Enqueue an async analytics export job for a connected account. Subject to plan limits (exports per month, cooldown hours, concurrent export cap).",
+                "description": "Enqueue an async analytics export job for a connected account. Subject to plan limits (exports per month, cooldown hours, concurrent export cap). For some TikTok accounts, include_transcript and include_vision are refused with 400 account.export_enrichment_not_supported; export again without them.",
                 "tags": [
                     "Exports"
                 ],
@@ -1594,7 +1681,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid definition (validation.*)",
+                        "description": "Invalid definition (validation.*), or a trigger or action needs a permission the account does not have (validation.permission_missing)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1835,7 +1922,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid definition (validation.*)",
+                        "description": "Invalid definition (validation.*), or a trigger or action needs a permission the account does not have (validation.permission_missing)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5144,7 +5231,7 @@
                         }
                     },
                     "400": {
-                        "description": "Missing or invalid fields",
+                        "description": "Missing or invalid fields, or invalid permissions (validation.permissions_empty, validation.permission_unknown)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7827,7 +7914,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns live profile counts plus trailing-30-day insight totals (reach, views, interactions, engaged accounts, net follower change) for a connected Instagram account. The totals require the instagram_business_manage_insights permission, requested on every connect. Accounts connected before that permission existed return 403 platform.instagram.insights_scope_missing and must be reconnected.",
+                "description": "Returns live profile counts plus trailing-30-day insight totals (reach, views, interactions, engaged accounts, net follower change) for a connected Instagram account. The totals need the analytics.read permission. An account without it returns 403 account.permission_missing: add analytics.read to the account's permissions or reconnect the account. If Instagram itself has withdrawn the insights access, the next call can return 403 platform.instagram.insights_scope_missing instead: reconnect the account.",
                 "tags": [
                     "Instagram"
                 ],
@@ -7866,7 +7953,7 @@
                         }
                     },
                     "403": {
-                        "description": "Account connected without the insights permission, reconnect required",
+                        "description": "Account does not have the analytics.read permission (account.permission_missing), or Instagram withdrew the insights access (platform.instagram.insights_scope_missing); add the permission or reconnect the account",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12359,6 +12446,17 @@
                         "type": "object",
                         "additionalProperties": {}
                     },
+                    "permissions": {
+                        "description": "Permissions are the permissions to request for this account. If omitted, the brand's existing selection for this platform applies, and a brand with none gets every permission. Valid values: posts.read, posts.write, comments.read, comments.write, messages.read, messages.write, reviews.read, reviews.write, analytics.read.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "comments.read",
+                            "comments.write"
+                        ]
+                    },
                     "platform": {
                         "description": "Platform identifies the social platform to connect (e.g. instagram, facebook, google, threads, tiktok, linkedin).",
                         "type": "string",
@@ -12502,6 +12600,17 @@
                     "expires_in_days": {
                         "type": "integer",
                         "example": 7
+                    },
+                    "permissions": {
+                        "description": "The permissions the connected account gets, which are the only ones the invited person is asked to grant. Omit it to keep the brand's current permissions for this platform, or to give every permission if it has none. Valid values: posts.read, posts.write, comments.read, comments.write, messages.read, messages.write, reviews.read, reviews.write, analytics.read.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "comments.read",
+                            "comments.write"
+                        ]
                     },
                     "platform": {
                         "type": "string",
@@ -13761,6 +13870,17 @@
                         "type": "boolean",
                         "example": true
                     },
+                    "permissions": {
+                        "description": "The permissions chosen when the invite was created. null means the brand's current permissions for this platform apply when the invite is used, or every permission if it has none.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "comments.read",
+                            "comments.write"
+                        ]
+                    },
                     "platform": {
                         "type": "string",
                         "example": "facebook"
@@ -13800,6 +13920,17 @@
                     "id": {
                         "type": "string",
                         "example": "inv_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "permissions": {
+                        "description": "The permissions chosen when the invite was created. null means the brand's current permissions for this platform apply when the invite is used, or every permission if it has none.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "comments.read",
+                            "comments.write"
+                        ]
                     },
                     "platform": {
                         "type": "string",
@@ -15789,6 +15920,23 @@
                     }
                 }
             },
+            "api_endpoints.UpdateAccountPermissionsRequest": {
+                "type": "object",
+                "properties": {
+                    "permissions": {
+                        "description": "Permissions replaces the account's permissions and is required. Send null to give the account every permission, including ones added later. An empty list is rejected. Removing a permission immediately deletes the comments, messages, analytics and posts not published through SocialAPI that it covers; posts published through SocialAPI are kept. Valid values: posts.read, posts.write, comments.read, comments.write, messages.read, messages.write, reviews.read, reviews.write, analytics.read.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "comments.read",
+                            "comments.write"
+                        ],
+                        "nullable": true
+                    }
+                }
+            },
             "api_endpoints.UpdateBoardRequest": {
                 "type": "object",
                 "properties": {
@@ -16990,6 +17138,13 @@
                         "description": "[always] SocialAPI brand ID this account belongs to",
                         "type": "string"
                     },
+                    "effective_permissions": {
+                        "description": "[always] The permissions this account can use right now: the requested permissions the platform supports, minus any the platform did not grant or has since refused. Uses the same names as permissions. An empty list when none apply",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "id": {
                         "description": "[always]",
                         "type": "string",
@@ -17012,6 +17167,13 @@
                     "page_name": {
                         "description": "[optional] Name of the single active page bound to this account; set only when exactly one page is active (e.g. facebook), so clients can label the tile with the page instead of the login identity",
                         "type": "string"
+                    },
+                    "permissions": {
+                        "description": "[always] The permissions requested for this account: one or more of posts.read, posts.write, comments.read, comments.write, messages.read, messages.write, reviews.read, reviews.write, analytics.read. null means every permission, including ones added later",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "platform": {
                         "description": "[always]",

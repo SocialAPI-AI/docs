@@ -345,6 +345,7 @@ What keeps an Automation from misbehaving:
 - **Your own activity never triggers it.** Comments and messages sent by the account itself are skipped, so an Automation's replies cannot trigger it again. On Facebook the account is the Page: a Page admin commenting from their personal profile does trigger it.
 - **A dm Automation answers one person at most 5 times an hour.** This stops two auto-responders from replying to each other forever. Button taps are not counted.
 - **Each event runs at most once per Automation**, even when the platform delivers it twice.
+- **The account needs the permissions the Automation uses.** Creating an Automation, changing its `steps`, or setting it to `active` returns `400 validation.permission_missing` when its trigger or an action needs a [permission](/guides/permissions#automations) outside the account's `effective_permissions`. `error.meta.permission` names it. An Automation is not paused when the account later loses a permission: its actions fail on the Firing with `account.permission_missing`.
 - **A past-due account gets no actions.** While your subscription is [past due](/guides/plans#past-due-accounts), Automations do nothing and record no Firings, the same way the API returns `402`.
 - **Platform rules still apply.** An action the platform or SocialAPI refuses (a private reply on a comment older than 7 days, a DM outside the messaging window, an exhausted interaction allowance) fails with the same error code the API call returns, and the failure is recorded on the Firing.
 
@@ -399,6 +400,7 @@ The Automation itself carries running totals: `fired_count` (runs, taps included
 A comment or DM that records no Firing at all was skipped before any action ran. Check, in order:
 
 - The Automation is `active`.
+- The account has the permission for the trigger: `comments.read` for a comment Automation, `messages.read` for a dm Automation. Without it, the platform's events are dropped before they reach the Automation.
 - For a comment trigger with `post_ids`, the comment is on one of those posts.
 - The text passes the `start` step's filters. A non-matching event records nothing.
 - With `once_per_person`, the person has not been reached already.
@@ -456,6 +458,7 @@ An agent connected to the [SocialAPI MCP server](/integrations/overview) can cre
 - [Comments](/guides/comments) for replying, private replies, and hiding through the API
 - [Direct messages](/guides/direct-messages) for the messaging window and sending DMs through the API
 - [Webhook events](/guides/webhook-events) for the events your own code receives
+- [Account permissions](/guides/permissions) for the permissions an account needs
 - [Scoped API keys](/guides/scoped-keys) for least-privilege keys
 - [Errors](/guides/errors) for every error code an action can record
 - [Unified inbox](/guides/inbox) for the inbox areas an Automation answers

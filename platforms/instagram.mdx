@@ -79,6 +79,7 @@ Instagram-specific rules:
 - **Account type.** The person must connect an Instagram Business or Creator account. A personal account cannot be connected.
 - **One account per brand.** A brand holds one Instagram account. Connecting a different Instagram account to the same brand returns `409 account.already_linked`.
 - **Reconnect.** If a token is no longer valid, calls return `401 platform.instagram.auth` and the account needs reconnecting. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **Permissions.** Send `permissions` to ask the person for fewer scopes: see [Permissions](#permissions).
 
 ## Comments
 
@@ -231,7 +232,7 @@ Response (HTTP 200):
 }
 ```
 
-The insight totals need the `instagram_business_manage_insights` permission. An account connected before SocialAPI requested it returns `403 platform.instagram.insights_scope_missing`: reconnect the account. Instagram's insight data can lag by up to 48 hours. Per-post and per-account metrics over a window you choose are in [Analytics](/guides/analytics).
+The insight totals need the `analytics.read` [permission](/guides/permissions) on the account. An account without it returns `403 account.permission_missing`. When Instagram withdraws the insights access, the next call can return `403 platform.instagram.insights_scope_missing` instead: reconnect the account. Instagram's insight data can lag by up to 48 hours. Per-post and per-account metrics over a window you choose are in [Analytics](/guides/analytics).
 
 ## Webhook events
 
@@ -250,6 +251,7 @@ Instagram accounts emit these events to your webhook endpoints. Payloads are in 
 | `dm.status.read` | A person read a DM you sent. Instagram sends no delivery receipts, so there is no `dm.status.delivered` |
 | `account.connected` | You finished connecting or reconnecting the account |
 | `account.disconnected` | The person revoked access to the account on Instagram, or SocialAPI flagged the account for reconnection (`reconnect_required: true`, see `reason`) |
+| `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
 
 Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for this platform.
@@ -269,15 +271,17 @@ Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitte
 
 ## Permissions
 
-SocialAPI's Meta app requests these scopes at connect. You apply for no app review.
+SocialAPI's Meta app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected. `instagram_business_basic` is always requested.
 
-| Scope | Used for |
-|---|---|
-| `instagram_business_basic` | Profile and media |
-| `instagram_business_manage_comments` | Read, reply to, hide, and delete comments, and the first comment |
-| `instagram_business_manage_messages` | Read and send DMs and private replies |
-| `instagram_business_content_publish` | Publish posts, Reels, carousels, and Stories |
-| `instagram_business_manage_insights` | Account summary and post insights |
+| Scope | Used for | Permissions |
+|---|---|---|
+| `instagram_business_basic` | Profile and media | Every account |
+| `instagram_business_manage_comments` | Read, reply to, hide, and delete comments, read mentions, and the first comment | `comments.read`, `comments.write` |
+| `instagram_business_manage_messages` | Read and send DMs and private replies | `messages.read`, `messages.write` |
+| `instagram_business_content_publish` | Publish posts, Reels, carousels, and Stories | `posts.write` |
+| `instagram_business_manage_insights` | Account summary and post insights | `analytics.read` |
+
+Instagram asks for comments and for messages as 1 scope each, covering both reading and writing, so the consent screen shows the broader scope. The account stays limited to the permissions you selected: an account connected with `comments.read` alone cannot reply to comments.
 
 ## Related
 

@@ -67,6 +67,7 @@ Every `/v1` request needs `Authorization: Bearer <API key>`. See [Authentication
 | 403 | `auth.insufficient_scope` | A [scoped API key](/guides/scoped-keys) lacks the scope the request needs, or a scoped key called an admin operation (managing keys, brands, invites, or `PATCH /v1/users/me`). `meta.required_scope` names the scope when one applies |
 | 402 | `billing.past_due` | Your subscription payment failed twice. Every endpoint returns it except every method of `/v1/users/me` and every `/v1/billing/*` endpoint. See [Past-due accounts](/guides/plans#past-due-accounts) for how access returns |
 | 403 | `auth.state_mismatch` | The `state` you passed to a connect step belongs to a different API key |
+| 403 | `account.permission_missing` | The connected account does not have the [permission](/guides/permissions) the call needs. `meta.permission` names it. Add it with `PATCH /v1/accounts/{id}`, or reconnect the account when the platform has not granted it |
 | 400 | `auth.oauth.invalid_client` | The MCP client's `client_id` is unknown. See [OAuth for MCP clients](/integrations/oauth) |
 | 400 | `auth.oauth.invalid_redirect` | The MCP client's `redirect_uri` is not registered for its `client_id` |
 
@@ -138,6 +139,8 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 400 | `validation.customer_state_too_long` | `state` is longer than 512 characters |
+| 400 | `validation.permission_unknown` | A value in `permissions` is not a [permission](/guides/permissions#the-permissions). `meta.permission` names it. `POST /v1/accounts/connect`, `POST /v1/invites`, and `PATCH /v1/accounts/{id}` return it |
+| 400 | `validation.permissions_empty` | `permissions` is an empty list. Send at least one permission, or omit the field. `PATCH /v1/accounts/{id}` also returns it, where `null` gives the account every permission |
 | 400 | `validation.redirect_uri_invalid_format` | `redirect_uri` is malformed |
 | 400 | `validation.redirect_uri_not_whitelisted` | `redirect_uri` is not registered. Register it in the dashboard first |
 | 400 | `validation.state_invalid` | A connection `state` is unknown or expired |
@@ -231,6 +234,7 @@ A target that fails after `POST /v1/posts` returned is a failed delivery. It doe
 | Code | When it occurs |
 |---|---|
 | `publishing.delivery.account_load_failed` | SocialAPI could not load the connected account when the delivery ran |
+| `account.permission_missing` | The account did not have the `posts.write` [permission](/guides/permissions) when the delivery ran |
 | `publishing.delivery.page_resolve_failed` | SocialAPI could not resolve the target's Facebook Page |
 | `publishing.delivery.timeout` | Sending did not finish within 15 minutes |
 | `validation.publish` | The post failed validation when the delivery ran, after the request had been accepted |
@@ -313,6 +317,7 @@ A definition that breaks a rule returns `400` with one of these codes, and `erro
 | `validation.action_duplicate` | The same action type appears twice on a step |
 | `validation.texts_invalid` | An action has no texts or more than 10, a text is empty or over 1,000 characters, or over 640 characters on a `private_reply` or `send_dm` whose step has buttons |
 | `validation.buttons_invalid` | More than 3 buttons, buttons on a step without a `private_reply` or `send_dm`, a title that is missing or over 20 characters, a `url` button without an `http` or `https` URL, a `postback` button without `next_step`, a button carrying the other type's field, or an unknown button type |
+| `validation.permission_missing` | The trigger or an action needs a [permission](/guides/permissions#automations) the account does not have. `error.meta.permission` names it |
 | `validation.follow_gate_invalid` | `follow_gate` sent together with `steps`, or with the `dm` trigger |
 
 An action that fails when an Automation runs is not returned as an error. It is recorded on the run with the same code the API call would have returned: see [Firings](/guides/automations#firings).
@@ -343,7 +348,8 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 400 | `validation.from_invalid`, `validation.to_invalid` | `from` or `to` is not formatted `YYYY-MM-DD` |
 | 400 | `validation.range_inverted` | The end of a date or time range is before its start |
 | 400 | `validation.range_too_wide` | The analytics range is longer than 400 days |
-| 403 | `platform.instagram.insights_scope_missing` | The account was connected without the insights permission. Reconnect it |
+| 403 | `account.permission_missing` | The account does not have the `analytics.read` [permission](/guides/permissions). Account analytics and the platform insight endpoints return it, and so does post analytics when no target of the post has the permission |
+| 403 | `platform.instagram.insights_scope_missing` | Instagram withdrew the insights access. Reconnect the account |
 | 422 | `platform.instagram.insights_unavailable` | Instagram has no insights of the requested kind for this media |
 | 400 | `validation.metric_required` | No metric was passed to a Threads or Google Business Profile insights request |
 | 400 | `validation.metric_invalid` | A metric is not valid for the request (and, on Threads, for the `level`) |
@@ -532,7 +538,7 @@ When a platform refuses a call, the code is `platform.<name>.<reason>`, where `<
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 401 | `platform.<name>.auth` | The platform rejected the saved token. Reconnect the account |
-| 403 | `platform.<name>.insufficient_scope` | The token lacks a permission the call needs. Reconnect the account to grant it. `error.message` names the permission when known |
+| 403 | `platform.<name>.insufficient_scope` | The platform refused the call because the account's access lacks a scope. `meta.scope` names the scope when the platform does. The account does not become `token_expired`. Reconnect the account to grant it |
 | 401 | `platform.<name>.unauthorized` | The platform answered 401 without saying the token is bad. A healthy account keeps working. Reconnect if it persists |
 | 429 | `platform.<name>.rate_limit` | The platform's own limit. See [Rate limits](#rate-limits) |
 | 422 | `platform.<name>.publish_failed` | A publish failed with an error SocialAPI does not map. Appears in [Delivery failures](#delivery-failures) |

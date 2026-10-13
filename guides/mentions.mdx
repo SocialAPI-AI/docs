@@ -81,7 +81,7 @@ Each item is an `Interaction`: see [The Interaction shape](/guides/inbox#the-int
 | Parameter | Description |
 |---|---|
 | `since` | Only mentions created after this time, in RFC 3339 format |
-| `limit` | Mentions per page, 1 to 100. The default is 20 |
+| `limit` | Mentions per page. The default is 20. A value above 100 is treated as 100. A value below 1 or one that is not an integer returns `400 validation.field_invalid` |
 | `cursor` | The `next_cursor` of the previous page |
 
 A malformed `since`, `limit`, or `cursor` returns `400 validation.field_invalid`. The response holds `data`, `count` (the number of items in `data`), and `next_cursor` when more mentions exist. Paging is in [Pagination](/guides/pagination#paginated-endpoints). Each call that returns at least one item also sends a `mention.received` event: see [Events](#events).
@@ -124,10 +124,11 @@ Check these in order when a mention call fails or returns nothing:
 
 1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
 2. **`404 account.not_found`, `403 account.reconnection_required`.** The `acc_` ID is not yours, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
-3. **`400 validation.field_required`, `400 validation.field_invalid`.** A required field is missing, or a query parameter is wrong.
-4. **`501 resource.not_supported`.** The platform has no mentions, or cannot reply to them.
-5. **`429 validation.interaction_limit_exhausted`.** The plan's interaction allowance is used up.
-6. **An empty list.** The platform does not list that kind of mention. On Instagram, subscribe to `mention.received` for caption and comment mentions. On Threads, the list can omit mentions until Meta grants the permission for every account: see [Threads mentions](/platforms/threads#mentions).
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list mentions, and `comments.write` to reply to one. `error.meta.permission` names it.
+4. **`400 validation.field_required`, `400 validation.field_invalid`.** A required field is missing, or a query parameter is wrong.
+5. **`501 resource.not_supported`.** The platform has no mentions, or cannot reply to them.
+6. **`429 validation.interaction_limit_exhausted`.** The plan's interaction allowance is used up.
+7. **An empty list.** The platform does not list that kind of mention. On Instagram, subscribe to `mention.received` for caption and comment mentions. On Threads, the list can omit mentions until Meta grants the permission for every account: see [Threads mentions](/platforms/threads#mentions).
 
 The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
 
@@ -140,7 +141,7 @@ The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-revie
 
 ## Events
 
-SocialAPI sends [`mention.received`](/guides/webhook-events#mention-received) when Instagram, Facebook, or Threads reports that your account was mentioned. The event and the list share the same `id` on Threads, so you can match them.
+SocialAPI sends [`mention.received`](/guides/webhook-events#mention-received) when Instagram, Facebook, or Threads reports that your account was mentioned. The event and the list share the same `id` on Threads, so you can match them. An account without the `comments.read` [permission](/guides/permissions) receives no `mention.received` events from the platform.
 
 `GET /v1/accounts/{id}/mentions` also sends a `mention.received` event on every call that returns at least one item, on every platform that lists mentions. Its `data` is an array of the listed items and it has no `raw_payload`. A call that returns no items sends no event. See [Mentions you list](/guides/webhook-events#mentions-you-list).
 
@@ -158,5 +159,6 @@ See [MCP tools](/integrations/tools#mentions).
 - [Comments](/guides/comments): answer the comments on your own posts.
 - [Webhook events](/guides/webhook-events#mentions): the `mention.received` payload per platform.
 - [Unified inbox](/guides/inbox): the Interaction shape and the other inbox areas.
+- [Account permissions](/guides/permissions): the permissions an account needs to list and answer mentions.
 - [Platform support](/platforms/overview): which platform lists and answers mentions.
 - [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit.

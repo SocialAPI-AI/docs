@@ -17,6 +17,7 @@ The same flow serves every platform. Telegram and Bluesky skip the consent scree
 | `GET` | `/v1/accounts/pending/{connection_id}` | Read a connection that waits for you to choose a location |
 | `POST` | `/v1/accounts/pending/{connection_id}/select` | Choose the location and finish the connection |
 | `POST` | `/v1/oauth/exchange` | Finish a connection whose authorization code your own page received |
+| `PATCH` | `/v1/accounts/{id}` | Change the account's permissions: see [Account permissions](/guides/permissions) |
 | `DELETE` | `/v1/accounts/{id}` | Disconnect an account |
 | `POST` | `/v1/invites` | Create a single-use link that lets someone else connect an account to a brand |
 | `GET` | `/v1/invites` | List a brand's invite links. Requires `brand_id` |
@@ -64,6 +65,7 @@ Store `account_id` against your user. The account is usable at once.
 | `brand_id` | string | No | The brand to connect the account into. Without it, SocialAPI creates a new brand named after the account, and the new brand counts against your plan's brand allowance |
 | `redirect_uri` | string | No | Where SocialAPI sends the person after the consent screen. See [Redirect URI rules](#redirect-uri-rules). Without it, the person sees a SocialAPI page that says the account is connected (or why it failed). Platforms that connect without a consent screen ignore it |
 | `state` | string | No | Your own value, up to 512 characters, returned unchanged on the redirect. Use it to match the redirect to the session that started it |
+| `permissions` | array of strings | No | The [permissions](/guides/permissions#the-permissions) to request: `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, `messages.write`, `reviews.read`, `reviews.write`, `analytics.read`. Omit it to keep the brand's current selection for this platform, or to request every permission when the brand has none. An empty list returns `400 validation.permissions_empty`, and an unknown name returns `400 validation.permission_unknown` |
 | `metadata` | object | No | Platform-specific connect options, documented on each platform's page: `bot_token` for Telegram, `identifier`, `app_password`, and `auth_factor_token` for Bluesky |
 
 ### Response fields
@@ -308,7 +310,9 @@ Response (HTTP 200):
       "bio": "Wood-fired bread since 1998",
       "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
       "status": "reconnect_recommended",
-      "reconnect_reason": "platform_unauthorized"
+      "reconnect_reason": "platform_unauthorized",
+      "permissions": null,
+      "effective_permissions": ["posts.read", "posts.write", "comments.read", "comments.write", "messages.read", "messages.write", "analytics.read"]
     }
   ],
   "count": 1
@@ -325,6 +329,8 @@ Response (HTTP 200):
 | `status` | `active`, `reconnect_recommended`, or `token_expired`, see below |
 | `reconnect_reason` | Why the account needs reconnecting. Absent when `status` is `active` or when SocialAPI has no reason to give |
 | `login_id` | The platform login shared by every account connected in the same authorization. Present for Facebook and Google accounts |
+| `permissions` | The [permissions](/guides/permissions) requested for this account. `null` means every permission, including ones added later. Always present |
+| `effective_permissions` | The permissions the account can use now: the requested ones that the platform supports and the person connecting granted. An empty list when none apply. Always present |
 
 | `status` | What it means | What to do |
 |---|---|---|
@@ -365,6 +371,7 @@ SocialAPI updates the existing account in place:
 
 - The account keeps its `id`, its brand, its posts, conversations, and Automations.
 - `status` returns to `active` and `reconnect_reason` is cleared.
+- The account keeps its `permissions` unless you send `permissions` on the reconnect. A narrower list deletes the data the removed permissions covered: see [Removing a permission deletes data](/guides/permissions#removing-a-permission-deletes-data).
 - SocialAPI sends `account.connected` again.
 
 Always pass `brand_id` when you reconnect. Without it, SocialAPI creates a new brand for the connection and moves the account into it, which leaves the old brand without the account.
@@ -372,6 +379,7 @@ Always pass `brand_id` when you reconnect. Without it, SocialAPI creates a new b
 Connecting a platform account that another of your brands already holds moves it to the brand you name. Facebook works differently: you assign Pages to brands, see [Facebook](/platforms/facebook).
 
 A brand holds one connected account per platform. Connecting a different account of the same platform into a brand that already has one fails with `409 account.already_linked`. On Facebook, connecting a brand whose account came from a different Facebook login ends with `error=account.different_login` on your `redirect_uri`.
+
 ## Let someone else connect an account
 
 An invite link lets a person who has no access to your SocialAPI account connect their own account to one of your brands. Agencies send it to clients. The link works once.
@@ -395,7 +403,8 @@ Response (HTTP 201):
   "platform": "facebook",
   "token": "a55755cf75f73b56deb3dfe0c993fd36fc4c2bfa7e1d94c60b8a3f52d17e9c40",
   "url": "https://api.social-api.ai/invite/a55755cf75f73b56deb3dfe0c993fd36fc4c2bfa7e1d94c60b8a3f52d17e9c40",
-  "expires_at": "2026-10-20T09:00:00Z"
+  "expires_at": "2026-10-20T09:00:00Z",
+  "permissions": null
 }
 ```
 
@@ -406,12 +415,13 @@ Send `url` to the person. They approve on the platform's consent screen, SocialA
 | `brand_id` | string | Yes | The brand that receives the account |
 | `platform` | string | Yes | A platform slug that connects through a consent screen, or `whatsapp` |
 | `expires_in_days` | integer | Yes | `1`, `3`, `7`, `14`, or `30`. Any other value returns `400 validation.field_invalid` |
+| `permissions` | array of strings | No | The [permissions](/guides/permissions#the-permissions) the connected account gets. Omit it to keep the brand's current selection for this platform, or to give every permission when the brand has none. An empty list returns `400 validation.permissions_empty`, and an unknown name returns `400 validation.permission_unknown`. The response and the invite list return it as you set it, `null` when you omitted it |
 
 - A `brand_id` that is not one of your brands returns `404 resource.not_found`.
 - A brand that already holds an account on that platform, or that already has an unused, unexpired invite for that platform, returns `409 resource.conflict`.
 - A Facebook invite connects every Page of the person's login that none of your other brands holds. The person cannot choose Pages.
 - An expired, used, or revoked link shows the person a SocialAPI error page.
-- `GET /v1/invites?brand_id={brand_id}` lists the brand's invites, newest first, each with `id`, `platform`, `token`, `url`, `is_active`, `expires_at`, and `created_at`. A missing `brand_id` returns `400 validation.field_required`.
+- `GET /v1/invites?brand_id={brand_id}` lists the brand's invites, newest first, each with `id`, `platform`, `token`, `url`, `is_active`, `expires_at`, `created_at`, and `permissions`. A missing `brand_id` returns `400 validation.field_required`.
 - `DELETE /v1/invites/{id}` revokes an invite and returns HTTP 204 with no body. An unknown or already used invite returns `404 resource.not_found`.
 
 Creating, listing, and revoking invites needs a full-access key or the dashboard, and costs no credits.
@@ -451,6 +461,7 @@ Disconnecting an account:
 - A request without `brand_id` when your plan's brand allowance is used up returns `403 billing.brands_limit`.
 - A `brand_id` that is not one of your brands returns `404 resource.not_found`, with `meta.resource` set to `brand`. A `brand_id` that is one of your brands but outside your [brand-restricted key](/guides/scoped-keys)'s brands returns `404 brand.not_found`.
 - A malformed or unregistered `redirect_uri` returns `400 validation.redirect_uri_invalid_format` or `400 validation.redirect_uri_not_whitelisted`.
+- An empty `permissions` list returns `400 validation.permissions_empty`, and an unknown permission name returns `400 validation.permission_unknown`, with `meta.permission` naming it. `POST /v1/invites` returns both codes too.
 - X with no app credentials saved returns `412 byok.credentials_missing`.
 - Telegram or Bluesky with a missing `metadata` field returns `400 validation.field_required`, with `meta.field` naming it.
 
@@ -461,13 +472,14 @@ Errors after the consent screen reach your `redirect_uri` as `status=error` (see
 | Scope | Grants |
 |---|---|
 | `accounts:read` | `GET /v1/accounts` |
-| `accounts:manage` | Connect, exchange, read and finish pending connections, and disconnect |
+| `accounts:manage` | Connect, exchange, read and finish pending connections, change an account's permissions, and disconnect |
 
 A brand-restricted key must pass a `brand_id` from its own list. A connection started without `brand_id` creates a new brand that the key cannot see. Invite endpoints need a full-access key. See [Scoped API keys](/guides/scoped-keys).
 
 ## Events
 
 - `account.connected` is sent each time an account connects or reconnects.
+- `account.updated` with `change: "permissions_reduced"` is sent when an account loses a permission you did not remove yourself: see [Account permissions](/guides/permissions#what-an-account-can-do-right-now).
 - `account.disconnected` is sent in two cases. When the person removes SocialAPI's app from Instagram, Facebook, or Threads, SocialAPI disconnects and deletes the account as `DELETE /v1/accounts/{id}` does, and the event carries `account_id`, `platform`, and `platform_user_id`. When an account needs reconnecting, the account stays connected and the event carries `reconnect_required: true` and a `reason`.
 
 The `reason` of a reconnect event names the cause. It equals `reconnect_reason` on `GET /v1/accounts`, with these exceptions:
@@ -482,18 +494,20 @@ Payloads are in [Webhook events](/guides/webhook-events).
 
 | Tool | What it does |
 |---|---|
-| `social_api_connect_account` | Starts a connection and returns the link to open |
+| `social_api_connect_account` | Starts a connection and returns the link to open. Accepts `permissions` |
 | `social_api_list_accounts` | Lists connected accounts with their status |
 | `social_api_list_pending_profiles` | Reads a pending connection's candidates |
 | `social_api_select_pending_profile` | Finishes a pending connection |
 | `social_api_exchange_oauth` | Finishes a connection from an authorization code |
+| `social_api_update_account_permissions` | Replaces an account's permissions |
 | `social_api_disconnect_account` | Disconnects an account |
-| `social_api_create_invite`, `social_api_list_invites`, `social_api_revoke_invite` | Create, list, and revoke invite links |
+| `social_api_create_invite`, `social_api_list_invites`, `social_api_revoke_invite` | Create, list, and revoke invite links. Creating accepts `permissions` |
 
 See [MCP tools](/integrations/tools) for every tool.
 
 ## Related
 
+- [Account permissions](/guides/permissions) for connecting an account with only the permissions you need
 - [Platform apps](/guides/platform-credentials) for which app each platform connects through
 - [Supported platforms](/platforms/overview) for what each platform can do once connected
 - [Scoped API keys](/guides/scoped-keys) for keys limited to some brands

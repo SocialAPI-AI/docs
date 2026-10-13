@@ -1,0 +1,253 @@
+---
+title: Account permissions
+description: Connect an account with only the permissions your integration uses, so the person connecting it is never asked for more.
+---
+
+Account permissions limit what one connected account can do. By default an account gets every permission its platform supports. Send `permissions` when you connect an account to ask for less: the person connecting sees a shorter consent screen where the platform allows it, and the account can do only what you selected.
+
+Permissions are not [API key scopes](/guides/scoped-keys). A permission limits what a connected account can do on its platform and is written `resource.action`. A key scope limits what an API key can do in SocialAPI and is written `resource:action`. Connecting an account and changing its permissions cost no credits.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/accounts/connect` | Connect an account. Send `permissions` to limit it |
+| `POST` | `/v1/invites` | Create an invite link. Send `permissions` to limit the account it connects |
+| `GET` | `/v1/invites` | List a brand's invite links, each with its `permissions` |
+| `GET` | `/v1/accounts` | List accounts, each with its `permissions` and `effective_permissions` |
+| `PATCH` | `/v1/accounts/{id}` | Replace an account's permissions |
+
+## Connect with permissions
+
+This request connects an Instagram account that can read and answer comments and nothing else:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "instagram",
+    "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "permissions": ["comments.read", "comments.write"]
+  }'
+```
+
+Response (HTTP 202): the usual connect response, described in [Connect accounts](/guides/connect-accounts#response-fields). After the person approves, `GET /v1/accounts` returns the account with both lists:
+
+```json
+{
+  "id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "instagram",
+  "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+  "status": "active",
+  "permissions": ["comments.read", "comments.write"],
+  "effective_permissions": ["comments.read", "comments.write"]
+}
+```
+
+`permissions` is a list of the names in [The permissions](#the-permissions). Duplicates collapse, and the lists are always in the order of that table.
+
+- **Omitted.** SocialAPI keeps the permissions of the brand's existing account on that platform. A brand with none gets every permission. Reconnecting without `permissions` never changes them.
+- **An empty list.** The request returns `400 validation.permissions_empty`.
+- **An unknown name.** The request returns `400 validation.permission_unknown`, and `error.meta.permission` holds the name.
+- **A name the platform has no use for.** The request is accepted. The name stays in `permissions` and never appears in `effective_permissions`. For example `reviews.read` on Instagram.
+
+## The permissions
+
+| Permission | Covers |
+|---|---|
+| `posts.read` | Reading the account's posts from the platform, including posts published outside SocialAPI: `POST /v1/accounts/{id}/sync`, stories, collaborators, and exports |
+| `posts.write` | Publishing, editing, and deleting posts, and the platform's posting options, such as TikTok creator info |
+| `comments.read` | Reading comments and mentions, and the `comment.received` and `mention.received` webhooks |
+| `comments.write` | Replying to, hiding, deleting, and liking comments, and replying to mentions |
+| `messages.read` | Reading conversations, messages, participant profiles, and follow status, and the `dm.*` webhooks |
+| `messages.write` | Sending and reacting to messages, and private replies to comments |
+| `reviews.read` | Reading reviews and the `review.*` webhooks |
+| `reviews.write` | Replying to reviews |
+| `analytics.read` | Account, brand, and post analytics, live post metrics, and platform insights |
+
+## Permissions per platform
+
+An account can use a permission only on a platform that supports it. The other names are accepted and ignored.
+
+| Platform | Supported permissions | Consent screen |
+|---|---|---|
+| Instagram | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, `messages.write`, `analytics.read` | Follows the selection |
+| Facebook | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, `messages.write`, `analytics.read` | Follows the selection |
+| Threads | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `analytics.read` | Follows the selection |
+| Google Business Profile | `posts.read`, `posts.write`, `reviews.read`, `reviews.write`, `analytics.read` | The same for every selection |
+| TikTok | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `analytics.read` | The same for every selection |
+| LinkedIn | `posts.write` | Follows the selection |
+| X / Twitter | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, `messages.write`, `analytics.read` | Follows the selection |
+| YouTube | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `analytics.read` | The same for every selection |
+| Pinterest | `posts.read`, `posts.write`, `analytics.read` | Follows the selection |
+| WhatsApp | `messages.read`, `messages.write` | No selection step |
+| Telegram | `messages.read`, `messages.write` | No selection step |
+| Zalo | `posts.read`, `posts.write`, `messages.read`, `messages.write` | No selection step |
+| Bluesky | `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, `messages.write` | No selection step |
+
+- **Follows the selection.** The consent screen asks for the platform scopes of the permissions you selected. A platform scope that serves more than one permission can make the screen show more than you selected: Instagram asks for comments and for messages as 1 scope each, covering reading and writing, and Facebook asks for messages as 1 scope. The account stays limited to your selection: an Instagram account connected with `comments.read` alone cannot reply to comments.
+- **The same for every selection.** The platform shows its fixed list of permissions. Google Business Profile and YouTube ask for 1 scope that covers everything. The account is still limited to your selection, and an account connected with `reviews.read` alone cannot reply to reviews.
+- **No selection step.** The platform has no consent screen that lists permissions, so SocialAPI alone enforces your selection.
+
+Each platform's page lists the scopes it requests, under Permissions.
+
+## What an account can do right now
+
+Every account has two lists:
+
+| Field | Meaning |
+|---|---|
+| `permissions` | What you selected, or `null` for every permission, including ones added later. Always present |
+| `effective_permissions` | What the account can use now. Always a list, empty when none apply |
+
+`effective_permissions` is `permissions` limited to what the platform supports and what the person connecting granted. The person can decline part of the consent screen, and a platform can withdraw access later.
+
+A call that needs a permission outside `effective_permissions` fails with `403 account.permission_missing`, and `error.meta.permission` names it. The refusal comes before the call reaches the platform. A platform's unsupported operation keeps its usual answer, `501 resource.not_supported`, whatever the permissions.
+
+An account without a permission also stops receiving what it covers:
+
+- **Webhooks and Automations.** Comments, mentions, messages, and reviews for a permission the account lacks are dropped: they do not reach your webhook endpoints, your Automations, or the inbox. On Instagram, Facebook, and WhatsApp, the `dm.status.*` events for messages you sent still arrive with `messages.write` alone.
+- **Scheduled posts.** A scheduled post fails at publish time with `account.permission_missing` on its target when the account no longer has `posts.write`.
+- **Analytics.** The account adds no new points to its stored analytics history.
+
+When an account loses a permission you did not remove yourself, you receive an [`account.updated` webhook](/guides/webhook-events#account-updated) with `change` set to `permissions_reduced`. Reconnect the account to ask for the permission again.
+
+When the platform refuses a call because the account's access lacks a scope, the call returns `403 platform.<name>.insufficient_scope`, with the scope in `error.meta.scope` when the platform names it. The account does not become `token_expired`. The permissions that need the scope leave `effective_permissions` until you reconnect the account.
+
+## Invite links
+
+`POST /v1/invites` takes the same `permissions` field. The account the person connects gets exactly that list, and on a platform whose consent screen [follows the selection](#permissions-per-platform) the person is asked only for what those permissions need.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/invites \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+    "platform": "instagram",
+    "expires_in_days": 7,
+    "permissions": ["comments.read", "comments.write"]
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "3f6c1a52-9d4e-4b7a-8c21-5e0f7a9b1d34",
+  "platform": "instagram",
+  "token": "a55755cf75f73b56deb3dfe0c993fd36fc4c2bfa7e1d94c60b8a3f52d17e9c40",
+  "url": "https://api.social-api.ai/invite/a55755cf75f73b56deb3dfe0c993fd36fc4c2bfa7e1d94c60b8a3f52d17e9c40",
+  "expires_at": "2026-10-20T09:00:00Z",
+  "permissions": ["comments.read", "comments.write"]
+}
+```
+
+The response and every item of `GET /v1/invites` return `permissions` as you set it. `null` means you omitted it: when the link is used, SocialAPI applies the rule for an omitted `permissions` described in [Connect with permissions](#connect-with-permissions).
+
+## Change an account's permissions
+
+`PATCH /v1/accounts/{id}` replaces an account's permissions. `permissions` is required: send a list, or `null` to give the account every permission, including ones added later.
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"permissions": ["comments.read", "comments.write", "messages.read"]}'
+```
+
+Response (HTTP 200): the account, with its new `permissions` and `effective_permissions`.
+
+```json
+{
+  "id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "instagram",
+  "name": "Acme Corp",
+  "username": "acmecorp",
+  "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+  "status": "active",
+  "permissions": ["comments.read", "comments.write", "messages.read"],
+  "effective_permissions": ["comments.read", "comments.write", "messages.read"]
+}
+```
+
+A request with no `permissions` field returns `400 validation.field_required`. A value that is neither a list of strings nor `null` returns `400 validation.body_invalid`. An empty list returns `400 validation.permissions_empty`, and an unknown name returns `400 validation.permission_unknown`. An ID that is not one of your accounts, or that a [brand-restricted key](/guides/scoped-keys) cannot reach, returns `404 account.not_found`.
+
+### Removing a permission deletes data
+
+<Warning>
+  Removing a permission takes effect at once and deletes the data it covered. Adding the permission back does not restore the data.
+</Warning>
+
+| Permission removed | Deleted at once |
+|---|---|
+| `comments.read` | The account's comments and the posts they belong to |
+| `messages.read` | The account's conversations and messages, with their attachments |
+| `posts.read` | Posts SocialAPI read from the platform, including their analytics history. Posts you published through SocialAPI are kept |
+| `analytics.read` | The account's stored analytics history |
+| `posts.write`, `comments.write`, `messages.write`, `reviews.read`, `reviews.write` | Nothing. Calls that need the permission fail with `403 account.permission_missing` |
+
+If the deletion fails, the call fails and the permissions stay unchanged. Connecting the account again with a narrower `permissions` list deletes the same data.
+
+A permission the person declines on the consent screen when reconnecting leaves `effective_permissions`, and SocialAPI sends `account.updated`. It also deletes the same data, except on the first reconnect of an account connected before account permissions existed.
+
+### Adding a permission
+
+Adding a permission takes effect at once when the platform already granted it to the account. Otherwise the permission appears in `permissions` but not in `effective_permissions`: reconnect the account so the person can grant it. Once a permission is in `effective_permissions`, the events it covers arrive again.
+
+## Automations
+
+An [Automation](/guides/automations) needs permissions on its account. Creating or updating it returns `400 validation.permission_missing` when its trigger or actions need a permission outside the account's `effective_permissions`, and `error.meta.permission` names it.
+
+| Automation part | Needs |
+|---|---|
+| A `comment` trigger | `comments.read` |
+| A `dm` trigger | `messages.read` |
+| A `follows_account` filter | `messages.read` |
+| A `reply_comment` or `hide_comment` action | `comments.write` |
+| A `private_reply` or `send_dm` action | `messages.write` |
+
+An update is checked only when it changes `steps` or sets `status` to `active`. An Automation is not paused when its account later loses a permission: its actions fail on the [Firing](/guides/automations#firings) with `account.permission_missing`.
+
+## Errors
+
+- `403 account.permission_missing`: the account does not have the permission the call needs. `error.meta.permission` names it. Add it with `PATCH /v1/accounts/{id}`, or reconnect the account when the platform has not granted it.
+- `400 validation.permission_unknown`: a value in `permissions` is not a permission. `error.meta.permission` names it.
+- `400 validation.permissions_empty`: `permissions` is an empty list.
+- `400 validation.permission_missing`: an Automation needs a permission the account does not have. `error.meta.permission` names it.
+- `403 platform.<name>.insufficient_scope`: the platform refused the call because the account's access lacks a scope.
+
+Every code is described in [Errors](/guides/errors).
+
+## Scopes
+
+| Scope | Grants |
+|---|---|
+| `accounts:read` | `GET /v1/accounts` |
+| `accounts:manage` | `PATCH /v1/accounts/{id}` and `POST /v1/accounts/connect` |
+
+Invite endpoints need a full-access key. See [Scoped API keys](/guides/scoped-keys).
+
+## Events
+
+`account.updated` with `change: "permissions_reduced"` fires when an account loses a permission you did not remove yourself. It does not fire when you remove a permission with `PATCH /v1/accounts/{id}`. The payload is in [Webhook events](/guides/webhook-events#account-updated).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_connect_account` | Starts a connection. Accepts `permissions` |
+| `social_api_create_invite` | Creates an invite link. Accepts `permissions` |
+| `social_api_update_account_permissions` | Replaces an account's permissions. Send `unrestricted: true` for every permission. Sending neither `permissions` nor `unrestricted` returns an error |
+
+See [MCP tools](/integrations/tools) for every tool.
+
+## Related
+
+- [Connect accounts](/guides/connect-accounts) for the connect flow and the account fields
+- [Webhook events](/guides/webhook-events) for the `account.updated` payload
+- [Automations](/guides/automations) for the permissions each trigger and action needs
+- [Scoped API keys](/guides/scoped-keys) for limiting what an API key can do
+- [Errors](/guides/errors) for every error code

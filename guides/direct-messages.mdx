@@ -94,12 +94,13 @@ Response (HTTP 200):
 | `page_id` | Only conversations of this Facebook Page, for an account with more than 1 Page |
 | `platform` | Only this platform, for example `instagram` |
 | `status` | `active` (default) or `archived` |
-| `limit` | Conversations per page. The default is 25 and the maximum is 100 |
+| `limit` | Conversations per page. The default is 25. A value above 100 is treated as 100, and a value of 0 or less, or one that is not an integer, is treated as 25 |
 | `cursor` | The `next_cursor` of the previous page |
 
 | Field | Description |
 |---|---|
 | `id` | The conversation ID |
+| `user_id` | The ID of your SocialAPI account |
 | `account_id` | The connected account that owns the conversation |
 | `page_id` | Facebook only: the SocialAPI ID of the Page. Absent elsewhere |
 | `platform` | The platform slug |
@@ -108,6 +109,7 @@ Response (HTTP 200):
 | `last_message`, `last_message_at` | The latest message text and its time |
 | `status` | `active` or `archived` |
 | `unread_count` | Messages received since you last marked the conversation as read |
+| `created_at`, `updated_at` | When SocialAPI created and last updated the conversation, in ISO 8601 UTC |
 | `sync_state`, `last_synced_at` | `idle`, `syncing`, or `failed`, and when the list last completed a refresh. `sync_state` is set only when you pass `account_id`: see [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually) |
 
 `PATCH /v1/inbox/conversations/{id}` with `{ "status": "archived" }` or `{ "status": "active" }` changes the status and returns `{ "success": true }`. Any other value returns `400 validation.field_invalid`. `POST /v1/inbox/conversations/{id}/read` sets `unread_count` to 0 and returns `{ "success": true }`. It does not send a read receipt to the person.
@@ -161,7 +163,7 @@ Response (HTTP 200):
 | `status_updated_at` | When `status` last changed. Outgoing messages only |
 | `created_at` | When the message was sent or received |
 
-`limit` is 25 by default and 200 at most. See [Pagination](/guides/pagination#paginated-endpoints).
+`limit` is 25 by default. A value above 200 is treated as 200, and a value of 0 or less, or one that is not an integer, is treated as 25. See [Pagination](/guides/pagination#paginated-endpoints).
 
 ## Send a message
 
@@ -323,12 +325,13 @@ Check these in order when a send fails:
 
 1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks `dms:send`.
 2. **`404 conversation.not_found`, `404 account.not_found`, `403 account.reconnection_required`.** The conversation is not yours or belongs to another connected account than `account_id`, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
-3. **`400 validation.*`.** The body is wrong. `error.meta.field` names the field. The codes are in [Send a message](#send-a-message) and [Interactive messages](#interactive-messages).
-4. **`400 platform.instagram.window_closed`, `400 platform.facebook.window_closed`, `400 whatsapp.window_closed`, `422 platform.zalo.not_deliverable`, `403 telegram.cannot_message`.** The messaging window is closed: see [The messaging window](#the-messaging-window).
-5. **`422 platform.instagram.thread_unavailable`, `422 platform.facebook.thread_unavailable`.** The platform refused to deliver to this conversation, which can be restricted or unavailable.
-6. **`403 platform.instagram.permission_denied`, `403 platform.facebook.permission_denied`.** The connected account's granted permissions do not cover the action. Reconnect and grant them.
-7. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.{platform}.rate_limit`.** Your allowance, the sender's messages per minute, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
-8. **`501 resource.not_supported`.** The platform has no DMs, or no reactions.
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `messages.write` to send a message or a reaction, and `messages.read` to start or read an inbox sync. `error.meta.permission` names it. The conversation and message lists return what SocialAPI stored and never return this error: an account without `messages.read` stores no new messages.
+4. **`400 validation.*`.** The body is wrong. `error.meta.field` names the field. The codes are in [Send a message](#send-a-message) and [Interactive messages](#interactive-messages).
+5. **`400 platform.instagram.window_closed`, `400 platform.facebook.window_closed`, `400 whatsapp.window_closed`, `422 platform.zalo.not_deliverable`, `403 telegram.cannot_message`.** The messaging window is closed: see [The messaging window](#the-messaging-window).
+6. **`422 platform.instagram.thread_unavailable`, `422 platform.facebook.thread_unavailable`.** The platform refused to deliver to this conversation, which can be restricted or unavailable.
+7. **`403 platform.instagram.permission_denied`, `403 platform.facebook.permission_denied`.** The connected account's granted permissions do not cover the action. Reconnect and grant them.
+8. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.{platform}.rate_limit`.** Your allowance, the sender's messages per minute, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
+9. **`501 resource.not_supported`.** The platform has no DMs, or no reactions.
 
 When a conversation or a message is missing from a list, force a refresh with [`POST /v1/inbox/sync`](/guides/inbox#refresh-the-inbox-manually). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
 
@@ -341,7 +344,7 @@ When a conversation or a message is missing from a list, force a refresh with [`
 
 ## Events
 
-SocialAPI sends DM events to your [webhook endpoint](/guides/webhooks): [`dm.received`](/guides/webhook-events#dm-received), `dm.sent`, `dm.postback`, `dm.referral`, `dm.deleted`, and `dm.status.*`. Each is described, with the platforms that emit it, on [Webhook events](/guides/webhook-events#direct-messages).
+SocialAPI sends DM events to your [webhook endpoint](/guides/webhooks): [`dm.received`](/guides/webhook-events#dm-received), `dm.sent`, `dm.postback`, `dm.referral`, `dm.deleted`, and `dm.status.*`. Each is described, with the platforms that emit it, on [Webhook events](/guides/webhook-events#direct-messages). An account without the `messages.read` [permission](/guides/permissions) receives none of the `dm.*` events, except that `dm.status.*` events for messages you sent still arrive on Instagram, Facebook, and WhatsApp with `messages.write` alone.
 
 ## Use from an AI agent
 
@@ -363,4 +366,5 @@ There is no tool for reactions or for inbox sync. See [MCP tools](/integrations/
 - [Webhook events](/guides/webhook-events#direct-messages): the DM event payloads.
 - [Rate limits](/guides/rate-limits#messaging-velocity-cap): the messages-per-minute cap.
 - [Platform support](/platforms/overview): which platform supports which DM feature.
+- [Account permissions](/guides/permissions): the permissions an account needs to read and send messages.
 - [Unified inbox](/guides/inbox): inbound attachments and manual sync.

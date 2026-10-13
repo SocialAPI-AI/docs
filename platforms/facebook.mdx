@@ -184,6 +184,7 @@ Facebook Pages emit these events to your webhook endpoints. Payloads are in [Web
 | `dm.status.sent`, `dm.status.delivered`, `dm.status.read` | Facebook accepted, delivered, or showed as read a DM you sent |
 | `account.connected` | You finished connecting or reconnecting the account |
 | `account.disconnected` | The person revoked access on Facebook, or SocialAPI flagged the account for reconnection (`reconnect_required: true`, see `reason`) |
+| `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
 | `page.removed` | A Page was removed from the login |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
 
@@ -206,19 +207,21 @@ A Page access token does not expire on its own. Reconnect only when a call retur
 
 ## Permissions
 
-SocialAPI's Meta app requests these scopes at connect. You apply for no app review.
+SocialAPI's Meta app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected. The scopes marked Every account are always requested.
 
-| Scope | Used for |
-|---|---|
-| `pages_show_list` | List the Pages the person manages |
-| `business_management` | List Pages owned through a Business Portfolio |
-| `pages_read_engagement` | Read likes, comments, and shares on Page posts |
-| `pages_read_user_content` | Read posts and comments that people make on the Page |
-| `pages_manage_engagement` | Reply to, hide, delete, and like comments |
-| `pages_manage_metadata` | Subscribe the Page to webhook events |
-| `pages_messaging` | Send and receive Messenger DMs |
-| `pages_manage_posts` | Create, edit, and delete Page posts |
-| `public_profile` | Identify the person who connected |
+| Scope | Used for | Permissions |
+|---|---|---|
+| `pages_show_list` | List the Pages the person manages | Every account |
+| `business_management` | List Pages owned through a Business Portfolio | Every account |
+| `pages_read_engagement` | Read likes, comments, and shares on Page posts | Every account |
+| `pages_read_user_content` | Read posts and comments that people make on the Page | `comments.read`, `comments.write` |
+| `pages_manage_engagement` | Reply to, hide, delete, and like comments | `comments.write` |
+| `pages_manage_metadata` | Subscribe the Page to webhook events | Every account |
+| `pages_messaging` | Send and receive Messenger DMs | `messages.read`, `messages.write` |
+| `pages_manage_posts` | Create, edit, and delete Page posts | `posts.write` |
+| `public_profile` | Identify the person who connected | Every account |
+
+Facebook asks for messages as 1 scope, covering both reading and writing, so the consent screen shows the broader scope. The account stays limited to the permissions you selected: an account connected with `messages.read` alone cannot send messages.
 
 ## Related
 

@@ -143,10 +143,11 @@ Check these in order when a review call fails:
 
 1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
 2. **`404 account.not_found`, `403 account.reconnection_required`.** The `acc_` ID is not yours, or the account needs reconnecting.
-3. **`422 account.platform_unsupported`.** The account's platform has no reviews.
-4. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The review ID is not a review ID, or it belongs to another platform.
-5. **`400 validation.field_required`, `400 validation.field_invalid`.** `account_id` or `text` is missing, or `limit` or `order` is wrong.
-6. **`429 validation.interaction_limit_exhausted`.** The plan's interaction allowance is used up.
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `reviews.read` to list the reviews of an account, and `reviews.write` to reply. `error.meta.permission` names it.
+4. **`422 account.platform_unsupported`.** The account's platform has no reviews.
+5. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The review ID is not a review ID, or it belongs to another platform.
+6. **`400 validation.field_required`, `400 validation.field_invalid`.** `account_id` or `text` is missing, or `limit` or `order` is wrong.
+7. **`429 validation.interaction_limit_exhausted`.** The plan's interaction allowance is used up.
 
 The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
 
@@ -159,7 +160,7 @@ The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-revie
 
 ## Events
 
-SocialAPI sends [`review.received`](/guides/webhook-events#review-received) when a customer posts a new review and [`review.updated`](/guides/webhook-events#review-updated) when a review changes or Google decides on a reply. Both are for Google Business Profile. Google can miss a notification and does not replay it, so read `GET /v1/inbox/reviews/{account_id}` on a schedule to fill any gap.
+SocialAPI sends [`review.received`](/guides/webhook-events#review-received) when a customer posts a new review and [`review.updated`](/guides/webhook-events#review-updated) when a review changes or Google decides on a reply. Both are for Google Business Profile, and an account without the `reviews.read` [permission](/guides/permissions) receives neither. Google can miss a notification and does not replay it, so read `GET /v1/inbox/reviews/{account_id}` on a schedule to fill any gap.
 
 ## Use from an AI agent
 
@@ -177,4 +178,5 @@ SocialAPI sends [`review.received`](/guides/webhook-events#review-received) when
 - [Webhook events](/guides/webhook-events#reviews): the `review.received` and `review.updated` payloads.
 - [Comments](/guides/comments): Google Business Profile has no comments, so use this guide for review replies.
 - [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit.
+- [Account permissions](/guides/permissions): the permissions an account needs to read and answer reviews.
 - [Unified inbox](/guides/inbox): the other inbox areas and manual sync.

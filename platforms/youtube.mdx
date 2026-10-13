@@ -220,7 +220,7 @@ Response (HTTP 200):
 
 ## Webhook events
 
-YouTube sends nothing to SocialAPI, so it emits no comment events: read comments with the endpoints above. Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for videos you publish through SocialAPI. You also receive `account.connected` when you connect a channel, and `account.disconnected` when SocialAPI flags the channel. See [Webhook events](/guides/webhook-events).
+YouTube sends nothing to SocialAPI, so it emits no comment events: read comments with the endpoints above. Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for videos you publish through SocialAPI. You also receive `account.connected` when you connect a channel, `account.disconnected` when SocialAPI flags the channel, and `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself. See [Webhook events](/guides/webhook-events).
 
 ## Suspended or closed channels
 
@@ -239,11 +239,13 @@ The publishing rules are in [YouTube publishing](/platforms/youtube/publishing#2
 
 ## Permissions
 
-SocialAPI's Google app requests this scope at connect. You apply for no Google app review.
+SocialAPI's Google app requests this scope at connect. You apply for no Google app review. The consent screen is the same whichever [permissions](/guides/permissions) you select.
 
 | Scope | Used for |
 |---|---|
 | `https://www.googleapis.com/auth/youtube.force-ssl` | Upload, edit, and delete videos, read channel and video data, and read, post, moderate, and edit comments |
+
+YouTube asks for 1 scope that covers reading and writing, so the consent screen shows it whatever you select. The account is still limited to the permissions you selected: an account connected with `comments.read` alone cannot reply to comments.
 
 A call the granted scope does not permit returns `403 platform.youtube.insufficientPermissions`. Reconnect the account to grant it again.
 

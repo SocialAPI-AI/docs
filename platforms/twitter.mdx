@@ -42,7 +42,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Reviews | No | X has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
 | Analytics | Partial | Post metrics: Yes. Stored history: Partial. Live account summary: No. See [Analytics](/guides/analytics) |
-| Webhook events | Partial | `account.connected` and the `post.*` events. X sends SocialAPI no comment or DM events: read them with the inbox endpoints. Listing mentions sends `mention.received` ([Mentions you list](/guides/webhook-events#mentions-you-list)) |
+| Webhook events | Partial | `account.connected`, `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself, and the `post.*` events. X sends SocialAPI no comment or DM events: read them with the inbox endpoints. Listing mentions sends `mention.received` ([Mentions you list](/guides/webhook-events#mentions-you-list)) |
 
 The cross-platform matrix is on [Platforms](/platforms/overview).
 
@@ -110,19 +110,19 @@ List conversations with `GET /v1/inbox/conversations`, read one with its message
 
 ## Permissions
 
-You choose the permissions on your own X app. SocialAPI requests these scopes when the person connects the account.
+You choose the permissions on your own X app. SocialAPI requests these scopes when the person connects the account. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected.
 
-| Scope | Used for |
-|---|---|
-| `tweet.read` | Read posts, replies, and mentions |
-| `tweet.write` | Publish and delete posts, reply to comments |
-| `tweet.moderate.write` | Hide and unhide replies |
-| `users.read` | Read profiles |
-| `dm.read` | Read DM conversations and messages |
-| `dm.write` | Send DMs |
-| `like.write` | Like and unlike posts. X refuses these calls for self-serve apps |
-| `media.write` | Upload images, video, and GIFs for a post |
-| `offline.access` | Keep the connection without asking the person again |
+| Scope | Used for | Permissions |
+|---|---|---|
+| `tweet.read` | Read posts, replies, and mentions | Every account |
+| `tweet.write` | Publish and delete posts, reply to comments | `posts.write`, `comments.write` |
+| `tweet.moderate.write` | Hide and unhide replies | `comments.write` |
+| `users.read` | Read profiles | Every account |
+| `dm.read` | Read DM conversations and messages | `messages.read` |
+| `dm.write` | Send DMs | `messages.write` |
+| `like.write` | Like and unlike posts. X refuses these calls for self-serve apps | `comments.write` |
+| `media.write` | Upload images, video, and GIFs for a post | `posts.write` |
+| `offline.access` | Keep the connection without asking the person again | Every account |
 
 ## Related
 

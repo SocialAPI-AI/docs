@@ -232,6 +232,7 @@ Threads accounts emit these events to your webhook endpoints. Payloads are in [W
 | `mention.received` | Another account mentions yours. Beta: see [Mentions](#mentions) |
 | `account.connected` | You finished connecting or reconnecting the account |
 | `account.disconnected` | The person revoked access to the account on Threads, or SocialAPI flagged the account for reconnection (`reconnect_required: true`, see `reason`) |
+| `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
 
 Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for this platform.
@@ -253,28 +254,30 @@ Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitte
 
 ## Permissions
 
-SocialAPI's Meta Threads app requests these scopes at connect. You apply for no app review.
+SocialAPI's Meta Threads app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected. `threads_basic` is always requested.
 
-| Scope | Used for |
-|---|---|
-| `threads_basic` | Profile and posts |
-| `threads_content_publish` | Publish posts and replies |
-| `threads_delete` | Delete posts and replies |
-| `threads_read_replies` | Read replies |
+| Scope | Used for | Permissions |
+|---|---|---|
+| `threads_basic` | Profile and posts | Every account |
+| `threads_content_publish` | Publish posts and replies | `posts.write`, `comments.write` |
+| `threads_delete` | Delete posts and replies | `posts.write`, `comments.write` |
+| `threads_read_replies` | Read replies | `comments.read` |
+
+Threads asks for publishing and deleting as 1 pair of scopes shared by `posts.write` and `comments.write`, so the consent screen can show more than you selected. The account stays limited to the permissions you selected.
 
 ### Beta permissions
 
 These further scopes are requested only for accounts enrolled in the beta:
 
-| Scope | Used for |
-|---|---|
-| `threads_manage_replies` | Hide and unhide replies |
-| `threads_manage_insights` | Insights, and the like and reply counts on posts |
-| `threads_manage_mentions` | Mentions |
-| `threads_profile_discovery` | Profile discovery |
-| `threads_location_tagging` | `location_id` on a post |
-| `threads_share_to_instagram` | `crossreshare_to_ig` on a post |
-| `threads_keyword_search` | Requested with `threads_profile_discovery`. No SocialAPI endpoint uses it |
+| Scope | Used for | Permissions |
+|---|---|---|
+| `threads_manage_replies` | Hide and unhide replies | `comments.write` |
+| `threads_manage_insights` | Insights, and the like and reply counts on posts | `analytics.read` |
+| `threads_manage_mentions` | Mentions | `comments.read` |
+| `threads_profile_discovery` | Profile discovery | Every account |
+| `threads_location_tagging` | `location_id` on a post | `posts.write` |
+| `threads_share_to_instagram` | `crossreshare_to_ig` on a post | `posts.write` |
+| `threads_keyword_search` | Requested with `threads_profile_discovery`. No SocialAPI endpoint uses it | Every account |
 
 Until Meta grants a scope for every account, a call that needs it from an account without it returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. A beta permission is added when the account connects: reconnect the account to add one granted later.
 

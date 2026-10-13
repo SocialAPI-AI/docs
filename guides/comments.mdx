@@ -137,10 +137,10 @@ The reply is public when the platform accepts it. `comment_id` in the response i
 | `since` | Only posts published at or after this time, in RFC 3339 format. A malformed value returns `400 validation.field_invalid` |
 | `sort_by` | `date` (default): the publish date of the post |
 | `sort_order` | `desc` (default) or `asc` |
-| `limit` | Posts per page. The default is 25 and the maximum is 100 |
+| `limit` | Posts per page. The default is 25. A value above 100 is treated as 100. A value of 0 or less, or one that is not an integer, returns `400 validation.field_invalid` |
 | `cursor` | The `next_cursor` of the previous page |
 
-Each post has `id` (the platform's post ID, the value for `{postId}`), `account_id`, `page_id` (Facebook only), `platform`, `content`, `thumbnail`, `permalink`, `comment_count`, `like_count`, `published_at`, `created_at`, and `updated_at`. `pagination` holds `has_more`, and `next_cursor` when `has_more` is `true`. Paging is in [Pagination](/guides/pagination#paginated-endpoints).
+Each post has `id` (the platform's post ID, the value for `{postId}`), `user_id` (the ID of your SocialAPI account), `account_id`, `page_id` (Facebook only), `platform`, `content`, `thumbnail`, `permalink`, `comment_count`, `like_count`, `published_at`, `created_at`, and `updated_at`. `pagination` holds `has_more`, and `next_cursor` when `has_more` is `true`. Paging is in [Pagination](/guides/pagination#paginated-endpoints).
 
 YouTube videos with comments appear only when you pass `account_id`, and that list is 1 page with no cursor.
 
@@ -151,7 +151,7 @@ YouTube videos with comments appear only when you pass `account_id`, and that li
 | Parameter | Description |
 |---|---|
 | `account_id` | Required. The connected account that owns the post |
-| `limit` | Items per page. The default is 25 for comments and 10 for replies. A value of 0 or less returns `400 validation.field_invalid` |
+| `limit` | Items per page. The default is 25 for comments and 10 for replies. A value above 100 is treated as 100. A value of 0 or less, or one that is not an integer, returns `400 validation.field_invalid` |
 | `cursor` | The `next_cursor` of the previous page |
 
 A page can hold fewer comments than `limit`, because the platform sets its own page size. Follow `next_cursor` until `has_more` is `false`: see [Pagination](/guides/pagination#fetch-every-page).
@@ -302,13 +302,14 @@ Check these in order when a comment call fails or returns nothing:
 
 1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
 2. **`404 account.not_found`, `403 account.reconnection_required`.** The `acc_` ID is not yours, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
-3. **`400 validation.field_required`, `400 validation.field_invalid`.** A required field is missing, or a parameter has a wrong value. `error.meta.field` names it.
-4. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The comment ID is the wrong type or belongs to another platform: see [IDs](/guides/ids#what-each-endpoint-accepts).
-5. **`501 resource.not_supported`.** The platform lacks the action. Read `capabilities` on the comment.
-6. **`404 resource.not_found`.** The post was deleted on the platform. The same post returns the same 404 afterwards.
-7. **`400 platform.instagram.private_reply_ineligible`, `400 platform.facebook.private_reply_ineligible`.** The comment already received its private reply, or is older than 7 days.
-8. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.{platform}.rate_limit`.** Your allowance, the sender's messages per minute, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
-9. **`422 platform.youtube.processing_failure`.** YouTube refused to delete a comment that your channel did not write. Hide it instead.
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list the comments on a post and the replies to a comment, `comments.write` to reply, hide, unhide, delete, or like, and `messages.write` for a private reply. `error.meta.permission` names it. `GET /v1/inbox/comments` lists the posts SocialAPI stored and never returns this error: an account without `comments.read` stores no new posts.
+4. **`400 validation.field_required`, `400 validation.field_invalid`.** A required field is missing, or a parameter has a wrong value. `error.meta.field` names it.
+5. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The comment ID is the wrong type or belongs to another platform: see [IDs](/guides/ids#what-each-endpoint-accepts).
+6. **`501 resource.not_supported`.** The platform lacks the action. Read `capabilities` on the comment.
+7. **`404 resource.not_found`.** The post was deleted on the platform. The same post returns the same 404 afterwards.
+8. **`400 platform.instagram.private_reply_ineligible`, `400 platform.facebook.private_reply_ineligible`.** The comment already received its private reply, or is older than 7 days.
+9. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.{platform}.rate_limit`.** Your allowance, the sender's messages per minute, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
+10. **`422 platform.youtube.processing_failure`.** YouTube refused to delete a comment that your channel did not write. Hide it instead.
 
 When the list is empty, check that the post has comments, that `account_id` owns the post, and, on a platform that sends events, that the comment arrived: see [Webhook events](/guides/webhook-events#comments). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
 
@@ -321,7 +322,7 @@ When the list is empty, check that the post has comments, that `account_id` owns
 
 ## Events
 
-SocialAPI sends `comment.received` when a person comments on a post of a connected account, on the platforms that report comments to SocialAPI. See [`comment.received`](/guides/webhook-events#comments) for the platforms and the payload. Platforms that report nothing, such as X, YouTube, and Bluesky, need the list endpoints above.
+SocialAPI sends `comment.received` when a person comments on a post of a connected account, on the platforms that report comments to SocialAPI. See [`comment.received`](/guides/webhook-events#comments) for the platforms and the payload. Platforms that report nothing, such as X, YouTube, and Bluesky, need the list endpoints above. An account without the `comments.read` [permission](/guides/permissions) receives no `comment.received` events.
 
 ## Use from an AI agent
 
@@ -346,4 +347,5 @@ The tool list and error shape are in [MCP tools](/integrations/tools#comments).
 - [Webhook events](/guides/webhook-events#comments): the `comment.received` payload per platform.
 - [Platform support](/platforms/overview): which platform supports which comment action.
 - [IDs](/guides/ids): the `sapi_cmt_` ID and the platform IDs these endpoints accept.
+- [Account permissions](/guides/permissions): the permissions an account needs for each comment action.
 - [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit.

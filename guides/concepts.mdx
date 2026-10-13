@@ -36,13 +36,17 @@ An account is one connected social account: an Instagram account, a Facebook log
   "name": "Acme Corp",
   "username": "acmecorp",
   "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
-  "status": "active"
+  "status": "active",
+  "permissions": null,
+  "effective_permissions": ["posts.read", "posts.write", "comments.read", "comments.write", "messages.read", "messages.write", "analytics.read"]
 }
 ```
 
 You connect an account with `POST /v1/accounts/connect` and send the person through the platform's consent screen. SocialAPI's own app connects most platforms, so you register nothing. X, Telegram, and Bluesky use your own app or credentials. See [Connect accounts](/guides/connect-accounts) and [Platform apps](/guides/platform-credentials).
 
 An account's `status` is `active`, `reconnect_recommended`, or `token_expired`. Reconnecting keeps the account's ID. See [Account status](/guides/connect-accounts#account-status).
+
+An account's `permissions` limit what it can do on its platform. `null` means every permission, and `effective_permissions` lists the ones the account can use now. See [Account permissions](/guides/permissions).
 
 ## Post
 
@@ -70,7 +74,7 @@ A post is one piece of outbound content. One `POST /v1/posts` call can send it t
 - **A request publishes only with `publish_now` or `scheduled_at`.** With neither, `POST /v1/posts` saves a draft.
 - **A post is `draft`, `scheduled`, `publishing`, `published`, `partial`, `failed`, or `cancelled`.** A target is `pending`, `publishing`, `published`, `failed`, or `unpublished`. See [Post status](/guides/delivery#post-status).
 - **An HTTP success means SocialAPI accepted the post.** Delivery to each platform finishes afterwards: read the post again or wait for a `post.*` webhook event. See [Track post delivery](/guides/delivery).
-- **Metric names are the same on every platform.** Where a platform reports a count, it uses the keys `likes`, `comments`, `shares`, and `saves`. A key the platform does not report is `0`, and Google Business Profile targets carry no counts. Each publishing page lists its extra keys.
+- **Metric names are the same on every platform.** Where a platform reports a count, it uses the keys `likes`, `comments`, `shares`, and `saves`. A key the platform does not report is `0`. A Google Business Profile target has no `metrics` object, or one whose four keys are all `0`. LinkedIn and Pinterest targets return `501 resource.not_supported`. Instagram, TikTok, YouTube, and Zalo add keys such as `views`: see [Analytics](/guides/analytics#read-live-post-metrics).
 
 ## Interaction
 
