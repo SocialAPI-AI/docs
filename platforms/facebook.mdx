@@ -71,9 +71,9 @@ Response (HTTP 202):
 
 After the person authorizes, the redirect carries `status=success` and the brand's Facebook account. That account holds every Page the login granted that none of your other brands already holds. A Page that another of your brands holds stays with that brand.
 
-- A login that grants no Page fails with `404 platform.facebook.no_pages`.
-- A login whose every Page belongs to another of your brands fails with `409 platform.facebook.no_assignable_pages`.
-- A brand whose Facebook account is connected through a different login returns `409 account.different_login`. Disconnect the brand's Facebook account first.
+- A login that grants no Page ends with `status=error` and `error=platform.facebook.no_pages` on your `redirect_uri`.
+- A login whose every Page belongs to another of your brands ends with `status=error` and `error=platform.facebook.no_assignable_pages`.
+- A brand whose Facebook account is connected through a different login ends with `status=error` and `error=account.different_login`. Disconnect the brand's Facebook account first.
 - Reconnecting the same login refreshes the access for every brand that uses it, not only the brand you reconnected from.
 
 ### Pages of an account
@@ -104,6 +104,14 @@ Response (HTTP 200):
   "count": 1
 }
 ```
+
+| Field | Description |
+|---|---|
+| `login_id` | The login you asked about |
+| `pages[].platform_page_id`, `name` | Facebook's Page ID and the Page's name |
+| `pages[].picture_url`, `category` | The Page's picture and category. Each is omitted when Facebook returns none |
+| `pages[].assignable` | `true` when no brand holds the Page. `false` when a brand holds it: `assigned_brand_id`, `assigned_brand_name`, and `assigned_account_id` then name it |
+| `count` | The number of Pages in `pages` |
 
 `login_id` is on each connected account. Move a Page to a brand with `POST /v1/platforms/facebook/logins/{loginId}/pages/{pageId}/assign`. A Page that another of your brands holds moves to the target brand. The call needs the `accounts:manage` scope.
 

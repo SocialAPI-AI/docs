@@ -124,9 +124,7 @@ Response (HTTP 200):
   "name": "Jane Doe",
   "profile_pic": "https://scontent.cdninstagram.com/v/.../profile.jpg",
   "follower_count": 310,
-  "is_verified_user": false,
-  "is_user_follow_business": true,
-  "is_business_follow_user": false
+  "is_user_follow_business": true
 }
 ```
 
@@ -134,6 +132,7 @@ Response (HTTP 200):
 - `profile_pic` links expire: do not store them.
 - Instagram discloses a profile only for a person who messaged the account or tapped an icebreaker or the persistent menu. For anyone else the call returns `403 platform.instagram.230`, which means Instagram withholds the data. It does not mean the person does not follow the account.
 - A field that Instagram has no value for, such as `name`, is absent.
+- `is_verified_user`, `is_user_follow_business`, and `is_business_follow_user` are absent when `false`, and `follower_count` is absent when it is `0`. An absent follow flag means the person does not follow in that direction. When Instagram will not disclose the relationship, the call returns `403 platform.instagram.230` instead.
 
 ## Mentions
 
@@ -161,6 +160,10 @@ Response (HTTP 200):
       "media_url": "https://scontent.cdninstagram.com/v/t51.../story.jpg",
       "permalink": "https://www.instagram.com/stories/acmecorp/17895695668004550/",
       "timestamp": "2026-10-12T12:00:00Z",
+      "like_count": 0,
+      "comments_count": 0,
+      "shares_count": 0,
+      "view_count": 0,
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
       "metadata": {
         "is_story": true,
@@ -172,7 +175,7 @@ Response (HTTP 200):
 }
 ```
 
-Each item has the shape of a post. `metadata.is_story` is always `true`, and `metadata.expires_at` is the posting time plus 24 hours. For a video story with no `media_url`, the cover image is returned as `media_url`.
+Each item has `id`, `platform`, `caption`, `media_type`, `media_url`, `permalink`, `timestamp`, `like_count`, `comments_count`, `shares_count`, `view_count`, `account_id`, and `metadata`. `like_count`, `comments_count`, `shares_count`, and `view_count` are always `0` on a story. An item also carries `settings` when Instagram reports any: see [Settings on published posts](/platforms/instagram/publishing#settings-on-published-posts). `metadata.is_story` is always `true`, and `metadata.expires_at` is the posting time plus 24 hours. For a video story with no `media_url`, the cover image is returned as `media_url`.
 
 ## Collaboration invites
 
@@ -180,9 +183,22 @@ A collaborator is invited when a post is published, with `platform_data.collabor
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collaborators` | Lists the collaborators of a post and the state of each invite: `accepted`, `pending`, or `declined`. Call it with the account that published the post |
+| `GET` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collaborators` | Lists the collaborators of a post and the `status` of each invite. Call it with the account that published the post |
 | `POST` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collab/accept` | Accepts a pending invite and publishes the co-authored post on this account's feed. Call it with the invited account. An invite expires 14 days after it is sent |
 | `POST` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collab/decline` | Declines a pending invite. The post does not appear on this account's feed. Call it with the invited account |
+
+The list call returns HTTP 200:
+
+```json
+{
+  "data": [
+    { "id": "17841405793187218", "username": "janesmith", "status": "pending" }
+  ],
+  "count": 1
+}
+```
+
+`status` is `accepted`, `pending`, or `declined`.
 
 Accepting or declining with no pending invite for the account on that media returns an error from Instagram. Accept and decline return `{"success": true}`.
 

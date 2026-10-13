@@ -32,7 +32,7 @@ A Facebook post goes to one Facebook Page. SocialAPI picks the format from the `
 | Text only | No `media`; no `link` in `platform_data` | Publishes a plain text status update |
 | Link preview | No `media`; include `link` in the target's `platform_data` | Facebook generates an Open Graph preview card |
 | Single photo | One image entry in `media` | Publishes a Page photo; accepts `alt_text` and the targeting and place fields, see "Platform data fields" below |
-| Single video | One video entry in `media` (`.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`) | Publishes a Page video; accepts `title` and the video, targeting, and place fields, see "Platform data fields" below |
+| Single video | One video entry in `media` | Publishes a Page video. SocialAPI treats a file whose name ends in `.mp4`, `.mov`, `.avi`, `.mkv`, or `.webm` as a video. Accepted formats for uploaded files are in File limits below. Accepts `title` and the video, targeting, and place fields, see "Platform data fields" below |
 | Reel | One vertical video entry in `media` plus `content_type: "reel"` in the target's `platform_data` | Publishes a Page Reel; accepts `content_type`, `share_to_feed` (default `true`), `title`, and `place` |
 | Story | One photo or video entry in `media` plus `content_type: "stories"` in the target's `platform_data` | Publishes a Page Story that expires after 24 hours. Captions, links, and audience targeting are ignored |
 | Multi-photo album | 2 to 10 image entries in `media` | Publishes one post containing every photo, with one caption. Accepts `link`, the CTA fields, age and country targeting, and `place`. |
@@ -266,7 +266,7 @@ Requirements: exactly one video, vertical orientation (9:16), and a duration of 
 
 ### Story
 
-Publish a 24-hour Page Story by setting `content_type: "stories"` in the target's `platform_data`. Provide exactly one photo or video entry in `media`. A video Story waits up to about 10 minutes for Facebook to process it. After that, the target fails with `504 platform.facebook.story_timeout`.
+Publish a 24-hour Page Story by setting `content_type: "stories"` in the target's `platform_data`. Provide exactly one photo or video entry in `media`. A video Story waits up to about 10 minutes for Facebook to process it. After that, the target fails with `504 platform.facebook.story_timeout`. If Facebook cannot process the video, the target fails with `422 platform.facebook.story_processing_failed`.
 
 Stories carry no caption, link, call-to-action, or audience targeting. `text` is ignored, and any `platform_data` key other than `content_type` is not sent and returns a validation warning.
 
@@ -469,8 +469,8 @@ A publish that fails after the request returned puts a structured error on the t
 
 ```json
 {
-  "code": "platform.facebook.api_error",
-  "message": "Invalid OAuth access token.",
+  "code": "platform.facebook.reel_processing_failed",
+  "message": "reel video processing failed: error",
   "category": "platform",
   "caused_by": "platform"
 }
@@ -478,7 +478,9 @@ A publish that fails after the request returned puts a structured error on the t
 
 - `401 platform.facebook.auth`: the access token is invalid or revoked. Reconnect the account.
 - `429 platform.facebook.rate_limit`: Facebook's own limit. Wait, then retry.
-- `502 platform.facebook.api_error`: Facebook refused the request. Read `message`. Common causes are a missing Page permission, a post that no longer exists, and an invalid media URL.
+- `platform.facebook.<code>`: Facebook refused the request with its own error code and message. The HTTP status is `502` unless the code has its own mapping, such as `404 platform.facebook.100` or `403 platform.facebook.230`. Read `message`. Common causes are a missing Page permission, a post that no longer exists, and an invalid media URL.
+- `502 platform.facebook.api_error`: a failure reaching Facebook, or a response with no usable error.
+- `422 platform.facebook.reel_processing_failed` and `422 platform.facebook.story_processing_failed`: Facebook could not process the video.
 - `504 platform.facebook.reel_timeout` and `504 platform.facebook.story_timeout`: Facebook did not finish processing the video in about 10 minutes.
 
 Every code is in [Errors](/guides/errors).

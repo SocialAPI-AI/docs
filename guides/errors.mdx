@@ -133,6 +133,8 @@ Allowances and billing periods are defined in [Plans and usage](/guides/plans).
 
 These codes come from `POST /v1/accounts/connect`, the steps that follow the consent screen, and the Page and location pickers. See [Connect accounts](/guides/connect-accounts) for the flow.
 
+A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as `status=error` and `error=<code>`, with `error_description`.
+
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 400 | `validation.customer_state_too_long` | `state` is longer than 512 characters |
@@ -149,14 +151,14 @@ These codes come from `POST /v1/accounts/connect`, the steps that follow the con
 | 400 | `validation.invalid_location_id` | The Google location ID is not valid |
 | 400 | `validation.auth_code_expired` | The TikTok authorization code expired or was already used. Start the connection again |
 | 409 | `account.already_linked` | This platform account is already connected to a SocialAPI account |
-| 409 | `account.different_login` | The brand's Facebook is connected through a different login. Disconnect it first |
+| 409 | `account.different_login` | The brand's Facebook is connected through a different login. Disconnect it first. During a connection it reaches your `redirect_uri` as `error=account.different_login`; assigning a Page returns the 409 |
 | 403 | `account.reconnection_required` | The platform token is no longer usable. Reconnect with `POST /v1/accounts/connect`, passing the existing connected account's brand and platform: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account) |
 | 400 | `account.unsupported_platform` | The platform value is not recognized |
-| 404 | `platform.facebook.no_pages` | The Facebook login has no Pages |
-| 404 | `platform.google.no_locations` | The Google login has no Business Profile locations |
-| 404 | `platform.youtube.no_channels` | The Google login has no YouTube channels |
+| Redirect | `platform.facebook.no_pages` | The Facebook login has no Pages |
+| Redirect | `platform.google.no_locations` | The Google login has no Business Profile locations |
+| Redirect | `platform.youtube.no_channels` | The Google login has no YouTube channels |
 | 404 | `platform.youtube.no_uploads_playlist` | The YouTube channel has no uploads playlist |
-| 409 | `platform.facebook.no_assignable_pages` | Every Page on the login already belongs to another brand |
+| Redirect | `platform.facebook.no_assignable_pages` | Every Page on the login already belongs to another brand |
 | 409 | `platform.google.brand_has_account` | The brand already has a Google Business Profile connected. Disconnect it first, or choose another brand |
 | 502 | `platform.instagram.api_error` | Instagram's token exchange failed during connection |
 | 400 | `account.page_not_found` | The `page_id` matches no Page of the account |
@@ -388,6 +390,8 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 404 | `platform.instagram.9010` | Instagram has no account for the participant ID, for example because the person deleted or deactivated the account |
 | 409 | `platform.instagram.9007` | Instagram is not ready to publish the media yet. Retry the publish |
 | 403 | `platform.instagram.230` | Instagram withholds the participant profile: the person has not messaged the account or tapped an icebreaker or the persistent menu |
+| 404 | `platform.facebook.100` | Facebook says the object does not exist, or the Page lacks a permission the call needs. Check the ID and the Page permissions |
+| 403 | `platform.facebook.230` | Facebook requires the user's consent to access the resource. Reconnect the account |
 | 504 | `platform.facebook.reel_timeout`, `platform.facebook.story_timeout` | Facebook did not finish processing the Reel or Story video within the time allowed |
 | 422 | `platform.facebook.reel_processing_failed`, `platform.facebook.story_processing_failed` | Facebook could not process the Reel or Story video |
 | 400 | `validation.media_invalid` | A Facebook Reel does not have exactly one video, and the post was sent with `skip_validation: true`. Without it, the post returns `400 publishing.validation_failed` |
@@ -533,7 +537,7 @@ When a platform refuses a call, the code is `platform.<name>.<reason>`, where `<
 | 429 | `platform.<name>.rate_limit` | The platform's own limit. See [Rate limits](#rate-limits) |
 | 422 | `platform.<name>.publish_failed` | A publish failed with an error SocialAPI does not map. Appears in [Delivery failures](#delivery-failures) |
 | 502 | `platform.<name>.api_error` | A failure reaching the platform, or a response with no usable error |
-| 502 | `platform.<name>.<code>` | The platform returned its own error code, such as `platform.facebook.100`. The status is `502` unless the platform's code maps to another status |
+| 502 | `platform.<name>.<code>` | The platform returned its own error code. The status is `502` unless the code has its own row above, such as `404 platform.facebook.100` |
 
 Branch on the prefix and suffix: `platform.` with `.auth` means reconnect, with `.rate_limit` means back off.
 

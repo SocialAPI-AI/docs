@@ -238,7 +238,7 @@ A publish that fails after the request returned puts a structured error on the t
 
 ```json
 {
-  "code": "platform.threads.api_error",
+  "code": "platform.threads.ERROR",
   "message": "The media could not be processed",
   "category": "platform",
   "caused_by": "platform"
@@ -250,7 +250,8 @@ A publish that fails after the request returned puts a structured error on the t
 - `422 platform.threads.THREADS_API__LINK_LIMIT_EXCEEDED`: the post holds more than 5 unique links.
 - `422 platform.threads.ERROR`, `422 platform.threads.EXPIRED`: Threads rejected or expired the media.
 - `504 platform.threads.container_timeout`: Threads did not finish processing the media after about 4 minutes.
-- `502 platform.threads.api_error`: Threads refused the request or returned no usable error. Read `message`.
+- `platform.threads.<code>`: Threads refused the request with its own error code and message. The HTTP status is `502` unless the code has its own mapping, such as `422 platform.threads.801`. Read `message`.
+- `502 platform.threads.api_error`: a failure reaching Threads, or a response with no usable error.
 
 Every code is in [Errors](/guides/errors).
 

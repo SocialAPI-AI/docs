@@ -165,7 +165,7 @@ Response (HTTP 200) for `level=account`:
 }
 ```
 
-Each metric comes back as a scalar (`value`) or a dated series (`values`), never both. Account-level `views` is a series. The other account-level metrics are scalars.
+Each metric comes back as a scalar (`value`), a dated series (`values`), or, for `follower_demographics`, a `breakdown`. Account-level `views` is a series, `follower_demographics` is a breakdown, and the other account-level metrics are scalars.
 
 | Level | Metrics |
 |---|---|
@@ -184,6 +184,7 @@ Each metric comes back as a scalar (`value`) or a dated series (`values`), never
 
 - `follower_demographics` needs exactly one `breakdown` and rejects `since` and `until`.
 - `follower_demographics` on an account with fewer than 100 followers returns `422 platform.threads.801`.
+- `follower_demographics` returns `breakdown`, a list of `{ "dimension", "value" }` rows, for example `{ "dimension": "US", "value": 540 }` with `breakdown=country`. `dimension` is a country code, a city, an age range, or a gender, matching the `breakdown` you sent.
 - Metrics for a new post appear after a delay, and a deleted post returns nothing. Both return an empty result, not an error.
 
 The `400` codes for these parameters are in [Errors](/guides/errors).
@@ -273,7 +274,7 @@ These further scopes are requested only for accounts enrolled in the beta:
 | `threads_profile_discovery` | Profile discovery |
 | `threads_location_tagging` | `location_id` on a post |
 | `threads_share_to_instagram` | `crossreshare_to_ig` on a post |
-| `threads_keyword_search` | Requested with the others. No SocialAPI endpoint uses it |
+| `threads_keyword_search` | Requested with `threads_profile_discovery`. No SocialAPI endpoint uses it |
 
 Until Meta grants a scope for every account, a call that needs it from an account without it returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. A beta permission is added when the account connects: reconnect the account to add one granted later.
 
