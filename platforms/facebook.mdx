@@ -77,7 +77,7 @@ After the person authorizes, the redirect carries `status=success` and the brand
 
 ### Pages of an account
 
-List the Pages of a connected account with `GET /v1/accounts/{id}/pages`. Each Page has an `id` (`sapi_page_` prefix), `platform_page_id`, `name`, `is_default`, and `is_active`. Publish to a Page with `page_id` on the post target: see [Delivery](/guides/delivery). `PATCH /v1/accounts/{id}/pages/{pageId}` sets `is_default` or `is_active`.
+List the Pages of a connected account with `GET /v1/accounts/{id}/pages`. Each Page has at least an `id` (`sapi_page_` prefix), `platform_page_id`, `name`, `is_default`, and `is_active`. A Page also carries `profile_picture_url`, `category`, `followers_count`, `username`, `link`, `verification_status`, `cover_photo_url`, `about`, and `enriched_at`, each omitted when it has no value. Publish to a Page with `page_id` on the post target: see [Delivery](/guides/delivery). `PATCH /v1/accounts/{id}/pages/{pageId}` sets `is_default` or `is_active`.
 
 ### One login, many brands
 
@@ -97,7 +97,6 @@ Response (HTTP 200):
     {
       "platform_page_id": "104857392011223",
       "name": "Acme Bakery",
-      "assigned_brand_id": "",
       "assignable": true
     }
   ],
@@ -171,6 +170,7 @@ Facebook Pages emit these events to your webhook endpoints. Payloads are in [Web
 | `dm.referral` | A person opened a conversation from an ad or referral link without sending a message |
 | `dm.postback` | A person tapped a button on a private reply |
 | `dm.status.sent`, `dm.status.delivered`, `dm.status.read` | Facebook accepted, delivered, or showed as read a DM you sent |
+| `account.connected` | You finished connecting or reconnecting the account |
 | `account.disconnected` | The person revoked access on Facebook |
 | `page.removed` | A Page was removed from the login |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
@@ -181,7 +181,7 @@ Facebook Pages emit these events to your webhook endpoints. Payloads are in [Web
 |---|---|
 | Post text | 63,206 characters |
 | Photo | 10 MB: JPEG, PNG, GIF, or WebP |
-| Video | 4 GB and 240 minutes: MP4, QuickTime, AVI, or WMV |
+| Video | 4 GB and 240 minutes: MP4, QuickTime, or AVI |
 | Multi-photo album | 2 to 10 images |
 | Posts | 100 per 24 hours and 25 per hour for each Page: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 | Messages | 10 per clock minute for each Page |

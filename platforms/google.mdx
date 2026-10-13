@@ -115,7 +115,7 @@ Response (HTTP 200):
 }
 ```
 
-A day with no activity is an explicit `0`, not a gap. Google publishes no retention window and no freshness lag for this data: a recent day can still be filling in, and an old range can return nothing.
+A day with no activity is an explicit `0`, not a gap. Google publishes no retention window and no freshness lag for this data.
 
 | Metric | Counts |
 |---|---|
@@ -154,7 +154,7 @@ Response (HTTP 200):
 | Parameter | Description |
 |---|---|
 | `start_month`, `end_month` | Required. Inclusive, formatted `YYYY-MM`. A missing or malformed month returns `400 validation.start_month_required`, `validation.start_month_invalid`, `validation.end_month_required`, or `validation.end_month_invalid`. An `end_month` before `start_month` returns `400 validation.range_inverted` |
-| `limit` | Keywords per page, 0 to 100. A value above 100 returns `400 validation.page_size_invalid` |
+| `limit` | Keywords per page, 1 to 100. Omit it or send `0` for the default, 100. A value above 100 returns `400 validation.page_size_invalid` |
 | `cursor` | The `next_cursor` of the previous page |
 
 <Warning>
@@ -170,7 +170,9 @@ Google Business Profile events arrive as ordinary SocialAPI webhooks. You set no
 | `review.received` | A customer left a new review. `data.review` holds the whole review |
 | `review.updated` | A review changed. `data.change` is `review_edited`, `reply_approved`, or `reply_rejected` |
 | `account.updated` | The location changed on Google. `data.change` is `customer_media_added`, `google_update_pending`, `voice_of_merchant_changed`, or `duplicate_location` |
+| `account.connected` | You finished connecting or reconnecting the location |
 | `account.disconnected` | The connection needs reconnecting |
+| `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
 
 The payloads are in [Webhook events](/guides/webhook-events). Google can miss a notification and does not replay it, so a gap is permanent. Read reviews on a schedule to backfill: [Reviews](/platforms/google/reviews#review-events).
 
@@ -182,7 +184,7 @@ The payloads are in [Webhook events](/guides/webhook-events). Google can miss a 
 | Local post image | 1 image, JPEG or PNG, up to 5 MB. Video is not accepted |
 | Location edits | 10 per minute per Business Profile. The 11th returns `429 platform.google.rate_limit` |
 | Reviews per page | 1 to 50 |
-| Search keywords per page | 0 to 100 |
+| Search keywords per page | 1 to 100. The default is 100 |
 
 ## Permissions
 

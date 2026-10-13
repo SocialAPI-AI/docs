@@ -1,12 +1,12 @@
 ---
 title: Threads publishing
 sidebarTitle: "Publishing"
-description: Full reference for publishing Threads posts via SocialAPI, including text, images, videos, and carousels, plus platform-specific parameters.
+description: Publish text, image, video, and carousel posts to Threads accounts through SocialAPI, with platform-specific fields, limits, and error recovery.
 ---
 
 ## 1. Overview
 
-A Threads post goes live once Threads has accepted it. A text post needs no media. A post with media waits for Threads to process the file, which takes seconds for an image and longer for a video.
+A Threads post goes live once Threads has accepted it. A text post needs no media. A post with media waits for Threads to process the file, for about 4 minutes at most.
 
 | Field | Value |
 |---|---|
@@ -113,7 +113,7 @@ Send these keys in `platform_data.threads` on the post, which applies them to ev
 | `location_id` | string | Needs the beta scope `threads_location_tagging` |
 | `crossreshare_to_ig` | boolean | Shares the post to the linked Instagram account as a Story. Needs the beta scope `threads_share_to_instagram`. `crossreshare_to_ig_dark_mode` sets the dark variant |
 
-SocialAPI forwards any additional keys in `platform_data.threads` only when the table above lists them. An unlisted key is not sent, and the response lists it as a validation warning naming the key.
+SocialAPI forwards any additional keys in `platform_data.threads` only when the table above lists them: it sends only the keys the table lists for the post type you publish. Any other key is not sent, and the response lists it as a validation warning naming the key.
 
 `reply_control` is not sent. Setting who can reply needs the `threads_manage_replies` permission, which Meta has not granted to every account. A post that includes `reply_control` publishes with Threads' default, where everyone can reply, and the response carries a validation warning that names the permission.
 
@@ -182,16 +182,16 @@ Each post includes a `targets` array with per-platform status and engagement met
       "platform": "threads",
       "platform_post_id": "1234567890123456",
       "status": "published",
-      "permalink": "https://www.threads.net/@yourhandle/post/ABC123",
+      "permalink": "https://www.threads.com/@yourhandle/post/ABC123",
       "metrics": {
         "likes": 0,
         "comments": 0,
         "shares": 0,
         "saves": 0,
         "extra": null
-      }
-    },
+      },
       "metrics_synced_at": null
+    }
   ]
 }
 ```
@@ -206,7 +206,7 @@ Likes and replies come from Threads insights, which need the `threads_manage_ins
 
 ### Media processing delay
 
-A post with media waits for Threads to process the file. SocialAPI checks once a minute for up to 5 minutes. If Threads has not finished by then, the target fails with `504 platform.threads.container_timeout`. If Threads rejects or expires the media, the target fails with `422 platform.threads.ERROR` or `422 platform.threads.EXPIRED`. A text post has no delay.
+A post with media waits for Threads to process the file. If Threads has not finished after about 4 minutes, the target fails with `504 platform.threads.container_timeout`. If Threads rejects or expires the media, the target fails with `422 platform.threads.ERROR` or `422 platform.threads.EXPIRED`. A text post has no delay.
 
 ### No post editing
 
@@ -249,7 +249,7 @@ A publish that fails after the request returned puts a structured error on the t
 - `429 platform.threads.rate_limit`: Threads' own limit. Wait, then retry.
 - `422 platform.threads.THREADS_API__LINK_LIMIT_EXCEEDED`: the post holds more than 5 unique links.
 - `422 platform.threads.ERROR`, `422 platform.threads.EXPIRED`: Threads rejected or expired the media.
-- `504 platform.threads.container_timeout`: Threads did not finish processing the media within 5 minutes.
+- `504 platform.threads.container_timeout`: Threads did not finish processing the media after about 4 minutes.
 - `502 platform.threads.api_error`: Threads refused the request or returned no usable error. Read `message`.
 
 Every code is in [Errors](/guides/errors).
@@ -343,16 +343,16 @@ Response once published:
       "platform": "threads",
       "platform_post_id": "1234567890123456",
       "status": "published",
-      "permalink": "https://www.threads.net/@yourhandle/post/ABC123",
+      "permalink": "https://www.threads.com/@yourhandle/post/ABC123",
       "metrics": {
         "likes": 0,
         "comments": 0,
         "shares": 0,
         "saves": 0,
         "extra": null
-      }
-    },
+      },
       "metrics_synced_at": null
+    }
   ],
   "created_at": "2026-04-10T09:00:00Z",
   "published_at": "2026-04-10T09:02:05Z"
