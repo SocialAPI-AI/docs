@@ -77,7 +77,7 @@ Response (HTTP 202):
 Instagram-specific rules:
 
 - **Account type.** The person must connect an Instagram Business or Creator account. A personal account cannot be connected.
-- **One account per brand.** A brand holds one Instagram account. Connecting a different Instagram account to the same brand returns `409 account.already_linked`.
+- **One account per brand.** A brand holds one Instagram account. Connecting a different Instagram account to the same brand ends with `status=error` and `error=account.already_linked` on your `redirect_uri`.
 - **Reconnect.** If a token is no longer valid, calls return `401 platform.instagram.auth` and the account needs reconnecting. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 - **Permissions.** Send `permissions` to ask the person for fewer scopes: see [Scopes](#scopes).
 
@@ -133,7 +133,7 @@ Response (HTTP 200):
 - `profile_pic` links expire: do not store them.
 - Instagram discloses a profile only for a person who messaged the account or tapped an icebreaker or the persistent menu. For anyone else the call returns `403 platform.instagram.230`, which means Instagram withholds the data. It does not mean the person does not follow the account.
 - A field that Instagram has no value for, such as `name`, is absent.
-- `is_verified_user`, `is_user_follow_business`, and `is_business_follow_user` are absent when `false`, and `follower_count` is absent when it is `0`. An absent follow flag means the person does not follow in that direction. When Instagram will not disclose the relationship, the call returns `403 platform.instagram.230` instead.
+- `is_verified_user`, `is_user_follow_business`, and `is_business_follow_user` are absent when `false`, and `follower_count` is absent when it is `0`. An absent follow flag means the person does not follow in that direction, or Instagram did not report it: the response does not tell the two apart. When Instagram withholds the relationship because the person has not given consent, the call returns `403 platform.instagram.230` instead.
 
 ## Mentions
 
