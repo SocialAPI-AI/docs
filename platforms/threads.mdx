@@ -230,8 +230,10 @@ Threads accounts emit these events to your webhook endpoints. Payloads are in [W
 | `comment.received` | A person replies to one of your posts |
 | `mention.received` | Another account mentions yours. Beta: see [Mentions](#mentions) |
 | `account.connected` | You finished connecting or reconnecting the account |
-| `account.disconnected` | The person revoked access to the account on Threads |
+| `account.disconnected` | The person revoked access to the account on Threads, or SocialAPI flagged the account for reconnection (`reconnect_required: true`, see `reason`) |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
+
+Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for this platform.
 
 ## Limits
 
@@ -273,7 +275,7 @@ These further scopes are requested only for accounts enrolled in the beta:
 | `threads_share_to_instagram` | `crossreshare_to_ig` on a post |
 | `threads_keyword_search` | Requested with the others. No SocialAPI endpoint uses it |
 
-Until Meta grants a scope for every account, a call that needs it from an account without it returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. SocialAPI adds the scope to your connection when Meta grants it: you do nothing.
+Until Meta grants a scope for every account, a call that needs it from an account without it returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. A beta permission is added when the account connects: reconnect the account to add one granted later.
 
 ## Related
 

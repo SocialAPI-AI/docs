@@ -37,7 +37,7 @@ An unsupported call returns `501 resource.not_supported`.
 | React to a DM | Yes | |
 | Mentions | Partial | `GET /v1/accounts/{id}/mentions` returns posts that tag the Page. A mention in a comment arrives as a `mention.received` event |
 | Reply to a mention | Yes | A public comment on the mention |
-| Reviews | No | Facebook removed the reviews edge in Graph API v22.0. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
+| Reviews | No | SocialAPI does not read Facebook reviews: Meta deprecated Page recommendations in Graph API v22.0. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | Yes | Comment and DM triggers, buttons on the first private reply, multi-step flows. A `send_dm` action delivers no buttons. No `follows_account` filter and no Follow gate: `400 validation.filter_unsupported` |
 | Analytics | Yes | See [Analytics](/guides/analytics) |
 | Webhook events | Yes | See [Webhook events](#webhook-events) |
@@ -108,7 +108,10 @@ Response (HTTP 200):
 `login_id` is on each connected account. Move a Page to a brand with `POST /v1/platforms/facebook/logins/{loginId}/pages/{pageId}/assign`. A Page that another of your brands holds moves to the target brand. The call needs the `accounts:manage` scope.
 
 ```bash
-curl -X POST "https://api.social-api.ai/v1/platforms/facebook/logins/cred_01J8X3Q4R5M6N7P8V2K0W1J/pages/104857392011223/assign"   -H "Authorization: Bearer $SOCAPI_KEY"   -H "Content-Type: application/json"   -d '{"brand_id": "7d2e4b1a-9c3f-4e5d-8a6b-1f2e3d4c5b6a"}'
+curl -X POST "https://api.social-api.ai/v1/platforms/facebook/logins/cred_01J8X3Q4R5M6N7P8V2K0W1J/pages/104857392011223/assign" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"brand_id": "7d2e4b1a-9c3f-4e5d-8a6b-1f2e3d4c5b6a"}'
 ```
 
 Response (HTTP 201):
@@ -146,7 +149,7 @@ A private reply sends a one-time DM to the person who commented. Send it with `P
 A Page can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.facebook.window_closed`.
 
 - **Message types.** Text and attachments. A DM send ignores `quick_replies`, `buttons`, and `cards`: it delivers only the text. Buttons work on a [private reply](/guides/comments#send-a-private-reply). Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
-- **Cap.** A Page sends 10 messages per clock minute. More returns `429 messaging.velocity_limit`: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
+- **Cap.** DMs, public comment replies, and private replies from a Page together count toward 10 per clock minute. More returns `429 messaging.velocity_limit`: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 - **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` reacts to a message, and `DELETE` on the same path removes the reaction.
 - **Delivery status.** `dm.status.sent`, `dm.status.delivered`, and `dm.status.read` events follow each DM you send.
 
@@ -156,7 +159,7 @@ A Page can message a person only inside the 24-hour messaging window that the pe
 
 ## Reviews
 
-Facebook removed Page reviews from Graph API v22.0. `GET /v1/inbox/reviews/{account_id}` for a Facebook account returns `422 account.platform_unsupported`, and no other call replaces it.
+SocialAPI does not read Facebook reviews: Meta deprecated Page recommendations in Graph API v22.0. `GET /v1/inbox/reviews/{account_id}` for a Facebook account returns `422 account.platform_unsupported`, and no other call replaces it.
 
 ## Webhook events
 
@@ -172,9 +175,11 @@ Facebook Pages emit these events to your webhook endpoints. Payloads are in [Web
 | `dm.postback` | A person tapped a button on a private reply |
 | `dm.status.sent`, `dm.status.delivered`, `dm.status.read` | Facebook accepted, delivered, or showed as read a DM you sent |
 | `account.connected` | You finished connecting or reconnecting the account |
-| `account.disconnected` | The person revoked access on Facebook |
+| `account.disconnected` | The person revoked access on Facebook, or SocialAPI flagged the account for reconnection (`reconnect_required: true`, see `reason`) |
 | `page.removed` | A Page was removed from the login |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
+
+Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for this platform.
 
 ## Limits
 
@@ -185,7 +190,7 @@ Facebook Pages emit these events to your webhook endpoints. Payloads are in [Web
 | Video | 4 GB and 240 minutes: MP4, QuickTime, or AVI |
 | Multi-photo album | 2 to 10 images |
 | Posts | 100 per 24 hours and 25 per hour for each Page: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
-| Messages | 10 per clock minute for each Page |
+| Messages | DMs, public comment replies, and private replies together count toward 10 per clock minute for each Page: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap) |
 | Private reply | 1 per comment, within 7 days |
 | Facebook's own rate limit | `429 platform.facebook.rate_limit`. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 
