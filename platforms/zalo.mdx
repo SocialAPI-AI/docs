@@ -1,11 +1,11 @@
 ---
 title: "Zalo API"
 sidebarTitle: "Overview"
-description: "Connect a Zalo Official Account to read and answer direct messages and to publish, update, and delete articles through one API, with no Zalo app to register."
+description: "Connect a Zalo Official Account to read and answer direct messages and to publish, schedule, and delete articles through one API, with no Zalo app to register."
 icon: "comment"
 ---
 
-SocialAPI connects a Zalo Official Account (OA), the business account on Zalo, Vietnam's messaging app. It reads and answers the direct messages (DMs) that people send to the OA, and it publishes, updates, and deletes OA articles. SocialAPI's own Zalo app connects the account, so you register no Zalo app and complete no step in the Zalo developer portal: see [Platform apps](/guides/platform-credentials).
+SocialAPI connects a Zalo Official Account (OA), the business account on Zalo, Vietnam's messaging app. It reads and answers the direct messages (DMs) that people send to the OA, and it publishes and deletes OA articles. SocialAPI's own Zalo app connects the account, so you register no Zalo app and complete no step in the Zalo developer portal: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
@@ -23,10 +23,10 @@ An unsupported call returns `501 resource.not_supported`.
 | Feature | Status | Condition |
 |---|---|---|
 | Publish an article | Yes | Text only. See [Zalo publishing](/platforms/zalo/publishing) |
-| Publish a video | No | `media` on a Zalo target is ignored. The article publishes with `text` only |
+| Publish a video | No | A `url` or `media_id` item on a Zalo target is ignored, and the article publishes with `text` only. A `platform_attachment_id` item fails the target with `422 publishing.media.unsupported_source` |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | No | `first_comment` is ignored |
-| Update a published article | Yes | Replaces the title and the text |
+| Update a published article | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published article. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct an article, delete it and publish a new one |
 | Delete a published article | Yes | |
 | List posts | Yes | Articles of type `normal`. See [List posts](/platforms/zalo/publishing#6-retrieve-posts) |
 | DMs: list, read, send | Yes | Sending needs the person to have interacted with the OA within 7 days: see [The 7-day messaging window](#the-7-day-messaging-window) |
@@ -87,7 +87,7 @@ Zalo also emits the `post.*` events for articles you publish through SocialAPI, 
 | Posts per publish target | 25 per hour and 50 per 24 hours: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 | Customer service window | 7 days from the person's last interaction |
 
-Zalo applies its own quotas per app and per Official Account. When one is used up, the call fails with `429 platform.zalo.rate_limit`. Wait, then retry.
+Zalo applies its own quotas per app and per Official Account. When one is used up, the call fails with `429 platform.zalo.rate_limit`. Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then retry.
 
 ## Permissions
 

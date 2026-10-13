@@ -420,6 +420,8 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 400 | `validation.privacy_level_unsupported`, `validation.invalid_privacy_level` | The `privacy_level` is not allowed for this account or this post type. `meta.privacy_level` is the value you sent |
 | 400 | `validation.branded_content_private` | Branded content cannot be private |
 | 400 | `validation.posting_limit` | The TikTok creator reached the daily posting limit |
+| 429 | `platform.tiktok.spam_risk_too_many_posts` | The creator reached TikTok's own limit on posts for the account. It is not a SocialAPI cap. Wait, then retry |
+| 403 | `platform.tiktok.spam_risk_user_banned_from_posting` | TikTok bars this creator from posting. A retry fails the same way. The creator resolves it with TikTok |
 
 ### X, LinkedIn, YouTube, and Zalo
 
@@ -500,13 +502,15 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 
 `platform.bluesky.dm_scope_missing` affects only the DM endpoints. Treat it as a failure of one capability, not a dead connection.
 
-### Pinterest boards
+### Pinterest
 
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 400 | `board.name_required` | A board has no name |
 | 400 | `board.privacy_invalid` | A board's privacy can be changed only to `PUBLIC` or `SECRET` |
 | 400 | `board.update_empty` | A board update set no field |
+| 403 | `platform.pinterest.403` | Pinterest refused the request for this account or board. `error.message` carries Pinterest's reason. Reconnecting does not clear it |
+| 404 | `platform.pinterest.404` | Pinterest reports that the board or Pin does not exist |
 
 ## Platform errors
 

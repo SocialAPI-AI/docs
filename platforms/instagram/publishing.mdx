@@ -15,7 +15,7 @@ Instagram processes media before it can be published, so every post type (image,
 | Platform API | Instagram API with Instagram Login (Meta) |
 | Create post | Yes |
 | Update post | Not after publishing (`409 post.state_invalid`). `draft`, `scheduled`, and `failed` posts can be edited |
-| Delete post | No (`501 resource.not_supported`) |
+| Delete post | No (`outcome: not_supported`) |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | Yes (best-effort, non-blocking) |
 | Posting caps | 45 posts per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
@@ -186,7 +186,7 @@ To correct a published post, delete it in the Instagram app and publish a new po
 
 ## 5. Delete post
 
-`DELETE /v1/posts/{pid}` and `POST /v1/posts/{pid}/unpublish` return `501 resource.not_supported` for an Instagram target, and the post stays live on Instagram. Instagram Login gives apps no media deletion call, so SocialAPI refuses rather than report a deletion that did not happen. Delete the post in the Instagram app.
+`DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for an Instagram target, and the post stays live on Instagram. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported` for an Instagram target. Instagram Login gives apps no media deletion call, so SocialAPI refuses rather than report a deletion that did not happen. Delete the post in the Instagram app.
 
 For a cross-platform post, the other platforms are still deleted or unpublished. The response names every platform whose content is still live, so an Instagram target refusing does not undo the targets that succeeded. See [Delete a post](/guides/delivery#delete-a-post).
 
@@ -472,3 +472,5 @@ SocialAPI's Meta app requests these scopes during the OAuth flow. You configure 
 | `instagram_business_manage_comments` | Post the first comment |
 | `instagram_business_content_publish` | Create and publish media containers |
 | `instagram_business_manage_insights` | Read per-post insights |
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

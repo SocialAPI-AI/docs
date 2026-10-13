@@ -26,7 +26,7 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | Yes | Not part of a Story |
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post in the Instagram app and publish a new one |
-| Delete a published post | No | `DELETE /v1/posts/{pid}` returns `501 resource.not_supported` for the Instagram target and the post stays live. Delete it in the Instagram app |
+| Delete a published post | No | `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the Instagram target, and the post stays live. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported`. Delete the post in the Instagram app |
 | List posts | Yes | Posts, Reels, and carousels |
 | List active stories | Yes | Only stories that are live now |
 | List comments and replies | Yes | Comments are read per post |
@@ -68,7 +68,7 @@ Response (HTTP 200):
 
 ```json
 {
-  "auth_url": "https://www.instagram.com/oauth/authorize/?client_id=...&state=...#weblink",
+  "auth_url": "https://www.instagram.com/oauth/authorize/?client_id=1234567890&redirect_uri=https%3A%2F%2Fapi.social-api.ai%2Foauth%2Fcallback%2Finstagram&response_type=code&state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2#weblink",
   "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
 }
 ```

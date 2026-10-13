@@ -149,7 +149,7 @@ curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1
 
 `GET /v1/platforms/pinterest/accounts/{id}/pins` returns the account's Pins, read from Pinterest on every call. The response and its fields are in [List Pins](/platforms/pinterest#list-pins). Each published target of a post you created carries `platform_post_id` and `permalink`.
 
-Pinterest reports no engagement counts on the Pin list, so a Pin has no metrics. `GET /v1/posts/{pid}/metrics` returns `501 resource.not_supported` for the Pinterest target. Account-level counts are in [Analytics](/guides/analytics).
+Pinterest reports no engagement counts on the Pin list, so a Pin has no metrics. `GET /v1/posts/{pid}/metrics` returns HTTP 200, and the Pinterest target carries `error.code: resource.not_supported`. Account-level counts are in [Analytics](/guides/analytics).
 
 ---
 
@@ -161,7 +161,7 @@ There is no default board, and a target without `board_id` is refused. When the 
 
 ### Boards and Pins are read live
 
-SocialAPI stores no board or Pin. A board you just created appears at once. If Pinterest is unavailable, a call fails.
+SocialAPI stores no board or Pin. A board you just created appears on the next call. If Pinterest is unavailable, a call fails.
 
 ### Errors on a failed target
 
@@ -174,7 +174,7 @@ A publish that fails after the request returned puts a structured error on the t
 
 ### Recovery
 
-- **Rate limit.** Wait, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Rate limit.** Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
 - **Auth error.** Reconnect the Pinterest account through the OAuth flow.
 - **Wrong board.** Delete the Pin, then publish it to the right board.
 
@@ -279,3 +279,5 @@ SocialAPI's Pinterest app requests these scopes during the OAuth flow. You confi
 | `boards:read` | List boards to choose `board_id` |
 | `boards:write` | Required by Pinterest to create and delete Pins |
 | `pins:write` | Create and delete Pins |
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

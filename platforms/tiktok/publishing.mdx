@@ -15,7 +15,7 @@ TikTok accepts a post as a job and finishes it later, so a TikTok target stays `
 | API | TikTok Content Posting API v2 |
 | Create post | Yes (video, photo carousel, or a draft in the TikTok app) |
 | Update post | No (`409 post.state_invalid` on a published post) |
-| Delete post | No (`501 resource.not_supported`) |
+| Delete post | No (`outcome: not_supported`) |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | No (`first_comment` is ignored) |
 | Posting caps | 18 posts per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
@@ -215,7 +215,7 @@ TikTok gives apps no edit call. `PATCH /v1/posts/{pid}` edits only a post in `dr
 
 ## 5. Delete post
 
-TikTok gives apps no deletion call. `DELETE /v1/posts/{pid}` and `POST /v1/posts/{pid}/unpublish` return `501 resource.not_supported` for a TikTok target, and the video stays on TikTok. Delete it in the TikTok app.
+TikTok gives apps no deletion call. `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the TikTok target, and the video stays on TikTok. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported` for a TikTok target. Delete the video in the TikTok app.
 
 For a cross-platform post, the other platforms are still deleted or unpublished. See [Delete a post](/guides/delivery#delete-a-post).
 
@@ -257,7 +257,7 @@ TikTok reports views, likes, comments, and shares. Reach, saves, and watch time 
 
 A post without `privacy_level` fails validation on the field `privacy_level`, and publishing is blocked. TikTok forbids a default chosen by the app, so SocialAPI sends none. A level the creator cannot use fails validation on the same field. Check [Creator info](/platforms/tiktok#creator-info) first.
 
-At publish time the same rules fail a target with `400 validation.privacy_level_required` or `400 validation.invalid_privacy_level`, with the value you sent in `meta.privacy_level`.
+At publish time the same rules fail a target with `400 validation.privacy_level_required` or `400 validation.invalid_privacy_level`. `validation.invalid_privacy_level` carries the value you sent in `meta.privacy_level`.
 
 ### Photo carousels need 2 to 35 images
 
@@ -301,6 +301,8 @@ A publish that fails after the request returned puts a structured error on the t
 
 - `401 platform.tiktok.auth`: the access token is no longer valid and the refresh failed. Reconnect the account.
 - `429 platform.tiktok.rate_limit`: TikTok's own limit. Wait, then retry.
+- `429 platform.tiktok.spam_risk_too_many_posts`: the creator reached TikTok's own limit on posts for the account. It is not a SocialAPI cap. Wait, then retry.
+- `403 platform.tiktok.spam_risk_user_banned_from_posting`: TikTok bars this creator from posting. A retry fails the same way. The creator resolves it with TikTok.
 - `422 platform.tiktok.publish_failed`: TikTok rejected the post while processing it. `message` carries TikTok's reason.
 - `502 platform.tiktok.api_error`: TikTok returned no usable answer. Retry.
 
@@ -425,3 +427,5 @@ SocialAPI's TikTok app requests these scopes during the OAuth flow. You configur
 | `user.info.basic` | Identify the account |
 | `video.publish` | Publish videos and photo carousels |
 | `video.upload` | Upload a video to the creator's TikTok drafts |
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

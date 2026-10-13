@@ -28,14 +28,14 @@ An unsupported call returns `501 resource.not_supported`.
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | No | `first_comment` is ignored |
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post, and TikTok gives apps no edit call |
-| Delete a published post | No | `DELETE /v1/posts/{pid}` returns `501 resource.not_supported` for the TikTok target and the post stays live. Delete it in the TikTok app |
+| Delete a published post | No | `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the TikTok target, and the video stays live. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported`. Delete the video in the TikTok app |
 | List posts | Yes | Videos with views, likes, comments, and shares. See [Sync videos](#sync-videos) |
 | Creator info | Yes | Allowed privacy levels and interaction settings. See [Creator info](#creator-info) |
 | Account summary | Yes | Follower, following, likes, and video counts. See [Account summary](#account-summary) |
 | Comments, replies, moderation | No | `501 resource.not_supported` |
 | DMs | No | `501 resource.not_supported` |
 | Mentions | No | `501 resource.not_supported` |
-| Reviews | No | TikTok has no reviews. `501 resource.not_supported` |
+| Reviews | No | TikTok has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
 | Analytics | Yes | See [Analytics](/guides/analytics) |
 | Webhook events | Partial | `account.disconnected` and the `post.*` events. See [Webhook events](#webhook-events) |
@@ -197,7 +197,7 @@ Every event is described in [Webhook events](/guides/webhook-events).
 | Photo carousel | 2 to 35 images, JPEG or WebP |
 | Posts | 18 per 24 hours and 25 per hour for each account. TikTok's own cap is 20 per day: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 | Videos per sync | 20 |
-| TikTok's own rate limit | `429 platform.tiktok.rate_limit`. It costs no SocialAPI credit |
+| TikTok's own rate limit | `429 platform.tiktok.rate_limit`. It costs no SocialAPI credit. Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then retry |
 
 ## Permissions
 

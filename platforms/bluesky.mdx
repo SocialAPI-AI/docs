@@ -24,10 +24,10 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 |---|---|---|
 | Publish a text post | Yes | Up to 300 characters. See [Bluesky publishing](/platforms/bluesky/publishing) |
 | Publish a post with images | Yes | 1 to 4 images, each at most 2 MB |
-| Publish a video | No | A video that SocialAPI recognizes returns `400 publishing.validation_failed` |
+| Publish a video | No | A `media_id` video returns `400 publishing.validation_failed`. A video sent as a `url` is skipped and the post publishes without it |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | No | `first_comment` is ignored |
-| Update a published post | No | `PATCH /v1/posts/{pid}` returns `501 resource.not_supported`. Delete the post and publish a new one |
+| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
 | Delete a published post | Yes | |
 | List posts | Yes | |
 | List comments and replies | Yes | Replies up to 6 levels below the post, as one flat list with no cursor |
@@ -40,7 +40,7 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 | Reply to a mention | Yes | |
 | DMs: list, read, send | Partial | Text only. Needs an app password with direct message access: see [Direct messages](#direct-messages) |
 | React to a DM | No | `501 resource.not_supported` |
-| Reviews | No | Bluesky has no reviews. `501 resource.not_supported` |
+| Reviews | No | Bluesky has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
 | Platform quota | Yes | `GET /v1/accounts/{id}/limits` returns `write_points_per_hour` and `write_points_per_day`: see [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
 | Webhook events | Partial | No comment, DM, or mention events. See [Webhook events](#webhook-events) |

@@ -14,7 +14,7 @@ A Bluesky post is published once Bluesky has accepted it. Publishing goes throug
 | Auth type | App password |
 | Platform API | AT Protocol (Bluesky) |
 | Create post | Yes |
-| Update post | No (`501 resource.not_supported`) |
+| Update post | Not after publishing (`409 post.state_invalid`). `draft`, `scheduled`, and `failed` posts can be edited |
 | Delete post | Yes |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | No (`first_comment` is not published on Bluesky) |
@@ -39,7 +39,7 @@ A Bluesky post is published once Bluesky has accepted it. Publishing goes throug
 
 **Alt text:** SocialAPI publishes every image with empty alt text. There is no field to set it.
 
-`platform_attachment_id` items are skipped: Bluesky has no uploaded media to reference by ID. Send images as `url` or `media_id`.
+A `platform_attachment_id` item fails the Bluesky target with `422 publishing.media.unsupported_source`: Bluesky has no uploaded media to reference by ID. Send images as `url` or `media_id`.
 
 ---
 
@@ -100,7 +100,7 @@ See [Scheduling](/guides/scheduling) for how scheduled posts settle.
 
 ## 4. Update post
 
-Bluesky has no way to edit a post. `PATCH /v1/posts/{pid}` for a Bluesky target returns `501 resource.not_supported`.
+Bluesky has no way to edit a published post. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post.
 
 To correct a post, delete it and publish a new one.
 
@@ -113,11 +113,13 @@ curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Or, to delete only the Bluesky target of a cross-platform post:
+To remove only the Bluesky target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{pid}` always removes every target.
 
 ```bash
-curl -X DELETE "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d?platform=bluesky" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
+curl -X POST https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/unpublish \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
 ```
 
 See [Delete a post](/guides/delivery#delete-a-post) for how a cross-platform post is handled.
@@ -171,7 +173,7 @@ Each post includes a `targets` array with the per-platform status and engagement
 
 ### No post editing
 
-Bluesky has no way to edit a post. `PATCH /v1/posts/{pid}` for a Bluesky target returns `501 resource.not_supported`. Delete the post and publish a new one.
+Bluesky has no way to edit a published post. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one.
 
 ### Video
 
@@ -308,3 +310,5 @@ Response (HTTP 200) once published:
 ## 9. Required OAuth scopes
 
 Bluesky has no OAuth scopes. The app password gives SocialAPI the access it needs to publish, with no extra option. Direct messages are the only feature that needs an option on the app password: see [Bluesky permissions](/platforms/bluesky#permissions).
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

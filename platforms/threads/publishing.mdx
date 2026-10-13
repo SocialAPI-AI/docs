@@ -148,11 +148,13 @@ curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Or, to delete only the Threads target of a cross-platform post:
+To remove only the Threads target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{pid}` always removes every target.
 
 ```bash
-curl -X DELETE "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d?platform=threads" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
+curl -X POST https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/unpublish \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"}'
 ```
 
 See [Delete a post](/guides/delivery#delete-a-post) for how a cross-platform post is handled.
@@ -370,3 +372,5 @@ SocialAPI's Meta Threads app requests these scopes during the OAuth flow. You co
 | `threads_read_replies` | Read replies on posts |
 | `threads_delete` | Delete published posts |
 | `threads_manage_insights` | Beta scope. Like and reply counts on posts. Requested only for accounts enrolled in the beta |
+
+The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).
