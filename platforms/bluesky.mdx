@@ -43,7 +43,7 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 | Reviews | No | Bluesky has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
 | Platform quota | Yes | `GET /v1/accounts/{id}/limits` returns `write_points_per_hour` and `write_points_per_day`: see [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
-| Webhook events | Partial | No comment, DM, or mention events. See [Webhook events](#webhook-events) |
+| Webhook events | Partial | No comment or DM events. `mention.received` only when you list mentions. See [Webhook events](#webhook-events) |
 
 The capability matrix for every platform is on [Supported platforms](/platforms/overview).
 
@@ -128,7 +128,7 @@ You read the replies to a post with `GET /v1/inbox/comments/{postId}` and answer
 
 ## Webhook events
 
-Bluesky raises no `comment.received`, `dm.received`, or `mention.received` event. Read comments, DMs, and mentions with the inbox endpoints. Bluesky does emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect the account, and `account.disconnected` when SocialAPI flags the account for reconnection. See [Webhook events](/guides/webhook-events).
+Bluesky sends SocialAPI no notification of its own, so there is no `comment.received` or `dm.received` event: read comments and DMs with the inbox endpoints. Listing mentions with `GET /v1/accounts/{id}/mentions` sends a `mention.received` event for the listed items: see [Mentions you list](/guides/webhook-events#mentions-you-list). Bluesky does emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect the account, and `account.disconnected` when SocialAPI flags the account for reconnection. See [Webhook events](/guides/webhook-events).
 
 ## Limits
 
