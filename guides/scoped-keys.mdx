@@ -35,6 +35,8 @@ Scopes are a stable, public vocabulary in the form `resource:action`. A scope-re
 | Inbox | `inbox:write` | Reply to and moderate comments, reviews, and mentions |
 | Messages | `dms:read` | Read direct message conversations |
 | Messages | `dms:send` | Send direct messages |
+| Automations | `automations:read` | Read [Automations](/guides/automations) and their recent runs |
+| Automations | `automations:write` | Create, edit, pause, and delete Automations. Each action also needs its own scope (see [below](#automations-need-their-actions-scopes)) |
 | Account-level | `webhooks:manage` | Manage webhook endpoints and deliveries (not available to brand-restricted keys) |
 | Account-level | `analytics:read` | Read the events log, summaries, and exports (not available to brand-restricted keys) |
 
@@ -50,11 +52,24 @@ curl https://api.social-api.ai/v1/keys/scopes \
   "data": [
     { "name": "posts:write", "description": "Create, edit, publish, and delete posts", "group": "Posts" }
   ],
-  "count": 12
+  "count": 14
 }
 ```
 
 `GET /v1/keys/scopes` is available to any valid key, including restricted ones.
+
+### Automations need their actions' scopes
+
+An [Automation](/guides/automations) carries out its actions on your behalf, long after the request that configured it. So a key may only configure an action it could perform itself: besides `automations:write`, it needs the scope of each action's own API call.
+
+| Action | Also needs |
+|---|---|
+| `hide_comment`, `reply_comment`, `private_reply` | `inbox:write` |
+| `send_dm` | `dms:send` |
+
+A key holding only `automations:write` that creates an Automation with a `send_dm` action gets `403 auth.insufficient_scope` with `meta.required_scope` set to `dms:send`.
+
+The rule applies whenever a change could make the Automation send more: creating it, resuming it, or changing its `steps`, `post_ids` or `once_per_person`. Renaming, pausing, and deleting need only `automations:write`, so a key can always stop an Automation it can see.
 
 ### Always available
 
@@ -88,7 +103,7 @@ The reason is escalation: a key that could call `POST /v1/keys` could mint itsel
 A brand-restricted key behaves as if the allowed brands are the only brands that exist. Filtering is **silent**:
 
 - **Reads** of an out-of-scope account, brand, conversation, or interaction return the ordinary `404` (`account.not_found`, `brand.not_found`, and so on). Never a `403`, and never any confirmation that the resource exists.
-- **List endpoints** (accounts, brands, posts, conversations, inbox, mentions) return only resources inside the allowed brands. `GET /v1/brands` returns only the allowed brands.
+- **List endpoints** (accounts, brands, posts, conversations, inbox, mentions, Automations) return only resources inside the allowed brands. `GET /v1/brands` returns only the allowed brands. An Automation belongs to the brand of its account.
 
 ### Posts
 

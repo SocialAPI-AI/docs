@@ -1,0 +1,460 @@
+---
+title: Automations
+description: Answer matching comments and DMs on Instagram and Facebook within seconds, with no code running on your side.
+---
+
+An Automation is a rule on one Instagram or Facebook account. When a comment or a DM on that account matches the rule's filters, SocialAPI carries out its actions itself within seconds: a private reply with a link, a public reply, a hidden comment, a DM. You configure it once through the API or an AI agent, and there is no server, webhook handler, or queue to run on your side.
+
+The classic use is comment-to-DM: someone comments "link" on a post and gets the link in their DMs. With buttons and steps, the same rule can offer a small menu or ask people to follow the account before they get the link.
+
+Automations send through the same path as your API calls. Each action costs what the same API call costs, and the same platform rules apply: the messaging window, one private reply per comment, and SocialAPI's sending limits.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/v1/automations` | Create an Automation |
+| `GET` | `/v1/automations` | List your Automations, newest first. Filter to one account with `account_id` |
+| `GET` | `/v1/automations/:id` | Get one Automation with its counters |
+| `PATCH` | `/v1/automations/:id` | Update the fields you send, or pause and resume |
+| `DELETE` | `/v1/automations/:id` | Delete an Automation and its run history |
+| `GET` | `/v1/automations/:id/firings` | List the Automation's runs from the last 30 days |
+
+Configuring Automations is free. Only the actions they carry out can cost credits.
+
+## Your first Automation
+
+This Automation sends a private reply with a link to anyone who comments "link" on any post of an Instagram account. A private reply is free.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/automations \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "name": "Send the link",
+    "trigger": "comment",
+    "once_per_person": true,
+    "steps": [
+      {
+        "key": "start",
+        "filters": [
+          { "type": "keyword", "keyword": { "keywords": ["link"], "match": "contains" } }
+        ],
+        "actions": [
+          {
+            "type": "private_reply",
+            "private_reply": {
+              "texts": [
+                "Here is the link: https://example.com/spring",
+                "Thanks for asking! Here you go: https://example.com/spring"
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "aut_01J9Z8Y7X6W5V4T3S2R1Q0P9N8",
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "name": "Send the link",
+  "status": "active",
+  "trigger": "comment",
+  "once_per_person": true,
+  "steps": [
+    {
+      "key": "start",
+      "filters": [
+        { "type": "keyword", "keyword": { "keywords": ["link"], "match": "contains" } }
+      ],
+      "actions": [
+        {
+          "type": "private_reply",
+          "private_reply": {
+            "texts": [
+              "Here is the link: https://example.com/spring",
+              "Thanks for asking! Here you go: https://example.com/spring"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "fired_count": 0,
+  "sent_count": 0,
+  "failed_count": 0,
+  "created_at": "2026-10-02T09:00:00Z",
+  "updated_at": "2026-10-02T09:00:00Z"
+}
+```
+
+The Automation is `active` as soon as it is created. A comment such as "Can I get the LINK?" now gets one of the two texts, picked at random, and `once_per_person` makes sure each commenter gets it only once.
+
+To stop it, pause it. Send `active` to resume:
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/automations/aut_01J9Z8Y7X6W5V4T3S2R1Q0P9N8 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "paused" }'
+```
+
+## How an Automation runs
+
+When a comment or DM arrives on the account, every active Automation with a matching trigger is checked on its own:
+
+1. Comments and messages from the account itself are skipped.
+2. For a comment trigger with `post_ids`, the comment must be on one of those posts.
+3. The `start` step's filters must all pass. If they do not, nothing happens and no run is recorded.
+4. Unless `once_per_person` or the [hourly cap on dm Automations](#limits-and-safety) stops it, the run is recorded as a [Firing](#firings) and the `start` step's actions are carried out.
+
+If several Automations match the same event, each one runs. There is no priority between them, so avoid two Automations that send a private reply to the same comments: Meta allows one private reply per comment, and the second one fails.
+
+## Triggers
+
+| Trigger | Fires on | Start step may use |
+|---|---|---|
+| `comment` | A new comment on any post of the account, or on the posts listed in `post_ids` | `hide_comment`, `reply_comment`, `private_reply` |
+| `dm` | A new DM to the account, the same messages your webhooks receive as `dm.received` | `send_dm` |
+
+Fields that shape the trigger:
+
+| Field | Description |
+|---|---|
+| `trigger` | `comment` or `dm`. Fixed at creation |
+| `post_ids` | Comment trigger only. Up to 100 platform post IDs, each 1 to 100 characters, the same value as `platform_post_id` on a `comment.received` event. Omit it to cover every post. On update, an empty list means every post |
+| `once_per_person` | Reach each person at most once. Defaults to `false`. A run in which every action failed does not count, so that person can trigger it again. Turning it on later also covers the people the Automation already reached |
+
+A `dm` trigger fires on every `dm.received`, which can include story replies and story mentions on Instagram. Add a keyword filter to the `start` step when you only want to answer certain messages.
+
+Facebook sends an edited comment again as a new event. Automations answer new comments only, so an edit never triggers one.
+
+## Steps
+
+An Automation is a list of 1 to 10 steps. Every Automation has one step keyed `start`, which runs when the trigger fires. Other steps run only when the person taps a button, or when a step's filters fail and it falls through to another step.
+
+| Field | Description |
+|---|---|
+| `key` | Unique within the Automation, 1 to 32 characters of `a-z`, `0-9` and `_`. The entry step is `start` |
+| `filters` | Up to 10 [filters](#filters). All must pass. No filters means every event passes |
+| `actions` | At least one [action](#actions), at most one of each type |
+| `buttons` | Up to 3 [buttons](#buttons-and-multi-step-flows), shown under the step's `private_reply` or `send_dm` message |
+| `fallthrough_step` | Key of the step to run when this step's filters fail. Not allowed on `start`. Fallthrough links must not form a cycle |
+
+<Warning>
+  A `start` step with no filters answers every comment, or every DM, on the account. Add a keyword filter unless that is what you want.
+</Warning>
+
+## Filters
+
+### keyword
+
+Matches the comment or message text against a list of keywords.
+
+```json
+{ "type": "keyword", "keyword": { "keywords": ["link", "price list"], "match": "contains" } }
+```
+
+| Field | Description |
+|---|---|
+| `keywords` | 1 to 50 keywords, each 1 to 100 characters. The filter passes when any keyword matches |
+| `match` | `contains`: a keyword appears in the text as a whole word or phrase. `exact`: the whole text equals a keyword |
+
+How matching works:
+
+- **Case, accents, and spacing are ignored.** "LINK", "Link" and "link" all match `link`, and "cafe" matches "Café". Runs of spaces count as one space.
+- **`contains` matches whole words.** `link` matches "send me the link!" but not "linked". A keyword of several words matches that phrase. An apostrophe separates words, so `info` matches "l'info".
+- **`exact` compares the whole text.** `link` matches "Link" but not "link please" or "link!".
+- **Symbols and emoji need no boundary.** On a side where a keyword starts or ends with a symbol or emoji, it matches with no space there: `#promo` matches "join#promo", and 🔥 matches wherever it appears.
+- **Unspaced scripts match anywhere.** Chinese, Japanese, Korean, Thai, Lao, Khmer and Burmese are written without spaces between words, so a keyword in those scripts matches wherever it appears in the text.
+- **Accents are ignored only where they are optional to a reader**: in Latin, Greek, Cyrillic, Arabic and Hebrew text. Elsewhere a mark changes the word (Japanese voicing marks, Thai tone marks), so it must match.
+
+### follows_account
+
+Passes when the person follows the account. Instagram only.
+
+```json
+{ "type": "follows_account" }
+```
+
+- It cannot be used on `start`. Instagram shares whether someone follows the account only after they tap a button or message it, and a comment does not count. Put it on a step reached by a button.
+- It is checked live when the step runs. If Instagram's answer is unknown, it is checked once more a few seconds later, and a person whose status is still unknown is treated as following. Only a definite "does not follow" fails the filter, because denying a real follower costs you more than letting one non-follower through, and Instagram can take a few seconds to report a fresh follow.
+- On a Facebook account it is refused with `400 validation.filter_unsupported`: Facebook does not tell apps whether a person follows a Page.
+
+## Actions
+
+Actions run in a fixed order, whatever order you write them in: `hide_comment`, `reply_comment`, `private_reply`, `send_dm`. A failed action does not stop the next one, and a failed action is not retried.
+
+| Action | What it does | Allowed on | Cost |
+|---|---|---|---|
+| `hide_comment` | Hides the comment | `start` of a comment Automation | Free |
+| `reply_comment` | Posts a public reply to the comment | `start` of a comment Automation | 1 interaction credit |
+| `private_reply` | Sends a DM to the commenter | `start` of a comment Automation | Free |
+| `send_dm` | Sends a DM in the conversation | `start` of a dm Automation, and every step after `start` | 1 interaction credit |
+
+Each cost is the cost of the same API call. See [what counts as an interaction](/guides/rate-limits#what-counts-as-a-post-or-interaction).
+
+Set the field named by `type` with the texts to send. `hide_comment` takes no field:
+
+```json
+[
+  { "type": "hide_comment" },
+  { "type": "reply_comment", "reply_comment": { "texts": ["Sent you a DM!"] } },
+  { "type": "private_reply", "private_reply": { "texts": ["Here is the link: https://example.com"] } }
+]
+```
+
+`texts` holds 1 to 10 variants, each 1 to 1,000 characters, and one is picked at random each time the action runs. When the step has buttons, each `private_reply` and `send_dm` text is at most 640 characters.
+
+Steps after `start` run after a button tap, which opens the messaging window but has no comment to act on, so they may only use `send_dm`.
+
+## Buttons and multi-step flows
+
+Buttons appear under the step's `private_reply` or `send_dm` message. A step with buttons must have one of those two actions.
+
+| Field | Description |
+|---|---|
+| `type` | `url` opens a link. `postback` runs another step when tapped |
+| `title` | Up to 20 characters |
+| `url` | An `http` or `https` URL. Required for a `url` button |
+| `next_step` | Key of the step to run when the button is tapped. Required for a `postback` button |
+
+This comment Automation answers "menu" with a private reply carrying three buttons. Two of them lead to steps that send a DM:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/automations \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "name": "Menu",
+    "trigger": "comment",
+    "steps": [
+      {
+        "key": "start",
+        "filters": [
+          { "type": "keyword", "keyword": { "keywords": ["menu"], "match": "contains" } }
+        ],
+        "actions": [
+          { "type": "private_reply", "private_reply": { "texts": ["Hi! What would you like to know?"] } }
+        ],
+        "buttons": [
+          { "type": "postback", "title": "Prices", "next_step": "prices" },
+          { "type": "postback", "title": "Opening hours", "next_step": "hours" },
+          { "type": "url", "title": "Website", "url": "https://example.com" }
+        ]
+      },
+      {
+        "key": "prices",
+        "actions": [
+          { "type": "send_dm", "send_dm": { "texts": ["Our price list: https://example.com/prices"] } }
+        ]
+      },
+      {
+        "key": "hours",
+        "actions": [
+          { "type": "send_dm", "send_dm": { "texts": ["We are open Monday to Saturday, 9am to 7pm."] } }
+        ],
+        "buttons": [
+          { "type": "postback", "title": "Prices", "next_step": "prices" }
+        ]
+      }
+    ]
+  }'
+```
+
+A tap on **Prices** runs the `prices` step and sends 1 DM (1 interaction credit). The **Opening hours** answer offers **Prices** again, since buttons may loop: each loop needs a person to tap.
+
+Rules for the graph:
+
+- Every `next_step` and `fallthrough_step` must name a step that exists.
+- On a comment Automation, a button cannot lead back to `start`.
+- A step reached by a tap checks its own filters when the tap arrives. A tap carries no text, so a keyword filter on a step after `start` never passes. Use `follows_account` there, and `fallthrough_step` for what to do when it fails.
+
+Progress lives in the button itself, so there is nothing to clean up and no expiry. A tap is honored whenever it arrives, weeks later included, and runs the step's current content, so an edit applies to buttons already sent. If the Automation is paused or deleted, or the step no longer exists, the tap does nothing.
+
+Taps have no limit. Each costs what its actions cost, and taps are exempt from `once_per_person` and from the hourly cap on dm Automations: they continue the run the trigger started.
+
+## The Follow gate
+
+The Follow gate sends a link only to people who follow the account. It is a shortcut for Instagram comment Automations: send `follow_gate` instead of `steps`, and SocialAPI builds the steps for you.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/automations \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "name": "Link for followers",
+    "trigger": "comment",
+    "once_per_person": true,
+    "follow_gate": {
+      "keywords": ["link"],
+      "opening_texts": ["Tap below to get the link"],
+      "button_title": "Get the link",
+      "link_texts": ["Here you go: https://example.com"],
+      "not_following_texts": ["Follow us first, then tap again"],
+      "retry_button_title": "I followed"
+    }
+  }'
+```
+
+| Field | Description |
+|---|---|
+| `keywords` | Comment keywords that open the gate, matched with `contains` |
+| `opening_texts` | Private reply sent to the commenter, under a button |
+| `button_title` | The button under the private reply, up to 20 characters |
+| `link_texts` | Sent when the person follows the account |
+| `not_following_texts` | Sent when the person does not follow the account yet, under a retry button |
+| `retry_button_title` | The retry button, up to 20 characters |
+
+The gate is stored as three ordinary steps:
+
+| Step | Filters | Action | Next |
+|---|---|---|---|
+| `start` | keyword, on `keywords` | `private_reply` with `opening_texts` | Button `button_title` leads to `check` |
+| `check` | `follows_account` | `send_dm` with `link_texts` | Falls through to `not_following` when the person does not follow |
+| `not_following` | none | `send_dm` with `not_following_texts` | Button `retry_button_title` leads back to `check` |
+
+`GET` returns these steps, with no trace of `follow_gate`, so you edit a gate like any other Automation. Sending `follow_gate` together with `steps`, or with the `dm` trigger, returns `400 validation.follow_gate_invalid`. On a Facebook account it returns `400 validation.filter_unsupported`, since the gate relies on `follows_account`.
+
+## Limits and safety
+
+| Limit | Value |
+|---|---|
+| Automations per account | 50 (`409 automation.limit_reached`) |
+| Platforms | Instagram and Facebook accounts (`422 automation.platform_unsupported` otherwise) |
+| Name | 1 to 100 characters |
+| Steps per Automation | 1 to 10 |
+| Filters per step | 10 |
+| Keywords per keyword filter | 1 to 50, each 1 to 100 characters |
+| Text variants per action | 1 to 10, each 1 to 1,000 characters, or 640 for a `private_reply` or `send_dm` on a step with buttons |
+| Buttons per step | 3, each title up to 20 characters |
+| `post_ids` | Up to 100 |
+| Runs of one dm Automation for one person | 5 per hour, button taps not counted |
+| Firings history | 30 days |
+
+What keeps an Automation from misbehaving:
+
+- **Your own activity never triggers it.** Comments and messages sent by the account itself are skipped, so an Automation's replies cannot trigger it again. On Facebook the account is the Page: a Page admin commenting from their personal profile does trigger it.
+- **A dm Automation answers one person at most 5 times an hour.** This stops two auto-responders from replying to each other forever. Button taps are not counted.
+- **Each event runs once per Automation.** A webhook Meta delivers twice, or an internal retry, never sends twice.
+- **A past-due account gets no actions.** While your subscription is [past due](/guides/errors#past-due-accounts), Automations do nothing and record no Firings, the same way the API returns `402`.
+- **Platform rules still apply.** An action the platform or SocialAPI refuses (a private reply on a comment older than 7 days, a DM outside the messaging window, an exhausted interaction allowance) fails with the same error code the API call returns, and the failure is recorded on the Firing.
+
+## Firings
+
+A Firing is one run of an Automation against one event: a comment, a DM, or a button tap. It records the step that ran and the outcome of each action. Firings are kept for 30 days. The record of who a `once_per_person` Automation already reached is kept beyond that, so pruning old Firings never makes it answer someone twice.
+
+```bash
+curl "https://api.social-api.ai/v1/automations/aut_01J9Z8Y7X6W5V4T3S2R1Q0P9N8/firings?limit=20" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "afr_01J9Z9A2B3C4D5E6F7G8H9J0K1",
+      "event_id": "17858893269577012",
+      "person_id": "17841400000000000",
+      "step_key": "start",
+      "outcomes": [
+        { "action": "reply_comment", "status": "sent" },
+        { "action": "private_reply", "status": "failed", "error_code": "platform.instagram.private_reply_ineligible" }
+      ],
+      "created_at": "2026-10-02T09:14:03Z"
+    }
+  ],
+  "next_cursor": ""
+}
+```
+
+| Field | Description |
+|---|---|
+| `event_id` | The platform's own ID for the comment, message, or button tap |
+| `person_id` | The platform ID of the person who commented, messaged, or tapped |
+| `step_key` | The step whose actions ran. When no step's filters passed (for example a failed `follows_account` with no fallthrough), the step the event entered at, with no outcomes |
+| `outcomes` | One entry per action: `status` is `sent` or `failed`, and a failure carries `error_code` |
+
+Firings are listed newest first. `limit` is 1 to 100 (default 20); pass `next_cursor` as `cursor` to fetch the next page, and stop when it is empty.
+
+The Automation itself carries running totals: `fired_count` (runs, taps included), `sent_count` (actions that succeeded) and `failed_count` (actions that failed).
+
+### Debug a failed action
+
+1. `GET /v1/automations/:id` and check `failed_count`.
+2. List the Firings and find an outcome with `"status": "failed"`.
+3. Look up its `error_code` in [Errors](/guides/errors). It is the code the same API call would have returned, so it means the same thing. For example, `platform.instagram.private_reply_ineligible` means the comment is older than 7 days or already had a private reply, perhaps from another Automation or from your own API call. `platform.instagram.window_closed` means a `send_dm` went outside the messaging window.
+4. Fix the cause, for example by removing an overlapping Automation. The failed action is not retried.
+
+### When nothing fired
+
+A comment or DM that records no Firing at all was skipped before any action ran. Check, in order:
+
+- The Automation is `active`.
+- For a comment trigger with `post_ids`, the comment is on one of those posts.
+- The text passes the `start` step's filters. A non-matching event records nothing.
+- With `once_per_person`, the person has not been reached already.
+- For a dm Automation, it has not already run 5 times for that person in the last hour.
+- The comment or message is not from the account itself (on Facebook, the Page).
+- The event is not an edited Facebook comment.
+- Your subscription is not past due.
+
+Automations run on the same inbound events as your `comment.received` and `dm.received` webhooks. If those stop arriving for an account, for example because it needs reconnecting, its Automations stop too.
+
+## Scopes
+
+Two [scopes](/guides/scoped-keys#scopes) cover Automations themselves:
+
+| Scope | Grants |
+|---|---|
+| `automations:read` | List and get Automations, list their Firings |
+| `automations:write` | Create, edit, pause, and delete Automations |
+
+An Automation sends on your behalf, so a scoped key also needs the scope each of its actions' own API call needs. Without it, the request returns `403 auth.insufficient_scope` naming the missing scope.
+
+| Action | Also needs |
+|---|---|
+| `hide_comment`, `reply_comment`, `private_reply` | `inbox:write` |
+| `send_dm` | `dms:send` |
+
+On `PATCH`, renaming or pausing needs only `automations:write`, so a key can always stop an Automation it can see. Resuming, or changing `steps`, `post_ids` or `once_per_person`, also needs each action's scope. Deleting needs only `automations:write`.
+
+A [brand-restricted key](/guides/scoped-keys#brand-restrictions) sees only the Automations on its brands' accounts. Creating one on another brand's account returns `404 account.not_found`.
+
+## Automations and your webhooks
+
+Automations do not change what your [webhooks](/guides/webhooks) receive. Every event goes to your webhook endpoints and to your Automations alike:
+
+- **Triggers are still delivered.** A comment or DM an Automation answers still arrives as `comment.received` or `dm.received`. If your own handler also replies to those events, the person gets both replies, so let one or the other answer each kind of event.
+- **Button taps arrive as `dm.postback`.** A tap on an Automation's postback button reaches your endpoint like any other tap, with an opaque `metadata.payload` that starts with `sa1.`. The Automation handles the tap, so ignore those payloads, and do not start your own payloads with `sa1.`.
+- **Sent DMs echo as `dm.sent`.** DMs an Automation sends are messages the account sent through SocialAPI, so on Instagram and Facebook they produce the same `dm.sent` echo as a DM you send through the API. Nothing in the event tells the two apart.
+- **There are no Automation events.** To see what an Automation did, read its [Firings](#firings).
+
+## Use from an AI agent
+
+An agent connected to the [SocialAPI MCP server](/integrations/overview) can create and manage Automations. The tool descriptions carry the main rules on this page, so an agent can build a valid definition from a plain request such as "When someone comments 'menu' on my Instagram posts, send them a private reply with a link to our menu."
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_automations` | List Automations, optionally for one account |
+| `social_api_get_automation` | Get one Automation with its steps and counters |
+| `social_api_create_automation` | Create an Automation, with `steps` or `follow_gate` |
+| `social_api_update_automation` | Change fields, or pause and resume |
+| `social_api_delete_automation` | Delete an Automation and its run history |
+| `social_api_list_automation_firings` | List runs from the last 30 days with each action's outcome |
+
+## Related
+
+- [Unified inbox](/guides/inbox) for replying, private replies, and DMs through the API
+- [Webhooks](/guides/webhooks) for the events your own code receives
+- [Scoped API keys](/guides/scoped-keys) for least-privilege keys
+- [Errors](/guides/errors) for every error code an action can record
+- [API Reference](/api-reference/introduction) for complete request and response schemas
