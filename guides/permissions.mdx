@@ -1,0 +1,146 @@
+---
+title: Account permissions
+description: Connect an account with only the permissions your integration uses, so the person connecting it is never asked for more.
+---
+
+Each connected account has a set of permissions. By default an account gets every permission its platform supports. Send `permissions` when you connect an account to ask for less: the person connecting it sees a shorter consent screen, and the account can only do what you asked for.
+
+Permissions are not [API key scopes](/guides/scoped-keys). A permission limits what a connected account can do on its platform and is written `resource.action`. A key scope limits what an API key can do in SocialAPI and is written `resource:action`.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/accounts/connect` | Connect an account. Send `permissions` to limit it |
+| `POST` | `/v1/invites` | Create an invite link. Send `permissions` to limit the account it connects |
+| `PATCH` | `/v1/accounts/{id}` | Change an account's permissions. A scoped key needs `accounts:manage` |
+| `GET` | `/v1/accounts` | List accounts with their `permissions` and `effective_permissions` |
+
+## The permissions
+
+| Permission | Covers |
+|---|---|
+| `posts.read` | Listing the account's posts |
+| `posts.write` | Publishing, editing and deleting posts |
+| `comments.read` | Reading comments and mentions, and the `comment.received` and `mention.received` webhooks |
+| `comments.write` | Replying to, hiding, deleting and liking comments, and replying to mentions |
+| `messages.read` | Reading conversations, and the `dm.*` webhooks |
+| `messages.write` | Sending and reacting to messages, and private replies to comments |
+| `reviews.read` | Reading reviews and the `review.*` webhooks |
+| `reviews.write` | Replying to reviews |
+| `analytics.read` | Account and post metrics |
+
+## Connect with permissions
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "instagram",
+    "brand_id": "b_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "permissions": ["comments.read", "comments.write"]
+  }'
+```
+
+The response is the usual [connect response](/guides/oauth#step-1-initiate-the-connection). Once the account is connected, each account in `GET /v1/accounts` carries both lists:
+
+```json
+{
+  "id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "instagram",
+  "brand_id": "b_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "status": "active",
+  "permissions": ["comments.read", "comments.write"],
+  "effective_permissions": ["comments.read", "comments.write"]
+}
+```
+
+Omit `permissions` to keep the permissions of the account the brand already has on that platform, or to connect with every permission if it has none. Connecting again without `permissions` never changes them.
+
+An empty list is rejected with `400 validation.permissions_empty`, and a value that is not in the table above is rejected with `400 validation.permission_unknown`, naming it in `error.meta.permission`. Send the same list for every platform if you like: a permission a platform has no use for, such as `reviews.read` on Instagram, is accepted and never appears in `effective_permissions`.
+
+## Invite links
+
+`POST /v1/invites` takes the same `permissions` field. The person who opens the link is asked only for what those permissions need, and the account they connect gets exactly that list.
+
+Omit `permissions` on an invite to apply the rule above when the link is used: the brand's current permissions for that platform, or every permission if it has none. Invite responses return `permissions` as it was set, so `null` means the brand's current permissions apply when the link is used.
+
+## Platforms with one permission for reading and writing
+
+Instagram asks for comments and for messages as one platform permission each, and Google Business Profile and YouTube ask for one platform permission covering everything. On those platforms the consent screen shows the broader permission, and the account is still limited to what you selected: an Instagram account connected with `comments.read` alone cannot reply to comments.
+
+## What an account can do right now
+
+Every account has two lists:
+
+| Field | Meaning |
+|---|---|
+| `permissions` | What you selected, or `null` for every permission, including ones added later |
+| `effective_permissions` | What the account can use right now. Always a list, empty when none apply |
+
+`effective_permissions` is `permissions` limited to what the platform supports and what the person connecting actually granted. The person connecting can decline part of the consent screen, and a platform can withdraw access later.
+
+A call that needs a permission outside `effective_permissions` fails with `403 account.permission_missing`, and `error.meta.permission` names it. Comments, mentions, messages and reviews the account has no permission for are not delivered to your webhooks. A scheduled post fails at publish time with the same code when the account no longer has `posts.write`.
+
+When an account loses a permission you did not remove yourself, you receive an [`account.updated` webhook](/guides/webhooks#accountupdated-lost-permissions-payload) with `"change": "permissions_reduced"` and the permissions it lost. Reconnect the account to ask for them again.
+
+When a platform reports that it refused the access a call needed, the error is `403 platform.<name>.insufficient_scope`, with the platform's scope in `error.meta.scope` when the platform names it. Reconnect the account to grant it.
+
+## Change an account's permissions
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"permissions": ["comments.read", "comments.write", "messages.read"]}'
+```
+
+The response is the account, with the new `permissions` and `effective_permissions`. `permissions` is required: send a list, or `null` to give the account every permission, including ones added later. An empty list returns `400 validation.permissions_empty`.
+
+Removing a permission takes effect at once and deletes what it covered. Adding the permission back does not restore it.
+
+| Permission removed | Deleted at once |
+|---|---|
+| `comments.read` | The account's comments and mentions |
+| `messages.read` | The account's conversations and messages, with their attachments |
+| `posts.read` | Posts imported from the platform. Posts you created through the API are kept |
+| `analytics.read` | The account's analytics history |
+| `posts.write`, `comments.write`, `messages.write`, `reviews.read`, `reviews.write` | Nothing. Calls that need the permission fail with `403 account.permission_missing` |
+
+Connecting the account again with a narrower `permissions` list deletes the same data. So does a reconnect where the person connecting declines a permission on the consent screen.
+
+Adding a permission takes effect at once when the platform already granted it to the account. Otherwise it appears in `permissions` but not in `effective_permissions`: reconnect the account so the person can grant it.
+
+## Automations
+
+An [Automation](/guides/automations) is refused with `400 validation.permission_missing` when its trigger or actions need a permission outside the account's `effective_permissions`, and `error.meta.permission` names it. A comment trigger needs `comments.read`. A DM trigger, or a `follows_account` filter, needs `messages.read`. Hiding or replying to a comment needs `comments.write`, and a private reply or a DM needs `messages.write`. An Automation is never paused when an account later loses a permission: its actions fail on the [Firing](/guides/automations#firings) with `account.permission_missing`.
+
+## Errors
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 403 | `account.permission_missing` | The account does not have the permission this call needs. `error.meta.permission` names it |
+| 400 | `validation.permission_unknown` | A value in `permissions` is not a permission. `error.meta.permission` names it |
+| 400 | `validation.permissions_empty` | `permissions` is an empty list. Omit it to connect with every permission |
+| 400 | `validation.permission_missing` | An Automation needs a permission the account does not have. `error.meta.permission` names it |
+| 403 | `platform.<name>.insufficient_scope` | The platform refused the call because the account's access lacks a scope. `error.meta.scope` names it when the platform does |
+
+See [Errors](/guides/errors) for the full catalog.
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_connect_account` | Connect an account. Accepts `permissions` |
+| `social_api_create_invite` | Create an invite link. Accepts `permissions` |
+| `social_api_update_account_permissions` | Replace an account's permissions, or send `unrestricted: true` for every permission |
+
+## Related
+
+- [OAuth flows](/guides/oauth) for the connect flow
+- [Webhooks](/guides/webhooks) for `account.updated`
+- [Automations](/guides/automations) for the permissions each trigger and action needs
+- [Scoped API keys](/guides/scoped-keys) for limiting what an API key can do
+- [Errors](/guides/errors) for every error code

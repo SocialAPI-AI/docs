@@ -72,6 +72,7 @@ The first segment of the code tells you where the failure originated.
 | 400 | `account.no_active_page` | Account has no active Page (Facebook, LinkedIn) selected |
 | 400 | `account.page_inactive` | The requested Page is currently disabled |
 | 400 | `account.pages_not_supported` | Pages do not apply to this platform |
+| 403 | `account.permission_missing` | The account does not have the [permission](/guides/permissions) this call needs. `meta.permission` names it. Add it with `PATCH /v1/accounts/{id}` or reconnect the account |
 | 409 | `account.different_login` | Brand's Facebook account is tied to a different login (shared credential); disconnect it before connecting a new one |
 
 ## Validation
@@ -84,6 +85,9 @@ The first segment of the code tells you where the failure originated.
 | 400 | `validation.redirect_uri_duplicate` | Redirect URI is already registered for this client |
 | 400 | `validation.scope_invalid` | A [key](/guides/scoped-keys) was created or edited with an unknown scope; the message names it |
 | 400 | `validation.brand_invalid` | A key's `brand_ids` references a brand that does not exist or that you do not own |
+| 400 | `validation.permission_unknown` | A value in `permissions` is not a [permission](/guides/permissions). `meta.permission` names it |
+| 400 | `validation.permissions_empty` | `permissions` is an empty list. Omit it to connect with every permission |
+| 400 | `validation.permission_missing` | An [Automation](/guides/automations) needs a permission the account does not have. `meta.permission` names it |
 
 The `code` always starts with `validation.`. The specific sub-code after the dot identifies the field or rule that failed; `error.meta.field` in the response points to the offending field name when applicable.
 
@@ -149,6 +153,7 @@ A definition that breaks a rule returns `400` with one of these `validation.*` c
 | `validation.action_duplicate` | The same action type appears twice on a step |
 | `validation.texts_invalid` | An action has no texts or more than 10, a text is empty or over 1,000 characters, or over 640 characters on a `private_reply` or `send_dm` whose step has buttons |
 | `validation.buttons_invalid` | More than 3 buttons, buttons on a step without a `private_reply` or `send_dm`, a title that is missing or over 20 characters, a `url` button without an `http` or `https` URL, a `postback` button without `next_step`, a button carrying the other type's field, or an unknown button type |
+| `validation.permission_missing` | The trigger or an action needs a [permission](/guides/permissions#automations) the account does not have. `error.meta.permission` names it |
 | `validation.follow_gate_invalid` | `follow_gate` sent together with `steps`, or with the `dm` trigger |
 
 Actions that fail when an Automation runs are not returned as errors. They are recorded on the run with the same code the API call would have returned: see [Firings](/guides/automations#firings).
@@ -200,10 +205,12 @@ When the upstream platform (Meta, TikTok, Google, etc.) rejects a call, the erro
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 401 | `platform.<name>.auth` | Platform rejected the stored OAuth token; the account needs to be reconnected |
+| 403 | `platform.<name>.insufficient_scope` | The platform refused the call because the account's access lacks a scope. `meta.scope` names the scope when the platform does. Reconnect the account to grant it |
 | 429 | `platform.<name>.rate_limit` | Upstream platform rate limit hit. This does **not** consume your SocialAPI quota |
 | 502 | `platform.<name>.api_error` | Generic upstream API failure; check the `error` message for detail |
 | 400 | `platform.tiktok.media_required` | TikTok requires media for this post type |
 | 403 | `platform.instagram.permission_denied`, `platform.facebook.permission_denied`, `platform.whatsapp.permission_denied` | OAuth scopes do not include the action |
+| 403 | `platform.instagram.insights_scope_missing`, `platform.facebook.insights_scope_missing` | The account's access does not include insights. Reconnect the account to grant it. Account insights on Instagram also return `account.permission_missing` when the account does not have `analytics.read` |
 | 400 | `platform.instagram.window_closed`, `platform.facebook.window_closed` | The 24-hour messaging window has closed; the user must message you first to reopen it. After the first refusal SocialAPI answers further sends on that thread itself, adding `blocked_locally` to the error meta (see [Inbox](/guides/inbox)) |
 | 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: the 7-day window has expired, or the comment already received one |
 | 404 | `platform.facebook.no_pages`, `platform.linkedin.no_pages`, `platform.google.no_locations`, `platform.youtube.no_channels`, `platform.youtube.no_uploads_playlist` | The connected account exposes no usable target |

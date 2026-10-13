@@ -80,7 +80,7 @@ Events are grouped into three categories: **inbox** (incoming interactions), **p
 | `post.retried` | posts | A failed or partial post is being retried. A subsequent `post.published`, `post.partial`, or `post.failed` event fires once the retry completes |
 | `account.connected` | accounts | A social account finished connecting. Payload includes username, display name, profile picture, bio, and a public profile link |
 | `account.disconnected` | accounts | A connected account was revoked by the user on the platform side (Meta deauthorize webhook, TikTok deauthorize webhook), or flagged for reconnection because all of its pages were removed or its access was revoked. When the payload includes `reconnect_required: true`, the account still exists but needs to be reconnected |
-| `account.updated` | accounts | Something changed on the account at the platform itself. Currently Google Business Profile only, where it covers a customer adding media, Google having pending updates to review, a Voice of Merchant status change, and the location being flagged as a duplicate. Branch on the `change` field to tell them apart |
+| `account.updated` | accounts | Something changed on the account. On Google Business Profile it covers a customer adding media, Google having pending updates to review, a Voice of Merchant status change, and the location being flagged as a duplicate. On every platform, `permissions_reduced` means the account lost [permissions](/guides/permissions) that you did not remove yourself. Branch on the `change` field to tell them apart |
 | `page.removed` | accounts | A page on a multi-page account (for example a Facebook Page) was detected as removed during a periodic refresh and was deactivated. Other pages on the same account are unaffected |
 
 You can subscribe to any combination. Fetch the authoritative list with `GET /v1/webhooks/events` and subscribe to everything by passing the full set.
@@ -192,6 +192,21 @@ Fires when a single page on a multi-page account (for example a Facebook Page) i
     "name": "ACME Storefront",
     "platform": "facebook",
     "reason": "page_not_found"
+  }
+}
+```
+
+### `account.updated` lost permissions payload
+
+Fires when an account loses a [permission](/guides/permissions) that you did not remove yourself, for example when the person who connected it withdraws access on the platform. `change` is `permissions_reduced` and `permissions` lists the permissions the account lost. It does not fire when you remove a permission with `PATCH /v1/accounts/{id}`. Reconnect the account to ask for the permissions again.
+
+```json
+{
+  "event": "account.updated",
+  "data": {
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "change": "permissions_reduced",
+    "permissions": ["messages.read", "messages.write"]
   }
 }
 ```

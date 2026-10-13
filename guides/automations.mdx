@@ -345,6 +345,7 @@ What keeps an Automation from misbehaving:
 - **Your own activity never triggers it.** Comments and messages sent by the account itself are skipped, so an Automation's replies cannot trigger it again. On Facebook the account is the Page: a Page admin commenting from their personal profile does trigger it.
 - **A dm Automation answers one person at most 5 times an hour.** This stops two auto-responders from replying to each other forever. Button taps are not counted.
 - **Each event runs once per Automation.** A webhook Meta delivers twice, or an internal retry, never sends twice.
+- **The account needs the permissions the Automation uses.** Creating or updating an Automation returns `400 validation.permission_missing` when its trigger or an action needs a [permission](/guides/permissions#automations) outside the account's `effective_permissions`. An Automation is not paused when the account later loses one: its actions fail on the Firing with `account.permission_missing`.
 - **A past-due account gets no actions.** While your subscription is [past due](/guides/errors#past-due-accounts), Automations do nothing and record no Firings, the same way the API returns `402`.
 - **Platform rules still apply.** An action the platform or SocialAPI refuses (a private reply on a comment older than 7 days, a DM outside the messaging window, an exhausted interaction allowance) fails with the same error code the API call returns, and the failure is recorded on the Firing.
 
@@ -456,5 +457,6 @@ An agent connected to the [SocialAPI MCP server](/integrations/overview) can cre
 - [Unified inbox](/guides/inbox) for replying, private replies, and DMs through the API
 - [Webhooks](/guides/webhooks) for the events your own code receives
 - [Scoped API keys](/guides/scoped-keys) for least-privilege keys
+- [Account permissions](/guides/permissions) for the permissions an account needs
 - [Errors](/guides/errors) for every error code an action can record
 - [API Reference](/api-reference/introduction) for complete request and response schemas
