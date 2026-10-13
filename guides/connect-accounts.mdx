@@ -122,9 +122,9 @@ flowchart TD
 `error` holds one of these values:
 
 - **The platform's own code** when the person declines or the platform refuses the request, for example `access_denied`.
-- **A SocialAPI error code** when SocialAPI refuses the connection, for example `billing.brands_limit` (your plan's brand allowance is used up), `account.already_linked` (the brand already holds a different account on this platform), `account.different_login` (the brand's Facebook is connected through a different login), `byok.credentials_missing` (no X app credentials saved), `byok.credentials_invalid` (X rejected the saved credentials), or `byok.app_access_denied` (X refused your app access to its API). Each code is listed in [Errors](/guides/errors).
+- **A `platform.*` or other SocialAPI error code** when the platform or SocialAPI refuses the connection, for example `billing.brands_limit` (your plan's brand allowance is used up), `account.already_linked` (the brand already holds a different account on this platform), `account.different_login` (the brand's Facebook is connected through a different login), `byok.credentials_missing` (no X app credentials saved), `byok.credentials_invalid` (X rejected the saved credentials), or `byok.app_access_denied` (X refused your app access to its API). Each code is listed in [Errors](/guides/errors).
 - **`missing_code`** when the platform returned neither a code nor an error.
-- **`exchange_failed`** for any other failure.
+- **`exchange_failed`** when the failure has no code.
 
 After any error, start a new connection: the old `auth_url` is spent.
 
@@ -239,7 +239,7 @@ Response (HTTP 201):
 
 ## Facebook Pages
 
-A Facebook connection has no selection step. SocialAPI assigns to the brand every Page the login granted that none of your other brands holds, and the redirect carries `status=success`. Each Page becomes its own connected account.
+A Facebook connection has no selection step. SocialAPI adds every Page the login granted that none of your other brands holds to the brand's Facebook account, and the redirect carries `status=success`.
 
 - A login that grants no Page fails with `error=platform.facebook.no_pages`.
 - A login whose every Page belongs to another of your brands fails with `error=platform.facebook.no_assignable_pages`.
@@ -371,8 +371,7 @@ Always pass `brand_id` when you reconnect. Without it, SocialAPI creates a new b
 
 Connecting a platform account that another of your brands already holds moves it to the brand you name. Facebook works differently: you assign Pages to brands, see [Facebook](/platforms/facebook).
 
-A brand holds one connected account per platform. Connecting a different account of the same platform into a brand that already has one fails with `409 account.already_linked`. On Facebook, a brand whose account came from a different Facebook login fails with `409 account.different_login`. A Facebook connected account is one Page.
-
+A brand holds one connected account per platform. Connecting a different account of the same platform into a brand that already has one fails with `409 account.already_linked`. On Facebook, a brand whose account came from a different Facebook login fails with `409 account.different_login`.
 ## Let someone else connect an account
 
 An invite link lets a person who has no access to your SocialAPI account connect their own account to one of your brands. Agencies send it to clients. The link works once.

@@ -33,12 +33,12 @@ An unsupported call returns `501 resource.not_supported`.
 | Hide, unhide, delete a comment | Yes | |
 | Like or unlike a comment | Yes | The Page likes the comment |
 | Private reply to a comment | Yes | One per comment, within 7 days of the comment |
-| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text, attachments, quick replies, buttons, cards |
+| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text and attachments. A send ignores `quick_replies`, `buttons`, and `cards` |
 | React to a DM | Yes | |
 | Mentions | Partial | `GET /v1/accounts/{id}/mentions` returns posts that tag the Page. A mention in a comment arrives as a `mention.received` event |
 | Reply to a mention | Yes | A public comment on the mention |
 | Reviews | No | Facebook removed the reviews edge in Graph API v22.0. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
-| Automations | Yes | Comment and DM triggers, buttons, multi-step flows. No `follows_account` filter and no Follow gate: `400 validation.filter_unsupported` |
+| Automations | Yes | Comment and DM triggers, buttons on the first private reply, multi-step flows. A `send_dm` action delivers no buttons. No `follows_account` filter and no Follow gate: `400 validation.filter_unsupported` |
 | Analytics | Yes | See [Analytics](/guides/analytics) |
 | Webhook events | Yes | See [Webhook events](#webhook-events) |
 
@@ -145,7 +145,7 @@ A private reply sends a one-time DM to the person who commented. Send it with `P
 
 A Page can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.facebook.window_closed`.
 
-- **Message types.** Text, attachments, quick replies, buttons, and cards. Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
+- **Message types.** Text and attachments. A DM send ignores `quick_replies`, `buttons`, and `cards`: it delivers only the text. Buttons work on a [private reply](/guides/comments#send-a-private-reply). Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
 - **Cap.** A Page sends 10 messages per clock minute. More returns `429 messaging.velocity_limit`: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 - **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` reacts to a message, and `DELETE` on the same path removes the reaction.
 - **Delivery status.** `dm.status.sent`, `dm.status.delivered`, and `dm.status.read` events follow each DM you send.
@@ -169,7 +169,7 @@ Facebook Pages emit these events to your webhook endpoints. Payloads are in [Web
 | `dm.received` | A person sends a Messenger message |
 | `dm.sent` | A message left the Page, including one sent from Meta Business Suite |
 | `dm.referral` | A person opened a conversation from an ad or referral link without sending a message |
-| `dm.postback` | A person tapped a quick reply or a button |
+| `dm.postback` | A person tapped a button on a private reply |
 | `dm.status.sent`, `dm.status.delivered`, `dm.status.read` | Facebook accepted, delivered, or showed as read a DM you sent |
 | `account.disconnected` | The person revoked access on Facebook |
 | `page.removed` | A Page was removed from the login |

@@ -136,7 +136,7 @@ The reply is public when the platform accepts it. `comment_id` in the response i
 | `since` | Only posts published after this time, in RFC 3339 format. A malformed value returns `400 validation.field_invalid` |
 | `sort_by` | `date` (default): the publish date of the post |
 | `sort_order` | `desc` (default) or `asc` |
-| `limit` | Posts per page. The default is 25 |
+| `limit` | Posts per page. The default is 25 and the maximum is 100 |
 | `cursor` | The `next_cursor` of the previous page |
 
 Each post has `id` (the platform's post ID, the value for `{postId}`), `account_id`, `platform`, `content`, `thumbnail`, `permalink`, `comment_count`, `like_count`, `published_at`, `created_at`, and `updated_at`. `pagination` holds `has_more`, and `next_cursor` when `has_more` is `true`. Paging is in [Pagination](/guides/pagination#paginated-endpoints).
@@ -166,7 +166,7 @@ A page can hold fewer comments than `limit`, because the platform sets its own p
 | `like_count` | Likes on the comment |
 | `reply_count` | Deprecated: not every platform reports an exact count. Read `has_replies` instead |
 | `has_replies` | `true` when the comment has replies |
-| `liked_by_viewer` | `true` when the connected account liked the comment. On Instagram and Facebook it reflects only likes made through SocialAPI |
+| `liked_by_viewer` | `true` when the connected account liked the comment. On Facebook it reflects only likes made through SocialAPI. On Instagram it is always `false` |
 | `is_hidden` | `true` when the comment is hidden |
 | `moderation_status` | YouTube only: `published`, `held_for_review`, `likely_spam`, or `rejected`. Absent elsewhere |
 | `parent_id` | The `platform_id` of the comment this one replies to, or `null` for a top-level comment |
@@ -223,7 +223,7 @@ Response (HTTP 200):
 | Field | Description |
 |---|---|
 | `account_id` | Required. The connected account that sends it |
-| `text` | Required. The message. With `buttons`, it is the body of the button template (640 characters at most) |
+| `text` | Required. The message. With `buttons`, it is the body of the button template (640 characters at most). On Instagram, the text holds 1,000 bytes of UTF-8 at most |
 | `buttons` | 1 to 3 buttons, sent as a button template. Fields and limits are in [Buttons](/guides/direct-messages#buttons). A tap on a `postback` button arrives as a `dm.postback` event |
 
 Private replies exist on Instagram and Facebook. The platform allows 1 private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.instagram.private_reply_ineligible` or `400 platform.facebook.private_reply_ineligible`. `error.meta.reason` says why: `already_replied`, `platform_refused`, or `window_expired`. This 400 is final, so retrying never succeeds, and the refusal does not count toward the messaging velocity cap. Every other platform returns `501 resource.not_supported`.
@@ -288,7 +288,9 @@ Every platform has its own comment rules: whether replies nest, who can hide or 
 |---|---|
 | Private replies per comment | 1, within 7 days of the comment |
 | Buttons on a private reply | 1 to 3, with a body of 640 characters at most |
+| Private reply text on Instagram | 1,000 bytes of UTF-8 |
 | `q` filter length | 256 characters |
+| Posts per page | Default 25, up to 100 |
 | Comments per page | Default 25, up to 100 |
 | Replies per page | Default 10, up to 100 |
 | Messages per minute per sender | 10 on Instagram and Facebook: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap) |
@@ -327,8 +329,8 @@ SocialAPI sends `comment.received` when a person comments on a post of a connect
 | `social_api_list_inbox_posts` | List your posts with their comment counts |
 | `social_api_list_post_comments` | List the comments on one post |
 | `social_api_get_comment_replies` | List the replies to one comment |
-| `social_api_reply_to_comment` | Reply publicly to a post or a comment. The text is 2,200 characters at most, and an Instagram reply needs `comment_id` |
-| `social_api_private_reply_to_comment` | Send a private reply. The text is 1,000 characters at most |
+| `social_api_reply_to_comment` | Reply publicly to a post or a comment. The text is 2,200 bytes at most, and an Instagram reply needs `comment_id` |
+| `social_api_private_reply_to_comment` | Send a private reply. The text is 1,000 bytes at most |
 | `social_api_hide_comment`, `social_api_unhide_comment` | Hide or unhide a comment |
 | `social_api_delete_comment` | Delete a comment |
 | `social_api_like_comment`, `social_api_unlike_comment` | Like or unlike a comment |
