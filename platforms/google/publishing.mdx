@@ -16,6 +16,7 @@ SocialAPI publishes local posts to one connected Google Business Profile locatio
 | Schedule | Yes | Google has no scheduling of its own. SocialAPI holds the post and creates it on Google at `scheduled_at` |
 | First comment | No | Google Business Profile has no comments. SocialAPI ignores `first_comment` on Google targets |
 | Multiple images, video | No | Pre-publish validation rejects them with `400 publishing.validation_failed` |
+| Posting caps | Yes | 25 posts per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 
 ---
 
@@ -245,6 +246,10 @@ Google publishes a local post the moment it is created and has no scheduling of 
 ### The location must allow posting
 
 A location whose merchant does not control the profile (`details.has_voice_of_merchant` is `false`) cannot publish. `details.can_operate_local_post` reports whether the location supports local posts at all. Both flags are described on [Google Business Profile locations](/platforms/google/locations#read-a-locations-details).
+
+### Posting caps
+
+SocialAPI refuses a publish that would pass 25 posts in an hour or 50 posts in 24 hours for one account, with `429 publishing.velocity_limit`. A scheduled post is held and published when the window clears. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
 
 ### Errors on a failed target
 

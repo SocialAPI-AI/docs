@@ -11,8 +11,8 @@ Instagram processes media before it can be published, so every post type (image,
 | Field | Value |
 |---|---|
 | Platform slug | `instagram` |
-| Auth type | OAuth 2.0 (Meta) |
-| API | Meta Graph API |
+| Auth type | OAuth 2.0 with Instagram Login |
+| Platform API | Instagram API with Instagram Login (Meta) |
 | Create post | Yes |
 | Update post | Not after publishing (`409 post.state_invalid`). `draft`, `scheduled`, and `failed` posts can be edited |
 | Delete post | No (`501 resource.not_supported`) |
@@ -29,7 +29,7 @@ Instagram processes media before it can be published, so every post type (image,
 | Single image | `content_type: "feed"` | Standard image post |
 | Single video (Reel) | `content_type: "reel"` | Published as `media_type: REELS` |
 | Carousel | `content_type: "carousel"` with 2 to 10 `media` entries | 2 to 10 items; mix of images and videos allowed |
-| Story | `content_type: "stories"` | Single image or video of up to 60 seconds and 100 MB; captions not supported |
+| Story | `content_type: "stories"` | A single image (up to 8 MB) or a single video (up to 60 seconds and 100 MB). Captions are not supported |
 
 `content_type` is required to publish or schedule an Instagram post, including a draft you publish later. Without it, the post fails validation with `400 publishing.validation_failed`. A draft can be saved without it, because drafts skip validation.
 
@@ -71,6 +71,34 @@ curl -X POST https://api.social-api.ai/v1/posts \
     }
   }'
 ```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "Check out our new collection. #fashion #style",
+  "status": "publishing",
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+  "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "instagram",
+      "status": "pending",
+      "text": "Check out our new collection. #fashion #style",
+      "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+      "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
+    }
+  ]
+}
+```
+
+SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
 
 ### Platform data fields
 
@@ -125,7 +153,7 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
   "text": "Scheduled caption",
   "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
   "platform_data": { "instagram": { "content_type": "feed" } },
-  "scheduled_at": "2026-04-15T10:00:00Z"
+  "scheduled_at": "2026-11-15T10:00:00Z"
 }
 ```
 
@@ -194,9 +222,9 @@ Each post includes a `targets` array with per-platform status and engagement met
         "likes": 42,
         "comments": 5,
         "shares": 0,
-        "saves": 0,
-        "metrics_synced_at": "2026-04-10T12:00:00Z"
-      }
+        "saves": 0
+      },
+      "metrics_synced_at": "2026-04-10T12:00:00Z"
     }
   ]
 }
@@ -233,9 +261,9 @@ curl "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/me
           "avg_watch_time_ms": 3400,
           "total_watch_time_ms": 14620000,
           "skip_rate": 41.2,
-          "crossposted_views": 310,
-          "metrics_synced_at": "2026-04-10T12:00:00Z"
-        }
+          "crossposted_views": 310
+        },
+        "metrics_synced_at": "2026-04-10T12:00:00Z"
       }
     ]
   }
@@ -270,7 +298,7 @@ An Instagram target can include a `settings` object with the options Instagram r
 | `product_type` | string | Surface the post lives on: `FEED`, `REELS`, `STORY`, or `AD`. |
 | `audio_type` | string | Kind of audio on a Reel: `MUSIC` or `ORIGINAL_SOUND`. |
 
-`settings` is absent when Instagram reported none of these for the post. Instagram does not report paid partnership, sponsor, location, user tag, audio name, or trial settings back, so those never appear here even when you set them at publish time. `settings` is also returned for posts published outside SocialAPI, since it reflects what Instagram reports at the time of the read for the post rather than what was sent through this API.
+`settings` is absent when Instagram reported none of these for the post. Instagram does not report location, user tag, audio name, or trial settings back, so those never appear here even when you set them at publish time. `settings` is also returned for posts published outside SocialAPI, since it reflects what Instagram reports at the time of the read for the post rather than what was sent through this API.
 
 ### Media on published posts
 
@@ -328,9 +356,11 @@ A publish that fails after the request returned puts a structured error on the t
 - `422 platform.instagram.container_failed`: Instagram accepted the media, then failed to process it. See "Container failures report no reason".
 - `422 platform.instagram.container_expired`: the media container was not published within 24 hours. Create the post again.
 - `504 platform.instagram.container_timeout`: the media was still processing after about 5 minutes.
-- `502 platform.instagram.api_error`: Instagram refused the request or returned no usable error. Read `message`.
+- `503 platform.instagram.1`, `503 platform.instagram.2`: a temporary Instagram failure. Retry.
+- `502 platform.instagram.api_error`: a failure reaching Instagram, or a response with no usable error.
+- `platform.instagram.<code>`: Instagram refused the request with its own error code and message, for example "The aspect ratio is not supported." The HTTP status is `502` unless the code has its own mapping, such as `403 platform.instagram.200`, `404 platform.instagram.100`, or `409 platform.instagram.9007`. Read `message`.
 
-A temporary Instagram failure returns `503`: retry. When Instagram returns an error code of its own, SocialAPI returns it as `platform.instagram.<code>` with Instagram's message, for example "The aspect ratio is not supported." These are the most actionable failures. Every code is in [Errors](/guides/errors).
+Every code is in [Errors](/guides/errors).
 
 ### Container failures report no reason
 
@@ -420,9 +450,9 @@ Response once published:
         "likes": 42,
         "comments": 5,
         "shares": 0,
-        "saves": 0,
-        "metrics_synced_at": "2026-04-10T12:00:00Z"
-      }
+        "saves": 0
+      },
+      "metrics_synced_at": "2026-04-10T12:00:00Z"
     }
   ],
   "created_at": "2026-04-10T09:00:00Z",

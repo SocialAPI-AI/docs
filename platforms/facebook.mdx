@@ -105,7 +105,30 @@ Response (HTTP 200):
 }
 ```
 
-`login_id` is on each connected account. Move a Page to a brand with `POST /v1/platforms/facebook/logins/{loginId}/pages/{pageId}/assign` and `{"brand_id": "7d2e4b1a-9c3f-4e5d-8a6b-1f2e3d4c5b6a"}`. A Page that another of your brands holds moves to the target brand. The response has `account_id`, `brand_id`, and `platform_page_id`. A brand whose Facebook account uses a different login returns `409 account.different_login`.
+`login_id` is on each connected account. Move a Page to a brand with `POST /v1/platforms/facebook/logins/{loginId}/pages/{pageId}/assign`. A Page that another of your brands holds moves to the target brand. The call needs the `accounts:manage` scope.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/platforms/facebook/logins/cred_01J8X3Q4R5M6N7P8V2K0W1J/pages/104857392011223/assign"   -H "Authorization: Bearer $SOCAPI_KEY"   -H "Content-Type: application/json"   -d '{"brand_id": "7d2e4b1a-9c3f-4e5d-8a6b-1f2e3d4c5b6a"}'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "brand_id": "7d2e4b1a-9c3f-4e5d-8a6b-1f2e3d4c5b6a",
+  "platform_page_id": "104857392011223"
+}
+```
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.field_required` | The body has no `brand_id` |
+| 400 | `validation.page_not_granted` | The Page is not accessible through this login |
+| 404 | `resource.not_found` | The login does not exist |
+| 404 | `brand.not_found` | The brand does not exist or your key cannot reach it |
+| 409 | `account.different_login` | The brand's Facebook account uses a different login |
+
 
 ## Comments
 
@@ -122,7 +145,7 @@ A private reply sends a one-time DM to the person who commented. Send it with `P
 
 A Page can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.facebook.window_closed`.
 
-- **Message types.** Text, one attachment by `attachment_url`, or by `attachment_id` with `attachment_type` (without the type the request returns `400 validation.attachment_type_required`), quick replies, buttons, and cards. Field rules are in [Direct messages](/guides/direct-messages).
+- **Message types.** Text, attachments, quick replies, buttons, and cards. Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
 - **Cap.** A Page sends 10 messages per clock minute. More returns `429 messaging.velocity_limit`: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 - **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` reacts to a message, and `DELETE` on the same path removes the reaction.
 - **Delivery status.** `dm.status.sent`, `dm.status.delivered`, and `dm.status.read` events follow each DM you send.

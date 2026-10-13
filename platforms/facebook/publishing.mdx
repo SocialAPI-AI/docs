@@ -78,6 +78,30 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
+Response (HTTP 201):
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "Exciting news from our team. Read the full announcement on our website.",
+  "status": "publishing",
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "facebook",
+      "status": "pending",
+      "text": "Exciting news from our team. Read the full announcement on our website."
+    }
+  ]
+}
+```
+
+SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
+
 ### Platform data fields
 
 Send these keys flat in the target's `platform_data` (`targets[].platform_data`), or in `platform_data.facebook` on the post, which applies them to every Facebook target. When both set the same key, the target's value wins. Which keys apply depends on the content type, shown in the "Applies to" column.
@@ -295,7 +319,7 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
 {
   "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
   "text": "Scheduled announcement.",
-  "scheduled_at": "2026-04-15T10:00:00Z"
+  "scheduled_at": "2026-11-15T10:00:00Z"
 }
 ```
 
@@ -359,9 +383,9 @@ Each post includes a `targets` array with per-platform status and engagement met
         "comments": 3,
         "shares": 7,
         "saves": 0,
-        "extra": null,
-        "metrics_synced_at": "2026-04-10T12:00:00Z"
-      }
+        "extra": null
+      },
+      "metrics_synced_at": "2026-04-10T12:00:00Z"
     }
   ]
 }
@@ -369,7 +393,7 @@ Each post includes a `targets` array with per-platform status and engagement met
 
 **Metrics notes:**
 - `likes` and `comments` are synced from Facebook.
-- `shares` is populated for Facebook posts. Facebook is the only platform where SocialAPI reports a non-zero share count.
+- `shares` is populated for Facebook posts.
 - `saves` is not available on Facebook and is always `0`.
 - `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Facebook.
 - A Reel reports `likes`, `comments`, and a view count under `metrics.views` (also under `metrics.extra.views`). Its `shares` stays `0`, because Facebook does not report a Reel's share count to SocialAPI.
@@ -529,9 +553,9 @@ Response once published:
         "comments": 3,
         "shares": 7,
         "saves": 0,
-        "extra": null,
-        "metrics_synced_at": "2026-04-10T12:00:00Z"
-      }
+        "extra": null
+      },
+      "metrics_synced_at": "2026-04-10T12:00:00Z"
     }
   ],
   "created_at": "2026-04-10T09:00:00Z",

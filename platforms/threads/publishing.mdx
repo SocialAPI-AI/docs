@@ -65,13 +65,41 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
+Response (HTTP 201):
+
+```json
+{
+  "id": "6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "text": "Shipping updates for April. Full details on our site.",
+  "status": "publishing",
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+  "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+  "hidden": false,
+  "retry_count": 0,
+  "created_at": "2026-10-13T09:00:00Z",
+  "updated_at": "2026-10-13T09:00:00Z",
+  "targets": [
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "threads",
+      "status": "pending",
+      "text": "Shipping updates for April. Full details on our site.",
+      "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+      "media_ids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"]
+    }
+  ]
+}
+```
+
+SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
+
 ### Platform data fields
 
 Send these keys in `platform_data.threads` on the post, which applies them to every Threads target. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `threads` key). When both set the same key, the target's value wins.
 
 | Key | Type | Notes |
 |---|---|---|
-| `link_attachment` | string (URL) | Attaches a link preview. A post holds at most 5 unique links: more returns a `422` error |
+| `link_attachment` | string (URL) | Attaches a link preview. A post holds at most 5 unique links: more fails the target with `422 platform.threads.THREADS_API__LINK_LIMIT_EXCEEDED` |
 | `poll_attachment` | object | Text-only posts. 2 to 4 options `option_a` to `option_d`, each 1 to 25 characters |
 | `alt_text` | string | Accessibility text for an image or video, up to 1,000 characters |
 | `topic_tag` | string | 1 to 50 characters, with no periods or ampersands |
@@ -85,7 +113,7 @@ Send these keys in `platform_data.threads` on the post, which applies them to ev
 | `location_id` | string | Needs the beta scope `threads_location_tagging` |
 | `crossreshare_to_ig` | boolean | Shares the post to the linked Instagram account as a Story. Needs the beta scope `threads_share_to_instagram`. `crossreshare_to_ig_dark_mode` sets the dark variant |
 
-SocialAPI forwards any additional keys in `platform_data.threads` only when the table above lists them. Threads answers an unknown key with an empty server error, so SocialAPI sends no other key: an unlisted key is not sent, and the response lists it as a validation warning naming the key.
+SocialAPI forwards any additional keys in `platform_data.threads` only when the table above lists them. An unlisted key is not sent, and the response lists it as a validation warning naming the key.
 
 `reply_control` is not sent. Setting who can reply needs the `threads_manage_replies` permission, which Meta has not granted to every account. A post that includes `reply_control` publishes with Threads' default, where everyone can reply, and the response carries a validation warning that names the permission.
 
@@ -97,7 +125,7 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
 {
   "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
   "text": "Big announcement coming tomorrow.",
-  "scheduled_at": "2026-04-15T10:00:00Z"
+  "scheduled_at": "2026-11-15T10:00:00Z"
 }
 ```
 
@@ -158,10 +186,10 @@ Each post includes a `targets` array with per-platform status and engagement met
         "comments": 0,
         "shares": 0,
         "saves": 0,
-        "extra": null,
-        "metrics_synced_at": null
+        "extra": null
       }
-    }
+    },
+      "metrics_synced_at": null
   ]
 }
 ```
@@ -176,7 +204,7 @@ Likes and replies come from Threads insights, which need the `threads_manage_ins
 
 ### Media processing delay
 
-A post with media waits for Threads to process the file. SocialAPI checks once a minute for up to 5 minutes. If Threads has not finished by then, the target fails with `504` and the post target is `failed`. If Threads rejects or expires the media, the target fails with `422`. A text post has no delay.
+A post with media waits for Threads to process the file. SocialAPI checks once a minute for up to 5 minutes. If Threads has not finished by then, the target fails with `504 platform.threads.container_timeout`. If Threads rejects or expires the media, the target fails with `422 platform.threads.ERROR` or `422 platform.threads.EXPIRED`. A text post has no delay.
 
 ### No post editing
 
@@ -217,6 +245,9 @@ A publish that fails after the request returned puts a structured error on the t
 
 - `401 platform.threads.auth`: the access token expired or was revoked. Reconnect the account.
 - `429 platform.threads.rate_limit`: Threads' own limit. Wait, then retry.
+- `422 platform.threads.THREADS_API__LINK_LIMIT_EXCEEDED`: the post holds more than 5 unique links.
+- `422 platform.threads.ERROR`, `422 platform.threads.EXPIRED`: Threads rejected or expired the media.
+- `504 platform.threads.container_timeout`: Threads did not finish processing the media within 5 minutes.
 - `502 platform.threads.api_error`: Threads refused the request or returned no usable error. Read `message`.
 
 Every code is in [Errors](/guides/errors).
@@ -316,10 +347,10 @@ Response once published:
         "comments": 0,
         "shares": 0,
         "saves": 0,
-        "extra": null,
-        "metrics_synced_at": null
+        "extra": null
       }
-    }
+    },
+      "metrics_synced_at": null
   ],
   "created_at": "2026-04-10T09:00:00Z",
   "published_at": "2026-04-10T09:02:05Z"

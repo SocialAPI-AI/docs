@@ -16,6 +16,7 @@ A YouTube post uploads 1 video to 1 connected YouTube channel and sets its metad
 | Schedule | Yes | `scheduled_at` makes SocialAPI upload the video at that time. `platform_data.youtube.publish_at` uploads it now as private and makes YouTube publish it at that time |
 | First comment | Yes | `first_comment` is posted after the upload. A failure does not fail the post |
 | Add to playlist | Yes | `platform_data.youtube.playlist_id`. A failure does not fail the post |
+| Posting caps | Yes | 25 posts per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 
 ---
 
@@ -346,6 +347,10 @@ YouTube schedules private videos only. `publish_at` with `public` or `unlisted` 
 ### First comment and playlist add never fail the post
 
 If the `first_comment` or the playlist add fails after a successful upload, the post stays `published` and the failure is not reported on the post. Check the video on YouTube, or post the comment with `POST /v1/inbox/comments/{postId}`.
+
+### Posting caps
+
+SocialAPI refuses a publish that would pass 25 posts in an hour or 50 posts in 24 hours for one account, with `429 publishing.velocity_limit`. A scheduled post is held and published when the window clears. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
 
 ### Errors on a failed target
 

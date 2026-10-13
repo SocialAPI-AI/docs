@@ -68,7 +68,7 @@ Response (HTTP 200):
 
 ```json
 {
-  "auth_url": "https://api.instagram.com/oauth/authorize?client_id=...&state=...",
+  "auth_url": "https://www.instagram.com/oauth/authorize/?client_id=...&state=...#weblink",
   "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
 }
 ```
@@ -98,7 +98,7 @@ A private reply sends a DM to the person who commented. Send it with `POST /v1/i
 
 An Instagram account can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.instagram.window_closed`. Send `message_tag: "HUMAN_AGENT"` to reply up to 7 days after the person's last message. Instagram accepts no other tag: any other value returns `400 validation.invalid_message_tag`.
 
-- **Message types.** Text, one attachment, quick replies, buttons, and cards. An `attachment_id` needs an `attachment_type`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
+- **Message types.** Text, attachments, quick replies, buttons, and cards. Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
 - **Size limits.** Instagram sets them and refuses a larger message: text up to 1,000 bytes of UTF-8; images in PNG or JPEG up to 8 MB; video in MP4, OGG, AVI, MOV, or WebM up to 25 MB; audio in AAC, M4A, WAV, or MP4 up to 25 MB; files in PDF up to 25 MB.
 - **Cap.** An Instagram account sends 10 messages per clock minute. More returns `429 messaging.velocity_limit`: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 - **Unsending.** Instagram does not let apps unsend or delete a sent DM. When the other person unsends a message, you receive a `dm.deleted` event and the message disappears from the conversation.
