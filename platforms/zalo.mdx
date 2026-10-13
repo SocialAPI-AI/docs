@@ -30,7 +30,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Delete a published article | Yes | |
 | List posts | Yes | Articles of type `normal`. See [List posts](/platforms/zalo/publishing#6-retrieve-posts) |
 | DMs: list, read, send | Yes | Sending needs the person to have interacted with the OA within 7 days: see [The 7-day messaging window](#the-7-day-messaging-window) |
-| DM attachments | Partial | A `url` attachment is sent as an image. A `platform_attachment_id` attachment with `type: "file"` sends a file |
+| DM attachments | Partial | A `url` or `media_id` attachment is sent as an image unless its `type` is `gif` or `sticker`. A `platform_attachment_id` attachment with `type: "file"` sends a file |
 | Buttons and a card | Partial | SocialAPI sends `buttons` and the first entry of `cards`. It ignores `quick_replies` and `list_sections` |
 | Quote a message in a DM | Yes | `reply_to_message_id` on the send request. It applies to the first message sent |
 | React to a DM | No | `501 resource.not_supported` |
@@ -39,7 +39,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Mentions | No | Zalo has no public mentions API |
 | Reviews | No | Zalo has no public reviews API |
 | Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
-| Platform quota | Yes | `GET /v1/accounts/{id}/limits` returns `remain` and `total`: see [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
+| Platform quota | No | `GET /v1/accounts/{id}/limits` returns `remain` and `total` as `0`: Zalo no longer reports its message quota. See [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
 | Webhook events | Partial | `dm.received` for text messages only. See [Webhook events](#webhook-events) |
 
 The capability matrix for every platform is on [Supported platforms](/platforms/overview).
@@ -50,7 +50,7 @@ A Zalo Official Account connects through the shared OAuth flow in [Connect accou
 
 Each Zalo authorization covers exactly one Official Account. The connected account's `username` is the Official Account's ID and its `display_name` is the OA's name. To connect a second Official Account, run the flow again.
 
-SocialAPI renews Zalo's access tokens (valid about 25 hours) for you. When renewal fails, a call returns `401 platform.zalo.auth`: connect the account again with the same `brand_id`.
+SocialAPI renews Zalo's access tokens (valid about 25 hours) for you. When renewal fails, the first call that fails returns `401 platform.zalo.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. Reconnect with the same `brand_id`.
 
 ## The 7-day messaging window
 
@@ -66,7 +66,7 @@ These rules are specific to Zalo:
 
 - **Zalo returns 10 at most.** One read returns the 10 most recent conversations or the 10 most recent messages of a conversation.
 - **A conversation is one person.** The conversation's participant ID is the person's Zalo user ID.
-- **Images by URL.** A `url` or `media_id` attachment is sent as an image.
+- **Images by URL.** A `url` or `media_id` attachment is sent as an image unless its `type` is `gif` or `sticker`.
 - **One card.** SocialAPI sends the first entry of `cards` as one card and drops the others.
 - **No message ID in the send response.** `message_id` is empty and each entry of `message_ids` is an empty string. Read the message's `platform_id` from `GET /v1/inbox/conversations/{conversation_id}/messages`.
 - **No `message_tag`.** Zalo has no message tags: `message_tag` is ignored.
@@ -85,7 +85,7 @@ Zalo also emits the `post.*` events for articles you publish through SocialAPI, 
 | Conversations or messages per read | 10 |
 | Articles imported when you connect or sync an account | 20 most recent |
 | Article title | 150 characters |
-| Posts per publish target | 25 per hour and 50 per 24 hours: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Posts | 25 per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 | Customer service window | 7 days from the person's last interaction |
 
 Zalo applies its own quotas per app and per Official Account. When one is used up, the call fails with `429 platform.zalo.rate_limit`. Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then retry.

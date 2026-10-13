@@ -31,7 +31,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Comments, DMs, mentions | No | `501 resource.not_supported` |
 | Reviews | No | LinkedIn has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
-| Webhook events | Partial | `account.disconnected` and the `post.*` events |
+| Webhook events | Partial | `account.connected` and the `post.*` events |
 
 The cross-platform matrix is on [Platforms](/platforms/overview).
 
@@ -62,14 +62,14 @@ Response (HTTP 200):
 LinkedIn-specific rules:
 
 - **Member connection.** The connected account is the person who signed in. Posts publish to that person's feed.
-- **Token lifetime.** LinkedIn access tokens last about 60 days and cannot be refreshed. When one expires, calls return `401 platform.linkedin.auth` and the person reconnects the account. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **Token lifetime.** LinkedIn access tokens last about 60 days and cannot be refreshed. When one expires, the first call that fails returns `401 platform.linkedin.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 - **Disconnect.** LinkedIn offers apps no way to end an authorization. Disconnecting an account removes it from SocialAPI, and the person removes SocialAPI's app in their LinkedIn settings.
 
 ## Webhook events
 
 | Event | When it fires |
 |---|---|
-| `account.disconnected` | SocialAPI flagged the account for reconnection. The event carries `reconnect_required: true` and a `reason` |
+| `account.connected` | The account was connected |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
 
 Every event is described in [Webhook events](/guides/webhook-events).

@@ -169,7 +169,7 @@ Each post includes a `targets` array with the per-platform status. Results defau
 
 **Metrics notes:**
 
-Zalo reports a view count and a share count for each article. `shares` holds the share count and `extra.view_count` holds the view count. Zalo reports no likes, comments, or saves, so those stay `0`.
+Zalo reports a view count and a share count for each article. `shares` holds the share count and `extra.view_count` holds the view count in `GET /v1/posts`. `GET /v1/posts/{pid}/metrics` returns the view count as `metrics.views` and `metrics.extra.views`. Zalo reports no likes, comments, or saves, so those stay `0`.
 
 **Articles published outside SocialAPI:** SocialAPI imports the 20 most recent articles of type `normal` when you connect the account and when you call `POST /v1/accounts/{id}/sync`. Older articles and articles of type `video` do not appear.
 
@@ -207,7 +207,7 @@ A publish that fails after the request returned puts a structured error on the t
 ```
 
 - `202 platform.zalo.article_processing`: Zalo was still processing after about 10 seconds. Check the Official Account before you retry.
-- `401 platform.zalo.auth`: the access token expired or was revoked, or the Official Account is no longer authorized. Connect the account again.
+- `401 platform.zalo.auth`: the access token expired or was revoked, or the Official Account is no longer authorized. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
 - `429 platform.zalo.rate_limit`: Zalo's quota for the app or the Official Account is used up. Wait, then retry.
 - `400 validation.platform_param`: Zalo rejected a parameter, for example a title over 150 characters. `error.message` carries Zalo's reason.
 - `502 platform.zalo.e<N>`: Zalo returned an error SocialAPI does not map. `<N>` is the absolute value of Zalo's numeric code.

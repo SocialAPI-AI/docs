@@ -35,7 +35,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Reviews | No | Pinterest has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
 | Analytics | Partial | Live account summary only; SocialAPI stores no account history, and Pins have no post metrics. See [Analytics](/guides/analytics) |
-| Webhook events | Partial | `account.connected`, `account.disconnected`, and the `post.*` events. Pinterest sends no events of its own |
+| Webhook events | Partial | `account.connected` and the `post.*` events. Pinterest sends no events of its own |
 
 The cross-platform matrix is on [Platforms](/platforms/overview).
 
@@ -66,7 +66,7 @@ Response (HTTP 200):
 Pinterest-specific rules:
 
 - **Token lifetime.** Pinterest access tokens last 30 days and refresh tokens last 60 days, and each use of a refresh token extends it. SocialAPI renews the access token before it expires, so a connected account keeps working without a reconnect.
-- **Reconnect.** When Pinterest reports that authentication failed, calls return `401 platform.pinterest.auth` and the account needs reconnecting. Any other `401` from Pinterest returns `401 platform.pinterest.unauthorized` and leaves the account working: reconnect only if it persists. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **Reconnect.** When Pinterest reports that authentication failed, the first call that fails returns `401 platform.pinterest.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. Any other `401` from Pinterest returns `401 platform.pinterest.unauthorized` and leaves the account working: reconnect only if it persists. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 - **Disconnect.** Pinterest offers apps no way to end an authorization. Disconnecting an account removes it from SocialAPI, and the person removes SocialAPI's app in their Pinterest settings.
 
 ## Boards and Pins are read live
@@ -130,7 +130,6 @@ Pinterest sends SocialAPI no events. These SocialAPI events still fire for a Pin
 | Event | When it fires |
 |---|---|
 | `account.connected` | The account was connected |
-| `account.disconnected` | SocialAPI flagged the account for reconnection. The event carries `reconnect_required: true` and a `reason` |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
 
 Every event is described in [Webhook events](/guides/webhook-events).

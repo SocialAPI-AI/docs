@@ -30,10 +30,10 @@ A Pin needs a destination board and one image. Pinterest has no text-only or lin
 
 SocialAPI sends the first `media` item to Pinterest as the Pin's image and ignores the rest. A Pin with no image fails validation on the field `media`. SocialAPI does not check the image's type or size in advance: Pinterest rejects a file it does not accept, and the target fails. A video is not supported.
 
-**Field limits:** title 100 characters, description 800 characters, alt text 500 characters, and link 2,048 characters. A longer value fails validation with `400 publishing.validation_failed`, and the issue names the field.
+**Field limits:** title 100 characters, description 800 characters, alt text 500 characters, and link 2,048 characters. A longer value in `platform_data.pinterest` fails validation with `400 publishing.validation_failed`, and the issue names the field. SocialAPI checks the 800-character limit only on `platform_data.pinterest.description`: a longer `text` is sent as is and Pinterest refuses it.
 
 <Warning>
-  Attach the image through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, or `url` for a public `http(s)` URL Pinterest can fetch. To upload first, see [Media](/guides/media).
+  Attach the image through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, or `url` for a public `http(s)` URL Pinterest can fetch. A `platform_attachment_id` item returns `422 publishing.media.unsupported_source`. To upload first, see [Media](/guides/media).
 </Warning>
 
 ---
@@ -167,9 +167,10 @@ SocialAPI stores no board or Pin. A board you just created appears on the next c
 
 A publish that fails after the request returned puts a structured error on the target, in `targets[].error`, with its `code`. Every code is in [Errors](/guides/errors).
 
-- `401 platform.pinterest.auth`: Pinterest reported that authentication failed. Reconnect the account.
+- `401 platform.pinterest.auth`: Pinterest reported that authentication failed. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
 - `401 platform.pinterest.unauthorized`: Pinterest answered 401 without naming the token. The account keeps working. Reconnect if it persists.
 - `403 platform.pinterest.403`: Pinterest refused the action for this account or board. Read `message`.
+- `404 platform.pinterest.404`: Pinterest reports that the board or Pin does not exist.
 - `429 platform.pinterest.rate_limit`: Pinterest's own limit. Wait, then retry.
 
 ### Recovery

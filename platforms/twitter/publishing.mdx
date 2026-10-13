@@ -32,7 +32,7 @@ X posts publish through your own X app, so X bills each write to your X develope
 | GIF | One GIF entry in `media` | A GIF takes the whole post |
 | Thread | `segments` on the post | Each continuation post is text only |
 
-A post holds up to 4 images, or exactly one video, or exactly one GIF, never a mix. More than 4 items fails with `400 validation.media_count`. A file type X does not accept fails with `400 validation.media_type`, and a file too large to upload fails with `400 validation.media_size`.
+A post holds up to 4 images, or exactly one video, or exactly one GIF, never a mix. More than 4 items, a file type X does not accept, or a file too large to upload returns `400 publishing.validation_failed`. With `skip_validation: true`, the target fails at publish time with `400 validation.media_count`, `400 validation.media_type`, or `400 validation.media_size`.
 
 **File limits for media you upload to SocialAPI** (`source_type: "media_id"`): the limits in the table apply, and a file outside them fails validation with `400 publishing.validation_failed`. SocialAPI uploads the media to X before it creates the post. If an upload fails, the whole post fails: SocialAPI never publishes the text without its media.
 
@@ -197,7 +197,7 @@ X charges more for a post that contains a URL than for a post without one. The c
 
 A publish that fails after the request returned puts a structured error on the target, in `targets[].error`, with its `code`. Every code is in [Errors](/guides/errors).
 
-- `401 platform.twitter.auth`: the access token is no longer valid and renewal failed. Reconnect the account.
+- `401 platform.twitter.auth`: the access token is no longer valid and renewal failed. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
 - `403 platform.twitter.insufficient_scope`: the token lacks a permission, for example `media.write`. Reconnect the account.
 - `402 platform.twitter.usage_capped`: your X app is out of credits or reached its spending limit. Add credits or raise the limit in the X Developer Console, then retry.
 - `429 platform.twitter.rate_limit`: X's own limit. Wait, then retry.
