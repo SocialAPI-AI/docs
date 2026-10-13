@@ -1,12 +1,12 @@
 ---
 title: "Connect a social account"
 sidebarTitle: "Connect accounts"
-description: "Connect Instagram, Facebook, TikTok, YouTube, LinkedIn, X, and more to SocialAPI, choose Pages or locations, reconnect, and disconnect accounts."
+description: "Connect Instagram, Facebook, TikTok, YouTube, LinkedIn, X, and more to SocialAPI, choose a location, reconnect, and disconnect accounts."
 ---
 
 A connected account is one social account (an Instagram account, a Facebook login with its Pages, a YouTube channel, a Telegram bot) that SocialAPI can act on for you. You start a connection with `POST /v1/accounts/connect`, send the person to the platform's consent screen, and SocialAPI redirects them back to your app with the new account's ID. SocialAPI keeps the platform's access tokens, so you never receive or refresh them.
 
-The same flow serves every platform. Telegram and Bluesky skip the consent screen and connect in one request. Facebook and Google Business Profile can pause so you choose which Pages or location to connect. Connecting, reconnecting, and disconnecting cost no credits.
+The same flow serves every platform. Telegram and Bluesky skip the consent screen and connect in one request. Google Business Profile can pause so you choose which location to connect. Facebook connects every Page at once, and you can assign Pages to brands afterwards (see [Facebook](/platforms/facebook)). Connecting, reconnecting, and disconnecting cost no credits.
 
 ## Endpoints
 
@@ -14,8 +14,8 @@ The same flow serves every platform. Telegram and Bluesky skip the consent scree
 |---|---|---|
 | `POST` | `/v1/accounts/connect` | Start a connection, or reconnect an existing account |
 | `GET` | `/v1/accounts` | List your connected accounts and their status. Filter to one brand with `brand_id` |
-| `GET` | `/v1/accounts/pending/{connection_id}` | Read a connection that waits for you to choose Pages or a location |
-| `POST` | `/v1/accounts/pending/{connection_id}/select` | Choose the Pages or the location and finish the connection |
+| `GET` | `/v1/accounts/pending/{connection_id}` | Read a connection that waits for you to choose a location |
+| `POST` | `/v1/accounts/pending/{connection_id}/select` | Choose the location and finish the connection |
 | `POST` | `/v1/oauth/exchange` | Finish a connection whose authorization code your own page received |
 | `DELETE` | `/v1/accounts/{id}` | Disconnect an account |
 | `POST` | `/v1/invites` | Create a single-use link that lets someone else connect an account to a brand |
@@ -77,7 +77,7 @@ The person has 1 hour from your request to finish on the platform. After 1 hour,
 
 ## How a connection works
 
-A connection either completes at once, pauses for a choice of Pages or a location, or fails. Every outcome reaches your `redirect_uri` as query parameters.
+A connection either completes at once, pauses for a choice of location, or fails. Every outcome reaches your `redirect_uri` as query parameters.
 
 ```mermaid
 flowchart TD
@@ -150,7 +150,7 @@ The `platform` field takes one of these values:
 | `telegram` | Telegram | One request with a bot token, no consent screen |
 | `bluesky` | Bluesky | One request with an app password, no consent screen |
 
-A slug that is unknown, or a platform your account cannot use, returns `403 billing.platform_not_available`. Trustpilot is not connectable. Which app each platform connects through (SocialAPI's or your own) is listed in [Platform apps](/guides/platform-credentials).
+A slug not in this table, including `trustpilot`, returns `403 billing.platform_not_available`. Which app each platform connects through (SocialAPI's or your own) is listed in [Platform apps](/guides/platform-credentials).
 
 ## Redirect URI rules
 
@@ -340,7 +340,7 @@ Treat a `reconnect_reason` you do not recognize as a request to reconnect.
 | `access_revoked` | The person removed SocialAPI's access on the platform, or removed the permissions it needs |
 | `all_pages_removed` | The login no longer grants any of the Pages this account used |
 | `page_access_lost` | A reconnect of the same Facebook login unchecked a Page this account used |
-| `posts_sync_auth_failed` | The platform refused SocialAPI's regular refresh of the account's posts with an authorization error |
+| `posts_sync_auth_failed` | The platform refused a read of the account's posts as unauthorized |
 | `youtube_account_suspended` | YouTube suspended the channel. Reconnecting does not lift a suspension: the channel owner resolves it with YouTube |
 | `whatsapp_number_unavailable` | Meta reports that the WhatsApp number can no longer be used through this connection |
 | `whatsapp_number_banned` | Meta banned the WhatsApp number. Reconnecting does not lift a ban: a connection to that number returns `403 whatsapp.number_banned` until Meta lifts it |
@@ -369,9 +369,9 @@ SocialAPI updates the existing account in place:
 
 Always pass `brand_id` when you reconnect. Without it, SocialAPI creates a new brand for the connection and moves the account into it, which leaves the old brand without the account.
 
-Connecting a platform account that another of your brands already holds moves it to the brand you name. Facebook works differently: you assign Pages to brands, see [Facebook](/platforms/facebook). To refuse such moves instead, set `lock_accounts_to_brand` to `true` with `PATCH /v1/users/me` (needs a full-access key or the dashboard): the connection then fails with `409 account.already_linked`, and `meta.brand_id` names the brand that holds the account. The setting does not apply to Facebook.
+Connecting a platform account that another of your brands already holds moves it to the brand you name. Facebook works differently: you assign Pages to brands, see [Facebook](/platforms/facebook).
 
-A brand holds one connected account per platform. Connecting a different account of the same platform into a brand that already has one fails with `409 account.already_linked`. On Facebook, a brand whose account came from a different Facebook login fails with `409 account.different_login`. A Facebook account carries the Pages you chose.
+A brand holds one connected account per platform. Connecting a different account of the same platform into a brand that already has one fails with `409 account.already_linked`. On Facebook, a brand whose account came from a different Facebook login fails with `409 account.different_login`. A Facebook connected account is one Page.
 
 ## Let someone else connect an account
 
@@ -448,7 +448,7 @@ Disconnecting an account:
 
 - A missing `platform` returns `400 validation.field_required`.
 - A `state` longer than 512 characters returns `400 validation.customer_state_too_long`.
-- An unknown slug, or a platform your account cannot use, returns `403 billing.platform_not_available`.
+- A slug not in the platform slugs table, including `trustpilot`, returns `403 billing.platform_not_available`.
 - A request without `brand_id` when your plan's brand allowance is used up returns `403 billing.brands_limit`.
 - A `brand_id` that is not one of your brands returns `404 resource.not_found`, with `meta.resource` set to `brand`. A `brand_id` that is one of your brands but outside your [brand-restricted key](/guides/scoped-keys)'s brands returns `404 brand.not_found`.
 - A malformed or unregistered `redirect_uri` returns `400 validation.redirect_uri_invalid_format` or `400 validation.redirect_uri_not_whitelisted`.
@@ -498,6 +498,6 @@ See [MCP tools](/integrations/tools) for every tool.
 - [Platform apps](/guides/platform-credentials) for which app each platform connects through
 - [Supported platforms](/platforms/overview) for what each platform can do once connected
 - [Scoped API keys](/guides/scoped-keys) for keys limited to some brands
-- [Plans](/guides/plans) for the brand and Facebook Page allowances
+- [Plans](/guides/plans) for the brand allowance
 - [Webhook events](/guides/webhook-events) for the `account.connected` and `account.disconnected` payloads
 - [Errors](/guides/errors) for every error code above

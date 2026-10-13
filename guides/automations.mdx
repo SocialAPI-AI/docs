@@ -1,13 +1,13 @@
 ---
 title: Automations
-description: Answer matching comments and DMs on Instagram and Facebook within seconds, with no code running on your side.
+description: Answer matching comments and DMs on Instagram and Facebook with rules you set once through the API, with no code running on your side.
 ---
 
-An Automation is a rule on one Instagram or Facebook account. When a comment or a DM on that account matches the rule's filters, SocialAPI carries out its actions itself within seconds: a private reply with a link, a public reply, a hidden comment, a DM. You configure it once through the API or an AI agent, and there is no server, webhook handler, or queue to run on your side.
+An Automation is a rule on one Instagram or Facebook account. When a comment or a DM on that account matches the rule's filters, SocialAPI carries out its actions itself: a private reply with a link, a public reply, a hidden comment, a DM. You configure it once through the API or an AI agent, and there is no server, webhook handler, or queue to run on your side.
 
 The classic use is comment-to-DM: someone comments "link" on a post and gets the link in their DMs. With buttons and steps, the same rule can offer a small menu or ask people to follow the account before they get the link.
 
-Automations send through the same path as your API calls. Each action costs what the same API call costs, and the same platform rules apply: the [messaging window](/guides/direct-messages#the-messaging-window), one [private reply](/guides/comments#send-a-private-reply) per comment, and the [messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
+Each Automation action costs what the same API call costs, and the same platform rules apply: the [messaging window](/guides/direct-messages#the-messaging-window), one [private reply](/guides/comments#send-a-private-reply) per comment, and the [messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 
 ## Endpoints
 
@@ -15,10 +15,10 @@ Automations send through the same path as your API calls. Each action costs what
 |--------|------|-------------|
 | `POST` | `/v1/automations` | Create an Automation |
 | `GET` | `/v1/automations` | List your Automations, newest first. Filter to one account with `account_id` |
-| `GET` | `/v1/automations/:id` | Get one Automation with its counters |
-| `PATCH` | `/v1/automations/:id` | Update the fields you send, or pause and resume |
-| `DELETE` | `/v1/automations/:id` | Delete an Automation and its run history |
-| `GET` | `/v1/automations/:id/firings` | List the Automation's runs from the last 30 days |
+| `GET` | `/v1/automations/{id}` | Get one Automation with its counters |
+| `PATCH` | `/v1/automations/{id}` | Update the fields you send, or pause and resume |
+| `DELETE` | `/v1/automations/{id}` | Delete an Automation and its run history |
+| `GET` | `/v1/automations/{id}/firings` | List the Automation's runs from the last 30 days |
 
 Configuring Automations is free. Only the actions they carry out can cost credits.
 
@@ -277,7 +277,7 @@ Rules for the graph:
 - On a comment Automation, a button cannot lead back to `start`.
 - A step reached by a tap checks its own filters when the tap arrives. A tap carries no text, so a keyword filter on a step after `start` never passes. Use `follows_account` there, and `fallthrough_step` for what to do when it fails.
 
-Progress lives in the button itself, so there is nothing to clean up and no expiry. A tap is honored whenever it arrives, weeks later included, and runs the step's current content, so an edit applies to buttons already sent. If the Automation is paused or deleted, or the step no longer exists, the tap does nothing.
+A tap has no expiry: it is honored whenever it arrives, weeks later included, and runs the step's current content, so an edit applies to buttons already sent. A tap on a paused or deleted Automation, or on a step that no longer exists, does nothing.
 
 Taps have no limit. Each costs what its actions cost, and taps are exempt from `once_per_person` and from the hourly cap on dm Automations: they continue the run the trigger started.
 
@@ -389,7 +389,7 @@ The Automation itself carries running totals: `fired_count` (runs, taps included
 
 ### Debug a failed action
 
-1. `GET /v1/automations/:id` and check `failed_count`.
+1. `GET /v1/automations/{id}` and check `failed_count`.
 2. List the Firings and find an outcome with `"status": "failed"`.
 3. Look up its `error_code` in [Errors](/guides/errors). It is the code the same API call would have returned, so it means the same thing. For example, `platform.instagram.private_reply_ineligible` means the comment is older than 7 days or already had a private reply, perhaps from another Automation or from your own API call. `platform.instagram.window_closed` means a `send_dm` went outside the messaging window.
 4. Fix the cause, for example by removing an overlapping Automation. The failed action is not retried.
