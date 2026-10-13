@@ -54,12 +54,13 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   }'
 ```
 
-Response (HTTP 200):
+Response (HTTP 202):
 
 ```json
 {
   "auth_url": "https://www.pinterest.com/oauth/?client_id=1234567&response_type=code&state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
-  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Open this link to connect your pinterest account. Once you've authorized, the account will be connected automatically."
 }
 ```
 
@@ -75,7 +76,7 @@ SocialAPI reads boards and Pins from Pinterest on every request and stores neith
 
 ## List Pins
 
-`GET /v1/platforms/pinterest/accounts/{id}/pins` returns the account's Pins in the order Pinterest returns them. `limit` is optional, defaults to 50, and is at most 50. It needs the `accounts:read` scope.
+`GET /v1/platforms/pinterest/accounts/{id}/pins` returns the account's Pins in the order Pinterest returns them. `limit` is optional, defaults to 50, and is at most 50. The response holds only the first 50 Pins at most, with no cursor: you cannot page to older Pins. It needs the `accounts:read` scope.
 
 ```bash
 curl "https://api.social-api.ai/v1/platforms/pinterest/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/pins?limit=20" \

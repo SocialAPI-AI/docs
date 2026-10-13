@@ -81,7 +81,7 @@ SocialAPI checks a draft before it creates the article. A draft with an empty `t
 
 ### Asynchronous creation
 
-Zalo does not return a finished article. It accepts the article, processes it, and then makes an article ID available. SocialAPI waits about 10 seconds for that ID. The target becomes `published` when the ID arrives, and its `platform_post_id` holds the article ID.
+Zalo does not return a finished article. It accepts the article, processes it, and then makes an article ID available. SocialAPI waits 10 seconds for that ID. The target becomes `published` when the ID arrives, and its `platform_post_id` holds the article ID.
 
 If Zalo is still processing after 10 seconds, the target fails with `202 platform.zalo.article_processing`. The article can still finish publishing on Zalo. Check the Official Account before you send `POST /v1/posts/{pid}/retry`, because a retry creates a second article.
 
@@ -206,7 +206,7 @@ A publish that fails after the request returned puts a structured error on the t
 }
 ```
 
-- `202 platform.zalo.article_processing`: Zalo was still processing after about 10 seconds. Check the Official Account before you retry.
+- `202 platform.zalo.article_processing`: Zalo was still processing after 10 seconds. Check the Official Account before you retry.
 - `401 platform.zalo.auth`: the access token expired or was revoked, or the Official Account is no longer authorized. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
 - `429 platform.zalo.rate_limit`: Zalo's quota for the app or the Official Account is used up. Wait, then retry.
 - `400 validation.platform_param`: Zalo rejected a parameter, for example a title over 150 characters. `error.message` carries Zalo's reason.

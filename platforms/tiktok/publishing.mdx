@@ -18,7 +18,7 @@ TikTok accepts a post as a job and finishes it later, so a TikTok target stays `
 | Delete post | No (`outcome: not_supported`) |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | No (`first_comment` is ignored) |
-| Posting caps | 18 posts per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Posting caps | 13 posts per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 
 ---
 
@@ -123,7 +123,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Draft in the TikTok app
 
-Set `post_mode` to `"inbox"` to send a video or a photo carousel to the creator's TikTok drafts. TikTok then asks the creator for the audience, interaction settings, and disclosures in the app, so SocialAPI ignores `privacy_level`, the `disable_*` fields, the branding fields, `is_aigc`, and `video_cover_timestamp_ms` on a draft. A video draft carries no caption: the creator writes it in the app. A photo draft keeps the post `text` as its title. A draft needs the `video.upload` permission, and it returns no public post ID and no permalink.
+Set `post_mode` to `"inbox"` to send a video or a photo carousel to the creator's TikTok drafts. TikTok then asks the creator for the audience, interaction settings, and disclosures in the app, so SocialAPI ignores `privacy_level`, the `disable_*` fields, `auto_add_music`, the branding fields, `is_aigc`, and `video_cover_timestamp_ms` on a draft. A video draft carries no caption: the creator writes it in the app. A photo draft keeps the post `text` as its title. A draft needs the `video.upload` permission, and it returns no public post ID and no permalink.
 
 ```json
 {
@@ -322,7 +322,7 @@ On a photo carousel, `brand_content_toggle: true` with `privacy_level: "SELF_ONL
 
 ### Posting caps
 
-SocialAPI caps each account at 18 posts per 24 hours and 25 per hour: a post beyond either cap returns `429 publishing.velocity_limit`. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps). TikTok also limits each account to 6 posts per minute and 15 per day, for the video call and for the photo call, so TikTok's daily limit is reached before SocialAPI's. A post TikTok refuses fails the target: read `targets[].error.code` and `targets[].error.message`.
+SocialAPI caps each account at 13 posts per 24 hours and 25 per hour: a post beyond either cap returns `429 publishing.velocity_limit`. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps). TikTok also limits each account to 6 posts per minute and 15 per day, for the video call and for the photo call. SocialAPI does not enforce the 6 per minute: TikTok refuses a 7th post within a minute. A post TikTok refuses fails the target: read `targets[].error.code` and `targets[].error.message`.
 
 ### Slow publishes and the `publishing` status
 
@@ -461,12 +461,13 @@ If TikTok rejects the file while processing, the target is `failed` with `error`
 
 ## 9. Required OAuth scopes
 
-SocialAPI's TikTok app requests these permissions during the OAuth flow. You configure nothing. The full list is in [TikTok permissions](/platforms/tiktok#permissions). Publishing uses `video.publish`, `user.info.username`, and, for `post_mode: "inbox"`, `video.upload`.
+SocialAPI's TikTok app requests these permissions during the OAuth flow. You configure nothing. The full list is in [TikTok permissions](/platforms/tiktok#permissions). Publishing uses `video.publish`, `user.info.username`, and, for `post_mode: "inbox"`, `video.upload`. Retrieving posts uses `video.list`.
 
 | Scope | Purpose |
 |---|---|
 | `video.publish` | Publish videos and photo carousels |
 | `video.upload` | Send a video or photo carousel to the creator's TikTok drafts |
+| `video.list` | Retrieve posts and their counts: see [Retrieve posts](#6-retrieve-posts) |
 | `user.info.username` | Build the permalink of a published post |
 
 The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

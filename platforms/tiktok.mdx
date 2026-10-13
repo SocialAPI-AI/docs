@@ -63,12 +63,13 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   }'
 ```
 
-Response (HTTP 200):
+Response (HTTP 202):
 
 ```json
 {
-  "auth_url": "https://www.tiktok.com/v2/auth/authorize?state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2&disable_auto_auth=1",
-  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
+  "auth_url": "https://www.tiktok.com/v2/auth/authorize?client_key=...&scope=...&response_type=code&redirect_uri=...&state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2&disable_auto_auth=1",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Open this link to connect your tiktok account. Once you've authorized, the account will be connected automatically."
 }
 ```
 
@@ -118,8 +119,8 @@ Response (HTTP 200):
 | Field | Description |
 |---|---|
 | `can_post` | `true` when TikTok lists `PUBLIC_TO_EVERYONE` for the account. `false` when it does not |
-| `max_video_duration_sec` | The longest video this account can post, in seconds |
-| `privacy_level_options` | `["PUBLIC_TO_EVERYONE"]`, or an empty list when `can_post` is `false`. It never lists another level, because every video publishes publicly. Photo carousels follow a different rule: see [TikTok publishing](/platforms/tiktok/publishing#privacy-level-differs-for-videos-and-photos) |
+| `max_video_duration_sec` | The longest video this account can post, in seconds. Absent when TikTok returns no value |
+| `privacy_level_options` | `["PUBLIC_TO_EVERYONE"]`. Absent when `can_post` is `false`. It never lists another level, because every video publishes publicly. Photo carousels follow a different rule: see [TikTok publishing](/platforms/tiktok/publishing#privacy-level-differs-for-videos-and-photos) |
 | `interaction_settings` | `true` for a setting the creator turned off in TikTok. A post cannot turn that interaction back on |
 | `avatar_url` | A temporary link from TikTok. Download the image if you need it later |
 
@@ -187,7 +188,7 @@ SocialAPI reads, writes, and moderates comments on the account's own TikTok post
 
 - **IDs.** `{postId}` is the TikTok video ID, which is the target's `platform_post_id`. A comment's `platform_id` is `{video_id}_{comment_id}`, and its `id` is the `sapi_cmt_` ID. Use `id` or `platform_id` as `{commentId}`. Hide, unhide, reply, and list replies need that full form: a bare TikTok comment ID returns `400 validation.comment_id_invalid`. Delete and like accept either form.
 - **List.** `GET /v1/inbox/comments/{postId}` returns up to 30 comments per page, and the replies endpoint returns up to 30 replies per page. The list includes hidden comments: `is_hidden` is `true` for them. A reply to a hidden comment cannot be listed. Comment text only: images in comments are not returned.
-- **`GET /v1/inbox/comments`.** It lists the posts SocialAPI has stored with their comment counts, so it shows a new post after [a sync](#sync-videos).
+- **`GET /v1/inbox/comments`.** It lists the account's posts that have comments, with their comment counts. A read refreshes that list when it is older than 1 hour.
 - **Reply.** `POST /v1/inbox/comments/{postId}` with `comment_id` replies to that comment. Without `comment_id` it comments on the post as the connected account. The text holds up to 1,200 characters, and a reply costs 1 interaction credit.
 - **Hide and unhide.** For comments written by other people. `capabilities.can_hide` is `false` on the connected account's own comments.
 - **Delete.** For comments the connected account wrote. `capabilities.can_delete` is `false` on other people's comments. Hide those instead.
@@ -206,13 +207,13 @@ TikTok limits each account to 40 requests per minute for each TikTok call. Beyon
 - **Page size.** A page holds up to 20 mentions, split between caption mentions and comment mentions. Newest first within a page. Follow `next_cursor` for the rest.
 - **Item fields.** `author.username` is the handle of the person, `content.text` is the caption or comment text, `platform_post_id` is the TikTok video ID, and `permalink` is the video link. `metadata` is `null`. A comment mention's `id` carries both the video and the comment.
 - **Reply.** `POST /v1/accounts/{id}/mentions/reply` works for a mention made in a comment. Send the mention's `sapi_mnt_` ID as `media_id`, or send the video ID as `media_id` with the comment's `platform_id` as `comment_id`. For a mention in a caption, TikTok has no reply: the call returns `400 validation.mention_reply_unsupported`. A reply costs 1 interaction credit.
-- **Events.** TikTok sends SocialAPI no mention events. Read the list.
+- **Events.** TikTok sends SocialAPI no mention notifications. Each call that returns at least one mention sends a `mention.received` event: see [Mentions you list](/guides/webhook-events#mentions-you-list).
 
 ## Webhook events
 
 | Event | When it fires |
 |---|---|
-| `comment.received` | Another person comments on, or replies under, a TikTok post of the account. See [`comment.received`](/guides/webhook-events#commentreceived) |
+| `comment.received` | Another person comments on, or replies under, a TikTok post of the account. See [`comment.received`](/guides/webhook-events#comment-received) |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery). A TikTok post can finish after the request that created it returned |
 | `account.connected` | You connected a TikTok account |
 | `account.disconnected` | SocialAPI flagged the account for reconnection: see [When TikTok authorization ends](#when-tiktok-authorization-ends) |
@@ -225,7 +226,7 @@ TikTok limits each account to 40 requests per minute for each TikTok call. Beyon
 - **Timing.** TikTok reports a new comment to SocialAPI within 5 minutes of the comment.
 - **Raw payload.** `raw_payload` holds the TikTok notification.
 
-TikTok has no mention, DM, or review events. Every event is described in [Webhook events](/guides/webhook-events).
+TikTok has no DM or review events. Listing mentions sends `mention.received`: see [Mentions you list](/guides/webhook-events#mentions-you-list). Every event is described in [Webhook events](/guides/webhook-events).
 
 ## Limits
 
@@ -235,8 +236,8 @@ TikTok has no mention, DM, or review events. Every event is described in [Webhoo
 | Photo title (the post `text`) | 90 UTF-16 characters |
 | Video file | MP4, MOV, or WebM, 3 seconds to the account's `max_video_duration_sec`, up to 1 GB |
 | Photo carousel | 2 to 35 images, JPEG or WebP, up to 20 MB each |
-| Posts, SocialAPI's cap | 18 per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
-| Posts, TikTok's own limit | 6 per minute and 15 per day for each account, for the video call and for the photo call |
+| Posts, SocialAPI's cap | 13 per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
+| Posts, TikTok's own limit | 6 per minute and 15 per day for each account, for the video call and for the photo call. SocialAPI does not enforce the 6 per minute: TikTok refuses a 7th post within a minute |
 | Comment or reply text | 1,200 characters |
 | Posts per sync | 20 |
 | Comments or replies per page | 30 |
@@ -253,7 +254,10 @@ SocialAPI's TikTok app asks the person for these permissions on TikTok's consent
 | `user.info.username` | Handle |
 | `user.info.profile` | Bio, profile link, and verification |
 | `user.info.stats` | Follower, following, likes, and video counts |
+| `user.account.type` | Whether the account is a TikTok Business Account |
+| `user.insights` | TikTok's daily account insights. No SocialAPI endpoint returns them |
 | `video.list` | List the account's posts and their counts |
+| `video.insights` | TikTok's per-post insights, such as watch time. No SocialAPI endpoint returns them |
 | `video.publish` | Publish videos and photo carousels as the account |
 | `video.upload` | Send a post to the account's TikTok drafts |
 | `comment.list` | Read comments and replies, and receive `comment.received` |
