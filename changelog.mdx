@@ -4,6 +4,12 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-10-14" description="Publishing" tags={["Publishing"]}>
+  ## Platform options on post targets
+
+  Each post target returns `platform_data` with the platform-specific options you set when the post was created or last updated, so a saved post reopens with its options. Chain continuation posts are returned in segments, not in `platform_data`. See [Publishing](/guides/publishing#where-platform-data-goes).
+</Update>
+
 <Update label="2026-10-13" description="Accounts" tags={["Accounts"]}>
   ## Account permissions
 
@@ -20,6 +26,24 @@ rss: true
   ## Pinterest boards
 
   AI agents can list a Pinterest account's boards with `social_api_list_pinterest_boards`. See [MCP tools reference](/integrations/tools).
+</Update>
+
+<Update label="2026-10-13" description="Accounts" tags={["Accounts", "TikTok"]}>
+  ## TikTok connects through TikTok API for Business
+
+  Every TikTok connect, invite, and reconnect authorizes the account through TikTok API for Business. Accounts that were already connected keep working until their owner reconnects. See [TikTok](/platforms/tiktok).
+</Update>
+
+<Update label="2026-10-13" description="Publishing" tags={["Publishing", "TikTok"]}>
+  ## TikTok posts capped at 13 per 24 hours
+
+  SocialAPI caps each TikTok account at 13 posts per 24 hours, below TikTok's limit of 15 per day. A post beyond the cap returns `429 publishing.velocity_limit` with a `Retry-After` header. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+</Update>
+
+<Update label="2026-10-13" description="Billing" tags={["Billing", "Publishing"]}>
+  ## Refused publishes and retries use no post credit
+
+  A publish or retry that returns `429 publishing.velocity_limit` does not use a post credit. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) and [Plans](/guides/plans).
 </Update>
 
 <Update label="2026-10-12" description="Instagram" tags={["Analytics", "Instagram"]}>
@@ -46,10 +70,46 @@ rss: true
   Instagram and Facebook post targets return `platform_media`, the images and videos of the published post, including posts published outside SocialAPI. See [Instagram publishing](/platforms/instagram/publishing).
 </Update>
 
+<Update label="2026-10-06" description="Instagram and Facebook" tags={["Accounts", "Instagram", "Facebook"]}>
+  ## Up to 500 posts per Instagram account and Facebook Page
+
+  Connecting an Instagram or Facebook account, and `POST /v1/accounts/{id}/sync`, cover up to the 500 most recent posts of an Instagram account and of each Facebook Page. See [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts).
+</Update>
+
+<Update label="2026-10-01" description="Threads" tags={["Accounts", "Threads"]}>
+  ## Threads connect fixed in some regions
+
+  Connecting a Threads account from some regions ended on the Threads home page instead of the authorization screen. Connect now opens the authorization screen from every region. See [Threads](/platforms/threads).
+</Update>
+
+<Update label="2026-09-30" description="WhatsApp" tags={["Accounts", "WhatsApp"]}>
+  ## Banned WhatsApp numbers cannot be connected
+
+  Connecting a WhatsApp number that Meta has banned fails with `403 whatsapp.number_banned`. Reconnecting does not lift the ban. See [Errors](/guides/errors#whatsapp).
+</Update>
+
+<Update label="2026-09-30" description="WhatsApp" tags={["Accounts", "WhatsApp"]}>
+  ## Numbers Meta no longer serves are flagged for reconnection
+
+  When Meta stops serving a WhatsApp number for a connection, the account is marked `reconnect_recommended` with the reason `whatsapp_number_unavailable`, and an `account.disconnected` webhook fires once. See [Account status](/guides/connect-accounts#account-status).
+</Update>
+
 <Update label="2026-09-29" description="Automations" tags={["Automations"]}>
   ## Multi-step Automations, buttons, and the Follow gate
 
   Automations run multi-step flows with postback buttons, and Instagram Automations can send a link only to people who follow the account. See [The Follow gate](/guides/automations#the-follow-gate).
+</Update>
+
+<Update label="2026-09-29" description="WhatsApp" tags={["Accounts", "Direct messages", "WhatsApp"]}>
+  ## WhatsApp numbers that stay in the WhatsApp Business app
+
+  A number that stays registered in the WhatsApp Business app can connect through Embedded Signup. Messages you send from the app appear in your inbox as outgoing messages, and imported message history arrives without firing webhooks. See [Keep using the WhatsApp Business app](/platforms/whatsapp#keep-using-the-whatsapp-business-app).
+</Update>
+
+<Update label="2026-09-29" description="Mentions" tags={["Mentions", "Threads"]}>
+  ## Reply to Threads mentions
+
+  `POST /v1/accounts/{id}/mentions/reply` now replies to a mention on Threads. Threads support is in beta. See [Reply to a mention](/guides/mentions#reply-to-a-mention).
 </Update>
 
 <Update label="2026-09-28" description="Automations" tags={["Automations"]}>
@@ -58,14 +118,1180 @@ rss: true
   An Automation on an Instagram or Facebook account can react only to comments or messages that contain your keywords. See [Automations](/guides/automations).
 </Update>
 
+<Update label="2026-09-28" description="Threads" tags={["Analytics", "Threads"]}>
+  ## Full Threads account insights
+
+  Account insights on Threads now include likes, clicks, replies, reposts, quotes, and follower counts, along with follower demographics. Those values were missing from responses before. See [Threads insights](/platforms/threads#insights).
+</Update>
+
+<Update label="2026-09-27" description="Instagram" tags={["Publishing", "Instagram"]}>
+  ## Instagram Reels require a video
+
+  Validation reports an error for a Reel draft that has no video. Use `content_type` `feed` for an image. See [Supported media](/platforms/instagram/publishing#2-supported-media).
+</Update>
+
+<Update label="2026-09-24" description="Instagram and Facebook" tags={["Publishing", "Instagram", "Facebook"]}>
+  ## More platform_data options on Instagram and Facebook
+
+  Instagram posts accept AI-generated labels, paid partnership, user tags, audio name, and thumbnail offset in `platform_data`. Facebook posts accept place, country targeting, link carousels, and video options. Validation reports a warning for any key the platform does not accept. See [Platform data fields](/platforms/instagram/publishing#platform-data-fields).
+</Update>
+
 <Update label="2026-09-22" description="Analytics" tags={["Analytics"]}>
   ## Stored analytics history
 
   SocialAPI stores daily history for accounts, brands, and posts, and returns it from the account, brand, and post analytics endpoints. See [Analytics](/guides/analytics).
 </Update>
 
+<Update label="2026-09-22" description="Billing" tags={["Billing"]}>
+  ## Billing block fields on /v1/users/me
+
+  `GET /v1/users/me` returns `billing_blocked`, `billing_blocked_at`, and `billing_block_reason`. Use them to tell a customer why calls are refused and whether paying lifts the block. See [Past-due accounts](/guides/plans#past-due-accounts).
+</Update>
+
+<Update label="2026-09-22" description="Accounts" tags={["Accounts"]}>
+  ## Last used time for API keys
+
+  API key responses include `last_used_at`, the time of the key's latest request. The field is absent when the key has never been used. See [List keys](/guides/authentication#list-keys).
+</Update>
+
+<Update label="2026-09-21" description="Pinterest" tags={["Publishing", "Pinterest"]}>
+  ## Pinterest posting limits
+
+  A Pinterest publish target allows 1,000 posts per 24 hours and has no hourly cap. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+</Update>
+
+<Update label="2026-09-20" description="Google Business Profile" tags={["Publishing", "Google Business Profile"]}>
+  ## Google platform_data keys
+
+  Google Business Profile posts send only the `platform_data` fields that Google accepts. Other keys are dropped, so a key meant for another platform no longer fails the whole post. See [Platform data fields](/platforms/google/publishing#platform-data-fields).
+</Update>
+
+<Update label="2026-09-20" description="Inbox" tags={["Inbox", "Instagram"]}>
+  ## Comments report liked_by_viewer
+
+  Each comment includes `liked_by_viewer`, which is `true` when the connected account liked it through SocialAPI. Instagram accounts connected with Facebook Login can like comments too. See [Like and unlike a comment](/guides/comments#like-and-unlike-a-comment).
+</Update>
+
+<Update label="2026-09-19" description="MCP" tags={["MCP"]}>
+  ## Output schemas for MCP tools
+
+  Every MCP tool declares an output schema, so a client can read the shape of each result before it calls the tool. See [MCP tools reference](/integrations/tools).
+</Update>
+
 <Update label="2026-09-17" description="Direct messages" tags={["Direct messages"]}>
   ## Reply to a specific message
 
   Messages carry `reply_to.platform_id` when they reply to an earlier message. See [Read messages](/guides/direct-messages#read-messages).
+</Update>
+
+<Update label="2026-09-17" description="Accounts" tags={["Accounts"]}>
+  ## Team role on /v1/users/me
+
+  `GET /v1/users/me` returns `role`: `admin`, `developer`, or an empty string for the account Owner. See [Account permissions](/guides/permissions).
+</Update>
+
+<Update label="2026-09-16" description="Pinterest" tags={["Accounts", "Publishing", "Pinterest"]}>
+  ## Pinterest
+
+  Connect a Pinterest account to publish Pins to a board, and to list, create, rename, and delete its boards with `/v1/accounts/{id}/boards`. `GET /v1/platforms/pinterest/accounts/{id}/pins` lists the account's Pins, and `GET /v1/platforms/pinterest/accounts/{id}/summary` returns its follower, Pin, board, and view counts. See [Pinterest](/platforms/pinterest).
+</Update>
+
+<Update label="2026-09-14" description="Billing" tags={["Billing"]}>
+  ## Profile packs on Empire
+
+  Business (Empire) accounts add Profile packs automatically when their brand count reaches the scale threshold, 90% of the allowance by default, as Pro (Full Send) accounts do. See [Profile packs](/guides/plans#profile-packs).
+</Update>
+
+<Update label="2026-09-14" description="MCP" tags={["MCP"]}>
+  ## Write tools declare readOnlyHint false
+
+  MCP write tools send `readOnlyHint: false`, so a client knows which tools change data. See [MCP tools reference](/integrations/tools).
+</Update>
+
+<Update label="2026-09-12" description="Instagram" tags={["Direct messages", "Instagram"]}>
+  ## Instagram story replies arrive as DMs
+
+  A reply to one of your Instagram stories arrives as a `dm.received` event, with the story in the `story` field. See [Webhook events](/guides/webhook-events#direct-messages).
+</Update>
+
+<Update label="2026-09-10" description="Billing" tags={["Billing"]}>
+  ## Automatic Profile packs on Full Send
+
+  Pro (Full Send) accounts add a Profile pack of 50 brands automatically when brands reach the scale threshold, 90% of the allowance by default. See [Profile packs](/guides/plans#profile-packs).
+</Update>
+
+<Update label="2026-09-08" description="WhatsApp" tags={["Accounts", "WhatsApp"]}>
+  ## Register Cloud API numbers
+
+  Register a WhatsApp Cloud API number with `POST /v1/platforms/whatsapp/phone-numbers/{id}/request-code`, `verify-code`, and `register`. Registration handles the two-step verification PIN. See [Connecting](/platforms/whatsapp#connecting).
+</Update>
+
+<Update label="2026-09-08" description="Facebook" tags={["Accounts", "Facebook"]}>
+  ## Move a Page between brands
+
+  Assigning a Facebook Page to a brand moves it from the brand that holds it now. Each brand holds as many Facebook Pages as its plan allows. See [One login, many brands](/platforms/facebook#one-login-many-brands).
+</Update>
+
+<Update label="2026-09-07" description="Inbox" tags={["Inbox", "Instagram", "Facebook"]}>
+  ## Private reply eligibility errors
+
+  A private reply that Instagram or Facebook refuses returns `platform.instagram.private_reply_ineligible` or `platform.facebook.private_reply_ineligible`. Examples are a comment older than the 7-day window, or a second private reply to the same comment. See [Send a private reply](/guides/comments#send-a-private-reply).
+</Update>
+
+<Update label="2026-09-06" description="YouTube" tags={["Errors", "YouTube"]}>
+  ## YouTube suspended accounts
+
+  When YouTube suspends or closes the account or its channel, every call for that account returns `403` with `platform.youtube.account_suspended`. See [Errors](/guides/errors#x-linkedin-youtube-and-zalo).
+</Update>
+
+<Update label="2026-09-06" description="Instagram and Facebook" tags={["Direct messages", "Instagram", "Facebook"]}>
+  ## Button taps are saved as messages
+
+  When someone taps a button in an Instagram or Facebook conversation, the tap is saved as an inbox message and raises `dm.postback`. See [Read messages](/guides/direct-messages#read-messages).
+</Update>
+
+<Update label="2026-09-06" description="Instagram and Facebook" tags={["Webhooks", "Instagram", "Facebook"]}>
+  ## platform_id on DM webhook events
+
+  `dm.received`, `dm.sent`, and `dm.postback` carry `platform_id` in `data`. The value matches the `platform_id` of the same message in the API. See [Webhook events](/guides/webhook-events#direct-messages).
+</Update>
+
+<Update label="2026-09-05" description="Direct messages" tags={["Direct messages", "Instagram", "Facebook", "WhatsApp"]}>
+  ## Messaging velocity cap
+
+  Each Instagram account, Facebook Page, and WhatsApp phone number can send 10 messages per minute. DMs, comment replies, private replies, and WhatsApp template messages all count. A send over the cap returns `429 messaging.velocity_limit` with `Retry-After`, and it spends no credit. See [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
+</Update>
+
+<Update label="2026-09-05" description="Direct messages" tags={["Direct messages", "Instagram", "Facebook"]}>
+  ## Closed messaging windows return the same error
+
+  After Instagram or Facebook refuses a DM because the 24-hour messaging window has closed, later sends to that conversation return the same `400` error code as the first refusal, with `meta.blocked_locally` set to `true`. The block lifts when the person messages you again. Sends that carry a `message_tag` are never blocked this way. See [The messaging window](/guides/direct-messages#the-messaging-window).
+</Update>
+
+<Update label="2026-09-05" description="WhatsApp" tags={["Accounts", "WhatsApp"]}>
+  ## Connect WhatsApp from your own page
+
+  WhatsApp Embedded Signup runs in three legs: your backend starts the connection, Meta's popup collects the number, and your backend completes it. See [Connecting](/platforms/whatsapp#connecting).
+</Update>
+
+<Update label="2026-09-04" description="Publishing" tags={["Publishing"]}>
+  ## Posting velocity caps
+
+  Each publish target can publish 25 posts per hour, and each platform has a 24-hour cap. Publishing past a cap returns `429 publishing.velocity_limit` with `Retry-After`, and creates nothing. A scheduled post is held until the window clears, not failed. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+</Update>
+
+<Update label="2026-09-02" description="Accounts" tags={["Accounts", "Analytics"]}>
+  ## Re-sync an account's posts
+
+  `POST /v1/accounts/{id}/sync` re-reads an account's posts from the platform. See [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts).
+</Update>
+
+<Update label="2026-09-01" description="Threads" tags={["Publishing", "Threads"]}>
+  ## Threads platform_data warnings
+
+  Threads draft validation reports a warning for each `platform_data` key it will ignore, so you can see which settings will not apply before you publish. See [Platform data fields](/platforms/threads/publishing#platform-data-fields).
+</Update>
+
+<Update label="2026-08-31" description="Google" tags={["Google Business Profile"]}>
+  ## Update a Google Business Profile location
+
+  `PUT /v1/platforms/google/accounts/{id}` changes a location's public profile: name, description, phone numbers, address, website, categories, opening hours, and service area. Only the fields you send are changed, and sending an empty value clears that field. Google moderates each edit, so a successful response means the edit was accepted for review. See [Update a location](/platforms/google/locations#update-a-location).
+</Update>
+
+<Update label="2026-08-31" description="Google" tags={["Google Business Profile", "Publishing"]}>
+  ## Photos and videos on Google locations
+
+  `GET`, `POST`, and `DELETE` on `/v1/platforms/google/accounts/{id}/media` manage the photos and videos on a location's public profile. Photos customers contributed can be read with `contributed=true`, but they cannot be deleted through the API. See [Profile media](/platforms/google/locations#profile-media).
+</Update>
+
+<Update label="2026-08-31" description="Google" tags={["Google Business Profile", "Analytics"]}>
+  ## Google performance metrics and search keywords
+
+  `GET /v1/platforms/google/accounts/{id}/insights` returns daily counts of how people found a location on Search and Maps and what they did next. `GET /v1/platforms/google/accounts/{id}/search-keywords` returns the monthly keywords that surfaced it. Google withholds exact counts for low-volume keywords, which come back as a threshold instead of a value. See [Performance metrics](/platforms/google#performance-metrics).
+</Update>
+
+<Update label="2026-08-31" description="Google" tags={["Google Business Profile", "Webhooks"]}>
+  ## Review reply moderation events
+
+  Google moderates review replies. `review.updated` is sent when a reply is approved or rejected, with `change` set to `reply_approved` or `reply_rejected`. See [Review events](/platforms/google/reviews#review-events).
+</Update>
+
+<Update label="2026-08-31" description="Bluesky" tags={["Bluesky"]}>
+  ## Bluesky
+
+  Connect a Bluesky account with an app password to publish posts and read comments, mentions, and direct messages. Direct messages need an app password with direct message access. See [Bluesky](/platforms/bluesky).
+</Update>
+
+<Update label="2026-08-31" description="WhatsApp" tags={["WhatsApp", "Publishing"]}>
+  ## Send media with a caption and filename
+
+  Messages can include media with an optional caption and filename. See [Sending media](/platforms/whatsapp#sending-media).
+</Update>
+
+<Update label="2026-08-31" description="WhatsApp" tags={["WhatsApp", "Direct messages"]}>
+  ## Interactive messages
+
+  Send a message with up to 3 reply buttons, or with a list menu. When a contact taps an option, it arrives as an inbound message in the same `messages` array as text and media. See [Interactive messages](/platforms/whatsapp#interactive-messages).
+</Update>
+
+<Update label="2026-08-31" description="WhatsApp" tags={["WhatsApp", "Direct messages"]}>
+  ## Inbound WhatsApp media
+
+  Media that contacts send is available from `GET /v1/inbox/media/{id}`, which returns the file. If the file is not ready yet, the call returns `504`, so retry it. See [Inbound media](/platforms/whatsapp#inbound-media).
+</Update>
+
+<Update label="2026-08-31" description="WhatsApp" tags={["WhatsApp", "Publishing"]}>
+  ## Template sends return a message ID
+
+  A template send returns `message_id`, the SocialAPI ID of the message. See [Send a template](/platforms/whatsapp#send-a-template).
+</Update>
+
+<Update label="2026-08-30" description="Google" tags={["Google Business Profile", "Reviews"]}>
+  ## Review replies show their moderation state
+
+  A reply you send to a Google review returns `state`, which is `PENDING` until Google approves it. A reply is not published at the moment you send it. See [Replies are moderated](/platforms/google/reviews#replies-are-moderated).
+</Update>
+
+<Update label="2026-08-30" description="WhatsApp" tags={["WhatsApp", "Webhooks"]}>
+  ## WhatsApp webhooks include account and conversation IDs
+
+  Breaking: `dm.received` for WhatsApp now sets `account_id` to the SocialAPI account ID, and sets `conversation_id`. Before, `account_id` held the WhatsApp phone number ID, so update code that read it as one. See [dm.received](/guides/webhook-events#dmreceived).
+</Update>
+
+<Update label="2026-08-30" description="Facebook" tags={["Facebook", "Direct messages"]}>
+  ## Private replies reject buttons
+
+  A private reply that includes `buttons` returns `platform.facebook.private_reply_ineligible` with a message to send text only. Before, the buttons were dropped without an error. See [Private replies](/platforms/facebook#private-replies).
+</Update>
+
+<Update label="2026-08-29" description="Google" tags={["Google Business Profile", "Accounts"]}>
+  ## Google logins show their account email
+
+  `GET /v1/platforms/google/logins/{loginId}/locations` returns `login_name` and `login_email`, so you can tell Google logins apart. See [Connect another location to a brand](/platforms/google/locations#connect-another-location-to-a-brand).
+</Update>
+
+<Update label="2026-08-29" description="Google" tags={["Google Business Profile", "Accounts"]}>
+  ## Assign new locations without reconnecting
+
+  After a Google login is connected, its Business Profile locations can be assigned to brands without repeating OAuth. Locations added in Business Profile later appear in `GET /v1/platforms/google/logins/{loginId}/locations`. See [Connect another location to a brand](/platforms/google/locations#connect-another-location-to-a-brand).
+</Update>
+
+<Update label="2026-08-28" description="WhatsApp" tags={["WhatsApp", "Errors"]}>
+  ## WhatsApp replies inside the 24-hour window send
+
+  Replies to a contact inside the 24-hour service window are no longer rejected by SocialAPI with `whatsapp.window_closed`. WhatsApp decides whether a send is allowed. See [The 24-hour service window](/platforms/whatsapp#the-24-hour-service-window).
+</Update>
+
+<Update label="2026-08-28" description="Instagram and Facebook" tags={["Direct messages", "Instagram", "Facebook"]}>
+  ## React to direct messages
+
+  `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` adds your account's emoji reaction to a message, and `DELETE` on the same path removes it. Send the emoji character itself. Supported on Instagram and Facebook Messenger. See [React to a message](/guides/direct-messages#react-to-a-message).
+</Update>
+
+<Update label="2026-08-24" description="YouTube" tags={["YouTube", "Publishing"]}>
+  ## Studio tags on published videos
+
+  `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` accepts `tags`, which sets the video's tags in YouTube Studio. See [Update post](/platforms/youtube/publishing#4-update-post).
+</Update>
+
+<Update label="2026-08-23" description="Inbox" tags={["Inbox"]}>
+  ## Refresh an account's inbox on demand
+
+  `POST /v1/inbox/sync` refreshes one account's conversations, or one conversation when you send `conversation_id`. The call returns right away: poll `GET /v1/inbox/sync` until `state` is no longer `syncing`. A sync for a target that ran too recently returns `429`, and `Retry-After` gives the seconds to wait. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually).
+</Update>
+
+<Update label="2026-08-23" description="Threads" tags={["Threads", "Analytics"]}>
+  ## Threads insights and profile lookup (beta)
+
+  `GET /v1/platforms/threads/insights` returns engagement for one Threads post or for the account. `GET /v1/platforms/threads/profile-lookup` resolves a public profile by exact username. See [Insights](/platforms/threads#insights).
+</Update>
+
+<Update label="2026-08-23" description="Zalo" tags={["Zalo"]}>
+  ## Zalo is open to every account
+
+  Zalo no longer needs a beta flag or an allowlist entry. See [Zalo](/platforms/zalo).
+</Update>
+
+<Update label="2026-08-23" description="Publishing" tags={["Publishing", "Threads", "Instagram", "Google Business Profile"]}>
+  ## A publish without an ID fails
+
+  If Threads or Instagram accepts a publish without returning a media ID, or Google accepts a local post without returning its resource name, the target now fails instead of reporting success. See [Errors on a failed target](/platforms/threads/publishing#errors-on-a-failed-target).
+</Update>
+
+<Update label="2026-08-23" description="YouTube" tags={["YouTube", "Direct messages"]}>
+  ## YouTube daily reply limit
+
+  Each YouTube channel can post 5 comment replies per day, counted in Pacific time. A reply over the limit returns `validation.youtube_daily_reply_limit`. See [Comments](/platforms/youtube#comments).
+</Update>
+
+<Update label="2026-08-22" description="Facebook" tags={["Facebook", "Analytics"]}>
+  ## Reel metrics on post metrics
+
+  `GET /v1/posts/{pid}/metrics` returns metrics for Facebook Reels. Before, Reel targets were dropped from the response without an error. See [Retrieve posts](/platforms/facebook/publishing#6-retrieve-posts).
+</Update>
+
+<Update label="2026-08-22" description="Publishing" tags={["Publishing", "Media"]}>
+  ## One media list on posts
+
+  Post requests accept a single `media` array that mixes `url`, `media_id`, and `platform_attachment_id` items, in the order you send them. `platform_attachment_id` publishes only on Instagram, Threads, LinkedIn, LinkedIn Page, and X. `media_ids` still works but is ignored when `media` is set. See [Publish a platform attachment ID](/guides/media#publish-a-platform-attachment-id).
+</Update>
+
+<Update label="2026-08-21" description="Instagram" tags={["Instagram", "Direct messages"]}>
+  ## Messaging participant profiles
+
+  `GET /v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile` returns a messaging participant's profile, with follow status in both directions. Instagram returns it only for users who messaged the account or tapped an icebreaker or persistent menu item. For anyone else the call returns `403 platform.instagram.230`: Instagram did not disclose the relationship, which does not mean the user does not follow the account. See [Participant profile](/platforms/instagram#participant-profile).
+</Update>
+
+<Update label="2026-08-20" description="Inbox" tags={["Inbox"]}>
+  ## Comment and review endpoints accept SocialAPI IDs
+
+  Comment and review endpoints accept a SocialAPI interaction ID, such as `sapi_cmt_...` or `sapi_rev_...`, in place of the platform ID. See [What each endpoint accepts](/guides/ids#what-each-endpoint-accepts).
+</Update>
+
+<Update label="2026-08-19" description="Instagram" tags={["Analytics", "Instagram"]}>
+  ## Instagram account summary
+
+  `GET /v1/platforms/instagram/accounts/{id}/summary` returns profile counts and trailing 30-day insight totals for an Instagram account, such as reach, views, interactions, engaged accounts, and net follower change. Accounts connected before the insights permission was requested return `403` until they are reconnected. See [Account summary](/platforms/instagram#account-summary).
+</Update>
+
+<Update label="2026-08-17" description="TikTok" tags={["TikTok", "Errors"]}>
+  ## TikTok refusals return 4xx
+
+  Some TikTok refusals now return `403`, and daily post limits return `429` so you know to back off. Before, these returned `502`. The `platform.tiktok.<code>` error code is unchanged. See [Errors on a failed target](/platforms/tiktok/publishing#errors-on-a-failed-target).
+</Update>
+
+<Update label="2026-08-15" description="WhatsApp" tags={["WhatsApp"]}>
+  ## WhatsApp Business is open to every account
+
+  WhatsApp Business no longer needs a beta flag or an allowlist entry. See [WhatsApp](/platforms/whatsapp).
+</Update>
+
+<Update label="2026-08-15" description="Accounts" tags={["Accounts"]}>
+  ## Redirect URIs keep their query string
+
+  A redirect URI you register can include a query string. SocialAPI keeps it and adds its own callback parameters. If your URI has a parameter with the same name as a callback parameter, SocialAPI's value replaces yours. See [Connect accounts](/guides/connect-accounts).
+</Update>
+
+<Update label="2026-08-14" description="Accounts" tags={["Accounts", "Billing"]}>
+  ## Deleting an account cancels its subscription
+
+  `DELETE /v1/users/me` cancels the account's paid subscription before the account is deleted. If the cancellation fails, the deletion still goes through. See [Change or cancel your plan](/guides/plans#change-or-cancel-your-plan).
+</Update>
+
+<Update label="2026-08-13" description="Instagram" tags={["Instagram", "Publishing"]}>
+  ## Instagram collaboration invites
+
+  Collaborators are invited when you publish, through `collaborators` in the platform data, and `GET /v1/platforms/instagram/accounts/{id}/media/{mediaId}/collaborators` lists them for the publishing account only. The invited account accepts or declines with `POST` on `collab/accept` or `collab/decline`. Invites expire 14 days after they are sent. See [Collaboration invites](/platforms/instagram#collaboration-invites).
+</Update>
+
+<Update label="2026-08-12" description="Billing" tags={["Billing"]}>
+  ## Plan catalog and use case
+
+  `GET /v1/billing/plans` returns the plan catalog: names, taglines, prices, limits, and which plan is marked popular. `GET /v1/users/me` returns `use_case`. See [The plan catalog](/guides/plans#the-plan-catalog).
+</Update>
+
+<Update label="2026-08-12" description="Webhooks" tags={["Webhooks", "Instagram"]}>
+  ## Instagram comment events include the post permalink
+
+  Instagram `comment.received` events include `permalink`, the public URL of the post. The field is optional and set only for Instagram comments. See [comment.received](/guides/webhook-events#commentreceived).
+</Update>
+
+<Update label="2026-08-12" description="Publishing" tags={["Publishing"]}>
+  ## Look up a post by its platform ID
+
+  `GET /v1/posts/{pid}` and `GET /v1/posts/{pid}/metrics` accept a platform post ID as well as a SocialAPI post ID. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-08-10" description="TikTok" tags={["TikTok", "Publishing"]}>
+  ## Send a TikTok video to the creator's inbox
+
+  Set `post_mode` to `inbox` in the TikTok platform data to upload a video to the creator's TikTok inbox as a draft instead of publishing it. The `video.upload` scope is required. See [Draft in the TikTok app](/platforms/tiktok/publishing#draft-in-the-tiktok-app).
+</Update>
+
+<Update label="2026-08-09" description="Webhooks" tags={["Webhooks"]}>
+  ## Replay protection headers
+
+  Each webhook delivery includes `X-SocialAPI-Timestamp`, `X-SocialAPI-Delivery`, and `X-SocialAPI-Signature-V2`. The V2 signature is an HMAC-SHA256 over the timestamp, a `.` character, and the raw request body. Use them to reject replayed deliveries. See [Replay protection](/guides/webhooks#replay-protection).
+</Update>
+
+<Update label="2026-08-09" description="LinkedIn" tags={["LinkedIn", "Publishing"]}>
+  ## LinkedIn posts return a permalink
+
+  LinkedIn and LinkedIn Page posts return `permalink`, the URL of the published post. It was empty before. See [Retrieve posts](/platforms/linkedin/publishing#6-retrieve-posts).
+</Update>
+
+<Update label="2026-08-08" description="Threads" tags={["Threads", "Publishing"]}>
+  ## Threads publishes retry when the media is not ready
+
+  A Threads publish that fails because its media container is not ready yet is retried before it is reported as failed. See [Errors on a failed target](/platforms/threads/publishing#errors-on-a-failed-target).
+</Update>
+
+<Update label="2026-08-06" description="Facebook" tags={["Facebook", "Direct messages"]}>
+  ## Ineligible private replies return a stable error
+
+  A private reply that Meta rejects because the comment is not eligible returns `platform.facebook.private_reply_ineligible`. The message explains that the 7-day window has passed or that the comment already received a private reply. See [Private replies](/platforms/facebook#private-replies).
+</Update>
+
+<Update label="2026-08-06" description="Facebook" tags={["Facebook", "Accounts"]}>
+  ## List every Facebook Page
+
+  Listing a user's Facebook Pages returns every Page. Accounts with more than 25 Pages were cut off at 25. See [Pages of an account](/platforms/facebook#pages-of-an-account).
+</Update>
+
+<Update label="2026-08-05" description="Billing" tags={["Billing", "Facebook"]}>
+  ## Facebook Page limit per plan
+
+  Each brand's Facebook Pages are capped by plan. Assigning more Pages than the plan allows returns `platform.facebook.page_cap`. A plan change to a lower tier removes the Pages above the new limit. See [Plan allowances](/guides/plans#plan-allowances).
+</Update>
+
+<Update label="2026-08-04" description="TikTok" tags={["TikTok", "Accounts"]}>
+  ## TikTok profile fields in the account summary
+
+  `GET /v1/platforms/tiktok/accounts/{id}/summary` returns the creator's display name, username, avatar, follower, following, likes, and video counts, and bio. See [Account summary](/platforms/tiktok#account-summary).
+</Update>
+
+<Update label="2026-07-31" description="Facebook and Instagram" tags={["Direct messages", "Errors", "Facebook", "Instagram"]}>
+  ## Specific error codes for Facebook messaging and Meta throttling
+
+  Sending a Facebook message after the 24-hour messaging window closes returns `400 platform.facebook.window_closed`. Other permission refusals from Facebook return `403 platform.facebook.permission_denied`. See [The messaging window](/guides/direct-messages#the-messaging-window) and [Errors](/guides/errors).
+</Update>
+
+<Update label="2026-07-30" description="TikTok" tags={["Analytics", "TikTok"]}>
+  ## TikTok account summary and video sync
+
+  `GET /v1/platforms/tiktok/accounts/{id}/summary` returns the profile and video statistics of a TikTok account. `POST /v1/platforms/tiktok/accounts/{id}/sync` re-syncs the account's videos. See [Account summary](/platforms/tiktok#account-summary) and [Sync videos](/platforms/tiktok#sync-videos).
+</Update>
+
+<Update label="2026-07-28" description="Announcements" tags={["Announcements"]}>
+  ## Service announcements
+
+  `GET /v1/announcements` lists current service announcements, newest first, with a `seen` flag for the calling user. `POST /v1/announcements/{id}/seen` marks one as seen, and repeating the call is safe. Both calls are free and work with restricted API keys. See [Announcements](/guides/announcements).
+</Update>
+
+<Update label="2026-07-27" description="X / Twitter" tags={["Publishing", "X / Twitter"]}>
+  ## Images and video on X posts
+
+  Posts to X accept up to 4 images, 1 video, or 1 GIF. Uploads need the `media.write` scope, so an account connected before this change must reconnect before its first upload. A failed upload fails the whole post; the text is not published alone. See [Supported media](/platforms/twitter/publishing#2-supported-media).
+</Update>
+
+<Update label="2026-07-27" description="X / Twitter" tags={["Inbox", "X / Twitter"]}>
+  ## Hide X replies
+
+  X comments report `can_hide: true`, so you can hide them through the inbox moderation calls. Deleting X replies is still not offered, because X only allows deleting posts the account wrote. See [X comments](/platforms/twitter#comments).
+</Update>
+
+<Update label="2026-07-27" description="X / Twitter" tags={["Inbox", "X / Twitter"]}>
+  ## X comment lists
+
+  A post's X comments no longer include the post itself as its first comment. A `limit` below X's minimum no longer returns `400`; the list is trimmed to the number you asked for. See [X comments](/platforms/twitter#comments).
+</Update>
+
+<Update label="2026-07-27" description="X / Twitter" tags={["Direct messages", "X / Twitter"]}>
+  ## X DM replies go to the other person
+
+  When the newest message in an X conversation was sent by your account, the conversation now resolves to the other participant. Before this fix, a reply in that case went to your own account. See [Direct messages](/platforms/twitter#direct-messages).
+</Update>
+
+<Update label="2026-07-27" description="X / Twitter" tags={["Accounts", "X / Twitter"]}>
+  ## X accounts stay connected after an unexplained 401
+
+  A 401 from X that does not name an invalid or expired token no longer marks the account as needing a reconnect. A token that X reports as invalid or expired still does. See [Account status](/guides/connect-accounts#account-status).
+</Update>
+
+<Update label="2026-07-17" description="Threads" tags={["Errors", "Threads"]}>
+  ## Threads error details from Meta
+
+  A bare error code 10 from Threads returns `422 platform.threads.10` with Meta's message, subcode, and trace ID. Before, it returned "Operation not supported for this platform" and dropped those details. See [Errors](/guides/errors).
+</Update>
+
+<Update label="2026-07-16" description="WhatsApp" tags={["Accounts", "Direct messages", "WhatsApp"]}>
+  ## WhatsApp Business (beta)
+
+  WhatsApp Business is available in beta. Request access from the dashboard, then connect a phone number through Meta's signup flow to read and reply to messages, send message templates, and check the phone number status. See [Connecting](/platforms/whatsapp#connecting).
+</Update>
+
+<Update label="2026-07-14" description="Google Business Profile" tags={["Accounts", "Google Business Profile"]}>
+  ## Google 403 responses do not require a reconnect
+
+  A 403 from Google, such as posting disabled by a policy, returns `403 platform.google.access_denied` with Google's message. The account no longer needs a reconnect for it. Only a 401 from Google requires one. See [Account status](/guides/connect-accounts#account-status).
+</Update>
+
+<Update label="2026-07-12" description="API keys" tags={["Accounts"]}>
+  ## Edit and rotate API keys
+
+  `PATCH /v1/keys/{id}` changes a key's name, scopes, and brand restrictions, and the key value stays the same. `POST /v1/keys/{id}/rotate` issues a new secret and stops the old one working immediately. The new secret is shown once. See [Scoped keys](/guides/scoped-keys).
+</Update>
+
+<Update label="2026-07-10" description="API keys" tags={["Accounts"]}>
+  ## Scoped and brand-restricted API keys
+
+  `POST /v1/keys` accepts `scopes` and `brand_ids` to limit a key to the actions and brands you choose. `GET /v1/keys/scopes` lists the scopes you can assign. A call outside a key's scopes returns `403 auth.insufficient_scope`. See [Scoped keys](/guides/scoped-keys).
+</Update>
+
+<Update label="2026-07-10" description="Direct messages" tags={["Direct messages"]}>
+  ## Stable DM conversation IDs
+
+  A direct message conversation keeps the `conversation_id` first delivered for it. The ID no longer changes partway through a thread. See [Conversations](/guides/direct-messages#conversations).
+</Update>
+
+<Update label="2026-07-09" description="X / Twitter" tags={["Accounts", "X / Twitter"]}>
+  ## X accounts stay connected after a duplicate post is refused
+
+  When X refuses a post as duplicate content, the account keeps working and does not need a reconnect. See [Account status](/guides/connect-accounts#account-status).
+</Update>
+
+<Update label="2026-07-06" description="Inbox" tags={["Inbox", "Publishing"]}>
+  ## brand_id filters on posts, comments, and conversations
+
+  `GET /v1/posts`, `GET /v1/inbox/comments`, and `GET /v1/inbox/conversations` now honor the `brand_id` parameter. Before, it was ignored and the results covered every brand. See [Concepts](/guides/concepts).
+</Update>
+
+<Update label="2026-07-06" description="Reviews" tags={["Reviews", "Google Business Profile"]}>
+  ## Reviews are listed per account
+
+  Breaking: `GET /v1/inbox/reviews` now returns the accounts that have reviews, each with its rating summary. To list reviews, call `GET /v1/inbox/reviews/{account_id}` for one account. See [The two list endpoints](/guides/reviews#the-two-list-endpoints).
+</Update>
+
+<Update label="2026-07-04" description="Google Business Profile" tags={["Accounts", "Google Business Profile"]}>
+  ## Choose one Google Business Profile
+
+  When a Google login manages more than one Business Profile, the connection stays in `selection_required` status until you choose one. `GET /v1/accounts/pending/{connection_id}` lists the candidates, and `POST /v1/accounts/pending/{connection_id}/select` connects the one you pick. The MCP tools `social_api_list_pending_profiles` and `social_api_select_pending_profile` do the same. See [Choose a Google Business Profile](/guides/connect-accounts#choose-a-google-business-profile).
+</Update>
+
+<Update label="2026-07-04" description="Google Business Profile" tags={["Accounts", "Google Business Profile"]}>
+  ## Every Google account and location is listed
+
+  Listing Google Business Profile accounts and locations now follows every page of results. Before, a long list was cut short, and the profiles past the cut could not be connected. See [Choose a Google Business Profile](/guides/connect-accounts#choose-a-google-business-profile).
+</Update>
+
+<Update label="2026-06-28" description="Zalo" tags={["Direct messages", "Publishing", "Zalo"]}>
+  ## Zalo Official Account (beta)
+
+  Zalo Official Account is available in beta. Connect an Official Account to read and send direct messages, and to create, update, list, and delete article posts. See [Zalo](/platforms/zalo).
+</Update>
+
+<Update label="2026-06-22" description="Mentions" tags={["Mentions", "Instagram", "Facebook"]}>
+  ## Reply to a mention as a public comment
+
+  `POST /v1/accounts/{id}/mentions/reply` posts a public comment in reply to a mention on Instagram or Facebook, including on a third-party post where a normal comment reply is not allowed. Each reply uses 1 interaction credit. See [Mentions](/guides/mentions).
+</Update>
+
+<Update label="2026-06-20" description="Publishing" tags={["Publishing"]}>
+  ## Post type on each target
+
+  Each target in a post response includes `media_type`, one of `feed`, `reel`, `stories`, or `carousel`. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-06-18" description="Publishing" tags={["Publishing"]}>
+  ## Platform settings on the post
+
+  `POST /v1/posts`, `PATCH /v1/posts/{pid}`, and `POST /v1/posts/validate` accept `platform_data` at the top level, keyed by platform name, for example `{"instagram": {"content_type": "feed"}}`. A target's own `platform_data` takes precedence over the top-level value. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-06-17" description="Instagram and Facebook" tags={["Webhooks", "Instagram", "Facebook"]}>
+  ## Mention events include the mention content
+
+  `mention.received` events for Instagram and Facebook include the text, media, permalink, and author of the mention when the platform returns them. Any field can be empty. See [Webhook events](/guides/webhook-events).
+</Update>
+
+<Update label="2026-06-16" description="LinkedIn" tags={["Publishing", "LinkedIn"]}>
+  ## LinkedIn post options
+
+  LinkedIn posts accept `platform_data` for `visibility`, `disable_reshare`, alt text for each image (`alt_text` or `alt_texts`), and `media_title`. Invalid values fail validation before the post is published. See [LinkedIn publishing](/platforms/linkedin/publishing).
+</Update>
+
+<Update label="2026-06-16" description="LinkedIn" tags={["Publishing", "LinkedIn"]}>
+  ## LinkedIn article and link posts
+
+  LinkedIn article posts accept `article_url`, `article_title`, `article_description`, and a thumbnail image in `platform_data`. Posts can add a call-to-action button with `cta_label` and `cta_url`. See [LinkedIn publishing](/platforms/linkedin/publishing).
+</Update>
+
+<Update label="2026-06-16" description="Instagram and Facebook" tags={["Direct messages", "Webhooks", "Instagram", "Facebook"]}>
+  ## Quick replies, buttons, and carousels in DMs
+
+  `POST /v1/inbox/conversations/{id}/messages` accepts `quick_replies`, `buttons`, and `cards` for Instagram and Facebook conversations. When a person taps a postback button, SocialAPI sends a `dm.postback` webhook event. See [Direct messages](/guides/direct-messages).
+</Update>
+
+<Update label="2026-06-16" description="Instagram and Facebook" tags={["Direct messages", "Instagram", "Facebook"]}>
+  ## Multiple attachments and replies in DMs
+
+  A DM request can send more than one attachment, each as its own message, using `attachments` with a `source_type` of `url`, `media_id`, or `platform_attachment_id`. `reply_to_message_id` sends the first message as a reply to an earlier message. `attachment_url` is deprecated in favor of `attachments`. See [Direct messages](/guides/direct-messages).
+</Update>
+
+<Update label="2026-06-16" description="Instagram" tags={["Publishing", "Instagram"]}>
+  ## Read Instagram stories
+
+  `GET /v1/platforms/instagram/accounts/{id}/stories` lists the account's active stories. It supports `limit` and `cursor`. See [Instagram](/platforms/instagram).
+</Update>
+
+<Update label="2026-06-14" description="Publishing" tags={["Publishing"]}>
+  ## Posts are validated before they are scheduled or published
+
+  Scheduling or publishing a post runs the same checks as `POST /v1/posts/validate`. If the checks find errors, the request returns `400` with `publishing.validation_failed` and the list of issues. Send `skip_validation: true` to schedule or publish anyway. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-06-14" description="Facebook" tags={["Webhooks", "Accounts", "Facebook"]}>
+  ## Removed Facebook Pages are reported
+
+  When a Facebook Page is removed or its access is revoked, SocialAPI sends a `page.removed` webhook event. If the account has no Pages left, its status becomes `reconnect_recommended`. See [Webhook events](/guides/webhook-events).
+</Update>
+
+<Update label="2026-06-14" description="LinkedIn" tags={["Inbox", "LinkedIn"]}>
+  ## LinkedIn comment authors include a headline and profile link
+
+  Comments on LinkedIn Page posts include `author_headline` and `author_profile_url` when LinkedIn returns them. See [Comments](/guides/comments).
+</Update>
+
+<Update label="2026-06-11" description="Accounts" tags={["Accounts"]}>
+  ## Connect without a registered redirect URI
+
+  `POST /v1/accounts/connect` accepts any valid `https` `redirect_uri` until you register at least one in the dashboard. After that, only registered URIs are accepted, and others return `400 validation.redirect_uri_not_whitelisted`. See [Connect accounts](/guides/connect-accounts).
+</Update>
+
+<Update label="2026-06-09" description="TikTok" tags={["Publishing", "TikTok"]}>
+  ## Choose the cover photo for TikTok photo posts
+
+  Set `platform_data.photo_cover_index` on a TikTok photo post to choose which photo is the cover. The default is the first photo, index `0`. See [TikTok publishing](/platforms/tiktok/publishing).
+</Update>
+
+<Update label="2026-06-08" description="Instagram and Facebook" tags={["Direct messages", "Instagram", "Facebook"]}>
+  ## Message tags on DMs
+
+  `message_tag` on a DM request sends a message outside the standard 24-hour window on Instagram and Facebook. Instagram accepts only `HUMAN_AGENT`, which requires Meta's Human Agent access, and Facebook also accepts `ACCOUNT_UPDATE`, `CONFIRMED_EVENT_UPDATE`, `CUSTOMER_FEEDBACK`, and `POST_PURCHASE_UPDATE`. See [Direct messages](/guides/direct-messages).
+</Update>
+
+<Update label="2026-06-08" description="Threads and X" tags={["Publishing", "Threads", "X / Twitter"]}>
+  ## Thread chains on Threads and X
+
+  `segments` on `POST /v1/posts` adds up to 25 follow-up posts that publish as a native thread on Threads and X. Each segment takes `text`, plus `media_ids` on Threads (X publishes segment text only). The response lists the published segment IDs in `thread_post_ids`. See [Threads publishing](/platforms/threads/publishing) and [X publishing](/platforms/twitter/publishing).
+</Update>
+
+<Update label="2026-06-08" description="YouTube" tags={["Inbox", "YouTube"]}>
+  ## YouTube comments in the inbox list
+
+  `GET /v1/inbox/comments` includes YouTube posts only when the request includes `account_id`. The YouTube list returns a single page with no cursor. See [Comments](/guides/comments).
+</Update>
+
+<Update label="2026-06-07" description="YouTube" tags={["Inbox", "YouTube"]}>
+  ## Moderate and edit YouTube comments
+
+  `POST /v1/platforms/youtube/comments/{commentId}/moderate` sets a comment to `published`, `held_for_review`, or `rejected`. Set `ban_author` to `true` to ban the author when the status is `rejected`. `PATCH /v1/platforms/youtube/comments/{commentId}` changes the comment text. Both calls require `account_id` and `post_id`. See [YouTube](/platforms/youtube).
+</Update>
+
+<Update label="2026-06-07" description="Comments" tags={["Inbox"]}>
+  ## Filter comments by status, order, and keyword
+
+  `GET /v1/inbox/comments/{postId}` accepts `moderation_status` (`published`, `held_for_review`, or `likely_spam`), `order` (`recent` or `relevance`), and `q` to search comment text. Other platforms ignore these parameters. See [Comments](/guides/comments).
+</Update>
+
+<Update label="2026-06-06" description="Telegram" tags={["Direct messages", "Telegram"]}>
+  ## Telegram direct messages
+
+  Telegram is available to all accounts. Connect a Telegram bot to read and send direct messages. See [Telegram](/platforms/telegram).
+</Update>
+
+<Update label="2026-06-06" description="YouTube" tags={["Analytics", "YouTube"]}>
+  ## YouTube channel summary, re-sync, and video edits
+
+  `GET /v1/platforms/youtube/accounts/{id}/summary` returns the channel summary. `POST /v1/platforms/youtube/accounts/{id}/sync` re-syncs the channel's videos. `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` edits a published video. See [YouTube](/platforms/youtube).
+</Update>
+
+<Update label="2026-06-04" description="Accounts" tags={["Accounts"]}>
+  ## Page IDs accept platform IDs
+
+  Requests that take a page ID accept either the SocialAPI page ID (`sapi_page_...`) or the platform's own page ID. See [IDs](/guides/ids).
+</Update>
+
+<Update label="2026-06-03" description="Facebook" tags={["Accounts", "Facebook"]}>
+  ## Facebook Page details
+
+  Facebook Page responses from `GET /v1/accounts/{id}/pages` include `followers_count`, `category`, `username`, `link`, `about`, `cover_photo_url`, `verification_status`, and `enriched_at`. SocialAPI fills these when a Page is connected and refreshes them over time. See [Connect accounts](/guides/connect-accounts).
+</Update>
+
+<Update label="2026-06-01" description="X" tags={["Publishing", "X / Twitter"]}>
+  ## X post settings in platform_data
+
+  X posts accept `platform_data` for `reply_settings`, `community_id`, `geo` and `geo_place_id`, `for_super_followers_only`, and `nullcast`. See [X publishing](/platforms/twitter/publishing).
+</Update>
+
+<Update label="2026-06-01" description="Facebook" tags={["Publishing", "Facebook"]}>
+  ## Publish Facebook Reels
+
+  Set `content_type` to `reel` in the Facebook `platform_data` to publish a Reel. A Reel takes a single video. A Reel fails if Facebook reports that processing did not finish. See [Facebook publishing](/platforms/facebook/publishing).
+</Update>
+
+<Update label="2026-05-31" description="LinkedIn" tags={["Publishing", "LinkedIn"]}>
+  ## LinkedIn member accounts
+
+  Connect a LinkedIn member account to publish text, images, and videos as that member, with multi-image posts limited to images. Comments, reactions, and reading the member's posts are not supported, and the member reconnects every 60 days when LinkedIn access expires. See [LinkedIn publishing](/platforms/linkedin/publishing).
+</Update>
+
+<Update label="2026-05-30" description="Errors" tags={["Errors"]}>
+  ## Send your own X-Request-ID
+
+  Send an `X-Request-ID` header to name a request. A valid value comes back on the response, and SocialAPI generates one when you send none. Log it with each call so you can match a request to a support ticket. See [Debugging](/guides/debugging).
+</Update>
+
+<Update label="2026-05-26" description="Webhooks" tags={["Webhooks", "Publishing"]}>
+  ## Post lifecycle webhook events
+
+  Subscribe to `post.scheduled`, `post.published`, `post.partial`, `post.failed`, `post.updated`, `post.deleted`, `post.unpublished`, and `post.retried` to follow posts you create. Each event carries the post's SocialAPI ID. See [Webhook events](/guides/webhook-events).
+</Update>
+
+<Update label="2026-05-26" description="Direct messages" tags={["Webhooks", "Direct messages"]}>
+  ## Direct message status events
+
+  `dm.status.sent`, `dm.status.delivered`, `dm.status.read`, and `dm.status.failed` report the delivery state of a message you sent. Which statuses arrive depends on the platform. See [Webhook events](/guides/webhook-events).
+</Update>
+
+<Update label="2026-05-26" description="Facebook" tags={["Publishing", "Facebook"]}>
+  ## Facebook multi-photo posts
+
+  A Facebook post with 2 to 10 images publishes as one multi-photo album. Images and videos cannot be mixed in one album: the request fails with `media_mixed`, and more than 10 images fail with `media_too_many`. See [Facebook publishing](/platforms/facebook/publishing).
+</Update>
+
+<Update label="2026-05-26" description="Inbox" tags={["Inbox"]}>
+  ## Mention list pagination
+
+  `GET /v1/accounts/{id}/mentions` returns `next_cursor` when more mentions exist. Pass it back to get the next page, and stop when the field is absent. See [Mentions](/guides/mentions).
+</Update>
+
+<Update label="2026-05-26" description="Inbox" tags={["Inbox", "Webhooks"]}>
+  ## Author usernames
+
+  Authors in interactions and webhook events include a `username` when the platform provides one, next to `name` and `avatar_url`. See [Webhook events](/guides/webhook-events#interaction-payload).
+</Update>
+
+<Update label="2026-05-25" description="Threads" tags={["Publishing", "Threads"]}>
+  ## Threads carousel posts
+
+  A Threads post with more than one media item publishes as a carousel. See [Threads publishing](/platforms/threads/publishing).
+</Update>
+
+<Update label="2026-05-25" description="Threads" tags={["Analytics", "Threads"]}>
+  ## Threads like and reply counts
+
+  Threads posts report like and reply counts taken from the platform. A count the platform does not return reads as 0. See [Threads publishing](/platforms/threads/publishing).
+</Update>
+
+<Update label="2026-05-25" description="Threads" tags={["Inbox", "Threads"]}>
+  ## Threads reply deletion
+
+  A Threads reply can be deleted only when the connected account wrote it, and the reply's capability flags now say so. Replies to your own posts can still be hidden. See [Comments](/guides/comments).
+</Update>
+
+<Update label="2026-05-25" description="Webhooks" tags={["Webhooks", "Accounts"]}>
+  ## account.connected and account.disconnected events
+
+  Subscribe to `account.connected` to hear when an account finishes connecting, and to `account.disconnected` when one is disconnected. Each event carries the account's details. See [Webhook events](/guides/webhook-events).
+</Update>
+
+<Update label="2026-05-21" description="Facebook" tags={["Accounts", "Facebook"]}>
+  ## Facebook connect requests business management access
+
+  Connecting a Facebook account asks for the `business_management` permission, which lets SocialAPI list Pages owned through a Meta Business Portfolio. Accounts connected before this change need to reconnect to grant it. See [Facebook publishing](/platforms/facebook/publishing).
+</Update>
+
+<Update label="2026-05-20" description="Publishing" tags={["Publishing"]}>
+  ## Post text can live on each target
+
+  `text` on `POST /v1/posts` is optional when every entry in `targets` sets its own `text`. Otherwise the top-level `text` is still required. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-05-18" description="Publishing" tags={["Publishing"]}>
+  ## Post deletion reports each platform
+
+  `DELETE /v1/posts/{pid}` returns `deleted` and a `results` list with one outcome per platform: `deleted`, `not_supported`, or `failed`. A platform that cannot delete a published post keeps its copy live. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-05-18" description="TikTok" tags={["Publishing", "TikTok"]}>
+  ## TikTok comment, duet, and stitch are off unless you turn them on
+
+  Set `disable_comment`, `disable_duet`, or `disable_stitch` to `false` in `platform_data` to allow an interaction. An omitted flag disables that interaction, and an interaction the creator's TikTok account has turned off stays off whatever you send. See [TikTok publishing](/platforms/tiktok/publishing).
+</Update>
+
+<Update label="2026-05-17" description="Errors" tags={["Errors", "Threads"]}>
+  ## Threads reconnect_required error
+
+  When Threads rejects a write because the connected account lacks a permission, the call returns `403` with `platform.threads.reconnect_required`. Reconnect the Threads account to grant the permission. See [Errors](/guides/errors).
+</Update>
+
+<Update label="2026-05-17" description="Instagram" tags={["Direct messages", "Instagram"]}>
+  ## Instagram DM attachments and shared posts
+
+  Instagram direct messages now carry their attachments, including shared posts and shared stories, in direct message events and message lists. See [Direct messages](/guides/direct-messages#attachments).
+</Update>
+
+<Update label="2026-05-16" description="TikTok" tags={["Publishing", "TikTok"]}>
+  ## Breaking: TikTok privacy level is required
+
+  Breaking: `platform_data.privacy_level` must now be set on every TikTok post. SocialAPI no longer picks a default, so a post without it fails with `validation.privacy_level_required`. Send one of the values TikTok lists for the creator. See [TikTok publishing](/platforms/tiktok/publishing).
+</Update>
+
+<Update label="2026-05-13" description="YouTube" tags={["Accounts", "YouTube"]}>
+  ## YouTube open to every account
+
+  YouTube no longer requires beta access, so any account can connect a YouTube channel. See [YouTube publishing](/platforms/youtube/publishing).
+</Update>
+
+<Update label="2026-05-08" description="Direct messages" tags={["Webhooks", "Direct messages"]}>
+  ## Direct message events include conversation and recipient
+
+  DM events include `conversation_id`, the SocialAPI ID of the conversation, and `recipient`, the person who received the message. See [Webhook events](/guides/webhook-events).
+</Update>
+
+<Update label="2026-05-06" description="Direct messages" tags={["Webhooks", "Direct messages"]}>
+  ## dm.sent and dm.referral events
+
+  `dm.sent` fires for messages the connected account sends on Instagram and Facebook. `dm.referral` fires when a conversation starts from an ad or link click. See [Webhook events](/guides/webhook-events).
+</Update>
+
+<Update label="2026-05-02" description="MCP" tags={["MCP"]}>
+  ## Token endpoint accepts HTTP Basic client credentials
+
+  `POST /oauth/token` accepts the client ID and secret in an `Authorization: Basic` header, as RFC 6749 allows. A `client_secret` in the body still works. See [OAuth](/integrations/oauth).
+</Update>
+
+<Update label="2026-05-02" description="MCP" tags={["MCP"]}>
+  ## Token endpoint errors use OAuth error fields
+
+  Errors from `POST /oauth/token` return `error` and `error_description` with the codes OAuth defines, such as `invalid_request`, `unsupported_grant_type`, and `invalid_client`. See [OAuth](/integrations/oauth).
+</Update>
+
+<Update label="2026-05-02" description="MCP" tags={["MCP"]}>
+  ## Client registration returns expiry fields
+
+  `POST /oauth/register` returns `client_id_issued_at` and `client_secret_expires_at`. A `client_secret_expires_at` of `0` means the secret does not expire. See [OAuth](/integrations/oauth).
+</Update>
+
+<Update label="2026-04-29" description="Accounts" tags={["Accounts"]}>
+  ## Send users back to your app after connecting
+
+  Pass `redirect_uri` and `state` on `POST /v1/accounts/connect` to send the user to your own URL when the connection finishes. The URL receives `status`, `platform`, `account_id` or `account_ids`, and your `state` as query parameters, or `status=error` with an `error` code on failure. The `redirect_uri` must be on your allowed list in the dashboard, or the call returns `400 validation.redirect_uri_not_whitelisted`. See [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+</Update>
+
+<Update label="2026-04-24" description="X / Twitter" tags={["Accounts", "X / Twitter"]}>
+  ## Connect X with your own developer app
+
+  X connections can use your own X developer app. Save its client ID and secret in the dashboard, for your account or for one brand. If X rejects the saved credentials, the call returns `byok.credentials_invalid`. See [Use your own X app](/platforms/twitter/own-app).
+</Update>
+
+<Update label="2026-04-22" description="Instagram and Facebook" tags={["Accounts", "Instagram", "Facebook"]}>
+  ## Connect Instagram and Facebook without an access request
+
+  Any account can connect Instagram and Facebook now. Neither platform needs an access request first. See [Instagram](/platforms/instagram) and [Facebook](/platforms/facebook).
+</Update>
+
+<Update label="2026-04-13" description="MCP" tags={["MCP", "Webhooks"]}>
+  ## Webhook tools for AI agents
+
+  AI agents can read and test webhooks with `social_api_get_webhook` and `social_api_test_webhook`, and inspect deliveries with `social_api_list_webhook_deliveries`, `social_api_get_webhook_delivery`, and `social_api_retry_webhook_delivery`. See [MCP tools reference](/integrations/tools#webhooks).
+</Update>
+
+<Update label="2026-04-12" description="TikTok" tags={["Publishing", "TikTok"]}>
+  ## TikTok privacy level is optional
+
+  `privacy_level` is optional on TikTok posts. When you leave it out, SocialAPI uses `SELF_ONLY` if TikTok allows it for the account, and otherwise the first option TikTok returns. Validation reports the default as a warning. Before this change, a missing `privacy_level` returned `400 validation.privacy_level_required`. See [Platform data fields](/platforms/tiktok/publishing#platform-data-fields).
+</Update>
+
+<Update label="2026-04-11" description="Webhooks" tags={["Webhooks"]}>
+  ## Webhook delivery history and retries
+
+  `GET /v1/webhooks/{id}/deliveries` lists the deliveries of a webhook endpoint, and `GET /v1/webhooks/{id}/deliveries/{did}` returns one. `POST /v1/webhooks/{id}/deliveries/{did}/retry` sends a delivery again, and `POST /v1/webhooks/{id}/test` sends a test event. Delivery history is kept for 3 days on Free, 7 days on Starter, 30 days on Pro, and 90 days on Business and Enterprise. See [Monitor deliveries](/guides/webhooks#monitor-deliveries) and [Test an endpoint](/guides/webhooks#test-an-endpoint).
+</Update>
+
+<Update label="2026-04-11" description="Events" tags={["Webhooks"]}>
+  ## Event summary counts
+
+  `GET /v1/events/summary` returns event totals, failure counts, and breakdowns by category and error category for a time window. Pass `from` and `to` as RFC 3339 timestamps. The `social_api_events_summary` MCP tool returns the same counts. See [Events, usage, and your SocialAPI account](/integrations/tools#events-usage-and-your-socialapi-account).
+</Update>
+
+<Update label="2026-04-11" description="Facebook" tags={["Publishing", "Facebook"]}>
+  ## Facebook post targets report their Page
+
+  A Facebook post target includes `metadata` with the `page_id` and `page_name` of the Page that published it. See [Facebook publishing](/platforms/facebook/publishing).
+</Update>
+
+<Update label="2026-04-10" description="Instagram" tags={["Publishing", "Instagram"]}>
+  ## Instagram content types and validation
+
+  Instagram posts take a `content_type` of `feed`, `reel`, `carousel`, or `stories`, and `POST /v1/posts/validate` checks it along with the media, `alt_text`, `collaborators`, and cover settings for each Instagram target. See [Instagram publishing](/platforms/instagram/publishing).
+</Update>
+
+<Update label="2026-04-08" description="Facebook" tags={["Accounts", "Facebook"]}>
+  ## Pages on Facebook accounts
+
+  A Facebook account can manage more than one Page: `GET /v1/accounts/{id}/pages` lists them, and `PATCH /v1/accounts/{id}/pages/{pageId}` sets `is_default` or `is_active`. Pass `page_id` to choose the Page on post targets, on `GET /v1/posts`, and on the inbox endpoints. The MCP tools are `social_api_list_account_pages` and `social_api_update_account_page`. See [Facebook Pages](/guides/connect-accounts#facebook-pages).
+</Update>
+
+<Update label="2026-04-07" description="Errors" tags={["Errors"]}>
+  ## Breaking: error responses have an error object
+
+  Error responses now put the details in an `error` object: `{"error": {"code": "...", "message": "...", "meta": {}}}`. Before, `error` was a string and `code` sat at the top level. Read `error.code` for the machine-readable code and `error.message` for the text; `meta` appears only when there are extra details, such as the name of the field that failed. See [Handling errors](/guides/errors#handling-errors).
+</Update>
+
+<Update label="2026-04-07" description="Publishing" tags={["Publishing"]}>
+  ## Breaking: a post where every target fails returns 422
+
+  `POST /v1/posts` returns `422` when every target fails, instead of `502`. Partial failures still return `207`. If your code treats `502` as a failed publish, check for `422` instead. See [Publishing errors](/guides/publishing#errors).
+</Update>
+
+<Update label="2026-04-06" description="TikTok" tags={["Accounts", "TikTok"]}>
+  ## Creator info for TikTok accounts
+
+  `GET /v1/accounts/{id}/creator-info` returns the privacy levels, interaction settings, and posting availability for a TikTok account. Read it before you publish. Other platforms return `501`. See [Creator info and validation](/platforms/tiktok/publishing#creator-info-and-validation).
+</Update>
+
+<Update label="2026-04-06" description="Publishing" tags={["Publishing"]}>
+  ## Validation checks TikTok targets
+
+  `POST /v1/posts/validate` checks each TikTok target against TikTok's own rules for the account. Errors set `valid` to `false`, and warnings are returned without blocking the post. See [Validate before you publish](/guides/publishing#validate-before-you-publish).
+</Update>
+
+<Update label="2026-04-06" description="TikTok" tags={["Publishing", "TikTok"]}>
+  ## Choose the TikTok video cover frame
+
+  TikTok video posts accept `video_cover_timestamp_ms` in `platform_data` to pick the frame used as the cover. See [Platform data fields](/platforms/tiktok/publishing#platform-data-fields).
+</Update>
+
+<Update label="2026-04-06" description="YouTube" tags={["Accounts", "Publishing", "Inbox", "YouTube"]}>
+  ## YouTube (beta)
+
+  Connect a YouTube channel to publish, update, and delete videos, and to read, reply to, moderate, hide, and delete comments. Request access from the dashboard. See [YouTube](/platforms/youtube).
+</Update>
+
+<Update label="2026-04-05" description="YouTube" tags={["Publishing", "YouTube"]}>
+  ## More YouTube publishing options
+
+  YouTube posts now apply these `platform_data` fields: `made_for_kids`, `license`, `embeddable`, `public_stats_viewable`, `publish_at`, `notify_subscribers`, `recording_date`, `default_language`, `playlist_id`, and `contains_synthetic_media`. The first comment is posted after upload, and `playlist_id` adds the video to that playlist. See [Platform data fields](/platforms/youtube/publishing#platform-data-fields).
+</Update>
+
+<Update label="2026-04-05" description="LinkedIn" tags={["Inbox", "LinkedIn"]}>
+  ## LinkedIn comment replies, likes, and deletes
+
+  Replies, likes, and deletes work on LinkedIn comments, through the same endpoints as the other platforms. See [Comments](/guides/comments#list-comments-and-replies) and [LinkedIn](/platforms/linkedin).
+</Update>
+
+<Update label="2026-04-04" description="Comments" tags={["Inbox"]}>
+  ## Replies to a comment
+
+  `GET /v1/inbox/comments/{postId}/{commentId}/replies` returns the replies to a comment, with cursor pagination. The response has the same shape as the top-level comment list. See [List comments and replies](/guides/comments#list-comments-and-replies).
+</Update>
+
+<Update label="2026-04-02" description="Analytics" tags={["Analytics", "MCP"]}>
+  ## MCP tools for exports
+
+  AI agents can create, list, and read analytics exports with `social_api_create_export`, `social_api_list_exports`, `social_api_get_export`, and `social_api_get_export_videos`. See [MCP tools reference](/integrations/tools#analytics-and-exports).
+</Update>
+
+<Update label="2026-04-01" description="Analytics" tags={["Analytics"]}>
+  ## Videos of an export
+
+  `GET /v1/exports/{id}/videos` returns the videos of a completed export. See [Exports](/guides/analytics#exports).
+</Update>
+
+<Update label="2026-03-28" description="Analytics" tags={["Analytics"]}>
+  ## Analytics exports
+
+  `POST /v1/accounts/{id}/export` starts an Excel export of an account's analytics. Fetch an export with `GET /v1/exports/{id}` or list them with `GET /v1/exports`. The number of exports per billing period depends on your plan. See [Analytics](/guides/analytics).
+</Update>
+
+<Update label="2026-03-27" description="Webhooks" tags={["Webhooks"]}>
+  ## Event history
+
+  `GET /v1/events` returns events for your account, such as account connections and disconnections. How far back you can query depends on your plan.
+</Update>
+
+<Update label="2026-03-27" description="Publishing" tags={["Publishing"]}>
+  ## Post logs replaced by events
+
+  Breaking: `GET /v1/posts/logs` and `GET /v1/posts/{pid}/logs` are removed. Read event history from `GET /v1/events` instead.
+</Update>
+
+<Update label="2026-03-27" description="Accounts" tags={["Accounts"]}>
+  ## Invite links
+
+  `POST /v1/invites` creates a single-use link that lets someone connect an account to a brand. List a brand's links with `GET /v1/invites` and revoke one with `DELETE /v1/invites/{id}`. The same actions are available as MCP tools. See [Connect accounts](/guides/connect-accounts).
+</Update>
+
+<Update label="2026-03-27" description="Accounts" tags={["Accounts"]}>
+  ## Platform access requests
+
+  Some platforms need access approval before an account can connect to them. A connect call for a platform you have no access to returns `403` with the error code `platform_not_available`. Request access from the dashboard; TikTok is open to every account. See [Platforms](/platforms/overview).
+</Update>
+
+<Update label="2026-03-27" description="Authentication" tags={["Authentication"]}>
+  ## Authorization header without Bearer
+
+  The `Authorization` header accepts a raw API key as well as `Bearer <key>`. See [Authentication](/guides/authentication).
+</Update>
+
+<Update label="2026-03-27" description="Instagram" tags={["Inbox", "Instagram"]}>
+  ## Comment replies include parent_id
+
+  Instagram comment replies include `parent_id`, the ID of the comment they answer. See [Comments](/guides/comments).
+</Update>
+
+<Update label="2026-03-26" description="Accounts" tags={["Accounts"]}>
+  ## Brands
+
+  A brand groups connected accounts. Manage brands with `GET /v1/brands`, `POST /v1/brands`, `PATCH /v1/brands/{id}`, and `DELETE /v1/brands/{id}`. Pass `brand_id` when you connect an account. See [Concepts](/guides/concepts).
+</Update>
+
+<Update label="2026-03-26" description="Billing" tags={["Billing"]}>
+  ## Usage reports brands
+
+  Breaking: `GET /v1/usage` returns `brands_used` and `brands_limit` in place of `accounts_used` and `accounts_limit`. Update clients that read the old names. See [Plans](/guides/plans).
+</Update>
+
+<Update label="2026-03-22" description="Inbox" tags={["Inbox"]}>
+  ## Per-account inbox routes removed
+
+  Breaking: these routes are removed: `GET /v1/accounts/{id}/dms`, `GET /v1/accounts/{id}/reviews`, `GET /v1/accounts/{id}/posts/{pid}/comments`, `POST /v1/accounts/{id}/dms/{tid}/send`, `POST /v1/accounts/{id}/interactions/{iid}/reply`, and the moderation and reply-thread routes beside them. Use the `/v1/inbox` routes instead. `GET /v1/accounts/{id}/mentions` still works. See [Inbox](/guides/inbox).
+</Update>
+
+<Update label="2026-03-22" description="Inbox" tags={["Inbox", "Direct messages"]}>
+  ## Unified inbox
+
+  `GET /v1/inbox/conversations` lists direct message threads, and `GET /v1/inbox/comments` lists posts that have comments. Reply, hide, delete, like, and send private replies to comments from the same routes. Reviews are at `/v1/inbox/reviews`. See [Inbox](/guides/inbox) and [Direct messages](/guides/direct-messages).
+</Update>
+
+<Update label="2026-03-22" description="Publishing" tags={["Publishing"]}>
+  ## Post targets, validation, and import
+
+  `POST /v1/posts` takes a `targets` list with one entry per account. Each entry can set its own `text`, `title`, `media_ids`, `first_comment`, `visibility`, `scheduled_at`, and `platform_data`. Check a draft with `POST /v1/posts/validate`, read platform limits with `GET /v1/posts/validate`, import many posts with `POST /v1/posts/import`, and unpublish a post with `POST /v1/posts/{pid}/unpublish`. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-03-22" description="Publishing" tags={["Publishing"]}>
+  ## Platform options replaced by targets
+
+  Breaking: `platform_options` is removed from post requests. Send `title`, `visibility`, `first_comment`, and `platform_data` on each entry in `targets` instead. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-03-22" description="Facebook" tags={["Facebook", "Inbox"]}>
+  ## Facebook Pages inbox (beta)
+
+  Comments and direct messages on Facebook Pages appear in the inbox, and you can reply to them from the same routes. Facebook is available to beta testers. See [Facebook](/platforms/facebook).
+</Update>
+
+<Update label="2026-03-20" description="Publishing" tags={["Publishing"]}>
+  ## Media library
+
+  `GET /v1/media` lists your media, up to 100 items per page. `DELETE /v1/media/{id}` removes an item, and `GET /v1/media/storage` shows your storage use. Upload with `POST /v1/media/upload`. See [Media](/guides/media).
+</Update>
+
+<Update label="2026-03-20" description="Billing" tags={["Billing"]}>
+  ## Unlimited posts and interactions on paid plans
+
+  Paid plans no longer cap posts or interactions per billing period. The Free plan keeps its limits. See [Plans](/guides/plans).
+</Update>
+
+<Update label="2026-03-19" description="Publishing" tags={["Publishing"]}>
+  ## Publish and wait for results
+
+  `POST /v1/posts` with `publish_now` set publishes to every target and returns each target's result: `201` when publishing succeeds and `502` when every target fails. Publishing that runs longer than 90 seconds reports a timeout error for the target. Instagram and Facebook results include the permalink of the published post. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-03-19" description="Publishing" tags={["Publishing"]}>
+  ## Reschedule and filter scheduled posts
+
+  `PATCH /v1/posts/{pid}` changes the scheduled time and accounts of a scheduled post. `GET /v1/posts` supports filters and pagination. See [Scheduling](/guides/scheduling).
+</Update>
+
+<Update label="2026-03-14" description="Publishing" tags={["Publishing"]}>
+  ## Retry a failed post
+
+  `POST /v1/posts/{pid}/retry` publishes a post again after its publish failed. See [Publishing](/guides/publishing).
+</Update>
+
+<Update label="2026-03-14" description="Accounts" tags={["Accounts"]}>
+  ## Disconnect an account
+
+  `DELETE /v1/accounts/{id}` disconnects an account. See [Connect accounts](/guides/connect-accounts).
+</Update>
+
+<Update label="2026-03-14" description="TikTok" tags={["Publishing", "TikTok"]}>
+  ## TikTok (beta)
+
+  Connect TikTok accounts and publish videos and photo carousels. TikTok is available to beta testers. See [TikTok](/platforms/tiktok).
+</Update>
+
+<Update label="2026-03-14" description="LinkedIn" tags={["Publishing", "LinkedIn"]}>
+  ## LinkedIn (beta)
+
+  Connect LinkedIn accounts, read and moderate comments, and publish text and media posts. LinkedIn is available to beta testers. See [LinkedIn](/platforms/linkedin).
+</Update>
+
+<Update label="2026-03-14" description="Threads" tags={["Publishing", "Threads"]}>
+  ## Threads (beta)
+
+  Connect Threads accounts, read mentions and replies, and publish posts. Threads is available to beta testers. See [Threads](/platforms/threads).
+</Update>
+
+<Update label="2026-03-14" description="Google" tags={["Google Business Profile"]}>
+  ## Google Business Profile (beta)
+
+  Connect Google Business Profile locations. Google is available to beta testers. See [Google](/platforms/google).
+</Update>
+
+<Update label="2026-03-11" description="Billing" tags={["Billing"]}>
+  ## Usage reports limits instead of credits
+
+  Breaking: `GET /v1/usage` no longer returns `credits_used` and `credits_limit`. It returns usage and limits for accounts, posts, and interactions in the current billing period. See [Plans](/guides/plans).
+</Update>
+
+<Update label="2026-03-11" description="Facebook" tags={["Publishing", "Facebook"]}>
+  ## Facebook Pages publishing
+
+  Create, update, and delete posts on Facebook Pages with `POST /v1/posts`, `PATCH /v1/posts/{pid}`, and `DELETE /v1/posts/{pid}`. See [Facebook publishing](/platforms/facebook/publishing).
+</Update>
+
+<Update label="2026-03-11" description="MCP" tags={["MCP", "Publishing"]}>
+  ## Publishing from MCP
+
+  MCP clients can create, update, delete, and retry posts, and upload media. See [MCP tools](/integrations/tools).
+</Update>
+
+<Update label="2026-03-10" description="Instagram" tags={["Publishing", "Instagram"]}>
+  ## Instagram publishing
+
+  Publish to Instagram accounts with `POST /v1/posts`, and delete a published post with `DELETE /v1/posts/{pid}`. Media for a post starts with `GET /v1/media/upload-url`. See [Instagram publishing](/platforms/instagram/publishing).
+</Update>
+
+<Update label="2026-03-07" description="Facebook" tags={["Facebook"]}>
+  ## Facebook Pages
+
+  Facebook Pages are available to connect. See [Facebook](/platforms/facebook).
+</Update>
+
+<Update label="2026-03-07" description="MCP" tags={["MCP"]}>
+  ## Hosted MCP server
+
+  The API hosts an MCP server at `/mcp`. MCP clients register and sign in with OAuth 2.1, and a consent page confirms access. See [OAuth](/integrations/oauth).
+</Update>
+
+<Update label="2026-03-07" description="Billing" tags={["Billing"]}>
+  ## Annual billing
+
+  Paid plans can be billed yearly at a 20% discount. See [Plans](/guides/plans).
+</Update>
+
+<Update label="2026-03-06" description="Comments" tags={["Inbox"]}>
+  ## Comments are scoped to a post
+
+  Breaking: `GET /v1/accounts/{id}/comments` is replaced by `GET /v1/accounts/{id}/posts/{pid}/comments`. Use `GET /v1/accounts/{id}/posts` to find post IDs. See [Comments](/guides/comments).
+</Update>
+
+<Update label="2026-03-01" description="Initial release" tags={["Accounts", "Inbox", "Instagram", "Webhooks", "Billing"]}>
+  ## Initial release
+
+  SocialAPI opens to public signups. At launch, SocialAPI offers:
+
+  - Instagram: connect accounts with `POST /v1/accounts/connect`, read comments, direct messages, and mentions, reply to comments, send direct messages, and moderate comments.
+  - API keys: create, list, and revoke keys with `/v1/keys`.
+  - Webhooks: create, list, update, and delete endpoints with `/v1/webhooks`.
+  - Usage: `GET /v1/usage`, and account deletion with `DELETE /v1/users/me`.
+  - Plans: paid plans with checkout and a billing portal in the dashboard.
+
+  Publishing, the MCP server, and the other platforms followed in March. See [Quickstart](/quickstart).
 </Update>
