@@ -31,7 +31,7 @@ rss: true
 <Update label="2026-10-13" description="Accounts" tags={["Accounts", "TikTok"]}>
   ## TikTok connects through TikTok API for Business
 
-  Every TikTok connect, invite, and reconnect authorizes the account through TikTok API for Business. Accounts that were already connected keep working until their owner reconnects. See [TikTok](/platforms/tiktok).
+  TikTok connects, invites, and reconnects authorize the account through TikTok API for Business, except a connect that sets its own `redirect_uri`, which keeps the TikTok Login Kit flow. Accounts that were already connected keep working until their owner reconnects. See [TikTok](/platforms/tiktok).
 </Update>
 
 <Update label="2026-10-13" description="Publishing" tags={["Publishing", "TikTok"]}>
@@ -151,7 +151,7 @@ rss: true
 <Update label="2026-09-22" description="Accounts" tags={["Accounts"]}>
   ## Last used time for API keys
 
-  API key responses include `last_used_at`, the time of the key's latest request. The field is absent when the key has never been used. See [List keys](/guides/authentication#list-keys).
+  API key responses include `last_used_at`, the time of the key's latest request, up to 1 minute out of date. The field is absent when the key has never been used. See [List keys](/guides/authentication#list-keys).
 </Update>
 
 <Update label="2026-09-21" description="Pinterest" tags={["Publishing", "Pinterest"]}>
@@ -220,6 +220,12 @@ rss: true
   Pro (Full Send) accounts add a Profile pack of 50 brands automatically when brands reach the scale threshold, 90% of the allowance by default. See [Profile packs](/guides/plans#profile-packs).
 </Update>
 
+<Update label="2026-09-08" description="Direct messages" tags={["Direct messages", "Instagram", "Facebook", "WhatsApp"]}>
+  ## Messaging cap counts per sender
+
+  The cap of 10 messages per minute now applies to each sender separately: each Instagram account, Facebook Page, and WhatsApp phone number has its own 10. See [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
+</Update>
+
 <Update label="2026-09-08" description="WhatsApp" tags={["Accounts", "WhatsApp"]}>
   ## Register Cloud API numbers
 
@@ -229,7 +235,7 @@ rss: true
 <Update label="2026-09-08" description="Facebook" tags={["Accounts", "Facebook"]}>
   ## Move a Page between brands
 
-  Assigning a Facebook Page to a brand moves it from the brand that holds it now. Each brand holds as many Facebook Pages as its plan allows. See [One login, many brands](/platforms/facebook#one-login-many-brands).
+  Assigning a Facebook Page to a brand moves it from the brand that holds it now. See [One login, many brands](/platforms/facebook#one-login-many-brands).
 </Update>
 
 <Update label="2026-09-07" description="Inbox" tags={["Inbox", "Instagram", "Facebook"]}>
@@ -259,13 +265,13 @@ rss: true
 <Update label="2026-09-05" description="Direct messages" tags={["Direct messages", "Instagram", "Facebook", "WhatsApp"]}>
   ## Messaging velocity cap
 
-  Each Instagram account, Facebook Page, and WhatsApp phone number can send 10 messages per minute. DMs, comment replies, private replies, and WhatsApp template messages all count. A send over the cap returns `429 messaging.velocity_limit` with `Retry-After`, and it spends no credit. See [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
+  Your SocialAPI account can send 10 messages per minute in total across its Instagram, Facebook, and WhatsApp accounts. DMs, comment replies, private replies, and WhatsApp template messages all count, and a DM with more than one attachment counts one message per attachment. A send over the cap returns `429 messaging.velocity_limit` with `Retry-After`, and it spends no credit. See [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 </Update>
 
 <Update label="2026-09-05" description="Direct messages" tags={["Direct messages", "Instagram", "Facebook"]}>
   ## Closed messaging windows return the same error
 
-  After Instagram or Facebook refuses a DM because the 24-hour messaging window has closed, later sends to that conversation return the same `400` error code as the first refusal, with `meta.blocked_locally` set to `true`. The block lifts when the person messages you again. Sends that carry a `message_tag` are never blocked this way. See [The messaging window](/guides/direct-messages#the-messaging-window).
+  After Instagram or Facebook refuses a DM because the 24-hour messaging window has closed, later sends to that conversation return the same `400` error code as the first refusal, with `meta.blocked_locally` set to `true`. The block lifts when the person messages you again, or 24 hours after the refusal, whichever comes first. Sends that carry a `message_tag` are never blocked this way. See [The messaging window](/guides/direct-messages#the-messaging-window).
 </Update>
 
 <Update label="2026-09-05" description="WhatsApp" tags={["Accounts", "WhatsApp"]}>
@@ -283,7 +289,7 @@ rss: true
 <Update label="2026-09-02" description="Accounts" tags={["Accounts", "Analytics"]}>
   ## Re-sync an account's posts
 
-  `POST /v1/accounts/{id}/sync` re-reads an account's posts from the platform. See [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts).
+  `POST /v1/accounts/{id}/sync` re-reads up to 100 of an account's most recent posts from the platform. See [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts).
 </Update>
 
 <Update label="2026-09-01" description="Threads" tags={["Publishing", "Threads"]}>
@@ -361,7 +367,7 @@ rss: true
 <Update label="2026-08-30" description="Facebook" tags={["Facebook", "Direct messages"]}>
   ## Private replies reject buttons
 
-  A private reply that includes `buttons` returns `platform.facebook.private_reply_ineligible` with a message to send text only. Before, the buttons were dropped without an error. See [Private replies](/platforms/facebook#private-replies).
+  A private reply that includes `buttons` returns `400 validation.field_not_supported` with `field` set to `buttons`, and the message asks you to send text only. Before, the buttons were dropped without an error. See [Private replies](/platforms/facebook#private-replies).
 </Update>
 
 <Update label="2026-08-29" description="Google" tags={["Google Business Profile", "Accounts"]}>
@@ -397,7 +403,7 @@ rss: true
 <Update label="2026-08-23" description="Inbox" tags={["Inbox"]}>
   ## Refresh an account's inbox on demand
 
-  `POST /v1/inbox/sync` refreshes one account's conversations, or one conversation when you send `conversation_id`. The call returns right away: poll `GET /v1/inbox/sync` until `state` is no longer `syncing`. A sync for a target that ran too recently returns `429`, and `Retry-After` gives the seconds to wait. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually).
+  `POST /v1/inbox/sync` refreshes one account's conversations, or one conversation when you send `conversation_id`. The call returns right away: poll `GET /v1/inbox/sync` until `state` is no longer `syncing`. Repeating a sync for the same target before its wait is over returns `429`, and `Retry-After` gives the seconds left. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually).
 </Update>
 
 <Update label="2026-08-23" description="Threads" tags={["Threads", "Analytics"]}>
@@ -538,12 +544,6 @@ rss: true
   Listing a user's Facebook Pages returns every Page. Accounts with more than 25 Pages were cut off at 25. See [Pages of an account](/platforms/facebook#pages-of-an-account).
 </Update>
 
-<Update label="2026-08-05" description="Billing" tags={["Billing", "Facebook"]}>
-  ## Facebook Page limit per plan
-
-  Each brand's Facebook Pages are capped by plan. Assigning more Pages than the plan allows returns `platform.facebook.page_cap`. A plan change to a lower tier removes the Pages above the new limit. See [Plan allowances](/guides/plans#plan-allowances).
-</Update>
-
 <Update label="2026-08-04" description="TikTok" tags={["TikTok", "Accounts"]}>
   ## TikTok profile fields in the account summary
 
@@ -553,7 +553,7 @@ rss: true
 <Update label="2026-07-31" description="Facebook and Instagram" tags={["Direct messages", "Errors", "Facebook", "Instagram"]}>
   ## Specific error codes for Facebook messaging and Meta throttling
 
-  Sending a Facebook message after the 24-hour messaging window closes returns `400 platform.facebook.window_closed`. Other permission refusals from Facebook return `403 platform.facebook.permission_denied`. See [The messaging window](/guides/direct-messages#the-messaging-window) and [Errors](/guides/errors).
+  Sending a Facebook message after the 24-hour messaging window closes returns `400 platform.facebook.window_closed`. Other refusals with Meta error code 10 return `403 platform.facebook.permission_denied`. See [The messaging window](/guides/direct-messages#the-messaging-window) and [Errors](/guides/errors).
 </Update>
 
 <Update label="2026-07-30" description="TikTok" tags={["Analytics", "TikTok"]}>
@@ -649,7 +649,7 @@ rss: true
 <Update label="2026-07-06" description="Reviews" tags={["Reviews", "Google Business Profile"]}>
   ## Reviews are listed per account
 
-  Breaking: `GET /v1/inbox/reviews` now returns the accounts that have reviews, each with its rating summary. To list reviews, call `GET /v1/inbox/reviews/{account_id}` for one account. See [The two list endpoints](/guides/reviews#the-two-list-endpoints).
+  Breaking: `GET /v1/inbox/reviews` now returns your connected Google Business Profile accounts, each with its rating summary, including accounts with no reviews. To list reviews, call `GET /v1/inbox/reviews/{account_id}` for one account. See [The two list endpoints](/guides/reviews#the-two-list-endpoints).
 </Update>
 
 <Update label="2026-07-04" description="Google Business Profile" tags={["Accounts", "Google Business Profile"]}>
@@ -706,10 +706,10 @@ rss: true
   LinkedIn article posts accept `article_url`, `article_title`, `article_description`, and a thumbnail image in `platform_data`. Posts can add a call-to-action button with `cta_label` and `cta_url`. See [LinkedIn publishing](/platforms/linkedin/publishing).
 </Update>
 
-<Update label="2026-06-16" description="Instagram and Facebook" tags={["Direct messages", "Webhooks", "Instagram", "Facebook"]}>
+<Update label="2026-06-16" description="Instagram" tags={["Direct messages", "Webhooks", "Instagram"]}>
   ## Quick replies, buttons, and carousels in DMs
 
-  `POST /v1/inbox/conversations/{id}/messages` accepts `quick_replies`, `buttons`, and `cards` for Instagram and Facebook conversations. When a person taps a postback button, SocialAPI sends a `dm.postback` webhook event. See [Direct messages](/guides/direct-messages).
+  `POST /v1/inbox/conversations/{id}/messages` accepts `quick_replies`, `buttons`, and `cards` for Instagram conversations. When a person taps a postback button on Instagram, SocialAPI sends a `dm.postback` webhook event. See [Direct messages](/guides/direct-messages).
 </Update>
 
 <Update label="2026-06-16" description="Instagram and Facebook" tags={["Direct messages", "Instagram", "Facebook"]}>
@@ -745,7 +745,7 @@ rss: true
 <Update label="2026-06-11" description="Accounts" tags={["Accounts"]}>
   ## Connect without a registered redirect URI
 
-  `POST /v1/accounts/connect` accepts any valid `https` `redirect_uri` until you register at least one in the dashboard. After that, only registered URIs are accepted, and others return `400 validation.redirect_uri_not_whitelisted`. See [Connect accounts](/guides/connect-accounts).
+  `POST /v1/accounts/connect` accepts any valid `https` `redirect_uri`, or `http` on `localhost`, until you register at least one in the dashboard. After that, only registered URIs are accepted, and others return `400 validation.redirect_uri_not_whitelisted`. See [Connect accounts](/guides/connect-accounts).
 </Update>
 
 <Update label="2026-06-09" description="TikTok" tags={["Publishing", "TikTok"]}>
@@ -817,7 +817,7 @@ rss: true
 <Update label="2026-06-01" description="Facebook" tags={["Publishing", "Facebook"]}>
   ## Publish Facebook Reels
 
-  Set `content_type` to `reel` in the Facebook `platform_data` to publish a Reel. A Reel takes a single video. A Reel fails if Facebook reports that processing did not finish. See [Facebook publishing](/platforms/facebook/publishing).
+  Set `content_type` to `reel` in the Facebook `platform_data` to publish a Reel. A Reel takes a single video. A Reel fails with `422` when Facebook reports that processing failed, and with `504` when processing does not finish in time. See [Facebook publishing](/platforms/facebook/publishing).
 </Update>
 
 <Update label="2026-05-31" description="LinkedIn" tags={["Publishing", "LinkedIn"]}>
@@ -889,7 +889,7 @@ rss: true
 <Update label="2026-05-21" description="Facebook" tags={["Accounts", "Facebook"]}>
   ## Facebook connect requests business management access
 
-  Connecting a Facebook account asks for the `business_management` permission, which lets SocialAPI list Pages owned through a Meta Business Portfolio. Accounts connected before this change need to reconnect to grant it. See [Facebook publishing](/platforms/facebook/publishing).
+  Connecting a Facebook account asks for the `business_management` permission, which lets SocialAPI list Pages owned through a Meta Business Portfolio. See [Facebook publishing](/platforms/facebook/publishing).
 </Update>
 
 <Update label="2026-05-20" description="Publishing" tags={["Publishing"]}>
@@ -922,7 +922,7 @@ rss: true
   Instagram direct messages now carry their attachments, including shared posts and shared stories, in direct message events and message lists. See [Direct messages](/guides/direct-messages#attachments).
 </Update>
 
-<Update label="2026-05-16" description="TikTok" tags={["Publishing", "TikTok"]}>
+<Update label="2026-05-17" description="TikTok" tags={["Publishing", "TikTok"]}>
   ## Breaking: TikTok privacy level is required
 
   Breaking: `platform_data.privacy_level` must now be set on every TikTok post. SocialAPI no longer picks a default, so a post without it fails with `validation.privacy_level_required`. Send one of the values TikTok lists for the creator. See [TikTok publishing](/platforms/tiktok/publishing).
@@ -940,10 +940,16 @@ rss: true
   DM events include `conversation_id`, the SocialAPI ID of the conversation, and `recipient`, the person who received the message. See [Webhook events](/guides/webhook-events).
 </Update>
 
-<Update label="2026-05-06" description="Direct messages" tags={["Webhooks", "Direct messages"]}>
+<Update label="2026-05-07" description="Facebook" tags={["Webhooks", "Direct messages", "Facebook"]}>
+  ## dm.sent and dm.referral events on Facebook
+
+  `dm.sent` and `dm.referral` now fire for Facebook Page conversations too. See [Webhook events](/guides/webhook-events).
+</Update>
+
+<Update label="2026-05-06" description="Instagram" tags={["Webhooks", "Direct messages", "Instagram"]}>
   ## dm.sent and dm.referral events
 
-  `dm.sent` fires for messages the connected account sends on Instagram and Facebook. `dm.referral` fires when a conversation starts from an ad or link click. See [Webhook events](/guides/webhook-events).
+  `dm.sent` fires for messages the connected Instagram account sends. `dm.referral` fires when an Instagram conversation starts from an ad or link click. See [Webhook events](/guides/webhook-events).
 </Update>
 
 <Update label="2026-05-02" description="MCP" tags={["MCP"]}>
@@ -1187,9 +1193,9 @@ rss: true
 </Update>
 
 <Update label="2026-03-19" description="Publishing" tags={["Publishing"]}>
-  ## Publish and wait for results
+  ## Publish right away
 
-  `POST /v1/posts` with `publish_now` set publishes to every target and returns each target's result: `201` when publishing succeeds and `502` when every target fails. Publishing that runs longer than 90 seconds reports a timeout error for the target. Instagram and Facebook results include the permalink of the published post. See [Publishing](/guides/publishing).
+  `POST /v1/posts` without `scheduled_at` publishes right away and returns the post: `201` when it is published, `207` when some accounts fail, and `502` when it fails. Publishing that runs longer than 90 seconds reports a timeout error. See [Publishing](/guides/publishing).
 </Update>
 
 <Update label="2026-03-19" description="Publishing" tags={["Publishing"]}>
@@ -1198,16 +1204,16 @@ rss: true
   `PATCH /v1/posts/{pid}` changes the scheduled time and accounts of a scheduled post. `GET /v1/posts` supports filters and pagination. See [Scheduling](/guides/scheduling).
 </Update>
 
-<Update label="2026-03-14" description="Publishing" tags={["Publishing"]}>
-  ## Retry a failed post
-
-  `POST /v1/posts/{pid}/retry` publishes a post again after its publish failed. See [Publishing](/guides/publishing).
-</Update>
-
-<Update label="2026-03-14" description="Accounts" tags={["Accounts"]}>
+<Update label="2026-03-15" description="Accounts" tags={["Accounts"]}>
   ## Disconnect an account
 
   `DELETE /v1/accounts/{id}` disconnects an account. See [Connect accounts](/guides/connect-accounts).
+</Update>
+
+<Update label="2026-03-14" description="Publishing" tags={["Publishing"]}>
+  ## Retry a failed post
+
+  `POST /v1/accounts/{id}/posts/{pid}/retry` publishes a post again after its publish failed. See [Publishing](/guides/publishing).
 </Update>
 
 <Update label="2026-03-14" description="TikTok" tags={["Publishing", "TikTok"]}>
@@ -1243,7 +1249,7 @@ rss: true
 <Update label="2026-03-11" description="Facebook" tags={["Publishing", "Facebook"]}>
   ## Facebook Pages publishing
 
-  Create, update, and delete posts on Facebook Pages with `POST /v1/posts`, `PATCH /v1/posts/{pid}`, and `DELETE /v1/posts/{pid}`. See [Facebook publishing](/platforms/facebook/publishing).
+  Create, update, and delete posts on Facebook Pages with `POST /v1/accounts/{id}/posts`, `PATCH /v1/accounts/{id}/posts/{pid}`, and `DELETE /v1/accounts/{id}/posts/{pid}`. See [Facebook publishing](/platforms/facebook/publishing).
 </Update>
 
 <Update label="2026-03-11" description="MCP" tags={["MCP", "Publishing"]}>
@@ -1255,7 +1261,7 @@ rss: true
 <Update label="2026-03-10" description="Instagram" tags={["Publishing", "Instagram"]}>
   ## Instagram publishing
 
-  Publish to Instagram accounts with `POST /v1/posts`, and delete a published post with `DELETE /v1/posts/{pid}`. Media for a post starts with `GET /v1/media/upload-url`. See [Instagram publishing](/platforms/instagram/publishing).
+  Publish to Instagram accounts with `POST /v1/accounts/{id}/posts`, and delete a published post with `DELETE /v1/accounts/{id}/posts/{pid}`. Media for a post starts with `GET /v1/media/upload-url`. See [Instagram publishing](/platforms/instagram/publishing).
 </Update>
 
 <Update label="2026-03-07" description="Facebook" tags={["Facebook"]}>
@@ -1285,7 +1291,7 @@ rss: true
 <Update label="2026-03-01" description="Initial release" tags={["Accounts", "Inbox", "Instagram", "Webhooks", "Billing"]}>
   ## Initial release
 
-  SocialAPI opens to public signups. At launch, SocialAPI offers:
+  SocialAPI is open to public signups, with:
 
   - Instagram: connect accounts with `POST /v1/accounts/connect`, read comments, direct messages, and mentions, reply to comments, send direct messages, and moderate comments.
   - API keys: create, list, and revoke keys with `/v1/keys`.
@@ -1293,5 +1299,5 @@ rss: true
   - Usage: `GET /v1/usage`, and account deletion with `DELETE /v1/users/me`.
   - Plans: paid plans with checkout and a billing portal in the dashboard.
 
-  Publishing, the MCP server, and the other platforms followed in March. See [Quickstart](/quickstart).
+  See [Quickstart](/quickstart).
 </Update>
