@@ -28,7 +28,9 @@ An unsupported call returns `501 resource.not_supported`.
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
 | Delete a published post | Yes | |
 | List posts | Partial | Returns the posts you published through SocialAPI, not a live read from LinkedIn |
-| Comments, DMs, mentions | No | `501 resource.not_supported` |
+| Comments | Beta | Available on a profile connected with `connection_type: "profile"`. The default member connection returns `501 resource.not_supported` |
+| Analytics | Beta | Available on a profile connected with `connection_type: "profile"`: see [Profile analytics](#profile-analytics-beta). The default member connection has none |
+| DMs, mentions | No | `501 resource.not_supported` |
 | Reviews | No | LinkedIn has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
 | Webhook events | Partial | `account.connected` and the `post.*` events |
@@ -103,6 +105,16 @@ SocialAPI's LinkedIn app requests these scopes at connect. You apply for no app 
 |---|---|---|
 | `openid`, `profile` | Identify the member: name, picture, and ID | Every account |
 | `w_member_social` | Publish posts as the member | `posts.write` |
+
+A profile connected with `connection_type: "profile"` (beta) requests these scopes instead:
+
+| Scope | Used for | Permissions |
+|---|---|---|
+| `r_basicprofile` | Identify the member: name, picture, and ID | Every account |
+| `w_member_social` | Publish posts as the member | `posts.write` |
+| `r_member_social_feed` | Read comments on the member's posts | `comments.read` |
+| `w_member_social_feed` | Reply to comments on the member's posts | `comments.write` |
+| `r_member_postAnalytics`, `r_member_profileAnalytics` | Post counts and the follower count | `analytics.read` |
 
 ## Related
 
