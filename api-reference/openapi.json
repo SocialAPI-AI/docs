@@ -7992,11 +7992,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Beta. Returns the follower count plus per-post aggregate performance (impressions, unique views, likes, comments, shares, clicks, engagement rate) for a connected LinkedIn organization page. The response shape may change without notice while this endpoint is in beta.",
+                "description": "Beta. Returns the follower count plus per-post performance for a connected LinkedIn account. For a company Page, `posts` covers the Page's recent posts. For a personal profile connected with `connection_type` `profile`, `posts` covers the 5 most recent posts published to it through SocialAPI, and `clicks` and `engagement_rate` are always 0. `kind` is `organization` for a Page and `member` for a profile. The response shape may change without notice while this endpoint is in beta.",
                 "tags": [
                     "LinkedIn"
                 ],
-                "summary": "Get LinkedIn page insights (beta)",
+                "summary": "Get LinkedIn insights (beta)",
                 "parameters": [
                     {
                         "description": "Connected account ID",
@@ -17143,6 +17143,14 @@
                         "description": "[always] SocialAPI brand ID this account belongs to",
                         "type": "string"
                     },
+                    "connection_type": {
+                        "description": "[optional] \"profile\" for a LinkedIn personal profile connected with connection_type \"profile\" (beta). Absent for every other account",
+                        "type": "string",
+                        "enum": [
+                            "profile"
+                        ],
+                        "example": "profile"
+                    },
                     "effective_permissions": {
                         "description": "[always] The permissions this account can use right now: the requested permissions the platform supports, minus any the platform did not grant or has since refused. Uses the same names as permissions. An empty list when none apply",
                         "type": "array",
@@ -18076,6 +18084,15 @@
                 "properties": {
                     "follower_count": {
                         "type": "integer"
+                    },
+                    "kind": {
+                        "description": "Kind is \"organization\" for a LinkedIn Page and \"member\" for a personal profile.",
+                        "type": "string",
+                        "enum": [
+                            "organization",
+                            "member"
+                        ],
+                        "example": "organization"
                     },
                     "posts": {
                         "type": "array",

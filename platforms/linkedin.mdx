@@ -28,7 +28,9 @@ An unsupported call returns `501 resource.not_supported`.
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
 | Delete a published post | Yes | |
 | List posts | Partial | Returns the posts you published through SocialAPI, not a live read from LinkedIn |
-| Comments, DMs, mentions | No | `501 resource.not_supported` |
+| Comments | Beta | Available on a profile connected with `connection_type: "profile"`. The default member connection returns `501 resource.not_supported` |
+| Analytics | Beta | Available on a profile connected with `connection_type: "profile"`: see [Profile analytics](#profile-analytics-beta). The default member connection has none |
+| DMs, mentions | No | `501 resource.not_supported` |
 | Reviews | No | LinkedIn has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
 | Webhook events | Partial | `account.connected` and the `post.*` events |
@@ -63,8 +65,18 @@ Response (HTTP 202):
 LinkedIn-specific rules:
 
 - **Member connection.** The connected account is the person who signed in. Posts publish to that person's feed.
+- **Profile connection (beta).** Send `"metadata": {"connection_type": "profile"}` to connect the member for posting, comments, and analytics as that person. This option is in beta and available to accounts with beta access. `GET /v1/accounts` returns `connection_type: "profile"` on these accounts and omits the field on every other account. See [Profile analytics](#profile-analytics-beta).
 - **Token lifetime.** LinkedIn access tokens last 60 days and cannot be refreshed. When one expires, the first call that fails returns `401 platform.linkedin.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 - **Disconnect.** LinkedIn offers apps no way to end an authorization. Disconnecting an account removes it from SocialAPI, and the person removes SocialAPI's app in their LinkedIn settings.
+
+## Profile analytics (beta)
+
+`GET /v1/platforms/linkedin/insights?account_id={id}` returns the follower count and per-post counts for a profile connected with `connection_type` `profile`. The same route serves LinkedIn Pages, and `kind` tells them apart: `member` for a profile, `organization` for a Page.
+
+- `posts` covers the 5 most recent posts published to the profile through SocialAPI. It is an empty array until you publish one, and `follower_count` is returned either way.
+- Each post returns `impressions`, `unique_views`, `likes`, `comments`, and `shares`. `clicks` and `engagement_rate` are always 0 for a profile.
+- A count LinkedIn cannot return for a post is 0.
+- The route requires the `analytics.read` [permission](/guides/permissions).
 
 ## Webhook events
 
@@ -93,6 +105,16 @@ SocialAPI's LinkedIn app requests these scopes at connect. You apply for no app 
 |---|---|---|
 | `openid`, `profile` | Identify the member: name, picture, and ID | Every account |
 | `w_member_social` | Publish posts as the member | `posts.write` |
+
+A profile connected with `connection_type: "profile"` (beta) requests these scopes instead:
+
+| Scope | Used for | Permissions |
+|---|---|---|
+| `r_basicprofile` | Identify the member: name, picture, and ID | Every account |
+| `w_member_social` | Publish posts as the member | `posts.write` |
+| `r_member_social_feed` | Read comments on the member's posts | `comments.read` |
+| `w_member_social_feed` | Reply to comments on the member's posts | `comments.write` |
+| `r_member_postAnalytics`, `r_member_profileAnalytics` | Post counts and the follower count | `analytics.read` |
 
 ## Related
 
