@@ -250,17 +250,24 @@ While an endpoint's `is_active` is `false`, SocialAPI sends it nothing. It does 
 
 ## Retries
 
-A failed attempt is retried until the delivery has used 5 attempts. The wait before each retry grows:
+A failed attempt is retried until the delivery has used 10 attempts. The wait before each retry grows, so an endpoint that is down for several hours still receives the event once it recovers:
 
-| Attempt | Sent |
-|---|---|
-| 1 | When the event occurs |
-| 2 | About 1 second after attempt 1 fails |
-| 3 | About 16 seconds after attempt 2 fails |
-| 4 | About 81 seconds after attempt 3 fails |
-| 5 | About 256 seconds after attempt 4 fails |
+| Attempt | Sent | Time since attempt 1 |
+|---|---|---|
+| 1 | When the event occurs | |
+| 2 | 10 seconds after attempt 1 fails | about 10 seconds |
+| 3 | 1 minute after attempt 2 fails | about 1 minute |
+| 4 | 5 minutes after attempt 3 fails | about 6 minutes |
+| 5 | 15 minutes after attempt 4 fails | about 21 minutes |
+| 6 | 30 minutes after attempt 5 fails | about 51 minutes |
+| 7 | 1 hour after attempt 6 fails | about 2 hours |
+| 8 | 2 hours after attempt 7 fails | about 4 hours |
+| 9 | 4 hours after attempt 8 fails | about 8 hours |
+| 10 | 6 hours after attempt 9 fails | about 14 hours |
 
-Each wait varies by up to 10 percent either way. After the fifth failed attempt, about 6 minutes after the first, the delivery's `status` becomes `failed` and SocialAPI makes no further attempts. Send a failed delivery again yourself with `POST /v1/webhooks/{id}/deliveries/{did}/retry`.
+Each wait varies by up to 10 percent either way. After the tenth failed attempt, about 14 hours after the first, the delivery's `status` becomes `failed` and SocialAPI makes no further attempts. Send a failed delivery again yourself with `POST /v1/webhooks/{id}/deliveries/{did}/retry`.
+
+A retried event can arrive hours after events that happened later. Order events by their own timestamps, not by arrival.
 
 When an attempt ends in a connection error, a `429`, or a `5xx` other than `501`, SocialAPI sends the same request one more time within the same attempt. Your endpoint can therefore receive the same delivery twice, seconds apart. Both requests carry the same `X-SocialAPI-Delivery`.
 
@@ -335,7 +342,7 @@ Deleting stops future deliveries. A delivery already in progress can still reach
 
 ## Monitor deliveries
 
-SocialAPI records every delivery with its status, the HTTP status of your response, and how long your endpoint took. A delivery's `status` is `pending` (not finished), `delivered` (your endpoint returned `2xx`), or `failed` (5 attempts used).
+SocialAPI records every delivery with its status, the HTTP status of your response, and how long your endpoint took. A delivery's `status` is `pending` (not finished), `delivered` (your endpoint returned `2xx`), or `failed` (10 attempts used).
 
 ```bash
 curl "https://api.social-api.ai/v1/webhooks/3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90/deliveries?status=failed&limit=20" \
@@ -400,7 +407,7 @@ Response (HTTP 200):
 
 Each attempt holds the first 10,240 bytes of your response body. An attempt that ended in a connection error has an `error_message` in place of a response. The example `payload` is shortened. The real one is the full body that was sent.
 
-`POST /v1/webhooks/{id}/deliveries/{did}/retry` creates a new delivery with the same event and payload and the description `Retry of {did}`. It returns the new delivery with `status` `pending`. The new delivery gets 5 attempts of its own. The original delivery is unchanged.
+`POST /v1/webhooks/{id}/deliveries/{did}/retry` creates a new delivery with the same event and payload and the description `Retry of {did}`. It returns the new delivery with `status` `pending`. The new delivery gets 10 attempts of its own. The original delivery is unchanged.
 
 SocialAPI keeps deliveries for the number of days your plan allows (see [History and export allowances](/guides/plans#history-and-export-allowances)).
 

@@ -45,7 +45,7 @@ A tool that fails returns a result with `isError: true`. When the failure comes 
 
 A missing or malformed argument returns a plain-text message instead, for example `account_id is required`.
 
-Every tool except `social_api_get_more_tools` also accepts an optional `context` string argument: the goal the call serves, in one short sentence. Describe people by role, never by name, email, or ID. A call without `context` runs the same way as a call with it.
+Every tool except `social_api_report_missing_capability` also accepts an optional `context` string argument: the goal the call serves, in one short sentence. Describe people by role, never by name, email, or ID. A call without `context` runs the same way as a call with it.
 
 ## Accounts and brands
 
@@ -53,7 +53,6 @@ Every tool except `social_api_get_more_tools` also accepts an optional `context`
 |---|---|---|
 | `social_api_list_accounts` | List your connected accounts, optionally for one brand. Returns the `id` that every other tool takes as `account_id` | `GET /v1/accounts` |
 | `social_api_connect_account` | Start connecting an account. On OAuth platforms it returns the `auth_url` the person opens to authorize access. On Telegram and Bluesky it connects the account at once and returns its `account_id`. Accepts `permissions`: see [Account permissions](/guides/permissions) | `POST /v1/accounts/connect` |
-| `social_api_exchange_oauth` | Finish a connection by exchanging the authorization code | `POST /v1/oauth/exchange` |
 | `social_api_list_pending_profiles` | List the Google Business Profiles a pending connection can connect | `GET /v1/accounts/pending/{connection_id}` |
 | `social_api_select_pending_profile` | Connect the chosen Google Business Profile from a pending connection | `POST /v1/accounts/pending/{connection_id}/select` |
 | `social_api_update_account_permissions` | Replace a connected account's permissions, or send `unrestricted: true` to give it every permission. Removing a permission deletes the data it covered: see [Account permissions](/guides/permissions#removing-a-permission-deletes-data) | `PATCH /v1/accounts/{id}` |
@@ -108,8 +107,6 @@ See [Direct messages](/guides/direct-messages) for platform support and the mess
 | `social_api_list_review_accounts` | List the connected accounts that support reviews, each with its rating summary | `GET /v1/inbox/reviews` |
 | `social_api_get_reviews` | List the reviews of one connected account | `GET /v1/inbox/reviews/{account_id}` |
 | `social_api_reply_to_review` | Reply to a review as the business. On Google Business Profile, replying again replaces the existing reply | `POST /v1/inbox/reviews/{id}/reply` |
-| `social_api_update_review_reply` | Always returns an error: no platform supports editing a review reply. Use `social_api_reply_to_review` to replace a Google Business Profile reply | None |
-| `social_api_delete_review_reply` | Always returns an error: no platform supports deleting a review reply | None |
 
 See [Reviews](/guides/reviews).
 
@@ -141,7 +138,7 @@ See [Automations](/guides/automations).
 |---|---|---|
 | `social_api_list_posts` | List your posts (drafts, scheduled, published, and failed), with filters | `GET /v1/posts` |
 | `social_api_get_post` | Get one post with its per-platform delivery details | `GET /v1/posts/{pid}` |
-| `social_api_create_post` | Create a draft, schedule a post with `scheduled_at`, or publish it with `publish_now` | `POST /v1/posts` |
+| `social_api_create_post` | Create a draft, schedule a post with `scheduled_at`, publish it with `publish_now`, or spread the targets over time with `stagger` | `POST /v1/posts` |
 | `social_api_update_post` | Update a draft, scheduled, or failed post | `PATCH /v1/posts/{pid}` |
 | `social_api_publish_post` | Publish a draft or scheduled post immediately | `POST /v1/posts/{pid}/publish` |
 | `social_api_retry_post` | Retry the failed platform deliveries of a `failed` or `partial` post | `POST /v1/posts/{pid}/retry` |
@@ -172,8 +169,7 @@ See [Media](/guides/media) for the upload flow.
 |---|---|---|
 | `social_api_get_account_analytics` | Get one connected account's daily metric history | `GET /v1/accounts/{id}/analytics` |
 | `social_api_get_brand_analytics` | Get a brand's daily metric history, summed across its accounts | `GET /v1/brands/{id}/analytics` |
-| `social_api_get_post_analytics` | Get one published post's daily engagement history | `GET /v1/posts/{pid}/analytics` |
-| `social_api_create_export` | Start an analytics export for a connected account | `POST /v1/accounts/{id}/export` |
+| `social_api_get_post_analytics` | Get one published post's daily engagement history | `GET /v1/posts/{pid}/analytics` || `social_api_create_export` | Start an analytics export for a connected account | `POST /v1/accounts/{id}/export` |
 | `social_api_get_export` | Get an export's status and, once it completes, its download links | `GET /v1/exports/{id}` |
 | `social_api_list_exports` | List your 50 most recent exports, newest first | `GET /v1/exports` |
 | `social_api_get_export_videos` | Get the per-video data of a completed export | `GET /v1/exports/{id}/videos` |
@@ -208,7 +204,7 @@ See [Webhooks](/guides/webhooks).
 | `social_api_patch_me` | Update your profile settings | `PATCH /v1/users/me` |
 | `social_api_list_keys` | List your API keys, without their secrets | `GET /v1/keys` |
 | `social_api_revoke_key` | Revoke an API key | `DELETE /v1/keys/{id}` |
-| `social_api_get_more_tools` | Report a capability that none of the tools provide. Its required `context` argument describes the capability and what it would accomplish. Returns `{"status": "received"}` and costs no credits | None |
+| `social_api_report_missing_capability` | Report a capability that none of the tools provide. Its required `context` argument describes the capability and what it would accomplish. Returns `{"status": "received"}` and costs no credits | None |
 
 ## What tools do not cover
 

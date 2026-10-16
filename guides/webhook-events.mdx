@@ -56,7 +56,7 @@ Which platforms emit an event is stated under each event as **Emitted for**. The
 
 - **Instagram, Facebook, Threads, WhatsApp, Telegram, Zalo, and Google Business Profile** send comments, direct messages, mentions, or reviews to SocialAPI as they happen, so those events arrive as webhook events. Each platform's page has a Capabilities table, and [Supported platforms](/platforms/overview) compares them.
 - **X / Twitter, YouTube, Bluesky, Pinterest, and LinkedIn** push nothing to SocialAPI. They emit no comment, DM, or review events, and no mention event from the platform: read those with the inbox endpoints. Listing mentions on X and Bluesky sends `mention.received` (see [Mentions you list](#mentions-you-list)).
-- **TikTok** sends new comments to SocialAPI, so it emits `comment.received`. It has no DM events or review events. Listing TikTok mentions sends `mention.received` (see [Mentions you list](#mentions-you-list)). TikTok accounts also emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect an account, and `account.disconnected` when SocialAPI flags the account for reconnection.
+- **TikTok** sends new comments to SocialAPI, so it emits `comment.received`. It has no DM events or review events. Listing TikTok mentions sends `mention.received` (see [Mentions you list](#mentions-you-list)). TikTok accounts also emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect an account, and `account.disconnected` when SocialAPI flags the account for reconnection. A TikTok [creator connection](/platforms/tiktok#creator-connection) emits no comment or mention events, and also emits `account.disconnected` when the person removes SocialAPI's app.
 - **Trustpilot** is not available, so it emits no events.
 
 ## Posts
@@ -657,7 +657,7 @@ Fires when a connected account is removed or needs reconnecting. It has 2 forms.
 }
 ```
 
-**Emitted for:** Instagram, Facebook, and Threads, when the person removes the app in the platform's settings. TikTok sends no notice of a removal: see [When TikTok authorization ends](/platforms/tiktok#when-tiktok-authorization-ends).
+**Emitted for:** Instagram, Facebook, Threads, and a TikTok [creator connection](/platforms/tiktok#creator-connection), when the person removes the app in the platform's settings. The default TikTok connection gets no notice of a removal: see [When TikTok authorization ends](/platforms/tiktok#when-tiktok-authorization-ends).
 
 **SocialAPI flagged the account for reconnection.** The account still exists. Its `status` changes so that calls on it signal that it needs reconnecting (see [Connect accounts](/guides/connect-accounts)). The payload has `reconnect_required: true` and a `reason`.
 

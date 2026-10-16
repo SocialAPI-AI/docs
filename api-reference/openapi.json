@@ -10222,7 +10222,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a post for one or more connected accounts. Set `publish_now: true` to publish\nimmediately: the post is accepted with status `publishing` and delivery runs in the\nbackground (so slow reel/video uploads do not block the request). The terminal status\n(`published`, `partial`, or `failed`) arrives via the `post.published`/`post.partial`/\n`post.failed` webhooks and by polling GET /posts/{pid}. Set `scheduled_at` to queue the\npost for future publication. With neither flag the post is saved as a draft (this is the\ndefault, even when targets are provided); publish it later with POST /posts/{pid}/publish.\nConsumes 1 post credit when the post is published or scheduled; saving a draft is free.",
+                "description": "Creates a post for one or more connected accounts. Set `publish_now: true` to publish\nimmediately: the post is accepted with status `publishing` and delivery runs in the\nbackground (so slow reel/video uploads do not block the request). The terminal status\n(`published`, `partial`, or `failed`) arrives via the `post.published`/`post.partial`/\n`post.failed` webhooks and by polling GET /posts/{pid}. Set `scheduled_at` to queue the\npost for future publication. With neither flag the post is saved as a draft (this is the\ndefault, even when targets are provided); publish it later with POST /posts/{pid}/publish.\nSet `stagger` to publish the targets one after another, separated by a random delay between\n`min_seconds` and `max_seconds`, instead of all at once; the post is then returned with status `scheduled`.\nConsumes 1 post credit when the post is published or scheduled; saving a draft is free.",
                 "tags": [
                     "Posts"
                 ],
@@ -12442,7 +12442,7 @@
                         "example": "b_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "metadata": {
-                        "description": "Metadata contains platform-specific connection data",
+                        "description": "Metadata contains platform-specific connection data. For tiktok, connection_type \"creator\" connects through TikTok's Content Posting API instead of the default Business API (\"business\").",
                         "type": "object",
                         "additionalProperties": {}
                     },
@@ -12733,6 +12733,14 @@
                         "description": "SkipValidation bypasses pre-publish validation. The post is scheduled/published as-is and may fail at the platform.",
                         "type": "boolean",
                         "example": false
+                    },
+                    "stagger": {
+                        "description": "Stagger spreads the targets out in time instead of publishing them all at once. Requires scheduled_at or publish_now. See StaggerRequest.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/api_endpoints.StaggerRequest"
+                            }
+                        ]
                     },
                     "targets": {
                         "description": "Targets specifies which connected accounts to publish to, with optional per-target overrides.",
@@ -15631,6 +15639,25 @@
                     "success": {
                         "type": "boolean",
                         "example": true
+                    }
+                }
+            },
+            "api_endpoints.StaggerRequest": {
+                "type": "object",
+                "properties": {
+                    "max_seconds": {
+                        "description": "MaxSeconds is the longest delay between two consecutive targets. Must be at least min_seconds and at most 86400 (24 hours).",
+                        "type": "integer",
+                        "maximum": 86400,
+                        "minimum": 0,
+                        "example": 300
+                    },
+                    "min_seconds": {
+                        "description": "MinSeconds is the shortest delay between two consecutive targets. Must be 0 or more.",
+                        "type": "integer",
+                        "maximum": 86400,
+                        "minimum": 0,
+                        "example": 60
                     }
                 }
             },

@@ -74,6 +74,39 @@ The post is `scheduled` and each target is `pending`. SocialAPI sends `post.sche
 - **Validation:** SocialAPI validates the post when you schedule it, so a violation returns `400 publishing.validation_failed` immediately, and validates the post again when its time arrives.
 - **Allowance:** at the post allowance, scheduling returns `429 validation.post_limit_exhausted` and creates nothing.
 
+## Stagger targets
+
+Add `stagger` to publish the targets one after another, with a random gap between them, instead of all at the same time. Set `min_seconds` and `max_seconds` in whole seconds:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Launching today: https://example.com/launch",
+    "scheduled_at": "2026-10-20T10:00:00Z",
+    "stagger": {"min_seconds": 60, "max_seconds": 300},
+    "targets": [
+      {"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"},
+      {"account_id": "acc_01HZ9X4T6B8C2D5F7G9H1J3K"},
+      {"account_id": "acc_01HZ9X6W8D1E4F7H9J2K5L3N"},
+      {"account_id": "acc_01HZ9X7Y9F2G5H8J1K4M6P4Q"}
+    ]
+  }'
+```
+
+The first target publishes at `scheduled_at`. Each next target publishes a random delay between `min_seconds` and `max_seconds` after the previous one, in the order the targets are listed. With 4 targets and a 60 to 300 second gap, the times are, for example, 10:00:00, 10:02:41, 10:03:52, and 10:08:30. Read each target's planned time from `targets[].scheduled_at` with `GET /v1/posts/{pid}`.
+
+- **Immediate start:** with `publish_now: true` and no `scheduled_at`, the first target publishes now and the others follow. The response still has `status: "scheduled"`, because the later targets are still waiting.
+- **Fixed gap:** set `min_seconds` equal to `max_seconds`.
+- **Explicit target times:** a target that sets its own `scheduled_at` keeps that time and is left out of the sequence. It does not move the targets after it.
+- **Required:** a post that would be saved as a draft (no `scheduled_at` and no `publish_now`) cannot use `stagger`. It returns `400 validation.field_invalid` with `meta.field` set to `stagger`.
+- **Bounds:** `0 <= min_seconds <= max_seconds <= 86400`. A value outside them returns `400 validation.field_invalid`.
+- **Cost:** 1 post credit for the whole post.
+- **Results:** the post settles through the usual `post.published`, `post.partial`, and `post.failed` events.
+- **Rescheduling:** `PATCH /v1/posts/{pid}` with a post-level `scheduled_at` moves every target to that single time and removes the spread. To keep a spread, send a `scheduled_at` on each target.
+- **Where it applies:** `stagger` applies only to `POST /v1/posts`. `PATCH /v1/posts/{pid}`, `POST /v1/posts/{pid}/publish`, and `POST /v1/posts/validate` ignore it, and CSV import has no column for it.
+
 ## How a scheduled post moves through statuses
 
 ```mermaid
@@ -143,7 +176,7 @@ On YouTube, `scheduled_at` makes SocialAPI upload the video at that time, and `p
 
 | Tool | What it does |
 |---|---|
-| `social_api_create_post` | Schedules a post with `scheduled_at` |
+| `social_api_create_post` | Schedules a post with `scheduled_at`, optionally spreading the targets with `stagger` |
 | `social_api_list_posts` | Lists posts, including `status=scheduled` |
 | `social_api_update_post` | Changes the time or content of a scheduled post |
 | `social_api_publish_post` | Publishes a scheduled post now |

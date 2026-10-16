@@ -6,7 +6,7 @@ description: Full reference for publishing TikTok videos and photo carousels via
 
 ## 1. Overview
 
-TikTok accepts a post as a job and finishes it later, so a TikTok target stays `publishing` until TikTok reports the post complete or failed. A video publishes publicly. A photo carousel needs a `privacy_level`.
+TikTok accepts a post as a job and finishes it later, so a TikTok target stays `publishing` until TikTok reports the post complete or failed. A video publishes publicly. A photo carousel needs a `privacy_level`. A [creator connection](/platforms/tiktok#creator-connection) follows other privacy and draft rules, listed on that section.
 
 | Field | Value |
 |---|---|
@@ -144,7 +144,7 @@ Send these keys in `platform_data.tiktok` on the post, which applies them to eve
 
 | Key | Type | Required | Applies to | Notes |
 |---|---|---|---|---|
-| `privacy_level` | string | Photo only | video, photo | Video: omit it or send `PUBLIC_TO_EVERYONE`. Any other value fails with `400 validation.privacy_level_unsupported`. Photo: required, and it must be a level TikTok allows for the account. See [Privacy level differs for videos and photos](#privacy-level-differs-for-videos-and-photos). Ignored on a draft |
+| `privacy_level` | string | Photo only. Video and photo on a creator connection. Not required on a draft | video, photo | Video: omit it or send `PUBLIC_TO_EVERYONE`. Any other value fails with `400 validation.privacy_level_unsupported`. Photo: required, and it must be a level TikTok allows for the account. See [Privacy level differs for videos and photos](#privacy-level-differs-for-videos-and-photos). Ignored on a draft. On a [creator connection](/platforms/tiktok#creator-connection), required on a published video and on a published photo carousel |
 | `media_type` | string | No | video, photo | `"video"` or `"photo"`, case-insensitive. Any other value fails validation on the `media_type` field |
 | `post_mode` | string | No | video, photo | `"direct"` (default) publishes the post. `"inbox"` sends a draft. Case-insensitive. Any other value fails with `400 validation.post_mode` |
 | `brand_content_toggle` | boolean | No | video, photo | Marks the post as paid partnership content. A photo cannot combine it with `SELF_ONLY` |
@@ -188,7 +188,7 @@ When TikTok cannot be reached for the check, `warnings` holds one entry on the f
 
 ### Scheduling
 
-Set `scheduled_at` to an ISO 8601 timestamp (UTC) instead of `publish_now`. SocialAPI holds the post and publishes it at that time. A photo carousel still needs `privacy_level`.
+Set `scheduled_at` to an ISO 8601 timestamp (UTC) instead of `publish_now`. SocialAPI holds the post and publishes it at that time. A photo carousel still needs `privacy_level`. On a creator connection, a video needs it too.
 
 ```json
 {
@@ -291,6 +291,8 @@ The view count has a different key on each endpoint: `metrics.extra.view_count` 
 ## 7. Quirks, errors, and recovery
 
 ### Privacy level differs for videos and photos
+
+This section covers the default connection. A [creator connection](/platforms/tiktok#creator-connection) requires `privacy_level` on every published post, from the account's `privacy_level_options`. A draft needs none.
 
 Every video publishes publicly, and TikTok takes no privacy setting for it. Omit `privacy_level` on a video, or send `PUBLIC_TO_EVERYONE`. Any other value, or a value that is not a string, fails with `400 validation.privacy_level_unsupported`, and nothing is sent to TikTok. `meta.privacy_level` carries the value you sent.
 

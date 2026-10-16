@@ -161,7 +161,7 @@ These query parameters apply to YouTube only:
 YouTube-specific behavior:
 
 - **Videos with comments.** `GET /v1/inbox/comments` lists commented videos only when you pass `account_id`. The list is 1 page with no cursor.
-- **Comments turned off.** A video with comments turned off returns `501 resource.not_supported` when you list its comments.
+- **Comments turned off.** Listing the comments of a video with comments turned off returns `422 platform.youtube.comments_disabled`. Retrying does not help: stop polling the video until the channel owner turns comments back on in YouTube Studio. After that, the error can continue for up to 24 hours.
 - **Reply or top-level comment.** `POST /v1/inbox/comments/{postId}` with `comment_id` replies to that comment. Without `comment_id`, it posts a new top-level comment on the video. Each costs 1 interaction credit.
 - **Hide.** `POST /v1/inbox/comments/{postId}/{commentId}/hide` sets the comment to `rejected`, which removes it from public view. `DELETE` on the same path sets it back to `published`.
 - **Moderate.** `POST /v1/platforms/youtube/comments/{commentId}/moderate` sets the status explicitly.

@@ -81,7 +81,7 @@ These codes apply to any endpoint. `error.meta.field` names the offending input 
 |---|---|---|
 | 400 | `validation.body_invalid` | The request body is not valid JSON, or has the wrong shape |
 | 400 | `validation.field_required` | A required field is missing. `meta.field` names it |
-| 400 | `validation.field_invalid` | A field or parameter has the wrong type, format, or value. `meta.field` names it. Examples: `from` is not RFC 3339, `cursor` is malformed, a webhook `url` is not an `https` URL, a webhook event type is unknown, a media `url` is not a public `http` or `https` address, `scheduled_at` is in the past on a post with targets |
+| 400 | `validation.field_invalid` | A field or parameter has the wrong type, format, or value. `meta.field` names it. Examples: `from` is not RFC 3339, `cursor` is malformed, a webhook `url` is not an `https` URL, a webhook event type is unknown, a media `url` is not a public `http` or `https` address, `scheduled_at` is in the past on a post with targets, `stagger` is sent on a draft, or `stagger` is outside `0 <= min_seconds <= max_seconds <= 86400` |
 | 400 | `validation.id_invalid` | A comment or review ID in the path is neither a platform ID nor a SocialAPI ID |
 | 400 | `validation.id_platform_mismatch` | A comment or review ID belongs to a different platform than the `account_id` |
 
@@ -138,6 +138,7 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 
 | HTTP | Code | When it occurs |
 |---|---|---|
+| 400 | `validation.connection_type_invalid` | `metadata.connection_type` on a TikTok connect is present but is not the string `business` or `creator`. `meta.field` is `connection_type` |
 | 400 | `validation.customer_state_too_long` | `state` is longer than 512 characters |
 | 400 | `validation.permission_unknown` | A value in `permissions` is not a [permission](/guides/permissions#the-permissions). `meta.permission` names it. `POST /v1/accounts/connect`, `POST /v1/invites`, and `PATCH /v1/accounts/{id}` return it |
 | 400 | `validation.permissions_empty` | `permissions` is an empty list. Send at least one permission, or omit the field. `PATCH /v1/accounts/{id}` also returns it, where `null` gives the account every permission |
@@ -337,7 +338,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 |---|---|---|
 | 413 | `billing.storage_quota` | The upload would exceed your plan's storage. Check `GET /v1/media/storage`, delete unused media, or change plan |
 | 400 | `account.exports_not_supported` | The account is a Pinterest account. Pinterest data is read live and cannot be exported |
-| 400 | `account.export_enrichment_not_supported` | `include_transcript` or `include_vision` on a TikTok account. TikTok exports hold captions and metrics only. Export again without those options |
+| 400 | `account.export_enrichment_not_supported` | `include_transcript` or `include_vision` on a TikTok account on the default connection, whose exports hold captions and metrics only. Export again without those options. A TikTok [creator connection](/platforms/tiktok#creator-connection) accepts both |
 | 400 | `validation.field_invalid` | The export is not completed yet, so its videos cannot be read |
 | 429 | `billing.export_limit`, `billing.export_cooldown`, `billing.export_concurrent` | See [Billing and plan allowances](#billing-and-plan-allowances) |
 
@@ -426,10 +427,11 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 400 | `validation.unsupported_photo_format` | A photo post includes an image that is not JPEG or WebP |
 | 400 | `validation.unsupported_media_type` | `media_type` is not `video` or `photo` |
 | 400 | `validation.post_mode` | `post_mode` is neither `direct` nor `inbox` |
-| 400 | `validation.privacy_level_required` | A photo carousel has no `privacy_level` |
+| 400 | `validation.privacy_level_required` | A photo carousel has no `privacy_level`. On a TikTok [creator connection](/platforms/tiktok#creator-connection), a published video or photo carousel (not a draft) has none |
+| 400 | `validation.posting_limit` | A TikTok [creator connection](/platforms/tiktok#creator-connection) has no privacy level TikTok allows right now, so it cannot post. `can_post` is `false` in [Creator info](/platforms/tiktok#creator-info) |
 | 400 | `validation.privacy_level_unsupported` | A video post sets a `privacy_level` other than `PUBLIC_TO_EVERYONE`, or a `privacy_level` that is not a string. `meta.privacy_level` is the value you sent |
-| 400 | `validation.invalid_privacy_level` | A photo carousel sets a `privacy_level` the account does not allow. `meta.privacy_level` is the value you sent |
-| 400 | `validation.branded_content_private` | A photo carousel sets `brand_content_toggle: true` with `privacy_level: "SELF_ONLY"` |
+| 400 | `validation.invalid_privacy_level` | A photo carousel sets a `privacy_level` the account does not allow, or, on a TikTok creator connection, a video or a photo carousel does. `meta.privacy_level` is the value you sent |
+| 400 | `validation.branded_content_private` | A photo carousel sets `brand_content_toggle: true` with `privacy_level: "SELF_ONLY"`, or, on a TikTok creator connection, a video or a photo carousel does |
 | 400 | `validation.comment_id_invalid` | A comment ID is a bare TikTok comment ID. Hide, unhide, reply, and list replies need the `id` or `platform_id` returned by the comments endpoint. `meta.comment_id` is the value you sent |
 | 400 | `validation.mention_reply_unsupported` | A reply to a TikTok mention names no comment. TikTok replies only to mentions made in a comment |
 | 400 | `platform.tiktok.40000`, `platform.tiktok.40002`, `platform.tiktok.40011`, `platform.tiktok.40904`, `platform.tiktok.40905`, `platform.tiktok.40906`, `platform.tiktok.40907`, `platform.tiktok.40908`, `platform.tiktok.40914`, `platform.tiktok.40915` | TikTok refused a parameter or a media file. `error.message` carries TikTok's reason. Fix the field it names |
@@ -458,6 +460,7 @@ A TikTok code that this table does not list returns `502` with the code after `p
 | 403 | `platform.youtube.insufficientPermissions` | The connection lacks a scope the call needs. Reconnect the account to grant it |
 | 403 | `platform.youtube.account_suspended` | YouTube suspended or closed the account or its channel. Reconnecting does not restore access. Resolve the suspension with YouTube. SocialAPI stops background sync for the account |
 | 422 | `platform.youtube.processing_failure` | YouTube refused to delete the comment: only comments your channel wrote can be deleted |
+| 422 | `platform.youtube.comments_disabled` | The video has comments turned off. Retrying does not help until the channel owner turns them back on, and the error can continue for up to 24 hours after that |
 
 ### WhatsApp
 

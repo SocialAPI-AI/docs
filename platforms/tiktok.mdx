@@ -5,7 +5,7 @@ description: Connect TikTok accounts to publish videos and photo carousels, read
 icon: "tiktok"
 ---
 
-The TikTok API in SocialAPI connects a TikTok account through TikTok's authorization screen, using TikTok API for Business. It publishes videos and photo carousels, lists the account's posts with their counts, reads, replies to, and moderates comments, lists mentions, sends `comment.received` events, and returns profile counts. SocialAPI's own TikTok app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
+The TikTok API in SocialAPI connects a TikTok account through TikTok's authorization screen, using TikTok API for Business. It publishes videos and photo carousels, lists the account's posts with their counts, reads, replies to, and moderates comments, lists mentions, sends `comment.received` events, and returns profile counts. A [creator connection](#creator-connection) uses TikTok's Content Posting API instead, and has no comments or mentions. SocialAPI's own TikTok app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
@@ -13,12 +13,12 @@ The TikTok API in SocialAPI connects a TikTok account through TikTok's authoriza
 |---|---|
 | Platform slug | `tiktok` |
 | Auth | OAuth 2.0 (TikTok authorization screen) |
-| Platform API | TikTok API for Business (Accounts API) |
+| Platform API | TikTok API for Business (Accounts API). TikTok Content Posting API with a [creator connection](#creator-connection) |
 | Status | Available |
 
 ## Capabilities
 
-An unsupported call returns `501 resource.not_supported`.
+An unsupported call returns `501 resource.not_supported`. This table is for the default connection. A [creator connection](#creator-connection) has its own table.
 
 | Feature | Status | Condition |
 |---|---|---|
@@ -43,7 +43,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Reply to a mention | Conditional | Mentions made in a comment only |
 | Reviews | No | TikTok has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
-| Analytics export | Partial | Captions and metrics. `include_transcript` or `include_vision` returns `400 account.export_enrichment_not_supported` |
+| Analytics export | Partial | Captions and metrics. On the default connection, `include_transcript` or `include_vision` returns `400 account.export_enrichment_not_supported`. A [creator connection](#creator-connection) accepts both |
 | Webhook events | Partial | `comment.received`, `mention.received` when you list mentions, the `post.*` events, `account.connected`, and `account.disconnected`. See [Webhook events](#webhook-events) |
 
 The cross-platform matrix is on [Platforms](/platforms/overview).
@@ -78,10 +78,13 @@ TikTok-specific rules:
 - **Consent screen.** The person always sees TikTok's consent screen, including when they authorized SocialAPI's app before.
 - **Account ID.** The connected account has an `acc_` ID. Its `name` is the TikTok display name, `username` is the TikTok handle, and `bio` is the profile bio. Profile counts are not on the account: read them with [Account summary](#account-summary).
 - **Account type.** Listing mentions needs a TikTok Business Account: see [Mentions](#mentions).
+- **Connection type.** `metadata.connection_type` is `"business"` (the default) or `"creator"`: see [Creator connection](#creator-connection). Without `connection_type` the connect uses `"business"`. Any other value, including an empty string or a non-string, returns `400 validation.connection_type_invalid`.
 - **Reconnect.** Reconnect with the same flow: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 - **Accounts connected before 2026-10-13.** [Comment](#comments) and [mention](#mentions) calls on them return `501 resource.not_supported` until you reconnect them.
 
 ### When TikTok authorization ends
+
+This section covers the default connection. A [creator connection](#creator-connection) is removed when the person removes SocialAPI's app.
 
 The authorization ends when the person removes SocialAPI's app in TikTok's settings, or when TikTok refuses to renew it. TikTok sends SocialAPI no notice of a removal, so SocialAPI learns it from the next call that reaches TikTok.
 
@@ -89,6 +92,44 @@ The authorization ends when the person removes SocialAPI's app in TikTok's setti
 - **Later calls.** They return `403 account.reconnection_required` until you reconnect the account.
 - **`401 platform.tiktok.unauthorized`.** TikTok refused one call as unauthorized without saying the authorization is invalid. The account stays usable. Reconnect it if the error repeats.
 - **`account.disconnected` event.** When SocialAPI's own refresh of the account's videos meets the ended authorization before one of your calls does, it sends `account.disconnected` with `reconnect_required: true` and `reason: "posts_sync_auth_failed"`. A removal in TikTok's settings does not delete the account from SocialAPI.
+
+## Creator connection
+
+A creator connection connects the TikTok account through TikTok's Content Posting API instead of TikTok API for Business. It works with a personal or creator TikTok account, which does not need to become a TikTok Business Account. Send `"connection_type": "creator"` in `metadata`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "tiktok",
+    "metadata": { "connection_type": "creator" }
+  }'
+```
+
+The response has the same shape as in [Connect an account](#connect-an-account), and the connected account's `platform` is `tiktok`.
+
+| Feature | Creator connection |
+|---|---|
+| Publish a video or photo carousel | Yes. `platform_data.privacy_level` is required on a published video and on a published photo carousel (not on a draft), and must be one of the account's `privacy_level_options` from [Creator info](#creator-info). A missing value returns `400 validation.privacy_level_required`, and a value not listed returns `400 validation.invalid_privacy_level`. When TikTok lists only `SELF_ONLY`, every post is private. When TikTok lists no level, `can_post` is `false` and a post returns `400 validation.posting_limit`. `brand_content_toggle: true` with `SELF_ONLY` returns `400 validation.branded_content_private` |
+| Send a post to the account's TikTok drafts | Video only. `post_mode: "inbox"`. A photo carousel sent to drafts fails validation on `post_mode` |
+| List posts | Yes. Videos, with likes, comments, shares, and views |
+| Creator info | Yes. `privacy_level_options` lists every level TikTok allows for the account |
+| Account summary | Yes |
+| Analytics export | Yes, including `include_transcript` and `include_vision` |
+| Comments, `comment.received`, and mentions | No. `501 resource.not_supported` |
+
+A creator connection asks on TikTok's consent screen for `user.info.basic` and `user.info.profile`, plus the scopes of the [permissions](/guides/permissions) you select:
+
+| Permission | Scopes |
+|---|---|
+| `posts.read` | `video.list` |
+| `posts.write` | `video.publish`, `video.upload` |
+| `analytics.read` | `user.info.stats` |
+
+When the person removes SocialAPI's app in TikTok's settings, SocialAPI removes the creator connection's account and sends `account.disconnected`.
+
+**Switching connection type.** Connecting the same TikTok username with the other `connection_type` moves the account to that connection type. It keeps its `acc_` ID, brand, and history while the account's authorization on the previous connection type still works. If that authorization no longer works, the connect creates a new account. A reconnect without `connection_type` uses `"business"`, so send `"creator"` on every reconnect of a creator connection.
 
 ## Creator info
 
@@ -119,9 +160,9 @@ Response (HTTP 200):
 
 | Field | Description |
 |---|---|
-| `can_post` | `true` when TikTok lists `PUBLIC_TO_EVERYONE` for the account. `false` when it does not |
+| `can_post` | `true` when TikTok lists `PUBLIC_TO_EVERYONE` for the account, `false` when it does not. On a [creator connection](#creator-connection): `true` when TikTok lists any level |
 | `max_video_duration_sec` | The longest video this account can post, in seconds. Absent when TikTok returns no value |
-| `privacy_level_options` | `["PUBLIC_TO_EVERYONE"]`. Absent when `can_post` is `false`. It never lists another level, because every video publishes publicly. Photo carousels follow a different rule: see [TikTok publishing](/platforms/tiktok/publishing#privacy-level-differs-for-videos-and-photos) |
+| `privacy_level_options` | `["PUBLIC_TO_EVERYONE"]`. Absent when `can_post` is `false`. It never lists another level, because every video publishes publicly. Photo carousels follow a different rule: see [TikTok publishing](/platforms/tiktok/publishing#privacy-level-differs-for-videos-and-photos). On a [creator connection](#creator-connection) it lists every level TikTok allows for the account |
 | `interaction_settings` | `true` for a setting the creator turned off in TikTok. A post cannot turn that interaction back on |
 | `avatar_url` | A temporary link from TikTok. Download the image if you need it later |
 
@@ -217,7 +258,7 @@ TikTok limits each account to 40 requests per minute for each TikTok call. Beyon
 | `comment.received` | Another person comments on, or replies under, a TikTok post of the account. See [`comment.received`](/guides/webhook-events#comment-received) |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery). A TikTok post can finish after the request that created it returned |
 | `account.connected` | You connected a TikTok account |
-| `account.disconnected` | SocialAPI flagged the account for reconnection: see [When TikTok authorization ends](#when-tiktok-authorization-ends) |
+| `account.disconnected` | SocialAPI flagged the account for reconnection: see [When TikTok authorization ends](#when-tiktok-authorization-ends). On a [creator connection](#creator-connection), the person removed SocialAPI's app and SocialAPI removed the account |
 | `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
 
 `comment.received` details on TikTok:
@@ -248,7 +289,7 @@ TikTok has no DM or review events. Listing mentions sends `mention.received`: se
 
 ## Scopes
 
-SocialAPI's TikTok app asks the person for these scopes on TikTok's consent screen. You apply for no app review. The consent screen is the same whichever [permissions](/guides/permissions) you select, and the account is limited to your selection.
+SocialAPI's TikTok app asks the person for these scopes on TikTok's consent screen. You apply for no app review. On the default connection, the consent screen is the same whichever [permissions](/guides/permissions) you select, and the account is limited to your selection. A creator connection asks for other scopes: see [Creator connection](#creator-connection).
 
 | Scope | Used for |
 |---|---|

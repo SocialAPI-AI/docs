@@ -4,6 +4,24 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-10-16" description="Publishing" tags={["Publishing"]}>
+  ## Stagger post targets
+
+  `POST /v1/posts` and `social_api_create_post` accept `stagger` with `min_seconds` and `max_seconds`. The targets publish one after another in the order listed, each a random delay in that range after the previous one, starting at `scheduled_at` or immediately with `publish_now`. The post is returned as `scheduled`, and each target's planned time is in `targets[].scheduled_at`. `stagger` on a draft, or outside `0 <= min_seconds <= max_seconds <= 86400`, returns `400 validation.field_invalid`. See [Stagger targets](/guides/scheduling#stagger-targets).
+</Update>
+
+<Update label="2026-10-16" description="TikTok" tags={["Accounts", "TikTok"]}>
+  ## TikTok creator connection
+
+  `POST /v1/accounts/connect` for `tiktok` accepts `"metadata": {"connection_type": "creator"}`, which connects the account through TikTok's Content Posting API instead of TikTok API for Business, so a personal or creator account does not need to be a TikTok Business Account. A creator connection publishes posts and drafts, lists posts, and reads creator info and the account summary. It has no comments or mentions. Connects without `connection_type` are unchanged. See [Creator connection](/platforms/tiktok#creator-connection).
+</Update>
+
+<Update label="2026-10-16" description="YouTube" tags={["Inbox", "YouTube"]}>
+  ## YouTube comments turned off, and rate-limit status
+
+  Listing the comments of a YouTube video with comments turned off returns `422 platform.youtube.comments_disabled` instead of `501 resource.not_supported`. Stop polling that video until the channel owner turns comments back on. When the YouTube daily quota is used up, calls return `429 platform.youtube.rate_limit` as documented, instead of `502 platform.youtube.api_error`. See [YouTube](/platforms/youtube).
+</Update>
+
 <Update label="2026-10-15" description="LinkedIn" tags={["Accounts", "LinkedIn", "Beta"]}>
   ## LinkedIn profile analytics (beta)
 
