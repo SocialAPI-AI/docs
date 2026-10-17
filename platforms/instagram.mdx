@@ -137,6 +137,8 @@ Hold each Instagram account through one path. Connecting through Facebook Login 
 | Instagram accounts per connection | One | Every account the login administers, each as a Page of the brand's Instagram account |
 | Delete a published post | No | Yes: `DELETE /v1/posts/{pid}` deletes it, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI |
 | Like a comment | No | Yes |
+| `message_tag: "HUMAN_AGENT"` on a DM | Extends the window to 7 days | Not sent: the DM goes out untagged and the 24-hour window applies |
+| `content_type` on a post | Required | Optional. `stories` and `carousel` apply as given. Otherwise, including `feed` and `reel`, the media decides: one video publishes as a Reel, one image as a feed post, 2 or more items as a carousel |
 | Paid-partnership label | Either key fails validation | `platform_data.is_paid_partnership` (`true` or `false`) and `platform_data.branded_content_sponsor_ids` (1 or 2 numeric Instagram account IDs) |
 | Scope names | `instagram_business_*` | `instagram_*` and `pages_*` |
 
@@ -181,7 +183,7 @@ A private reply sends a DM to the person who commented. Send it with `POST /v1/i
 
 ## Direct messages and the messaging window
 
-An Instagram account can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.instagram.window_closed`. Send `message_tag: "HUMAN_AGENT"` to reply up to 7 days after the person's last message. Instagram accepts no other tag: any other value returns `400 validation.invalid_message_tag`.
+An Instagram account can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.instagram.window_closed`. On Instagram Login, send `message_tag: "HUMAN_AGENT"` to reply up to 7 days after the person's last message. Instagram Login accepts no other tag: any other value returns `400 validation.invalid_message_tag`. On [Facebook Login](#connect-through-facebook-login), `message_tag` is not sent: the DM goes out untagged and the 24-hour window applies.
 
 - **Message types.** Text, attachments, quick replies, buttons, and cards. Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
 - **Size limits.** Instagram sets them and refuses a larger message: text up to 1,000 bytes of UTF-8; images in PNG or JPEG up to 8 MB; video in MP4, OGG, AVI, MOV, or WebM up to 25 MB; audio in AAC, M4A, WAV, or MP4 up to 25 MB; files in PDF up to 25 MB.

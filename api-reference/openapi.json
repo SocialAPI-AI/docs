@@ -76,7 +76,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Initiates account connection. For OAuth2 platforms returns an auth_url to redirect the user to.\nFor apikey/credentials platforms stores the credentials immediately and returns account_id.",
+                "description": "Initiates account connection. For OAuth2 platforms returns an auth_url to redirect the user to.\nFor apikey/credentials platforms stores the credentials immediately and returns account_id.\nFor WhatsApp, open auth_url to run Meta's signup. When the WhatsApp Business account holds several numbers, the redirect to your redirect_uri carries status=selection_required and a connection_id: list the numbers with GET /v1/accounts/pending/{connection_id} and pick one with POST /v1/accounts/pending/{connection_id}/select.\nSet the top-level redirect_uri field when connecting WhatsApp so the result reaches a page you control.",
                 "tags": [
                     "Accounts"
                 ],
@@ -12446,6 +12446,15 @@
                         "type": "object",
                         "additionalProperties": {}
                     },
+                    "onboarding": {
+                        "description": "Onboarding applies to WhatsApp only. cloud_api (default) connects the number for use through the API alone. business_app connects a number that stays in use on the WhatsApp Business app, and imports its recent chats.",
+                        "type": "string",
+                        "enum": [
+                            "cloud_api",
+                            "business_app"
+                        ],
+                        "example": "cloud_api"
+                    },
                     "permissions": {
                         "description": "Permissions are the permissions to request for this account. If omitted, the brand's existing selection for this platform applies, and a brand with none gets every permission. Valid values: posts.read, posts.write, comments.read, comments.write, messages.read, messages.write, reviews.read, reviews.write, analytics.read.",
                         "type": "array",
@@ -15596,7 +15605,7 @@
                         }
                     },
                     "message_tag": {
-                        "description": "MessageTag attaches a Meta message tag so the DM can be sent outside the\nstandard 24-hour window. Instagram/Facebook only. Instagram accepts only\nHUMAN_AGENT; Facebook also accepts ACCOUNT_UPDATE, CONFIRMED_EVENT_UPDATE,\nCUSTOMER_FEEDBACK, POST_PURCHASE_UPDATE. Requires Meta \"Human Agent\"\nadvanced access for HUMAN_AGENT. Ignored by non-Meta platforms. For beta\ntesters replying on Facebook Messenger, HUMAN_AGENT is applied\nautomatically when this field is omitted.",
+                        "description": "MessageTag sends the DM outside the standard 24-hour window. Instagram\nconnected through Instagram Login only, which accepts only HUMAN_AGENT and\nextends the window to 7 days; any other value returns 400\nvalidation.invalid_message_tag. On Facebook, on Instagram connected\nthrough Facebook Login, and on every other platform, the DM is sent\nuntagged and the 24-hour window applies.",
                         "type": "string",
                         "example": "HUMAN_AGENT"
                     },

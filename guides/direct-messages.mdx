@@ -176,7 +176,7 @@ Response (HTTP 200):
 | `attachments` | A list of attachments, described below |
 | `attachment_url` | Deprecated shorthand for one attachment, ignored when `attachments` is set. A public media URL |
 | `reply_to_message_id` | Facebook and Zalo: make the first message a reply to the message with this `platform_id`. On Instagram connected through Instagram Login, the send fails with `422 platform.instagram.invalid_parameter`. Other platforms ignore the field |
-| `message_tag` | Instagram: `HUMAN_AGENT`, see [The messaging window](#the-messaging-window). Not sent on Facebook |
+| `message_tag` | Instagram Login: `HUMAN_AGENT`, see [The messaging window](#the-messaging-window). Not sent on Facebook or on Instagram connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login) |
 | `quick_replies`, `buttons`, `cards` | Interactive content, described in [Interactive messages](#interactive-messages). Set 1 of the 3. A Facebook send delivers only `text` and ignores these fields |
 | `list_sections`, `list_button` | WhatsApp only: a list menu. See [WhatsApp](/platforms/whatsapp) |
 
@@ -292,12 +292,12 @@ Response (HTTP 200):
 
 Most platforms let you message a person only for a limited time after their last message. A send outside the window fails, and SocialAPI sends nothing.
 
-- **Instagram and Facebook:** 24 hours from the person's last message. Outside it, the send returns `400 platform.instagram.window_closed` or `400 platform.facebook.window_closed`. On Instagram, `message_tag: "HUMAN_AGENT"` extends the window to 7 days. Instagram accepts no other tag: any other value returns `400 validation.invalid_message_tag`. A Facebook Page sends no `message_tag`: the DM goes out untagged.
+- **Instagram and Facebook:** 24 hours from the person's last message. Outside it, the send returns `400 platform.instagram.window_closed` or `400 platform.facebook.window_closed`. On Instagram Login, `message_tag: "HUMAN_AGENT"` extends the window to 7 days. Instagram Login accepts no other tag: any other value returns `400 validation.invalid_message_tag`. A Facebook Page, and an Instagram account connected through Facebook Login, send no `message_tag`: the DM goes out untagged.
 - **WhatsApp:** a free-form message needs the 24-hour service window, and outside it the send returns `400 whatsapp.window_closed`. An approved template is the way to reach the person: see [WhatsApp](/platforms/whatsapp#the-24-hour-service-window).
 - **Zalo:** the person must have interacted with the Official Account in the last 7 days. Outside it, the send returns `422 platform.zalo.not_deliverable`: see [Zalo](/platforms/zalo#the-7-day-messaging-window).
 - **Telegram:** the person must have messaged the bot first. Before that, the send returns `403 telegram.cannot_message`: see [Telegram](/platforms/telegram).
 
-After Instagram or Facebook refuses a conversation for a closed window, SocialAPI refuses further sends on it with the same code until the person messages you again or 24 hours pass. These refusals cost no credit. An Instagram send with `message_tag` is not refused this way. A [private reply](/guides/comments#send-a-private-reply) does not clear the refusal. The person's next message does.
+After Instagram or Facebook refuses a conversation for a closed window, SocialAPI refuses further sends on it with the same code until the person messages you again or 24 hours pass. These refusals cost no credit. An Instagram Login send with `message_tag` is not refused this way. A send on Instagram connected through Facebook Login goes out untagged, so it is refused. A [private reply](/guides/comments#send-a-private-reply) does not clear the refusal. The person's next message does.
 
 ## Limits
 
