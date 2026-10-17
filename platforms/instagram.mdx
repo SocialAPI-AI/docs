@@ -5,15 +5,15 @@ description: Connect Instagram Business and Creator accounts to publish, moderat
 icon: "instagram"
 ---
 
-The Instagram API in SocialAPI connects an Instagram Business or Creator account through Instagram Login. It publishes posts, Reels, carousels, and Stories, reads and moderates comments, sends private replies and direct messages (DMs), and reads mentions, stories, and insights. SocialAPI's own Meta app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
+The Instagram API in SocialAPI connects an Instagram Business or Creator account through Instagram Login by default, or through Facebook Login when the account has a linked Facebook Page: see [Connect through Facebook Login](#connect-through-facebook-login). It publishes posts, Reels, carousels, and Stories, reads and moderates comments, sends private replies and direct messages (DMs), and reads mentions, stories, and insights. SocialAPI's own Meta app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
 | Field | Value |
 |---|---|
 | Platform slug | `instagram` |
-| Auth | OAuth 2.0 with Instagram Login. The account needs no linked Facebook Page |
-| Platform API | Instagram API with Instagram Login (Meta) |
+| Auth | OAuth 2.0 with Instagram Login (default): the account needs no linked Facebook Page. Or OAuth 2.0 with Facebook Login, selected with `metadata.connection_type: "facebook_login"`: the account needs a linked Facebook Page |
+| Platform API | Instagram API with Instagram Login, or Instagram API with Facebook Login for Business (Meta) |
 | Status | Available |
 
 ## Capabilities
@@ -22,29 +22,29 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 
 | Feature | Status | Condition |
 |---|---|---|
-| Publish feed image, Reel, carousel, Story | Yes | See [Instagram publishing](/platforms/instagram/publishing) |
+| Publish feed image, Reel, carousel, Story | Partial | All four on Instagram Login. On [Facebook Login](#connect-through-facebook-login), a feed image or a Reel only. See [Instagram publishing](/platforms/instagram/publishing) |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | Yes | Not part of a Story |
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post in the Instagram app and publish a new one |
-| Delete a published post | No | `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the Instagram target, and the post stays live. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported`. Delete the post in the Instagram app |
+| Delete a published post | Partial | Instagram Login: `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the Instagram target, and the post stays live. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported`. Delete the post in the Instagram app. [Facebook Login](#connect-through-facebook-login): `DELETE /v1/posts/{pid}` deletes the post from Instagram, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI |
 | List posts | Yes | Posts, Reels, and carousels |
 | List active stories | Yes | Only stories that are live now |
 | List comments and replies | Yes | Comments are read per post |
 | Reply to a comment | Yes | |
 | Hide, unhide, delete a comment | Yes | |
-| Like a comment | No | `501 resource.not_supported`. `can_like` is `false` on every comment |
+| Like a comment | Partial | Instagram Login: `501 resource.not_supported`, and `can_like` is `false` on every comment. [Facebook Login](#connect-through-facebook-login): yes, and `can_like` is `true` |
 | Private reply to a comment | Yes | One per comment, within 7 days of the comment |
-| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text, attachments, quick replies, buttons, cards |
-| React to a DM | Yes | |
+| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text, attachments, quick replies, buttons, cards. On [Facebook Login](#connect-through-facebook-login), text only: see [Differences from Instagram Login](#differences-from-instagram-login) |
+| React to a DM | Partial | Instagram Login only. On Facebook Login it returns `501 resource.not_supported` |
 | Unsend or delete a DM | No | Only the Instagram app can |
 | Messaging participant profile | Yes | Only for a person who messaged the account or tapped an icebreaker or the persistent menu |
 | Mentions | Partial | `GET /v1/accounts/{id}/mentions` returns media the account is tagged in. Caption and comment @mentions arrive as `mention.received` events only |
 | Reply to a mention | Yes | |
 | Reviews | No | Instagram has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
-| Automations | Yes | Comment and DM triggers, buttons, multi-step flows, the Follow gate. See [Automations](/guides/automations) |
+| Automations | Yes | Comment and DM triggers, buttons, multi-step flows, the Follow gate. On [Facebook Login](#connect-through-facebook-login), buttons work on the first private reply only: a `send_dm` action delivers no buttons. See [Automations](/guides/automations) |
 | Account summary | Yes | Needs the `analytics.read` [permission](/guides/permissions): see [Account summary](#account-summary) |
 | Analytics | Yes | See [Analytics](/guides/analytics) |
-| Collaboration invites | Yes | List, accept, decline. Invites are sent at publish time only |
+| Collaboration invites | Partial | List, accept, decline. Invites are sent at publish time only. Instagram Login only: on [Facebook Login](#connect-through-facebook-login) these calls return `501 resource.not_supported` |
 | Webhook events | Yes | See [Webhook events](#webhook-events) |
 
 The cross-platform matrix is on [Platforms](/platforms/overview).
@@ -77,15 +77,104 @@ Response (HTTP 202):
 Instagram-specific rules:
 
 - **Account type.** The person must connect an Instagram Business or Creator account. A personal account cannot be connected.
-- **One account per brand.** A brand holds one Instagram account. Connecting a different Instagram account to the same brand ends with `status=error` and `error=account.already_linked` on your `redirect_uri`.
+- **One account per brand.** A brand holds one Instagram account. With [Facebook Login](#connect-through-facebook-login), each further Instagram account the login granted appears as a Page of the brand's Instagram account. Connecting a different Instagram account to the same brand ends with `status=error` and `error=account.already_linked` on your `redirect_uri`.
 - **Reconnect.** If a token is no longer valid, calls return `401 platform.instagram.auth` and the account needs reconnecting. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 - **Permissions.** Send `permissions` to ask the person for fewer scopes: see [Scopes](#scopes).
+
+## Connect through Facebook Login
+
+Connect through Facebook Login when the Instagram account has a linked Facebook Page and you need to delete published posts, like comments, or set the paid-partnership label. Instagram Login stays the default: send no `connection_type` and nothing changes. The two paths are the same platform, `instagram`, and every call, field, and webhook event is the same unless this section says otherwise.
+
+Select Facebook Login with `metadata.connection_type: "facebook_login"` on `POST /v1/accounts/connect`. Any other value, or none, connects through Instagram Login.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/connect \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "instagram",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123",
+    "metadata": {"connection_type": "facebook_login"}
+  }'
+```
+
+Response (HTTP 202):
+
+```json
+{
+  "auth_url": "https://www.facebook.com/v25.0/dialog/oauth?client_id=1234567890&redirect_uri=https%3A%2F%2Fapi.social-api.ai%2Foauth%2Fcallback%2Finstagram&state=4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2&response_type=code&auth_type=rerequest&scope=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Open this link to connect your instagram account. Once you've authorized, the account will be connected automatically."
+}
+```
+
+The person signs in to Facebook, not Instagram, and approves the scopes in [Facebook Login scopes](#facebook-login-scopes). The redirect then carries `status=success` and the brand's Instagram account, as described in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+
+### More than one Instagram account under one login
+
+A Facebook login can administer more than one Instagram account. The brand's Instagram account holds every Instagram account the login granted that none of your other brands holds, each as a Page. The `platform_page_id` of such a Page is the Instagram account ID. List the Pages with `GET /v1/accounts/{id}/pages`, and publish to one with `page_id` on the post target: see [Delivery](/guides/delivery). A Facebook Page with no linked Instagram account is not listed.
+
+- A login that grants no Instagram account ends with `status=error` and `error=platform.instagram.no_pages` on your `redirect_uri`.
+- A login whose every Instagram account belongs to another of your brands, or is already held through Instagram Login, ends with `status=error` and `error=platform.instagram.no_assignable_pages`.
+- A brand whose Instagram account is connected through a different Facebook login ends with `status=error` and `error=account.different_login`. Disconnect the brand's Instagram account first.
+
+### Requirements
+
+- The Instagram account is a Business or Creator account linked to a Facebook Page. An account with no linked Page does not appear in the connection: use Instagram Login.
+- The person holds the Page task that each capability needs. Meta grants an Instagram scope only for a task the person holds on the Page: create content for publishing, moderate for comments, messaging for DMs, and analyze for insights.
+- A DM or private reply on an account with no Facebook Page linked to it returns `409 platform.instagram.no_page`. Reconnect the account.
+
+### One path per Instagram account
+
+Hold each Instagram account through one path. Connecting through Facebook Login does not add an account that you hold through Instagram Login: if no account remains, the connection ends with `status=error` and `error=platform.instagram.no_assignable_pages`. To switch an account to Facebook Login, disconnect it, then connect it again with `connection_type: "facebook_login"`.
+
+### Differences from Instagram Login
+
+| Feature | Instagram Login | Facebook Login |
+|---|---|---|
+| Linked Facebook Page | Not needed | Required |
+| Instagram accounts per connection | One | Every account the login administers, each as a Page of the brand's Instagram account |
+| Publish a carousel | Yes | No: a post with more than 1 media item fails validation on `media` |
+| Publish a Story | Yes | No: a post with `content_type` other than `feed` or `reel` publishes as a feed post or Reel, with a validation warning on `content_type` |
+| Delete a published post | No | Yes: `DELETE /v1/posts/{pid}` deletes it, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI |
+| Like a comment | No | Yes |
+| Paid-partnership label | Either key fails validation | `platform_data.is_paid_partnership` (`true` or `false`) and `platform_data.branded_content_sponsor_ids` (1 or 2 numeric Instagram account IDs) |
+| Collaboration invites: list, accept, decline | Yes | `501 resource.not_supported` |
+| Send a DM | Text, attachments, quick replies, buttons, cards, and `message_tag` | Text only. Attachments, quick replies, buttons, cards, and `message_tag` are not sent |
+| Read DMs | Text and attachments | Text only. A message carries no attachments |
+| React to a DM | Yes | `501 resource.not_supported` |
+| Scope names | `instagram_business_*` | `instagram_*` and `pages_*` |
+
+Every other row of the Capabilities table behaves the same on both paths.
+
+### Facebook Login scopes
+
+SocialAPI's Meta app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected. The scopes marked Every account are always requested.
+
+| Scope | Used for | Permissions |
+|---|---|---|
+| `instagram_basic` | Profile and media | Every account |
+| `pages_show_list` | List the Pages the person manages | Every account |
+| `pages_read_engagement` | Read engagement on the linked Page | Every account |
+| `pages_read_user_content` | Read content on the linked Page | Every account |
+| `pages_manage_metadata` | Subscribe the linked Page to webhook events | Every account |
+| `business_management` | List Pages owned through a Business Portfolio | Every account |
+| `instagram_content_publish` | Publish posts and Reels | `posts.write` |
+| `instagram_manage_contents` | Delete a published post | `posts.write` |
+| `instagram_manage_comments` | Read, reply to, hide, and delete comments, read mentions, and the first comment | `comments.read`, `comments.write` |
+| `instagram_manage_engagement` | Like a comment | `comments.write` |
+| `instagram_manage_messages` | Read and send DMs and private replies | `messages.read`, `messages.write` |
+| `pages_messaging` | Receive DM events for the linked Page | `messages.read`, `messages.write` |
+| `instagram_manage_insights` | Account summary and post insights | `analytics.read` |
+
+The account stays limited to the permissions you selected: an account connected with `comments.read` alone cannot reply to comments.
 
 ## Comments
 
 List comments on a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID (`targets[].platform_post_id`). Reply, hide, unhide, and delete work as described in [Comments](/guides/comments). Instagram-specific rules:
 
-- A comment's `capabilities.can_like` is always `false`, because Instagram has no like endpoint for comments.
+- On Instagram Login, a comment's `capabilities.can_like` is always `false`, because Instagram has no like endpoint for comments on that path. On [Facebook Login](#connect-through-facebook-login) it is `true`.
 
 ## Private replies
 
@@ -98,7 +187,7 @@ A private reply sends a DM to the person who commented. Send it with `POST /v1/i
 
 ## Direct messages and the messaging window
 
-An Instagram account can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.instagram.window_closed`. Send `message_tag: "HUMAN_AGENT"` to reply up to 7 days after the person's last message. Instagram accepts no other tag: any other value returns `400 validation.invalid_message_tag`.
+An Instagram account can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.instagram.window_closed`. On Instagram Login, send `message_tag: "HUMAN_AGENT"` to reply up to 7 days after the person's last message. Instagram Login accepts no other tag: any other value returns `400 validation.invalid_message_tag`. On [Facebook Login](#connect-through-facebook-login), `message_tag` is not sent and the 24-hour window applies.
 
 - **Message types.** Text, attachments, quick replies, buttons, and cards. Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
 - **Size limits.** Instagram sets them and refuses a larger message: text up to 1,000 bytes of UTF-8; images in PNG or JPEG up to 8 MB; video in MP4, OGG, AVI, MOV, or WebM up to 25 MB; audio in AAC, M4A, WAV, or MP4 up to 25 MB; files in PDF up to 25 MB.
@@ -180,7 +269,7 @@ Each item has `id`, `platform`, `caption`, `media_type`, `media_url`, `permalink
 
 ## Collaboration invites
 
-A collaborator is invited when a post is published, with `platform_data.collaborators`: see [Instagram publishing](/platforms/instagram/publishing#platform-data-fields). Instagram has no call that adds a collaborator to a published post. Three calls remain:
+These calls work on Instagram Login only. A collaborator is invited when a post is published, with `platform_data.collaborators`: see [Instagram publishing](/platforms/instagram/publishing#platform-data-fields). Instagram has no call that adds a collaborator to a published post. Three calls remain:
 
 | Method | Path | Description |
 |---|---|---|
@@ -271,7 +360,7 @@ Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitte
 
 ## Scopes
 
-SocialAPI's Meta app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected. `instagram_business_basic` is always requested.
+SocialAPI's Meta app requests these scopes at connect through Instagram Login. You apply for no app review. The scopes of Facebook Login are in [Facebook Login scopes](#facebook-login-scopes). Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected. `instagram_business_basic` is always requested.
 
 | Scope | Used for | Permissions |
 |---|---|---|

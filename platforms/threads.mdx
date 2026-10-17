@@ -5,7 +5,7 @@ description: Connect Threads accounts to publish text, image, video, and carouse
 icon: "threads"
 ---
 
-The Threads API in SocialAPI connects Threads accounts. It publishes text, image, video, and carousel posts, reads and answers replies, and, in beta, reads mentions, insights, and public profiles. Threads has no direct messages in the API. SocialAPI's own Meta Threads app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
+The Threads API in SocialAPI connects Threads accounts. It publishes text, image, video, and carousel posts, reads, answers, and moderates replies, reads mentions and insights, and, in beta, looks up public profiles. Threads has no direct messages in the API. SocialAPI's own Meta Threads app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
@@ -14,11 +14,11 @@ The Threads API in SocialAPI connects Threads accounts. It publishes text, image
 | Platform slug | `threads` |
 | Auth | OAuth 2.0 (Meta Threads) |
 | Platform API | Threads API (Meta) |
-| Status | Available. Mentions, insights, profile discovery, and reply moderation are in beta |
+| Status | Available. Profile discovery is in beta |
 
 ## Capabilities
 
-An unsupported call returns `501 resource.not_supported`. A Beta row depends on a Threads scope that Meta has not granted to SocialAPI's app for every account: see [Beta scopes](#beta-scopes).
+An unsupported call returns `501 resource.not_supported`. A Beta row depends on a Threads scope that Meta has not granted to SocialAPI's app for every account: see [Beta scopes](#beta-scopes). Reply moderation, mentions, and insights need a scope that an account connected before 2026-10-17 does not hold: reconnect such an account to use them.
 
 | Feature | Status | Condition |
 |---|---|---|
@@ -32,13 +32,13 @@ An unsupported call returns `501 resource.not_supported`. A Beta row depends on 
 | List replies | Yes | Replies to a post, and replies to a reply |
 | Reply to a reply | Yes | |
 | Delete a reply | Conditional | Only replies your account wrote. `can_delete` is `false` on a reply from another account |
-| Hide, unhide a reply | Beta | Only replies from other accounts (`can_hide` is `false` on your own replies). Needs the `threads_manage_replies` scope. Without it the call returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code |
+| Hide, unhide a reply | Yes | Only replies from other accounts (`can_hide` is `false` on your own replies). Needs the `threads_manage_replies` scope. Without it the call returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code |
 | Like a reply | No | `501 resource.not_supported` |
 | Private reply | No | `501 resource.not_supported` |
 | DMs | No | Threads has no messaging API. `501 resource.not_supported` |
 | Reviews | No | `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
-| Mentions | Beta | Needs `threads_manage_mentions`. List, reply, and the `mention.received` event |
-| Insights | Beta | Needs `threads_manage_insights`. Post-level and account-level metrics. Without it, `likes` and `comments` in the `metrics` of a Threads post stay `0` |
+| Mentions | Yes | Needs `threads_manage_mentions`. List, reply, and the `mention.received` event |
+| Insights | Yes | Needs `threads_manage_insights`. Post-level and account-level metrics. Without it, `likes` and `comments` in the `metrics` of a Threads post stay `0` |
 | Profile discovery | Beta | Needs `threads_profile_discovery`. Public profile lookup by exact username |
 | Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
 | Webhook events | Yes | See [Webhook events](#webhook-events) |
@@ -76,8 +76,8 @@ A Threads access token lasts about 60 days. SocialAPI refreshes it. If a call re
 
 List the replies to a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID. Reply and delete work as described in [Comments](/guides/comments). Threads calls a comment a reply.
 
-- **Hide and unhide:** only replies from other accounts. They need the beta scope `threads_manage_replies`.
-- **Delete:** only replies your account wrote, and it works without the beta scope. A reply from another account cannot be deleted: hide it instead.
+- **Hide and unhide:** only replies from other accounts. They need the scope `threads_manage_replies`.
+- **Delete:** only replies your account wrote, and it works without `threads_manage_replies`. A reply from another account cannot be deleted: hide it instead.
 - A like and a private reply return `501 resource.not_supported`.
 
 ## Mentions
@@ -126,7 +126,7 @@ curl -X POST "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J
   -d '{"media_id": "sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I", "text": "Thanks for the mention!"}'
 ```
 
-`media_id` is the `id` from the list response. An account connected without `threads_manage_mentions` gets `403` with a `platform.threads.<code>` error code on the list, where `<code>` is Meta's error code. On an account that has the scope, until Meta grants it for every account, the list and the `mention.received` event include only mentions made by accounts enrolled in the beta. Mentions from other accounts are left out, and the list can come back empty with no error.
+`media_id` is the `id` from the list response. An account connected without `threads_manage_mentions` gets `403` with a `platform.threads.<code>` error code on the list, where `<code>` is Meta's error code. Reconnect the account to add the scope.
 
 ## Insights
 
@@ -229,7 +229,7 @@ Threads accounts emit these events to your webhook endpoints. Payloads are in [W
 | Event | When it fires |
 |---|---|
 | `comment.received` | A person replies to one of your posts |
-| `mention.received` | Another account mentions yours. Beta: see [Mentions](#mentions) |
+| `mention.received` | Another account mentions yours. See [Mentions](#mentions) |
 | `account.connected` | You finished connecting or reconnecting the account |
 | `account.disconnected` | The person revoked access to the account on Threads, or SocialAPI flagged the account for reconnection (`reconnect_required: true`, see `reason`) |
 | `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
@@ -262,8 +262,13 @@ SocialAPI's Meta Threads app requests these scopes at connect. You apply for no 
 | `threads_content_publish` | Publish posts and replies | `posts.write`, `comments.write` |
 | `threads_delete` | Delete posts and replies | `posts.write`, `comments.write` |
 | `threads_read_replies` | Read replies | `comments.read` |
+| `threads_manage_mentions` | Mentions | `comments.read` |
+| `threads_manage_replies` | Hide and unhide replies, `reply_control` on a post | `comments.write` |
+| `threads_manage_insights` | Insights, and the like and reply counts on posts | `analytics.read` |
 
 Threads asks for publishing and deleting as 1 pair of scopes shared by `posts.write` and `comments.write`, so the consent screen can show more than you selected. The account stays limited to the permissions you selected.
+
+`threads_manage_mentions`, `threads_manage_replies`, and `threads_manage_insights` are requested since 2026-10-17. An account connected before that date does not hold them: a call that needs one returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. Reconnect the account to add them.
 
 ### Beta scopes
 
@@ -271,9 +276,6 @@ These further scopes are requested only for accounts enrolled in the beta:
 
 | Scope | Used for | Permissions |
 |---|---|---|
-| `threads_manage_replies` | Hide and unhide replies | `comments.write` |
-| `threads_manage_insights` | Insights, and the like and reply counts on posts | `analytics.read` |
-| `threads_manage_mentions` | Mentions | `comments.read` |
 | `threads_profile_discovery` | Profile discovery | Every account |
 | `threads_location_tagging` | `location_id` on a post | `posts.write` |
 | `threads_share_to_instagram` | `crossreshare_to_ig` on a post | `posts.write` |

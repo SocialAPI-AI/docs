@@ -155,14 +155,16 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | 400 | `validation.invalid_location_id` | The Google location ID is not valid |
 | 400 | `validation.auth_code_expired` | The TikTok authorization code expired or was already used. Start the connection again |
 | 409 | `account.already_linked` | The brand already holds a different account on this platform. Telegram, Bluesky, and choosing a Google location with `POST /v1/accounts/pending/{connection_id}/select` return the 409. On a platform with a consent screen it reaches your `redirect_uri` as `error=account.already_linked` |
-| 409 | `account.different_login` | The brand's Facebook is connected through a different login. Disconnect it first. During a connection it reaches your `redirect_uri` as `error=account.different_login`; assigning a Page returns the 409 |
+| 409 | `account.different_login` | The brand's Facebook, or its Instagram connected through Facebook Login, is connected through a different login. Disconnect it first. During a connection it reaches your `redirect_uri` as `error=account.different_login`; assigning a Page returns the 409 |
 | 403 | `account.reconnection_required` | The platform token is no longer usable. Reconnect with `POST /v1/accounts/connect`, passing the existing connected account's brand and platform: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account) |
 | 400 | `account.unsupported_platform` | The platform value is not recognized |
 | Redirect | `platform.facebook.no_pages` | The Facebook login has no Pages |
+| Redirect | `platform.instagram.no_pages` | The Facebook login has no Instagram account: see [Connect through Facebook Login](/platforms/instagram#connect-through-facebook-login) |
 | Redirect | `platform.google.no_locations` | The Google login has no Business Profile locations |
 | Redirect | `platform.youtube.no_channels` | The Google login has no YouTube channels |
 | 404 | `platform.youtube.no_uploads_playlist` | The YouTube channel has no uploads playlist |
 | Redirect | `platform.facebook.no_assignable_pages` | Every Page on the login already belongs to another brand |
+| Redirect | `platform.instagram.no_assignable_pages` | Every Instagram account on the Facebook login already belongs to another brand, or you hold it through Instagram Login |
 | 409 | `platform.google.brand_has_account` | Assigning a location when the brand already has a Google Business Profile connected. Disconnect it first, or choose another brand |
 | 502 | `platform.instagram.api_error` | Instagram's token exchange failed during connection |
 | 400 | `account.page_not_found` | The `page_id` matches no Page of the account |
@@ -252,6 +254,7 @@ See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [R
 | 400 | `platform.instagram.window_closed`, `platform.facebook.window_closed` | The 24-hour messaging window is closed. The person must message you first |
 | 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: it is older than 7 days, or already received one |
 | 422 | `platform.instagram.thread_unavailable`, `platform.facebook.thread_unavailable` | The platform refused to deliver to this conversation. It can be restricted or unavailable |
+| 409 | `platform.instagram.no_page` | A DM or private reply on a Facebook Login account with no Facebook Page linked to it. Reconnect the account |
 | 422 | `platform.instagram.invalid_parameter` | Instagram rejected a parameter. Retrying unchanged will not help |
 | 403 | `platform.instagram.permission_denied`, `platform.facebook.permission_denied`, `platform.whatsapp.permission_denied` | The scopes granted to the connected account do not cover the action |
 | 400 | `platform.whatsapp.invalid_parameter` | WhatsApp rejected a parameter. `error.message` carries WhatsApp's reason |
@@ -260,7 +263,7 @@ See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [R
 | 400 | `validation.attachment_invalid` | An attachment has no `source_type` |
 | 400 | `validation.attachment_type_required` | An attachment of source `platform_attachment_id` has no `type` |
 | 400 | `validation.media_unresolved` | A `media_id` attachment could not be resolved |
-| 400 | `validation.invalid_message_tag` | The `message_tag` is not supported. Instagram accepts only `HUMAN_AGENT` |
+| 400 | `validation.invalid_message_tag` | The `message_tag` is not supported. Instagram Login accepts only `HUMAN_AGENT` |
 | 400 | `validation.message_required` | `message_id` is missing when reacting to a message |
 | 400 | `validation.participant_required` | `participant_id` is missing when reacting to a message, or the conversation's X participant is unknown |
 | 400 | `validation.invalid_reaction` | The reaction is not a single emoji character |
@@ -351,7 +354,9 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 400 | `validation.range_too_wide` | The analytics range is longer than 400 days |
 | 403 | `account.permission_missing` | The account does not have the `analytics.read` [permission](/guides/permissions). Account analytics and the platform insight endpoints return it, and so does post analytics when no target of the post has the permission |
 | 403 | `platform.instagram.insights_scope_missing` | Instagram withdrew the insights access. Reconnect the account |
+| 403 | `platform.facebook.insights_scope_missing` | The Page was connected before 2026-10-17, its login declined the `read_insights` scope, or the person who connected it does not hold the Analyze task on the Page. A reconnect fixes the first two; for the third, grant the Analyze task on Facebook, then reconnect |
 | 422 | `platform.instagram.insights_unavailable` | Instagram has no insights of the requested kind for this media |
+| 400 | `validation.days_invalid` | Facebook Page insights `days` is below 1 or above 365 |
 | 400 | `validation.metric_required` | No metric was passed to a Threads or Google Business Profile insights request |
 | 400 | `validation.metric_invalid` | A metric is not valid for the request (and, on Threads, for the `level`) |
 | 400 | `validation.level_invalid` | Threads insights `level` is not `media` or `account` |

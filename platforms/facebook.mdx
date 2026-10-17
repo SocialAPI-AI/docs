@@ -40,6 +40,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Reviews | No | SocialAPI does not read Facebook reviews: Meta deprecated Page recommendations in Graph API v22.0. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | Yes | Comment and DM triggers, buttons on the first private reply, multi-step flows. A `send_dm` action delivers no buttons. No `follows_account` filter and no Follow gate: `400 validation.filter_unsupported` |
 | Analytics | Yes | See [Analytics](/guides/analytics) |
+| Page insights | Yes | `GET /v1/platforms/facebook/accounts/{id}/summary` (trailing 30 days) and `GET /v1/platforms/facebook/accounts/{id}/insights/daily`. Needs `read_insights`: see [Page insights](#page-insights) |
 | Webhook events | Yes | See [Webhook events](#webhook-events) |
 
 The cross-platform matrix is on [Platforms](/platforms/overview).
@@ -160,10 +161,70 @@ A Page can message a person only inside the 24-hour messaging window that the pe
 - **Cap.** DMs, public comment replies, and private replies from a Page together count toward 10 per clock minute. More returns `429 messaging.velocity_limit`: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap).
 - **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` reacts to a message, and `DELETE` on the same path removes the reaction.
 - **Delivery status.** `dm.status.sent`, `dm.status.delivered`, and `dm.status.read` events follow each DM you send.
+- **No message tags.** A `message_tag` on a Facebook DM, including `HUMAN_AGENT`, is not sent: the DM goes out untagged and the 24-hour window applies.
 
 ## Mentions
 
 `GET /v1/accounts/{id}/mentions` returns the posts that tag the Page. A mention inside a comment is not in that list: it arrives as a `mention.received` event. Reply to a mention with `POST /v1/accounts/{id}/mentions/reply`, which posts a public comment. Details are in [Mentions](/guides/mentions).
+
+## Page insights
+
+`GET /v1/platforms/facebook/accounts/{id}/summary` returns the Page's followers, views, reach, post engagements, and net follower change over the trailing 30 days.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/facebook/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "follower_count": 12840,
+  "views": 48210,
+  "reach": 31975,
+  "interactions": 2216,
+  "net_follows": 154,
+  "period_start": "2026-09-17T09:00:00Z",
+  "period_end": "2026-10-17T09:00:00Z"
+}
+```
+
+`interactions` counts post engagements, and `net_follows` is new follows minus unfollows over the period.
+
+`GET /v1/platforms/facebook/accounts/{id}/insights/daily` returns one point per day, oldest first. `days` sets how many trailing days, from 1 to 365 (default 365). A day with no data is left out.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/facebook/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/insights/daily?days=2" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {"date": "2026-10-15", "followers": 12831, "views": 1620, "reach": 1104, "interactions": 71},
+    {"date": "2026-10-16", "followers": 12840, "views": 1755, "reach": 1187, "interactions": 83}
+  ]
+}
+```
+
+`followers` is the count at the end of the day. `views`, `reach`, and `interactions` are that day's totals.
+
+Both routes take an optional `page_id`, the `id` from `GET /v1/accounts/{id}/pages`. Without it they report on the account's default Page. Both are free, need the `accounts:read` scope on a scoped API key, and have no MCP tool.
+
+Both need the `read_insights` scope, requested since 2026-10-17 with the `analytics.read` permission. Post metrics in [Analytics](/guides/analytics) do not need it.
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.days_invalid` | `days` is below 1 or above 365 |
+| 403 | `platform.facebook.insights_scope_missing` | The Page was connected before 2026-10-17, its login declined `read_insights`, or the person who connected it does not hold the Analyze task on the Page. A reconnect fixes the first two; for the third, grant the Analyze task on Facebook, then reconnect |
+| 403 | `account.permission_missing` | The account does not have the `analytics.read` [permission](/guides/permissions) |
+| 404 | `account.not_found` | The account does not exist |
+| 404 | `resource.not_found` | `page_id` is not an active Page of the account, or the account has no default Page |
+| 501 | `resource.not_supported` | `{id}` is not a Facebook account |
+| 502 | `platform.facebook.<code>` or `platform.facebook.api_error` | Facebook returned an error, where `<code>` is Meta's error code, or failed with no code: see [Errors](/guides/errors) |
 
 ## Reviews
 
@@ -219,6 +280,7 @@ SocialAPI's Meta app requests these scopes at connect. You apply for no app revi
 | `pages_manage_metadata` | Subscribe the Page to webhook events | Every account |
 | `pages_messaging` | Send and receive Messenger DMs | `messages.read`, `messages.write` |
 | `pages_manage_posts` | Create, edit, and delete Page posts | `posts.write` |
+| `read_insights` | [Page insights](#page-insights). A login that declines it keeps `analytics.read` | `analytics.read` |
 | `public_profile` | Identify the person who connected | Every account |
 
 Facebook asks for messages as 1 scope, covering both reading and writing, so the consent screen shows the broader scope. The account stays limited to the permissions you selected: an account connected with `messages.read` alone cannot send messages.

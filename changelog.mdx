@@ -4,6 +4,24 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-10-17" description="Threads" tags={["Threads", "Inbox", "Analytics", "Publishing"]}>
+  ## Threads mentions, insights, reply moderation, and reply_control
+
+  Threads mentions, insights, and hiding or unhiding replies are no longer in beta, and `reply_control` in a Threads target's `platform_data` now sets who can reply. A Threads connect requests `threads_manage_mentions`, `threads_manage_replies`, and `threads_manage_insights`, each with its permission: see [Scopes](/platforms/threads#scopes). An account connected before 2026-10-17 does not hold them, and those calls return `403` with a `platform.threads.<code>` error code until the account is reconnected. `reply_control` applies only on an account whose last connect was on or after 2026-10-17 with `comments.write` or with no `permissions` selection: on any other account it is not sent and comes back as a validation warning. Profile discovery stays in beta. See [Threads](/platforms/threads).
+</Update>
+
+<Update label="2026-10-17" description="Facebook" tags={["Facebook", "Analytics"]}>
+  ## Facebook Page insights
+
+  `GET /v1/platforms/facebook/accounts/{id}/summary` and `GET /v1/platforms/facebook/accounts/{id}/insights/daily` are open to every key and no longer return `403 platform.facebook.beta_required`. A connect with the `analytics.read` permission requests `read_insights`. A Page connected before 2026-10-17 returns `403 platform.facebook.insights_scope_missing` until the account is reconnected. Facebook DMs still send no `message_tag`. See [Page insights](/platforms/facebook#page-insights).
+</Update>
+
+<Update label="2026-10-17" description="Instagram" tags={["Accounts", "Instagram"]}>
+  ## Instagram through Facebook Login
+
+  `POST /v1/accounts/connect` for `instagram` accepts `"metadata": {"connection_type": "facebook_login"}` for every key, which connects the account through Facebook Login for Business and its linked Facebook Page. That path also deletes published posts, likes comments, and sets the paid-partnership label, and publishes one image or one video per post: a post with more than 1 media item fails validation on `media`. See [Connect through Facebook Login](/platforms/instagram#connect-through-facebook-login).
+</Update>
+
 <Update label="2026-10-16" description="Publishing" tags={["Publishing"]}>
   ## Stagger post targets
 

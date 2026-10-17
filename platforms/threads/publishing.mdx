@@ -110,12 +110,13 @@ Send these keys in `platform_data.threads` on the post, which applies them to ev
 | `gif_attachment` | `{gif_id, provider}` | `provider` must be `"GIPHY"`. Any other provider is not sent |
 | `is_ghost_post` | boolean | Text-only posts. The post archives itself after 24 hours. Not valid together with `enable_reply_approvals` |
 | `enable_reply_approvals` | boolean | Replies need your approval before they appear publicly |
+| `reply_control` | string | Who can reply: `everyone`, `accounts_you_follow`, `mentioned_only`, `parent_post_author_only`, or `followers_only`. On an account that holds `threads_manage_replies`, any other value fails validation. On any other account the key is not sent and the response carries a warning: see below |
 | `location_id` | string | Needs the beta scope `threads_location_tagging` |
 | `crossreshare_to_ig` | boolean | Shares the post to the linked Instagram account as a Story. Needs the beta scope `threads_share_to_instagram`. `crossreshare_to_ig_dark_mode` sets the dark variant |
 
 SocialAPI forwards any additional keys in `platform_data.threads` that the table above lists for the post type you publish, and no others. Any other key is not sent, and the response lists it as a validation warning naming the key.
 
-`reply_control` is not sent. Setting who can reply needs the `threads_manage_replies` scope, which Meta has not granted to every account. A post that includes `reply_control` publishes with Threads' default, where everyone can reply, and the response carries a validation warning that names the scope.
+`reply_control` needs the `threads_manage_replies` scope. An account holds it when its last connect was on or after 2026-10-17 and included the `comments.write` [permission](/guides/permissions), or sent no `permissions`. On any other account, `reply_control` is not sent: the post publishes with Threads' default, where everyone can reply, and the response carries a validation warning on `reply_control`. Reconnect the account with `comments.write` to apply it.
 
 ### Scheduling
 
@@ -198,7 +199,7 @@ Each post includes a `targets` array with per-platform status and engagement met
 
 **Metrics notes:**
 
-Likes and replies come from Threads insights, which need the `threads_manage_insights` scope. That scope is in beta, so `likes` and `comments` stay `0` for an account outside the beta. Threads does not report shares or saves, so those stay `0`. Account and post insights are in [Threads insights](/platforms/threads#insights).
+Likes and replies come from Threads insights, which need the `threads_manage_insights` scope. An account connected before 2026-10-17 does not hold it, so `likes` and `comments` stay `0` until the account is reconnected. Threads does not report shares or saves, so those stay `0`. Account and post insights are in [Threads insights](/platforms/threads#insights).
 
 ---
 
@@ -222,7 +223,7 @@ Omit `media` to publish a post with a text body only.
 
 ### Who can reply
 
-Everyone can reply to a post. SocialAPI does not send `reply_control`: see "Platform data fields".
+Everyone can reply to a post unless `reply_control` sets otherwise. `reply_control` applies only on an account that holds `threads_manage_replies`: see "Platform data fields".
 
 ### Token expiry
 
@@ -372,6 +373,7 @@ SocialAPI's Meta Threads app requests these scopes during the OAuth flow. You co
 | `threads_content_publish` | Create and publish media containers |
 | `threads_read_replies` | Read replies on posts |
 | `threads_delete` | Delete published posts |
-| `threads_manage_insights` | Beta scope. Like and reply counts on posts. Requested only for accounts enrolled in the beta |
+| `threads_manage_insights` | Like and reply counts on posts. Requested since 2026-10-17 |
+| `threads_manage_replies` | `reply_control` on a post. Requested since 2026-10-17 with `comments.write` |
 
 The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).

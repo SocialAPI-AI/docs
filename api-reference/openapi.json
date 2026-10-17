@@ -1066,7 +1066,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Fetches posts where your brand account was mentioned or tagged. Results are sorted newest-first. Returns 501 for platforms that do not support mention tracking. On Instagram this returns only media your account was tagged in: @mentions written inside a post caption or inside a comment are never included, because Meta exposes no endpoint to poll them, and they are not currently delivered as mention.received webhooks either. Threads support is beta and requires the threads_manage_mentions permission, which is pending Meta App Review: a Threads account connected without it gets an authorization error, and until Meta approves it only mentions made by accounts on the app's tester list are returned, so mentions from other accounts are left out of an otherwise successful response.",
+                "description": "Fetches posts where your brand account was mentioned or tagged. Results are sorted newest-first. Returns 501 for platforms that do not support mention tracking. On Instagram this returns only media your account was tagged in: @mentions written inside a post caption or inside a comment are never included, because Meta exposes no endpoint to poll them, and they are not currently delivered as mention.received webhooks either. On Threads, an account connected before 2026-10-17 gets an authorization error until it is reconnected.",
                 "tags": [
                     "Mentions"
                 ],
@@ -1180,7 +1180,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Replies, as a public comment, to a mention of the connected account, including on a third-party post where the normal comment-reply endpoint is not permitted. Provide media_id (the media/post the mention is on); set comment_id only when the mention was in a comment (omit it to reply to a mention in the post caption). Supported on Instagram, Facebook, Threads (beta) and Bluesky. Consumes 1 interaction credit.",
+                "description": "Replies, as a public comment, to a mention of the connected account, including on a third-party post where the normal comment-reply endpoint is not permitted. Provide media_id (the media/post the mention is on); set comment_id only when the mention was in a comment (omit it to reply to a mention in the post caption). Supported on Instagram, Facebook, Threads and Bluesky. Consumes 1 interaction credit.",
                 "tags": [
                     "Mentions"
                 ],
@@ -3275,7 +3275,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, Threads, and YouTube. Check the can_hide capability flag. Threads support is beta and requires the threads_manage_replies permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
+                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, Threads, and YouTube. Check the can_hide capability flag. On Threads, an account connected before 2026-10-17 gets an authorization error until it is reconnected.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -3387,7 +3387,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, Threads, and YouTube. Threads support is beta and requires the threads_manage_replies permission, which is pending Meta App Review, so Threads accounts outside the app's tester roster return an upstream authorization error until it is granted.",
+                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, Threads, and YouTube. On Threads, an account connected before 2026-10-17 gets an authorization error until it is reconnected.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -6319,11 +6319,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Beta. Returns one point per day for one Page of a connected Facebook account: followers at the end of the day, plus that day's views, reach and post engagements. Days with no data are omitted. Same beta and permission errors as the Page insights summary.",
+                "description": "Returns one point per day for one Page of a connected Facebook account: followers at the end of the day, plus that day's views, reach and post engagements. Days with no data are omitted. Same permission errors as the Page insights summary.",
                 "tags": [
                     "Facebook"
                 ],
-                "summary": "Get daily Facebook Page insights (beta)",
+                "summary": "Get daily Facebook Page insights",
                 "parameters": [
                     {
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
@@ -6384,7 +6384,7 @@
                         }
                     },
                     "403": {
-                        "description": "Beta access required, or Page connected without the insights permission",
+                        "description": "Page connected without the insights permission",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6423,11 +6423,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Beta. Returns trailing-30-day Page insight aggregates (followers, views, reach, post engagements, net follower change) for one Page of a connected Facebook account. Access is limited to beta testers while the read_insights permission is in Meta App Review, and non-beta keys receive 403 platform.facebook.beta_required. Pages connected without the permission return 403 platform.facebook.insights_scope_missing and must be reconnected. The response shape may change without notice while this endpoint is in beta.",
+                "description": "Returns trailing-30-day Page insight aggregates (followers, views, reach, post engagements, net follower change) for one Page of a connected Facebook account. A Page connected before 2026-10-17, or whose login declined the insights permission, returns 403 platform.facebook.insights_scope_missing and must be reconnected.",
                 "tags": [
                     "Facebook"
                 ],
-                "summary": "Get Facebook Page insights summary (beta)",
+                "summary": "Get Facebook Page insights summary",
                 "parameters": [
                     {
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
@@ -6470,7 +6470,7 @@
                         }
                     },
                     "403": {
-                        "description": "Beta access required, or Page connected without the insights permission",
+                        "description": "Page connected without the insights permission",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8231,11 +8231,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Beta. Returns engagement metrics for a single Threads post (level=media) or for the connected account (level=account). Requires the threads_manage_insights Threads permission, which is pending Meta App Review, so calls may return an upstream authorization error for accounts outside the app's tester roster until that permission is granted. Media metrics are views, likes, replies, reposts, quotes and shares. Account metrics are those five plus clicks, followers_count and follower_demographics. shares is media-only and clicks is account-only. follower_demographics requires exactly one breakdown (country, city, age or gender) and rejects since or until.",
+                "description": "Returns engagement metrics for a single Threads post (level=media) or for the connected account (level=account). An account connected before 2026-10-17 gets an authorization error until it is reconnected. Media metrics are views, likes, replies, reposts, quotes and shares. Account metrics are those five plus clicks, followers_count and follower_demographics. shares is media-only and clicks is account-only. follower_demographics requires exactly one breakdown (country, city, age or gender) and rejects since or until.",
                 "tags": [
                     "Threads"
                 ],
-                "summary": "Get Threads insights (beta)",
+                "summary": "Get Threads insights",
                 "parameters": [
                     {
                         "description": "Connected account ID",

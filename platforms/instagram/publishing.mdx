@@ -11,11 +11,11 @@ Instagram processes media before it can be published, so every post type (image,
 | Field | Value |
 |---|---|
 | Platform slug | `instagram` |
-| Auth type | OAuth 2.0 with Instagram Login |
-| Platform API | Instagram API with Instagram Login (Meta) |
+| Auth type | OAuth 2.0 with Instagram Login, or with Facebook Login: see [Connect through Facebook Login](/platforms/instagram#connect-through-facebook-login) |
+| Platform API | Instagram API with Instagram Login, or with Facebook Login (Meta) |
 | Create post | Yes |
 | Update post | Not after publishing (`409 post.state_invalid`). `draft`, `scheduled`, and `failed` posts can be edited |
-| Delete post | No (`outcome: not_supported`) |
+| Delete post | Instagram Login: No (`outcome: not_supported`). Facebook Login: Yes, and unpublish works. See [Delete post](#5-delete-post) |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | Yes (best-effort, non-blocking) |
 | Posting caps | 45 posts per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
@@ -30,6 +30,8 @@ Instagram processes media before it can be published, so every post type (image,
 | Single video (Reel) | `content_type: "reel"` | Published as `media_type: REELS` |
 | Carousel | `content_type: "carousel"` with 2 to 10 `media` entries | 2 to 10 items; mix of images and videos allowed |
 | Story | `content_type: "stories"` | A single image (up to 8 MB) or a single video (up to 60 seconds and 100 MB). Captions are not supported |
+
+An account connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login) publishes a single image or a single video (as a Reel) only. A post with more than 1 media item fails validation on `media`, and `content_type: "stories"` or `"carousel"` publishes as a feed post or Reel with a validation warning on `content_type`.
 
 `content_type` is required to publish or schedule an Instagram post, including a draft you publish later. Without it, the post fails validation with `400 publishing.validation_failed`. A draft can be saved without it, because drafts skip validation.
 
@@ -117,6 +119,8 @@ Send these keys in `platform_data.instagram` on the post, which applies them to 
 | `is_ai_generated` | boolean | feed, reel, stories, carousel (whole carousel, not per slide) | Adds Instagram's AI info label. See "AI-generated content" below. |
 | `user_tags` | array of `{username, x, y}` | feed (x and y required, 0 to 1), reel (username only) | Tags people in the post. Returns an error on carousels. |
 | `audio_name` | string | reel | Name of the audio track shown on the Reel. |
+| `is_paid_partnership` | boolean | feed, reel | Facebook Login only. Adds Instagram's paid-partnership label. On Instagram Login it fails validation. |
+| `branded_content_sponsor_ids` | array of 1 or 2 numeric strings | feed, reel | Facebook Login only. Instagram account IDs of the sponsors named on the paid-partnership label. On Instagram Login it fails validation. |
 | `trial_params` | `{graduation_strategy}` | reel | Sets how a trial Reel graduates to your full audience. `graduation_strategy` is `"MANUAL"` or `"SS_PERFORMANCE"`. |
 
 SocialAPI forwards any additional keys in `platform_data.instagram` that the table above lists for the post type you publish, and no others. Any other key, including a key listed for another post type, is not sent, and the response lists each one as a validation warning naming the key. `location_id` must be a string of digits, `share_to_feed` and `is_ai_generated` must be booleans, and `alt_text` on a Reel is not sent.
@@ -186,7 +190,9 @@ To correct a published post, delete it in the Instagram app and publish a new po
 
 ## 5. Delete post
 
-`DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for an Instagram target, and the post stays live on Instagram. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported` for an Instagram target. Instagram Login gives apps no media deletion call, so SocialAPI refuses rather than report a deletion that did not happen. Delete the post in the Instagram app.
+On an account connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login), `DELETE /v1/posts/{pid}` deletes the post from Instagram, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI. The rest of this section covers Instagram Login.
+
+On Instagram Login, `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for an Instagram target, and the post stays live on Instagram. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported` for an Instagram target. Instagram Login gives apps no media deletion call, so SocialAPI refuses rather than report a deletion that did not happen. Delete the post in the Instagram app.
 
 For a cross-platform post, the other platforms are still deleted or unpublished. The response names every platform whose content is still live, so an Instagram target refusing does not undo the targets that succeeded. See [Delete a post](/guides/delivery#delete-a-post).
 
