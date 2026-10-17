@@ -31,8 +31,6 @@ Instagram processes media before it can be published, so every post type (image,
 | Carousel | `content_type: "carousel"` with 2 to 10 `media` entries | 2 to 10 items; mix of images and videos allowed |
 | Story | `content_type: "stories"` | A single image (up to 8 MB) or a single video (up to 60 seconds and 100 MB). Captions are not supported |
 
-An account connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login) publishes a single image or a single video (as a Reel) only. A post with more than 1 media item fails validation on `media`, and `content_type: "stories"` or `"carousel"` publishes as a feed post or Reel with a validation warning on `content_type`.
-
 `content_type` is required to publish or schedule an Instagram post, including a draft you publish later. Without it, the post fails validation with `400 publishing.validation_failed`. A draft can be saved without it, because drafts skip validation.
 
 **File limits for media you upload to SocialAPI** (`source_type: "media_id"`): images must be JPEG and at most 8 MB. Videos must be MP4 or QuickTime, at most 300 MB, and 3 seconds to 15 minutes long. A file outside these limits fails validation with `400 publishing.validation_failed`. A `url` item is not checked in advance, so a PNG sent by URL reaches Instagram and can fail there.
@@ -119,8 +117,8 @@ Send these keys in `platform_data.instagram` on the post, which applies them to 
 | `is_ai_generated` | boolean | feed, reel, stories, carousel (whole carousel, not per slide) | Adds Instagram's AI info label. See "AI-generated content" below. |
 | `user_tags` | array of `{username, x, y}` | feed (x and y required, 0 to 1), reel (username only) | Tags people in the post. Returns an error on carousels. |
 | `audio_name` | string | reel | Name of the audio track shown on the Reel. |
-| `is_paid_partnership` | boolean | feed, reel | Facebook Login only. Adds Instagram's paid-partnership label. On Instagram Login it fails validation. |
-| `branded_content_sponsor_ids` | array of 1 or 2 numeric strings | feed, reel | Facebook Login only. Instagram account IDs of the sponsors named on the paid-partnership label. On Instagram Login it fails validation. |
+| `is_paid_partnership` | boolean | feed, reel, carousel | Facebook Login only. Adds Instagram's paid-partnership label. On Instagram Login it fails validation. |
+| `branded_content_sponsor_ids` | array of 1 or 2 numeric strings | feed, reel, carousel | Facebook Login only. Instagram account IDs of the sponsors named on the paid-partnership label. On Instagram Login it fails validation. |
 | `trial_params` | `{graduation_strategy}` | reel | Sets how a trial Reel graduates to your full audience. `graduation_strategy` is `"MANUAL"` or `"SS_PERFORMANCE"`. |
 
 SocialAPI forwards any additional keys in `platform_data.instagram` that the table above lists for the post type you publish, and no others. Any other key, including a key listed for another post type, is not sent, and the response lists each one as a validation warning naming the key. `location_id` must be a string of digits, `share_to_feed` and `is_ai_generated` must be booleans, and `alt_text` on a Reel is not sent.

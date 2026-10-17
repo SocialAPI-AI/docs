@@ -173,10 +173,10 @@ Response (HTTP 200):
 |---|---|
 | `account_id` | Required. The connected account that sends the message |
 | `text` | The message text. Required with `quick_replies` and `buttons` |
-| `attachments` | A list of attachments, described below. Not sent for an Instagram account connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login) |
+| `attachments` | A list of attachments, described below |
 | `attachment_url` | Deprecated shorthand for one attachment, ignored when `attachments` is set. A public media URL |
-| `reply_to_message_id` | Facebook and Zalo: make the first message a reply to the message with this `platform_id`. On Instagram Login, the send fails with `422 platform.instagram.invalid_parameter`. On Instagram connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login), it threads the reply like Facebook. Other platforms ignore the field |
-| `message_tag` | Instagram Login: `HUMAN_AGENT`, see [The messaging window](#the-messaging-window). Not sent on Facebook or on Instagram connected through Facebook Login |
+| `reply_to_message_id` | Facebook and Zalo: make the first message a reply to the message with this `platform_id`. On Instagram connected through Instagram Login, the send fails with `422 platform.instagram.invalid_parameter`. Other platforms ignore the field |
+| `message_tag` | Instagram: `HUMAN_AGENT`, see [The messaging window](#the-messaging-window). Not sent on Facebook |
 | `quick_replies`, `buttons`, `cards` | Interactive content, described in [Interactive messages](#interactive-messages). Set 1 of the 3. A Facebook send delivers only `text` and ignores these fields |
 | `list_sections`, `list_button` | WhatsApp only: a list menu. See [WhatsApp](/platforms/whatsapp) |
 
@@ -208,13 +208,13 @@ curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a
   }'
 ```
 
-The platform fetches a `url` attachment from your URL, so it must be reachable without a login. Facebook accepts files up to 25 MB. Instagram accepts images up to 8 MB and video, audio, and PDF files up to 25 MB. An Instagram account connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login) sends no attachments. SocialAPI resolves every `media_id` before it sends anything, so an unknown or unfinished `media_id` returns `400 validation.media_unresolved` and sends no message. If a send fails part way, the earlier messages stay delivered. The error carries `error.meta.sent_count` (messages sent) and `error.meta.failed_index` (the item that failed, counting text as item 0 when present), so you can retry from there.
+The platform fetches a `url` attachment from your URL, so it must be reachable without a login. Facebook accepts files up to 25 MB. Instagram accepts images up to 8 MB and video, audio, and PDF files up to 25 MB. SocialAPI resolves every `media_id` before it sends anything, so an unknown or unfinished `media_id` returns `400 validation.media_unresolved` and sends no message. If a send fails part way, the earlier messages stay delivered. The error carries `error.meta.sent_count` (messages sent) and `error.meta.failed_index` (the item that failed, counting text as item 0 when present), so you can retry from there.
 
 Some platforms accept less. X sends text only and rejects an attachment with `400 validation.attachment_unsupported`. Bluesky sends only `text`. Zalo sends a `url` or `media_id` attachment as an image unless its `type` is `gif` or `sticker`. Telegram accepts attachments with captions. See [X](/platforms/twitter#direct-messages), [Bluesky](/platforms/bluesky#direct-messages), [Zalo](/platforms/zalo#direct-messages), and [Telegram](/platforms/telegram).
 
 ### Interactive messages
 
-Instagram Login sends structured, tappable content. A DM send on Facebook, or on an Instagram account connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login), delivers only `text` and ignores `quick_replies`, `buttons`, and `cards`, so the rules in this section apply to Instagram Login. Buttons do work on a [private reply](/guides/comments#send-a-private-reply) on Facebook and on Instagram connected through Facebook Login. Set at most 1 of `quick_replies`, `buttons`, or `cards` per message. More than 1 returns `400 validation.interactive_conflict`. When the person taps a quick reply or a `postback` button, SocialAPI sends a [`dm.postback`](/guides/webhook-events#dm-postback) event with the `payload` you set. To answer taps without your own handler, use an [Automation](/guides/automations#buttons-and-multi-step-flows). Interactive content follows the messaging window like any message.
+Instagram sends structured, tappable content. A Facebook DM send delivers only `text` and ignores `quick_replies`, `buttons`, and `cards`, so the rules in this section apply to Instagram. Buttons do work on a Facebook [private reply](/guides/comments#send-a-private-reply). Set at most 1 of `quick_replies`, `buttons`, or `cards` per message. More than 1 returns `400 validation.interactive_conflict`. When the person taps a quick reply or a `postback` button, SocialAPI sends a [`dm.postback`](/guides/webhook-events#dm-postback) event with the `payload` you set. To answer taps without your own handler, use an [Automation](/guides/automations#buttons-and-multi-step-flows). Interactive content follows the messaging window like any message.
 
 #### Quick replies
 
@@ -271,7 +271,7 @@ WhatsApp has buttons with its own rules and list menus, and Zalo takes buttons a
 
 ## React to a message
 
-`POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` adds your emoji reaction to a message, and replaces your earlier one. It works on Instagram and Facebook. Other platforms, and Instagram accounts connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login), return `501 resource.not_supported`.
+`POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` adds your emoji reaction to a message, and replaces your earlier one. It works on Instagram and Facebook. Other platforms return `501 resource.not_supported`.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages/m_AbCdEf123/reaction" \
@@ -292,12 +292,12 @@ Response (HTTP 200):
 
 Most platforms let you message a person only for a limited time after their last message. A send outside the window fails, and SocialAPI sends nothing.
 
-- **Instagram and Facebook:** 24 hours from the person's last message. Outside it, the send returns `400 platform.instagram.window_closed` or `400 platform.facebook.window_closed`. On Instagram Login, `message_tag: "HUMAN_AGENT"` extends the window to 7 days. Instagram Login accepts no other tag: any other value returns `400 validation.invalid_message_tag`. An Instagram account connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login) and a Facebook Page send no `message_tag`: the DM goes out untagged.
+- **Instagram and Facebook:** 24 hours from the person's last message. Outside it, the send returns `400 platform.instagram.window_closed` or `400 platform.facebook.window_closed`. On Instagram, `message_tag: "HUMAN_AGENT"` extends the window to 7 days. Instagram accepts no other tag: any other value returns `400 validation.invalid_message_tag`. A Facebook Page sends no `message_tag`: the DM goes out untagged.
 - **WhatsApp:** a free-form message needs the 24-hour service window, and outside it the send returns `400 whatsapp.window_closed`. An approved template is the way to reach the person: see [WhatsApp](/platforms/whatsapp#the-24-hour-service-window).
 - **Zalo:** the person must have interacted with the Official Account in the last 7 days. Outside it, the send returns `422 platform.zalo.not_deliverable`: see [Zalo](/platforms/zalo#the-7-day-messaging-window).
 - **Telegram:** the person must have messaged the bot first. Before that, the send returns `403 telegram.cannot_message`: see [Telegram](/platforms/telegram).
 
-After Instagram or Facebook refuses a conversation for a closed window, SocialAPI refuses further sends on it with the same code until the person messages you again or 24 hours pass. These refusals cost no credit. An Instagram Login send with `message_tag` is not refused this way. A [private reply](/guides/comments#send-a-private-reply) does not clear the refusal. The person's next message does.
+After Instagram or Facebook refuses a conversation for a closed window, SocialAPI refuses further sends on it with the same code until the person messages you again or 24 hours pass. These refusals cost no credit. An Instagram send with `message_tag` is not refused this way. A [private reply](/guides/comments#send-a-private-reply) does not clear the refusal. The person's next message does.
 
 ## Limits
 
