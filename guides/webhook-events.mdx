@@ -26,6 +26,7 @@ Every delivery is a JSON object with an `event` name, a `data` value (an object,
     "metadata": null,
     "received_at": "2026-10-13T14:30:00Z",
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "platform_post_id": "17895695668004550"
   },
   "raw_payload": {
@@ -49,6 +50,24 @@ Every delivery is a JSON object with an `event` name, a `data` value (an object,
 The body carries no event ID and no sent-at time. The `X-SocialAPI-Delivery` header identifies the delivery, and `X-SocialAPI-Timestamp` holds the time of the attempt.
 
 SocialAPI delivers each event at least once, and events can arrive in a different order than they happened. [Deduplicate and order](/guides/webhooks#respond-to-a-webhook) on your side.
+
+## Route events by brand
+
+Webhook events carry `brand_id`, the [brand](/guides/concepts#brand) of the connected account, next to `account_id`. One endpoint receives the events of all your brands, so when you serve more than one customer from one SocialAPI account, route each event to its customer with `brand_id`.
+
+| Location of `brand_id` | Events |
+|---|---|
+| `data.brand_id` | `comment.received`, `dm.received`, `dm.sent`, `dm.referral`, `dm.postback`, `dm.deleted`, `dm.status.sent`, `dm.status.delivered`, `dm.status.read`, `dm.status.failed`, `mention.received` that a platform notification triggers, `review.received`, `review.updated`, `account.connected`, `account.disconnected`, `account.updated`, `page.removed`, `post.unpublished` |
+| `data[].brand_id` | `mention.received` that [listing mentions](#mentions-you-list) triggers |
+| `data.targets[].brand_id` | `post.scheduled` |
+| `data.results[].brand_id` | `post.published`, `post.partial`, `post.failed` |
+
+A post can target accounts of different brands, so `post.scheduled`, `post.published`, `post.partial`, and `post.failed` carry one `brand_id` per target. `post.updated`, `post.deleted`, and `post.retried` name no account and carry no `brand_id`. To route `post.updated` and `post.retried`, read `targets[].account_id` from `GET /v1/posts/{pid}`, then each account's `brand_id` from `GET /v1/accounts`. `post.deleted` fires after the post is deleted, so read `targets[].account_id` from `GET /v1/posts/{pid}` before you delete the post, or record each post's brands when you create it.
+
+Treat `brand_id` as optional: an event can arrive without it. For example, these cases always arrive without it:
+
+- `post.unpublished` with `account_id` set to `null`. Route it like `post.updated`, with `GET /v1/posts/{pid}`.
+- `comment.received` and `mention.received` from Threads, when the same Threads account is connected to more than one of your brands. Their `account_id` is the Threads user ID, which is the `platform_user_id` of each of those accounts in its `account.connected` event, so you choose which of those brands handles the event.
 
 ## Platform coverage
 
@@ -77,8 +96,8 @@ Fires when you create a post with a future `scheduled_at` and it enters the `sch
     "status": "scheduled",
     "scheduled_at": "2026-10-20T14:00:00Z",
     "targets": [
-      { "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "platform": "instagram" },
-      { "account_id": "acc_02HZ9X3Q4R5M6N7P8V2K0W1K", "platform": "facebook" }
+      { "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43", "platform": "instagram" },
+      { "account_id": "acc_02HZ9X3Q4R5M6N7P8V2K0W1K", "brand_id": "4d8a2c7e-91b3-4f6a-a2d5-7e0c3b9f1a64", "platform": "facebook" }
     ]
   }
 }
@@ -89,7 +108,7 @@ Fires when you create a post with a future `scheduled_at` and it enters the `sch
 | `post_id` | The post's ID |
 | `status` | `scheduled` |
 | `scheduled_at` | When the post publishes, in ISO 8601 UTC |
-| `targets` | One item per destination, each with `account_id` and `platform` |
+| `targets` | One item per destination, each with `account_id`, `brand_id`, and `platform` |
 
 ### `post.published`, `post.partial`, and `post.failed`
 
@@ -104,6 +123,7 @@ Fires when you create a post with a future `scheduled_at` and it enters the `sch
     "results": [
       {
         "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+        "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
         "platform": "instagram",
         "status": "published",
         "platform_post_id": "17895695668004550",
@@ -111,6 +131,7 @@ Fires when you create a post with a future `scheduled_at` and it enters the `sch
       },
       {
         "account_id": "acc_02HZ9X3Q4R5M6N7P8V2K0W1K",
+        "brand_id": "4d8a2c7e-91b3-4f6a-a2d5-7e0c3b9f1a64",
         "platform": "facebook",
         "status": "failed",
         "error": {
@@ -129,6 +150,7 @@ Fires when you create a post with a future `scheduled_at` and it enters the `sch
 | `status` | `published`, `partial`, or `failed`, matching the event name |
 | `results` | One item per target |
 | `results[].account_id` | The connected account |
+| `results[].brand_id` | The brand of the connected account |
 | `results[].page_id` | The SocialAPI page ID, when the target is a page of the account. Omitted otherwise |
 | `results[].platform` | The platform slug |
 | `results[].status` | `published` or `failed` |
@@ -182,12 +204,13 @@ Fires when `POST /v1/posts/{pid}/unpublish` removes at least one target of a pub
   "data": {
     "post_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "unpublished_count": 1
   }
 }
 ```
 
-`account_id` is the account the request limited the removal to. It is `null` when the request did not name an account. `unpublished_count` is the number of targets removed from their platform.
+`account_id` is the account the request limited the removal to, and `brand_id` is that account's brand. `account_id` is `null` when the request did not name an account, and `brand_id` is then absent. `unpublished_count` is the number of targets removed from their platform.
 
 ### `post.retried`
 
@@ -247,6 +270,7 @@ Fires when a person sends a message to a connected account.
     "metadata": null,
     "received_at": "2026-10-13T14:30:00Z",
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
     "platform_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA1"
   },
@@ -294,6 +318,7 @@ On WhatsApp there is no message echo. The event fires once per message, when Wha
     "metadata": null,
     "received_at": "2026-10-13T14:31:00Z",
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
     "platform_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA2"
   }
@@ -331,6 +356,7 @@ Fires when a person opens a conversation from an ad or referral link without sen
     },
     "received_at": "2026-10-13T14:32:00Z",
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067"
   }
 }
@@ -360,6 +386,7 @@ Fires when a person taps a quick reply or a `postback` button in a DM. `metadata
     },
     "received_at": "2026-10-13T14:33:00Z",
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
     "platform_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA3"
   }
@@ -387,6 +414,7 @@ Fires when the sender unsends a message. `platform_id` names the removed message
     "metadata": null,
     "received_at": "2026-10-13T14:34:00Z",
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
     "platform_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA1"
   }
@@ -395,7 +423,7 @@ Fires when the sender unsends a message. `platform_id` names the removed message
 
 ### `dm.status.sent`, `dm.status.delivered`, `dm.status.read`, and `dm.status.failed`
 
-These events report the progress of a message you sent. Their `data` is a short status object, not an interaction, and has no `account_id`: match the message by its IDs.
+These events report the progress of a message you sent. Their `data` is a short status object, not an interaction: match the message by its IDs. `account_id` and `brand_id` name the account that sent it.
 
 | Event | Fires when | Emitted for |
 |---|---|---|
@@ -411,6 +439,8 @@ On Instagram and Facebook:
   "event": "dm.status.read",
   "data": {
     "status": "read",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "mids": ["aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDA2"],
     "recipient_id": "17846744073097661"
   }
@@ -420,6 +450,8 @@ On Instagram and Facebook:
 | Field | Description |
 |---|---|
 | `status` | `sent`, `delivered`, or `read` |
+| `account_id` | The connected account that sent the message |
+| `brand_id` | The brand of that account |
 | `mids` | The platform message IDs the receipt covers |
 | `recipient_id` | The platform ID of the person who received or read the message |
 | `page_id` | Facebook only: the SocialAPI page ID |
@@ -432,6 +464,8 @@ On WhatsApp:
   "event": "dm.status.failed",
   "data": {
     "id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1J",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "message_id": "wamid.HBgLMTU1NTAxMjM0NTYVAgARGBI5QTNDQTVCM0Q0Q0Q2RkE4RjUA",
     "recipient_id": "15550123456",
     "status": "failed",
@@ -445,6 +479,8 @@ On WhatsApp:
 | Field | Description |
 |---|---|
 | `id` | The SocialAPI message ID, the same value the send response returned. Empty when WhatsApp sent no `recipient_id` |
+| `account_id` | The connected WhatsApp account that sent the message |
+| `brand_id` | The brand of that account |
 | `message_id` | The WhatsApp message ID |
 | `recipient_id` | The recipient's WhatsApp ID |
 | `status` | `sent`, `delivered`, `read`, or `failed` |
@@ -473,6 +509,7 @@ Fires in two cases: the platform tells SocialAPI that a connected account was @m
     },
     "received_at": "2026-10-13T14:35:00Z",
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "platform_post_id": "17895695668004550"
   },
   "raw_payload": {
@@ -496,7 +533,7 @@ On Threads, `GET /v1/accounts/{id}/mentions` returns the same mention with the s
 
 Every `GET /v1/accounts/{id}/mentions` call that returns at least one item also sends one `mention.received` event, on every platform that lists mentions. A call that returns no items sends none. SocialAPI sends the event on every such call, including a repeated call that returns the same items.
 
-For this event, `data` is an array: the items of that response's `data`, in the same order, each with the fields of the item in the list. The event has no `raw_payload`. The event a platform notification triggers has an object in `data`, so a handler for `mention.received` must accept both an object and an array.
+For this event, `data` is an array: the items of that response's `data`, in the same order, each with the fields of the item in the list plus `brand_id`. The event has no `raw_payload`. The event a platform notification triggers has an object in `data`, so a handler for `mention.received` must accept both an object and an array.
 
 ```json
 {
@@ -514,6 +551,7 @@ For this event, `data` is an array: the items of that response's `data`, in the 
       },
       "received_at": "2026-10-13T14:35:00Z",
       "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
       "platform_post_id": "17895695668004550"
     }
   ]
@@ -537,6 +575,7 @@ Fires when a customer posts a new review on a connected location.
   "event": "review.received",
   "data": {
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "review_id": "sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
     "change": "new_review",
     "review": {
@@ -554,6 +593,7 @@ Fires when a customer posts a new review on a connected location.
 | Field | Description |
 |---|---|
 | `account_id` | The connected Google Business Profile account |
+| `brand_id` | The brand of that account |
 | `review_id` | The review's interaction ID |
 | `change` | `new_review` |
 | `review` | The review. Omitted when SocialAPI could not read it (the review was deleted in the meantime, or the account's access was revoked). Fall back to `GET /v1/inbox/reviews/{account_id}` |
@@ -580,6 +620,7 @@ Fires when a review changes. Branch on `change`, because one event covers every 
   "event": "review.updated",
   "data": {
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "review_id": "sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
     "change": "reply_approved",
     "state": "APPROVED",
@@ -651,6 +692,7 @@ Fires when a connected account is removed or needs reconnecting. It has 2 forms.
   "event": "account.disconnected",
   "data": {
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "platform": "instagram",
     "platform_user_id": "17841405793187218"
   }
@@ -666,6 +708,7 @@ Fires when a connected account is removed or needs reconnecting. It has 2 forms.
   "event": "account.disconnected",
   "data": {
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "platform": "facebook",
     "reason": "all_pages_removed",
     "reconnect_required": true
@@ -705,6 +748,7 @@ Fires when something changes on the account. Branch on `change`.
   "event": "account.updated",
   "data": {
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "change": "customer_media_added",
     "media_id": "accounts/123456789/locations/987654321/media/customers/AF1QipN"
   }
@@ -718,6 +762,7 @@ Fires when something changes on the account. Branch on `change`.
   "event": "account.updated",
   "data": {
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "change": "permissions_reduced",
     "permissions": ["messages.read", "messages.write"]
   }
@@ -735,6 +780,7 @@ Fires when a Page of a multi-page account is found removed. SocialAPI deactivate
   "event": "page.removed",
   "data": {
     "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43",
     "platform_page_id": "102938475610293",
     "name": "ACME Storefront",
     "platform": "facebook",
@@ -759,6 +805,7 @@ Comments, direct messages, and mentions share one `data` shape. Fields marked op
 | `platform` | The platform slug |
 | `type` | The interaction type, in the table below |
 | `account_id` | The connected account that received or sent the interaction |
+| `brand_id` | The brand of that account. See [Route events by brand](#route-events-by-brand) |
 | `page_id` | Optional. Facebook only: the SocialAPI page ID of the Page that received the event |
 | `author` | Who wrote it: `id`, `name`, `username`, and `avatar_url`, each omitted when the platform gives none |
 | `recipient` | Optional. The other party of a DM event on Instagram, Facebook, and WhatsApp, in the shape of `author` |
