@@ -1,9 +1,9 @@
 ---
 title: "Rate limits"
-description: "Stay within SocialAPI's posting and messaging velocity caps and each platform's own limits, and handle HTTP 429 with Retry-After."
+description: "Stay within SocialAPI's posting velocity caps and each platform's own limits, and handle HTTP 429 with Retry-After."
 ---
 
-SocialAPI applies rate limits of its own: a posting velocity cap per publish target and a messaging velocity cap per sender. Each platform also applies its own limits. All of them answer HTTP 429. Read the `Retry-After` header when it is present and wait that many seconds before you send the request again.
+SocialAPI applies a rate limit of its own: a posting velocity cap per publish target. Each platform also applies its own limits. All of them answer HTTP 429. Read the `Retry-After` header when it is present and wait that many seconds before you send the request again.
 
 These limits are the same on every plan, and upgrading does not raise them. Post and interaction allowances per billing period are on [Plans and usage](/guides/plans).
 
@@ -30,13 +30,12 @@ A 429 from SocialAPI's own limits uses the standard error envelope. `error.meta.
 | Code | What it limits | Retry-After |
 |---|---|---|
 | `publishing.velocity_limit` | [Posts per hour and per 24 hours](#posting-velocity-caps) for one publish target | Yes |
-| `messaging.velocity_limit` | [Messages per minute](#messaging-velocity-cap) from one Instagram account, Facebook Page, or WhatsApp phone number | Yes |
 | `platform.{platform}.rate_limit` | The [platform's own limit](#platform-limits) | When the platform reports a wait |
 | `inbox.sync_rate_limited` | Repeated `POST /v1/inbox/sync` for the same target. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually) | Yes |
 | `accounts.sync_rate_limited` | Repeated `POST /v1/accounts/{id}/sync` for the same connected account. See [Analytics](/guides/analytics) | Yes |
 | `validation.post_limit_exhausted`, `validation.interaction_limit_exhausted`, `billing.post_limit`, `billing.export_limit`, `billing.export_cooldown`, `billing.export_concurrent` | Plan allowances. See [Plans and usage](/guides/plans) | No |
 
-A request refused by `publishing.velocity_limit` or `messaging.velocity_limit` never reaches the platform and spends no credit.
+A request refused by `publishing.velocity_limit` never reaches the platform and spends no credit.
 
 ## Posting velocity caps
 

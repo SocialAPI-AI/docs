@@ -164,9 +164,9 @@ SocialAPI gives the credit back when:
 - `POST /v1/posts` fails with `publishing.validation_failed`.
 - `POST /v1/posts`, `POST /v1/posts/{pid}/publish`, or `POST /v1/posts/{pid}/retry` fails with `429 publishing.velocity_limit`.
 - Every target of `POST /v1/posts` with `publish_now: true`, or of `POST /v1/posts/{pid}/publish`, fails.
-- SocialAPI refuses a reply or DM before sending it: the [messaging velocity cap](/guides/rate-limits#messaging-velocity-cap), or a conversation whose messaging window is closed (see [Direct messages](/guides/direct-messages)).
+- SocialAPI refuses a reply or DM before sending it because the conversation's messaging window is closed (see [Direct messages](/guides/direct-messages)).
 
-A comment reply, DM, or review reply refused with `403 account.permission_missing` is never charged. A reply to a mention refused for the same reason keeps its credit: see [Permissions](/guides/permissions). Any other failure keeps the credit spent. That includes a request the platform refuses (for example `429 platform.{platform}.rate_limit` on a reply or DM), a `409 resource.conflict` for duplicate content, a post that fails on only some of its targets, and a retry that fails again.
+A comment reply, DM, review reply, or mention reply refused with `403 account.permission_missing` is never charged: see [Permissions](/guides/permissions). Any other failure keeps the credit spent. That includes a request the platform refuses (for example `429 platform.{platform}.rate_limit` on a reply or DM), a `409 resource.conflict` for duplicate content, a post that fails on only some of its targets, and a retry that fails again.
 
 ## Billing periods
 
@@ -253,7 +253,7 @@ The interaction allowance returns the same shape with `validation.interaction_li
 
 `POST /v1/posts/import` checks the allowance before it creates anything. When the CSV holds more valid rows than you have post credits left, drafts included, it returns `429 billing.post_limit` and creates no post.
 
-The posting and messaging velocity caps are separate from plan allowances: upgrading does not raise them. See [Rate limits](/guides/rate-limits).
+The posting velocity caps are separate from plan allowances: upgrading does not raise them. See [Rate limits](/guides/rate-limits).
 
 ## Change or cancel your plan
 
@@ -287,7 +287,7 @@ Pay the open invoice in the dashboard under **Billing** to restore access. Acces
 
 ## Related
 
-- [Rate limits](/guides/rate-limits): posting and messaging velocity caps, and platform limits that apply on every plan
+- [Rate limits](/guides/rate-limits): posting velocity caps, and platform limits that apply on every plan
 - [Errors](/guides/errors): every `billing.*` code with its status
 - [Media](/guides/media): uploads, storage, and the storage quota
 - [Webhooks](/guides/webhooks): event delivery and the delivery log

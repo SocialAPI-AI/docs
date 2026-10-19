@@ -196,7 +196,7 @@ Read `capabilities` instead of assuming. A call the platform does not support re
 | `text` | Required. The reply text. A missing value returns `400 validation.field_required` |
 | `comment_id` | The comment to reply to. Omit it to comment on the post itself. Instagram has no comment on the post itself through the API, so an Instagram reply needs `comment_id` |
 
-A reply costs 1 interaction credit and counts as 1 message toward the [messaging velocity cap](/guides/rate-limits#messaging-velocity-cap) of the Instagram account or Facebook Page. When the plan's interaction allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. A credit is returned when the request fails with a `validation.*` error: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
+A reply costs 1 interaction credit. When the plan's interaction allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. A credit is returned when the request fails with a `validation.*` error: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
 
 ## Send a private reply
 
@@ -227,7 +227,7 @@ Response (HTTP 200):
 | `text` | Required. The message. With `buttons`, it is the body of the button template (640 characters at most). On Instagram, the text holds 1,000 bytes of UTF-8 at most |
 | `buttons` | 1 to 3 buttons, sent as a button template. Fields and limits are in [Buttons](/guides/direct-messages#buttons). A tap on a `postback` button arrives as a `dm.postback` event |
 
-Private replies exist on Instagram and Facebook. The platform allows 1 private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.instagram.private_reply_ineligible` or `400 platform.facebook.private_reply_ineligible`. `error.meta.reason` says why: `already_replied`, `platform_refused`, or `window_expired`. This 400 is final, so retrying never succeeds, and the refusal does not count toward the messaging velocity cap. Every other platform returns `501 resource.not_supported`.
+Private replies exist on Instagram and Facebook. The platform allows 1 private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.instagram.private_reply_ineligible` or `400 platform.facebook.private_reply_ineligible`. `error.meta.reason` says why: `already_replied`, `platform_refused`, or `window_expired`. This 400 is final, so retrying never succeeds. Every other platform returns `501 resource.not_supported`.
 
 A private reply does not open the [messaging window](/guides/direct-messages#the-messaging-window). You cannot message the person again until they answer, and their answer opens the window.
 
@@ -294,7 +294,6 @@ Every platform has its own comment rules: whether replies nest, who can hide or 
 | Posts per page | Default 25, up to 100 |
 | Comments per page | Default 25, up to 100. On TikTok, up to 30 comments and 30 replies |
 | Replies per page | Default 10, up to 100 |
-| Messages per minute per sender | 10 on Instagram and Facebook: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap) |
 
 ## Errors and debugging
 
@@ -308,7 +307,7 @@ Check these in order when a comment call fails or returns nothing:
 6. **`501 resource.not_supported`.** The platform lacks the action. Read `capabilities` on the comment.
 7. **`404 resource.not_found`.** The post was deleted on the platform. The same post returns the same 404 afterwards.
 8. **`400 platform.instagram.private_reply_ineligible`, `400 platform.facebook.private_reply_ineligible`.** The comment already received its private reply, or is older than 7 days.
-9. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.{platform}.rate_limit`.** Your allowance, the sender's messages per minute, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
+9. **`429 validation.interaction_limit_exhausted`, `429 platform.{platform}.rate_limit`.** Your allowance, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
 10. **`422 platform.youtube.processing_failure`.** YouTube refused to delete a comment that your channel did not write. Hide it instead.
 
 When the list is empty, check that the post has comments, that `account_id` owns the post, and, on a platform that sends events, that the comment arrived: see [Webhook events](/guides/webhook-events#comments). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
@@ -318,7 +317,7 @@ When the list is empty, check that the post has comments, that `account_id` owns
 | Scope | Operations |
 |---|---|
 | `inbox:read` | List posts with comments, list comments, list replies |
-| `inbox:write` | Reply, send a private reply, hide, unhide |
+| `inbox:write` | Reply, send a private reply, hide, unhide, delete, like, unlike |
 
 ## Events
 

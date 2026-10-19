@@ -305,7 +305,6 @@ After Instagram or Facebook refuses a conversation for a closed window, SocialAP
 |---|---|
 | Conversations per page | Default 25, up to 100 |
 | Messages per page | Default 25, up to 200 |
-| Messages per minute per sender | 10 on Instagram, Facebook, and WhatsApp. Each message counts, so a request that sends 3 messages counts 3. More returns `429 messaging.velocity_limit` and sends nothing: see [Messaging velocity cap](/guides/rate-limits#messaging-velocity-cap) |
 | Quick replies | 13 per message, 20 characters per title |
 | Buttons | 3 per message or card, 20 characters per title, 640 characters of body text |
 | Cards | 10 per message, 80 characters per title and subtitle |
@@ -330,7 +329,7 @@ Check these in order when a send fails:
 5. **`400 platform.instagram.window_closed`, `400 platform.facebook.window_closed`, `400 whatsapp.window_closed`, `422 platform.zalo.not_deliverable`, `403 telegram.cannot_message`.** The messaging window is closed: see [The messaging window](#the-messaging-window).
 6. **`422 platform.instagram.thread_unavailable`, `422 platform.facebook.thread_unavailable`.** The platform refused to deliver to this conversation, which can be restricted or unavailable.
 7. **`403 platform.instagram.permission_denied`, `403 platform.facebook.permission_denied`.** The platform scopes granted at connect do not cover the action. Reconnect the account and approve every scope.
-8. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.{platform}.rate_limit`.** Your allowance, the sender's messages per minute, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
+8. **`429 validation.interaction_limit_exhausted`, `429 platform.{platform}.rate_limit`.** Your allowance, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
 9. **`501 resource.not_supported`.** The platform has no DMs, or no reactions.
 
 When a conversation or a message is missing from a list, force a refresh with [`POST /v1/inbox/sync`](/guides/inbox#refresh-the-inbox-manually). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
@@ -364,7 +363,7 @@ There is no tool for reactions or for inbox sync. See [MCP tools](/integrations/
 - [Comments](/guides/comments): private replies start a DM conversation from a comment.
 - [Automations](/guides/automations): send DMs and answer button taps without your own handler.
 - [Webhook events](/guides/webhook-events#direct-messages): the DM event payloads.
-- [Rate limits](/guides/rate-limits#messaging-velocity-cap): the messages-per-minute cap.
+- [Rate limits](/guides/rate-limits): platform limits on sending.
 - [Platform support](/platforms/overview): which platform supports which DM feature.
 - [Account permissions](/guides/permissions): the permissions an account needs to read and send messages.
 - [Unified inbox](/guides/inbox): inbound attachments and manual sync.
