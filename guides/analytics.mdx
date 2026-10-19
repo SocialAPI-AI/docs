@@ -154,7 +154,7 @@ Each published target has `metrics` or, when its platform cannot report them, an
 | X / Twitter | `likes`, `comments` (replies) |
 | Bluesky | `likes`, `comments` (replies), `shares` (reposts) |
 | Zalo | `shares`, `views`, `extra.views` |
-| LinkedIn | Not available: the target returns `501 resource.not_supported` |
+| LinkedIn | Not available: the target returns `501 resource.not_supported`. Account-level figures are in [LinkedIn insights](/platforms/linkedin#insights-beta) |
 | Pinterest | Not available: the target returns `501 resource.not_supported` |
 | Google Business Profile | Local posts report no engagement counts, so every count is `0`. Use [performance metrics](/platforms/google#performance-metrics) |
 
@@ -177,9 +177,9 @@ Response (HTTP 200):
 }
 ```
 
-- **Depth:** Instagram covers up to the 500 most recent posts, Facebook up to the 500 most recent per Page, and other platforms the 25 most recent. The TikTok route has its own depth: see [TikTok](/platforms/tiktok#sync-videos).
+- **Depth:** Instagram covers up to the 500 most recent posts, Facebook up to the 500 most recent per Page, TikTok and Zalo the 20 most recent, and other platforms the 25 most recent. The TikTok platform route has its own cooldown: see [TikTok](/platforms/tiktok#sync-videos).
 - **Cooldown:** SocialAPI allows 1 sync per account every 5 minutes. The 5-minute window starts when you connect the account and on every sync request, including one that returns `501`. A request inside the window returns `429 accounts.sync_rate_limited`, with `Retry-After` and `error.meta.retry_after_seconds` set to the seconds left.
-- **Unsupported platforms:** a platform that cannot list posts, such as LinkedIn or WhatsApp, returns `501 resource.not_supported`.
+- **Unsupported platforms:** a platform that cannot list posts, such as a LinkedIn member or profile connection or WhatsApp, returns `501 resource.not_supported`.
 - **Pinterest:** `POST /v1/accounts/{id}/sync` returns 200 `{"success": true}` and refreshes nothing: Pins are read live.
 - **Other errors:** `404 account.not_found` for an account your key cannot reach, `403 account.permission_missing` for an account without `posts.read`, and `502` with a `platform.{platform}.*` code when the platform fails.
 
@@ -198,6 +198,7 @@ These endpoints return live figures from one platform:
 | YouTube | Channel counts. See [YouTube channel stats](/platforms/youtube#read-videos-and-channel-stats) |
 | Pinterest | Profile counts. See [Pinterest account summary](/platforms/pinterest#account-summary) |
 | Google Business Profile | Daily performance metrics and search keywords. See [Google performance metrics](/platforms/google#performance-metrics) |
+| LinkedIn (beta) | Follower count and per-post counts for a company Page or a profile connection. `GET /v1/platforms/linkedin/insights`. See [LinkedIn insights](/platforms/linkedin#insights-beta) |
 
 ## Scopes
 
@@ -206,7 +207,7 @@ These endpoints return live figures from one platform:
 | `accounts:read` | `GET /v1/accounts/{id}/analytics` and `GET /v1/brands/{id}/analytics`, and the platform account summaries |
 | `posts:read` | `GET /v1/posts/{pid}/analytics` and `GET /v1/posts/{pid}/metrics` |
 | `accounts:manage` | `POST /v1/accounts/{id}/sync` |
-| `analytics:read` | The events log and exports, not history. Refused to brand-restricted keys |
+| `analytics:read` | The events log, exports, Threads insights, Threads profile lookups, and LinkedIn insights, not history. Refused to brand-restricted keys |
 
 A brand-restricted key can read history for its own brands only. See [Scoped API keys](/guides/scoped-keys).
 

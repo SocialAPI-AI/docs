@@ -49,7 +49,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
     "text": "Spring sale starts today: https://example.com/spring",
     "publish_now": true,
     "targets": [
-      {"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"},
+      {"account_id": "acc_01HZ9X8B3C4D5F6G7H9J2K1M"},
       {"account_id": "acc_01HZ9X4T6B8C2D5F7G9H1J3K", "page_id": "sapi_page_01HZ9X5V7C9D3E6G8H1J4K2M"}
     ]
   }'
@@ -68,7 +68,7 @@ Response (HTTP 201):
   "updated_at": "2026-10-13T09:00:00Z",
   "targets": [
     {
-      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "account_id": "acc_01HZ9X8B3C4D5F6G7H9J2K1M",
       "platform": "threads",
       "status": "publishing"
     },
@@ -89,6 +89,7 @@ The post is accepted, and delivery continues after the response. Read the post a
 | You send | Result |
 |---|---|
 | `publish_now: true` and at least one target | The post is published now. Its status is `publishing` |
+| `publish_now: true`, at least one target, and `stagger` | The first target publishes now and the others follow at the staggered gaps. Its status is `scheduled`. See [Stagger targets](/guides/scheduling#stagger-targets) |
 | `scheduled_at` in the future and at least one target | The post is scheduled. See [Schedule posts](/guides/scheduling) |
 | Neither, or no targets | The post is saved as a draft. It is not published, even when you send targets |
 | Both `publish_now` and `scheduled_at` | The post is scheduled |
@@ -144,7 +145,7 @@ When both set the same key, the target's value wins. A platform slug used as a k
     "youtube": {"tags": ["launch"], "category_id": "22"}
   },
   "targets": [
-    {"account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "platform_data": {"made_for_kids": false}}
+    {"account_id": "acc_01HZ9X9C4D5F6G7H8J1K2M3N", "platform_data": {"made_for_kids": false}}
   ]
 }
 ```
@@ -161,7 +162,7 @@ curl -X POST https://api.social-api.ai/v1/posts/validate \
   -H "Content-Type: application/json" \
   -d '{
     "text": "Spring sale starts today: https://example.com/spring",
-    "account_ids": ["acc_01HZ9X3Q4R5M6N7P8V2K0W1J"]
+    "account_ids": ["acc_01HZ9X8B3C4D5F6G7H9J2K1M"]
   }'
 ```
 
@@ -211,6 +212,8 @@ Response (HTTP 200):
 ```
 
 The endpoint covers Instagram, Facebook, Threads, LinkedIn, YouTube, TikTok, Google Business Profile, Bluesky, and X. `counting_mode` is `chars`, `utf16`, or `bytes`. TikTok's per-creator privacy levels and maximum duration come from `GET /v1/accounts/{id}/creator-info`. See [TikTok publishing](/platforms/tiktok/publishing).
+
+`supports_mixed_media` is about `platform_attachment_id` items only: `false` means a `platform_attachment_id` item must be the only item in `media` and cannot sit next to `url` or `media_id` items. It does not limit a carousel, which can mix images and videos where `carousel.allow_video` is `true` and `carousel.images_only` is `false`, as on Instagram.
 
 ## Drafts
 

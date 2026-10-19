@@ -3,9 +3,9 @@ title: Supported platforms
 description: Which operations each SocialAPI platform supports for the inbox, Automations, publishing, analytics, and webhook events, in one matrix per feature area.
 ---
 
-SocialAPI connects Instagram, Facebook, Threads, Google Business Profile, TikTok, LinkedIn, X / Twitter, Telegram, WhatsApp, Zalo, Bluesky, Pinterest, and YouTube through one API. Trustpilot is marked Coming soon and cannot be connected. Most platforms connect through SocialAPI's own platform app, so you register nothing with the platform. Telegram connects with a bot token from @BotFather, Bluesky with an app password, and X / Twitter through an X developer app that you create. See [Platform apps](/guides/platform-credentials) for who owns the app for each platform.
+SocialAPI connects Instagram, Facebook, Threads, Google Business Profile, TikTok, LinkedIn, X / Twitter, Telegram, WhatsApp, Zalo, Bluesky, Pinterest, and YouTube through one API. Trustpilot is not available and cannot be connected: see [Trustpilot](/platforms/trustpilot). Most platforms connect through SocialAPI's own platform app, so you register nothing with the platform. Telegram connects with a bot token from @BotFather, Bluesky with an app password, and X / Twitter through an X developer app that you create. See [Platform apps](/guides/platform-credentials) for who owns the app for each platform.
 
-Every platform and every operation is available on every plan, except WhatsApp template messages, which need a paid plan (`403 whatsapp.paid_plan_required` on the Free plan). Plans otherwise differ only in resource limits: see [Plans](/guides/plans). Each platform page holds a Capabilities table with the condition behind every cell below.
+Every platform and every operation is available on every plan, with two exceptions that need a paid plan: WhatsApp template messages (`403 whatsapp.paid_plan_required` on the Free plan) and visual analysis in analytics exports (`include_vision`, ignored on the Free plan). Plans otherwise differ only in resource limits: see [Plans](/guides/plans). Each platform page holds a Capabilities table with the condition behind every cell below.
 
 When you call an operation a platform does not support, SocialAPI returns `501 resource.not_supported`. That is a platform limit, not a mistake in your integration, so handle the 501 instead of branching per platform. An Automation on an account that does not support Automations returns `422 automation.platform_unsupported`, and a reviews call on a platform without reviews returns `422 account.platform_unsupported`.
 
@@ -17,7 +17,7 @@ The cells have 5 values:
 | No | Not supported. The call returns an error, or the feature does not exist on the platform |
 | Partial | Supported with a limit on what it covers |
 | Conditional | Supported only when a condition holds, such as an action on your own comment |
-| Beta | Supported for accounts where the platform has granted the scope |
+| Beta | Supported for accounts with beta access, on the connection types named on the platform page |
 
 The condition behind every Partial, Conditional, and Beta cell is on the platform page. Each comment returned by the inbox also carries a `capabilities` object that tells you which actions the platform allows for it: see [Comments](/guides/comments).
 
@@ -32,17 +32,19 @@ Comments, replies, moderation, private replies, direct messages, mentions, and r
 | [Threads](/platforms/threads) | Yes | Yes | Yes | Conditional | No | No | No | Yes | No |
 | [Google Business Profile](/platforms/google) | No | No | No | No | No | No | No | No | Yes |
 | [TikTok](/platforms/tiktok) | Yes | Yes | Conditional | Conditional | Yes | No | No | Conditional | No |
-| [LinkedIn](/platforms/linkedin) | No | No | No | No | No | No | No | No | No |
+| [LinkedIn](/platforms/linkedin) | Beta | Beta | No | Beta | Beta | No | No | Beta | No |
 | [X / Twitter](/platforms/twitter) | Yes | Yes | Yes | Conditional | No | No | Yes | Yes | No |
 | [Telegram](/platforms/telegram) | No | No | No | No | No | No | Conditional | No | No |
 | [WhatsApp](/platforms/whatsapp) | No | No | No | No | No | No | Yes | No | No |
 | [Zalo](/platforms/zalo) | No | No | No | No | No | No | Yes | No | No |
-| [Bluesky](/platforms/bluesky) | Yes | Yes | Yes | Partial | No | No | Partial | Yes | No |
+| [Bluesky](/platforms/bluesky) | Yes | Yes | Yes | Conditional | No | No | Partial | Yes | No |
 | [Pinterest](/platforms/pinterest) | No | No | No | No | No | No | No | No | No |
-| [YouTube](/platforms/youtube) | Yes | Yes | Yes | Partial | No | No | No | No | No |
-| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No | No | No | No | No | No | No |
+| [YouTube](/platforms/youtube) | Yes | Yes | Yes | Conditional | No | No | No | No | No |
+| [Trustpilot](/platforms/trustpilot) | No | No | No | No | No | No | No | No | No |
 
 A TikTok account connected with a [creator connection](/platforms/tiktok#creator-connection) has no comments and no mentions.
+
+LinkedIn comments and mentions work on a company Page connection. A profile connection (`connection_type: "profile"`) can reply to, like, and delete comments but cannot list them, and it has no mentions: see [LinkedIn](/platforms/linkedin#capabilities).
 
 ## Automations
 
@@ -63,7 +65,7 @@ A TikTok account connected with a [creator connection](/platforms/tiktok#creator
 | [Bluesky](/platforms/bluesky) | No | No | No | No |
 | [Pinterest](/platforms/pinterest) | No | No | No | No |
 | [YouTube](/platforms/youtube) | No | No | No | No |
-| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No | No |
+| [Trustpilot](/platforms/trustpilot) | No | No | No | No |
 
 ## Publishing
 
@@ -84,7 +86,7 @@ Publish, schedule, update, and delete posts, and add a first comment. Guides: [P
 | [Bluesky](/platforms/bluesky) | Yes | Yes | Yes | No | Yes | Yes | No | Yes | No |
 | [Pinterest](/platforms/pinterest) | Yes | No | Yes | No | No | Yes | No | Yes | No |
 | [YouTube](/platforms/youtube) | Yes | No | No | Yes | No | Yes | Yes | Yes | Yes |
-| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No | No | No | No | No | No | No |
+| [Trustpilot](/platforms/trustpilot) | No | No | No | No | No | No | No | No | No |
 
 Update and Delete describe a post that is already published.
 
@@ -99,7 +101,7 @@ Live post metrics, a live account summary, and the history SocialAPI stores. Gui
 | [Threads](/platforms/threads) | Yes | Yes | Yes |
 | [Google Business Profile](/platforms/google) | No | Yes | No |
 | [TikTok](/platforms/tiktok) | Yes | Yes | Yes |
-| [LinkedIn](/platforms/linkedin) | No | No | No |
+| [LinkedIn](/platforms/linkedin) | No | Beta | No |
 | [X / Twitter](/platforms/twitter) | Yes | No | Partial |
 | [Telegram](/platforms/telegram) | No | No | No |
 | [WhatsApp](/platforms/whatsapp) | No | No | No |
@@ -107,7 +109,7 @@ Live post metrics, a live account summary, and the history SocialAPI stores. Gui
 | [Bluesky](/platforms/bluesky) | Yes | No | Yes |
 | [Pinterest](/platforms/pinterest) | No | Yes | No |
 | [YouTube](/platforms/youtube) | Yes | Yes | Yes |
-| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No |
+| [Trustpilot](/platforms/trustpilot) | No | No | No |
 
 ## Webhook events
 
@@ -128,7 +130,7 @@ Which event groups each platform emits. The events, their payloads, and the plat
 | [Bluesky](/platforms/bluesky) | No | Partial | No | No | Yes | Yes |
 | [Pinterest](/platforms/pinterest) | No | No | No | No | Yes | Yes |
 | [YouTube](/platforms/youtube) | No | No | No | No | Yes | Yes |
-| [Trustpilot (Coming soon)](/platforms/trustpilot) | No | No | No | No | No | No |
+| [Trustpilot](/platforms/trustpilot) | No | No | No | No | No | No |
 
 ## Related
 

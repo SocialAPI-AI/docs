@@ -250,7 +250,7 @@ While an endpoint's `is_active` is `false`, SocialAPI sends it nothing. It does 
 
 ## Retries
 
-A failed attempt is retried until the delivery has used 10 attempts. The wait before each retry grows, so an endpoint that is down for several hours still receives the event once it recovers:
+A failed attempt is retried until the delivery has used 10 attempts. The wait before each retry grows, so an endpoint that recovers within about 14 hours of the first attempt still receives the event:
 
 | Attempt | Sent | Time since attempt 1 |
 |---|---|---|
@@ -457,7 +457,7 @@ Which platforms emit each event is listed under the event on [Webhook events](/g
 | Limit | Value |
 |---|---|
 | Response time per request | 10 seconds |
-| Attempts per delivery | 5 |
+| Attempts per delivery | 10 |
 | Response body kept per attempt | 10,240 bytes |
 | Deliveries per list page | 1 to 100, default 50 |
 | Delivery history | Per plan: [History and export allowances](/guides/plans#history-and-export-allowances) |
@@ -482,7 +482,7 @@ Other codes on these endpoints: `401 auth.invalid_key` and its siblings for a mi
 |---|---|
 | `webhooks:manage` | Every endpoint on this page except `GET /v1/webhooks/events` |
 
-A brand-restricted key cannot hold `webhooks:manage`, because endpoints belong to your SocialAPI account and not to one brand. See [Scoped API keys](/guides/scoped-keys).
+A brand-restricted key is refused these endpoints with `403 auth.insufficient_scope`, even when it holds `webhooks:manage`, because endpoints belong to your SocialAPI account and not to one brand. See [Scoped API keys](/guides/scoped-keys).
 
 ## Use from an AI agent
 

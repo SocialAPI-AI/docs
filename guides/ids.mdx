@@ -17,11 +17,12 @@ Every object SocialAPI returns has an `id` string. Treat every ID as an opaque s
 | Automation Firing | `afr_` prefix | `afr_01HZ9X3Q4R5M6N7P8V2K0W1J` |
 | Comment | `sapi_cmt_` prefix | `sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
 | Review | `sapi_rev_` prefix | `sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
-| Direct message | `sapi_dm_` prefix | `sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
+| Direct message, as the `id` of a `dm.*` webhook event and in `message_id` and `message_ids` of a send response | `sapi_dm_` prefix | `sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
 | Mention | `sapi_mnt_` prefix | `sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
-| Post, brand, invite, API key, webhook endpoint, webhook delivery, media file, conversation, message, event, export, announcement | UUID, no prefix | `7c9e6679-7425-40de-944b-e07fc1f90ae7` |
+| Message, as the `id` of an item in `GET /v1/inbox/conversations/{id}/messages` | UUID, no prefix | `7c9e6679-7425-40de-944b-e07fc1f90ae7` |
+| Post, brand, invite, API key, webhook endpoint, webhook delivery, media file, conversation, event, export, announcement | UUID, no prefix | `7c9e6679-7425-40de-944b-e07fc1f90ae7` |
 
-The `sapi_cmt_`, `sapi_rev_`, `sapi_dm_`, and `sapi_mnt_` IDs are interaction IDs: the `id` of each item returned by the comment, review, direct message, and mention endpoints. An API key's secret starts with `sapi_key_`, which is not an ID: the `id` of a key is a UUID, and the secret is shown once when you create the key.
+The `sapi_cmt_`, `sapi_rev_`, `sapi_dm_`, and `sapi_mnt_` IDs are interaction IDs: the `id` of each item returned by the comment, review, and mention endpoints, of each direct message in a webhook event, and of each message a send request returns. A message in a conversation's message list has a UUID `id` instead, and its `platform_id` is the platform's own ID. The two are different values for the same message. An API key's secret starts with `sapi_key_`, which is not an ID: the `id` of a key is a UUID, and the secret is shown once when you create the key.
 
 Fields named `platform_id` hold the platform's own ID for the same object, such as an Instagram comment ID. They are different values from `id`.
 
@@ -77,7 +78,7 @@ See [Comments](/guides/comments), [Reviews](/guides/reviews), and [Mentions](/gu
 
 ## What stays stable
 
-- **Interaction IDs:** the same comment, review, direct message, or mention always has the same `id`, in every response and every webhook event. Store it and join on it.
+- **Interaction IDs:** the same comment, review, or mention always has the same `id`, in every response and every webhook event. Store it and join on it. For a direct message, the `sapi_dm_` ID is stable but the message list does not return it. To match a listed message to a webhook event, compare `platform_id`.
 - **Connected accounts:** an `acc_` ID stays the same for the life of the connection. Reconnecting the same platform account to your SocialAPI account keeps its `acc_` ID. Disconnecting an account with `DELETE /v1/accounts/{id}` deletes it, and connecting it again creates a new `acc_` ID.
 - **Every other object:** an ID never changes for the life of the object.
 

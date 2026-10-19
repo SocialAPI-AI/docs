@@ -376,9 +376,17 @@ SocialAPI updates the existing account in place:
 
 Always pass `brand_id` when you reconnect. Without it, SocialAPI creates a new brand for the connection and moves the account into it, which leaves the old brand without the account.
 
-Connecting a platform account that another of your brands already holds moves it to the brand you name. Facebook works differently: you assign Pages to brands, see [Facebook](/platforms/facebook).
+Connecting a platform account that another of your brands already holds moves it to the brand you name. These cases do not move it:
+
+- **Facebook, and Instagram connected through Facebook Login.** A Page or Instagram account that another of your brands holds is not taken. A login whose every Page or Instagram account belongs to another brand ends with `error=platform.facebook.no_assignable_pages` or `error=platform.instagram.no_assignable_pages`. You assign Pages to brands as described in [Facebook](/platforms/facebook).
+- **Google Business Profile locations assigned with the assign call.** `POST /v1/platforms/google/logins/{loginId}/locations/{locationId}/assign` returns `400 validation.location_already_assigned` for a location that another brand holds. See [Google locations](/platforms/google/locations).
+- **`lock_accounts_to_brand` set to `true` on your SocialAPI account** (`PATCH /v1/users/me`). A connect that would move an account to a different brand ends with `error=account.already_linked`, or returns `409 account.already_linked`. The default is `false`. The lock does not apply to Facebook.
+
+Each of those errors leaves the account in its current brand.
 
 A brand holds one connected account per platform. Connecting a different account of the same platform into a brand that already has one ends with `status=error` and `error=account.already_linked` on your `redirect_uri`. Telegram and Bluesky, which connect in one request, return `409 account.already_linked` from `POST /v1/accounts/connect`, and so does `POST /v1/accounts/pending/{connection_id}/select` for a Google location. On Facebook, connecting a brand whose account came from a different Facebook login ends with `error=account.different_login` on your `redirect_uri`.
+
+A Google login with more than one YouTube channel connects every channel in one authorization, and the redirect carries every account in `account_ids`. Without `brand_id`, each channel connects into its own new brand named after the channel. With a `brand_id`, the brand takes one channel, and each further channel ends the connection with `status=error` and `error=account.already_linked` on your `redirect_uri`. Channels connected before the error stay connected.
 
 ## Let someone else connect an account
 

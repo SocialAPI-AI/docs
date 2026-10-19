@@ -118,7 +118,7 @@ Send these keys flat in the target's `platform_data` (`targets[].platform_data`)
 | `place` | string (numeric Page ID) | text/link posts, photo, video, multi-photo albums, reel | Tags a location on the post. |
 | `alt_text` | string | single photo | Accessibility text for the photo. |
 | `title` | string | single video, reel | Title shown with the video or Reel. |
-| `share_to_feed` | boolean | reel | Default `true`: the Reel also appears in the Page feed, not just the Reels tab. Send `false` to keep it in the Reels tab only. |
+| `share_to_feed` | boolean | reel | Default `true`: the Reel is also shared to the Page feed on Facebook, not just the Reels tab. Send `false` to keep it in the Reels tab only. Either value, the Reel is not returned by List posts. |
 | `no_story` | boolean | single photo, single video | When `true`, the photo or video is added without posting a separate update to the Page feed. |
 | `content_category` | string | single video | One of Facebook's video categories: `BEAUTY_FASHION`, `BUSINESS`, `CARS_TRUCKS`, `COMEDY`, `CUTE_ANIMALS`, `ENTERTAINMENT`, `FAMILY`, `FOOD_HEALTH`, `HOME`, `LIFESTYLE`, `MUSIC`, `NEWS`, `POLITICS`, `SCIENCE`, `SPORTS`, `TECHNOLOGY`, `VIDEO_GAMING`, or `OTHER`. |
 | `content_tags` | array of numeric Facebook Page or profile IDs | single video | Tags Pages or profiles in the video. |
@@ -260,7 +260,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-`share_to_feed` defaults to `true`. Reels also accept `title` and `place`; see the table above for every option.
+`share_to_feed` defaults to `true`, which shares the Reel to the Page feed on Facebook as well as the Reels tab. List posts does not return a Reel with either value. Reels also accept `title` and `place`; see the table above for every option.
 
 Requirements: exactly one video, vertical orientation (9:16), and a duration of 3 to 90 seconds. SocialAPI warns when the duration is outside that range; Facebook enforces the aspect ratio at publish time and rejects videos that do not comply.
 
@@ -429,7 +429,7 @@ A Facebook target includes `platform_media`: every photo and video on the publis
 | `url` | string | Link to the file, hosted by Facebook. |
 | `thumbnail_url` | string | Link to a video's cover image. Absent on images. |
 
-Link and share posts have no `platform_media`: their image is a preview of the linked site, not media the Page posted. A Reel has none either, since Reels do not appear in the Page feed.
+Link and share posts have no `platform_media`: their image is a preview of the linked site, not media the Page posted. A Reel has none either, since List posts does not return Reels, whatever `share_to_feed` is.
 
 The links expire. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{id}/sync`, then read the post again.
 

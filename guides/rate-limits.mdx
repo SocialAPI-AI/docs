@@ -64,12 +64,6 @@ TikTok also limits publishing to 6 posts per minute per account. SocialAPI does 
 - **More than one target in one request:** the request is all or nothing. If one target is at a cap, the whole request is refused and no target's counter moves.
 - **Scheduled post:** a scheduled post is never failed by a velocity cap. SocialAPI holds the target and publishes it once the window clears, so it goes out late. The wait does not count as a failed delivery.
 
-## Messaging velocity cap
-
-Each sender can send 10 messages per clock minute on Instagram, Facebook, and WhatsApp. The sender is the Instagram account, Facebook Page, or WhatsApp phone number the message goes out from. DMs, public replies to comments, private replies, and WhatsApp template messages all count, including the ones an [Automation](/guides/automations) sends. Each message counts: a DM request that sends 3 messages counts 3.
-
-A request that takes the sender past 10 messages in the current minute returns `429 messaging.velocity_limit`, with `Retry-After` set to the seconds left in the minute. Nothing in that request is sent and no interaction credit is spent.
-
 ## Platform limits
 
 Each platform limits what an app can do for an account. When the platform refuses a request for its own rate limit, SocialAPI returns `429 platform.{platform}.rate_limit`, for example `platform.instagram.rate_limit`. Match on the `platform.*.rate_limit` pattern to handle every platform. When the platform reports how long to wait, SocialAPI passes it on as `Retry-After` and `error.meta.retry_after_seconds`. Without them, wait at least 60 seconds, then retry with exponential backoff.

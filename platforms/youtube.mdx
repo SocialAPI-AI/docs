@@ -34,7 +34,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Post a top-level comment | Yes | Omit `comment_id` when you reply |
 | Hide, unhide a comment | Yes | Hiding sets the comment to `rejected` |
 | Hold a comment for review, ban its author | Yes | `POST /v1/platforms/youtube/comments/{commentId}/moderate` |
-| Delete a comment | Partial | Only comments your channel wrote. Another person's comment returns `422 platform.youtube.processing_failure`: hide it instead |
+| Delete a comment | Conditional | Only comments your channel wrote. Another person's comment returns `422 platform.youtube.processing_failure`: hide it instead |
 | Edit your own comment | Yes | `PATCH /v1/platforms/youtube/comments/{commentId}` |
 | Like a comment | No | `501 resource.not_supported`. YouTube has no comment-like API |
 | Private reply | No | `501 resource.not_supported` |
@@ -75,7 +75,7 @@ Response (HTTP 202):
 
 YouTube-specific rules:
 
-- **One account per channel.** Each connected `youtube` account is 1 YouTube channel. When the Google login manages more than 1 channel, one authorization connects all of them, and the redirect carries their IDs in `account_ids`.
+- **One account per channel.** Each connected `youtube` account is 1 YouTube channel. When the Google login manages more than 1 channel, one authorization connects all of them, and the redirect carries their IDs in `account_ids`. Without `brand_id`, each channel connects into its own new brand. With a `brand_id`, the brand takes one channel and each further channel ends with `error=account.already_linked`: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 - **A login with no channel.** A Google login that has no YouTube channel ends with `status=error` and `error=platform.youtube.no_channels` on your `redirect_uri`.
 - **Reconnect.** When YouTube no longer accepts the saved connection, calls return `401 platform.youtube.auth`. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 

@@ -12,7 +12,7 @@ description: Connect a WhatsApp Business phone number to receive and reply to di
 | Platform slug | `whatsapp` |
 | Auth type | Embedded Signup (OAuth), Meta-hosted |
 | API | WhatsApp Cloud API |
-| Access | Live (available on all plans) |
+| Access | Live. Available on all plans, except that sending template messages needs a paid plan (see [Plans](/guides/plans)) |
 | Best for | A unified inbox for the messages your WhatsApp Business number receives. |
 
 ## Capabilities
@@ -21,7 +21,7 @@ description: Connect a WhatsApp Business phone number to receive and reply to di
 |---|---|---|
 | Receive DMs | Yes | Inbound messages arrive in real time via webhooks |
 | Free-form reply | Yes | Text, media, or interactive, and only inside the open 24-hour service window (see below) |
-| Template messages | Yes | Create, list, edit, delete, and validate templates via the API, and send approved templates (including outside the 24-hour window) |
+| Template messages | Yes | Create, list, edit, delete, and validate templates via the API, and send approved templates (including outside the 24-hour window). Sending a template needs a paid plan: on the Free plan, `send-template` returns `403 whatsapp.paid_plan_required`. See [Plans](/guides/plans) |
 | Interactive messages | Yes | Up to 3 reply buttons, or a list of up to 10 rows. Taps arrive on your webhook as `dm.received` |
 | Conversation list / history | Partial | There is no history API, so the inbox is built from webhooks received after you connect. A number connected from the WhatsApp Business app also brings the chat history the business shares (see [Keep using the WhatsApp Business app](#keep-using-the-whatsapp-business-app)) |
 | Phone-number management | Yes | Request a code, verify, register, deregister, and check status of the business number |
@@ -192,7 +192,7 @@ curl -X POST https://api.social-api.ai/v1/platforms/whatsapp/accounts/{account_i
   }'
 ```
 
-`to` is E.164 without the leading `+`. The template must already be `APPROVED` and `language` must match an approved variant. This send is allowed whether or not the 24-hour window is open, and the message is recorded in the inbox thread.
+`to` is E.164 without the leading `+`. The template must already be `APPROVED` and `language` must match an approved variant. This send is allowed whether or not the 24-hour window is open, and the message is recorded in the inbox thread. On the Free plan the request returns `403 whatsapp.paid_plan_required` and nothing is sent. Replies to people who messaged you work on every plan. See [Plans](/guides/plans).
 
 The response includes `message_id`, the SocialAPI message ID for the send, alongside WhatsApp's own `messages[].id` (the `wamid`). `message_id` is the same value that arrives as `id` on the `dm.status.sent`, `dm.status.delivered`, `dm.status.read`, and `dm.status.failed` webhooks for this message, so you can bind a delivery receipt to the row you created without matching on the `wamid`.
 
@@ -325,6 +325,7 @@ WhatsApp exposes inbound media only to the connected account, never to an extern
 | 400 | `whatsapp.media_upload_failed` | WhatsApp rejected the media file. |
 | 400 | `validation.caption_unsupported` | A caption was set on an audio attachment. WhatsApp audio messages have no caption. |
 | 400 | `whatsapp.undeliverable` | The recipient is not a WhatsApp user. |
+| 403 | `whatsapp.paid_plan_required` | A template was sent on the Free plan. Template sends need a paid plan: see [Plans](/guides/plans). Replies inside the 24-hour window work on every plan. |
 | 403 | `whatsapp.user_opted_out` | The recipient has opted out of messages from this business. |
 | 409 | `whatsapp.business_app_number` | `register` was called for a number that stays on the WhatsApp Business app. It is already registered: do not retry. |
 | 429 | `whatsapp.frequency_cap` | The recipient has hit their daily marketing-message limit. |
