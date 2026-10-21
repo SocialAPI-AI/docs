@@ -6644,7 +6644,7 @@
                         }
                     },
                     "403": {
-                        "description": "Brand already has the maximum of 5 Facebook Pages (platform.facebook.page_cap)",
+                        "description": "Brand already holds as many Facebook Pages as the plan allows (platform.facebook.page_cap)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10272,7 +10272,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a post for one or more connected accounts. Set `publish_now: true` to publish\nimmediately: the post is accepted with status `publishing` and delivery runs in the\nbackground (so slow reel/video uploads do not block the request). The terminal status\n(`published`, `partial`, or `failed`) arrives via the `post.published`/`post.partial`/\n`post.failed` webhooks and by polling GET /posts/{pid}. Set `scheduled_at` to queue the\npost for future publication. With neither flag the post is saved as a draft (this is the\ndefault, even when targets are provided); publish it later with POST /posts/{pid}/publish.\nSet `stagger` to publish the targets one after another, separated by a random delay between\n`min_seconds` and `max_seconds`, instead of all at once; the post is then returned with status `scheduled`.\nConsumes 1 post credit when the post is published or scheduled; saving a draft is free.",
+                "description": "Creates a post for one or more connected accounts. Set `publish_now: true` to publish\nimmediately: the post is accepted with status `publishing` and delivery runs in the\nbackground (so slow reel/video uploads do not block the request). The terminal status\n(`published`, `partial`, or `failed`) arrives via the `post.published`/`post.partial`/\n`post.failed` webhooks and by polling GET /posts/{pid}. Set `scheduled_at` to queue the\npost for future publication. With neither flag the post is saved as a draft (this is the\ndefault, even when targets are provided); publish it later with POST /posts/{pid}/publish.\nSet `stagger` to publish the targets one after another, separated by a random delay between\n`min_seconds` and `max_seconds`, instead of all at once; the post is then returned with status `scheduled`.\nSet `queue_id` instead of `scheduled_at` to schedule the post at the earliest free time of a Queue; the time is in `scheduled_at` on the response.\nConsumes 1 post credit when the post is published or scheduled; saving a draft is free.",
                 "tags": [
                     "Posts"
                 ],
@@ -10321,6 +10321,26 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "queue_id names a Queue that does not exist, or the Brand has no default Queue (queue.not_found)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The Queue is paused or has no free time within 366 days (queue.paused, queue.full)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10670,7 +10690,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the text, media, schedule time, targets, or hidden status of a pending post.\nOnly posts in `draft`, `scheduled`, or `failed` status can be updated.\nOmit `targets` to keep the current ones. Sending `targets` replaces them all.\n`scheduled_at` must be in the future, and a scheduled post must keep at least one target.",
+                "description": "Updates the text, media, schedule time, targets, or hidden status of a pending post.\nOnly posts in `draft`, `scheduled`, or `failed` status can be updated.\n`queue_id` moves the post to another Queue, and `queue_id: null` takes it out of its Queue and keeps its time.\nOmit `targets` to keep the current ones. Sending `targets` replaces them all.\n`scheduled_at` must be in the future, and a scheduled post must keep at least one target.",
                 "tags": [
                     "Posts"
                 ],
@@ -10729,7 +10749,7 @@
                         }
                     },
                     "404": {
-                        "description": "Post not found",
+                        "description": "Post not found, or queue_id names a Queue that does not exist (queue.not_found)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10739,7 +10759,7 @@
                         }
                     },
                     "409": {
-                        "description": "Post is not in an editable state",
+                        "description": "Post is not in an editable state, or the Queue is paused, has no free time, or already holds a post at the requested time (queue.paused, queue.full, queue.slot_conflict)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10918,7 +10938,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Publishes a post in `draft` or `scheduled` status immediately. The post is accepted\nwith status `publishing` and delivery runs in the background (so slow reel/video uploads\ndo not block the request); the terminal status arrives via the `post.published`/\n`post.partial`/`post.failed` webhooks and by polling GET /posts/{pid}. Use this to publish\na post that was saved as a draft, or to publish a scheduled post ahead of its time.\nConsumes 1 post credit.",
+                "description": "Publishes a post in `draft` or `scheduled` status immediately. The post is accepted\nwith status `publishing` and delivery runs in the background (so slow reel/video uploads\ndo not block the request); the terminal status arrives via the `post.published`/\n`post.partial`/`post.failed` webhooks and by polling GET /posts/{pid}. Use this to publish\na post that was saved as a draft, or to publish a scheduled post ahead of its time.\nA post in a Queue publishes now and leaves the Queue.\nConsumes 1 post credit.",
                 "tags": [
                     "Posts"
                 ],
@@ -11161,6 +11181,464 @@
                     },
                     "501": {
                         "description": "resource.not_supported: a target platform cannot unpublish (content stays live)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/queues": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists your Queues, grouped by Brand, oldest first. Filter to one Brand with brand_id.",
+                "tags": [
+                    "Queues"
+                ],
+                "summary": "List Queues",
+                "parameters": [
+                    {
+                        "description": "Brand ID",
+                        "name": "brand_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.QueueListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include posts:read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a Queue on a Brand: a weekly list of posting times in one timezone. A post created with queue_id takes the earliest free time. day is a lowercase English weekday name and time is HH:MM, both in the Queue's timezone. A Brand holds at most 20 Queues and always has exactly one default. The first Queue of a Brand becomes its default, and is_default: true makes this one the default.",
+                "tags": [
+                    "Queues"
+                ],
+                "summary": "Create a Queue",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.CreateQueueParams"
+                            }
+                        }
+                    },
+                    "description": "Queue definition",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/social-api_ai_core_api_service.Queue"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing brand_id, invalid timezone, slots or name (validation.field_required, validation.field_invalid)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include posts:write",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Brand not found (brand.not_found)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The Brand already has 20 Queues (queue.limit_reached)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/queues/{qid}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns one Queue.",
+                "tags": [
+                    "Queues"
+                ],
+                "summary": "Get a Queue",
+                "parameters": [
+                    {
+                        "example": "que_01J9Z8Y7X6W5V4T3S2R1Q0P9N8",
+                        "description": "Queue ID",
+                        "name": "qid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/social-api_ai_core_api_service.Queue"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include posts:read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Queue not found (queue.not_found)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a Queue. Its posts keep their scheduled times and are no longer queued; released_count is how many there were. If it was the default, the Brand's oldest remaining Queue becomes the default.",
+                "tags": [
+                    "Queues"
+                ],
+                "summary": "Delete a Queue",
+                "parameters": [
+                    {
+                        "example": "que_01J9Z8Y7X6W5V4T3S2R1Q0P9N8",
+                        "description": "Queue ID",
+                        "name": "qid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.DeleteQueueResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include posts:write",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Queue not found (queue.not_found)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the fields you send and keeps the rest. slots replaces the whole list. Set active to false to pause the Queue: posts already in it keep their times, and no new post can join it. is_default can only be set to true, which makes this Queue the Brand's default; to change the default, set another Queue's is_default to true. Posts already queued keep their times unless you send reshuffle_existing: true, which moves them onto the new slots in their current order and returns reshuffled_count.",
+                "tags": [
+                    "Queues"
+                ],
+                "summary": "Update a Queue",
+                "parameters": [
+                    {
+                        "example": "que_01J9Z8Y7X6W5V4T3S2R1Q0P9N8",
+                        "description": "Queue ID",
+                        "name": "qid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.UpdateQueueParams"
+                            }
+                        }
+                    },
+                    "description": "Fields to change",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.UpdateQueueResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid timezone, slots, name or is_default (validation.field_invalid)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include posts:write",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Queue not found (queue.not_found)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "reshuffle_existing found no free time for a post within 366 days (queue.full)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/queues/{qid}/preview": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the next free times of a Queue as RFC 3339 with the Queue's local offset, soonest first. Works on a paused Queue. A forecast, not a reservation: send queue_id, never copy a previewed time into scheduled_at.",
+                "tags": [
+                    "Queues"
+                ],
+                "summary": "Preview a Queue's next times",
+                "parameters": [
+                    {
+                        "example": "que_01J9Z8Y7X6W5V4T3S2R1Q0P9N8",
+                        "description": "Queue ID",
+                        "name": "qid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Number of times, 1 to 100, default 10",
+                        "name": "count",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.QueuePreviewResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "count is not an integer from 1 to 100 (validation.field_invalid)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The key's scopes do not include posts:read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Queue not found (queue.not_found)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12771,6 +13249,11 @@
                         "type": "boolean",
                         "example": false
                     },
+                    "queue_id": {
+                        "description": "QueueID puts the post in a Queue: it takes the Queue's earliest free time and is scheduled. Send a Queue ID, or \"default\" for the default Queue of the targets' Brand. Requires targets, all in one Brand. Cannot be combined with scheduled_at, publish_now or a target's scheduled_at.",
+                        "type": "string",
+                        "example": "que_01J9Z8Y7X6W5V4T3S2R1Q0P9N8"
+                    },
                     "scheduled_at": {
                         "description": "ScheduledAt queues the post for future publication (RFC3339). When set, the post is scheduled rather than drafted.",
                         "type": "string",
@@ -13028,6 +13511,21 @@
                     }
                 }
             },
+            "api_endpoints.DeleteQueueResponse": {
+                "type": "object",
+                "properties": {
+                    "deleted": {
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "released_count": {
+                        "description": "Number of posts that were in the Queue. They keep their scheduled times and are no longer queued.",
+                        "type": "integer"
+                    }
+                }
+            },
             "api_endpoints.DeliveryDetailResponse": {
                 "type": "object",
                 "properties": {
@@ -13125,6 +13623,11 @@
                 "properties": {
                     "error": {
                         "$ref": "#/components/schemas/api_endpoints.ErrorBody"
+                    },
+                    "request_id": {
+                        "description": "RequestID matches the X-Request-ID response header. Include it when contacting support.",
+                        "type": "string",
+                        "example": "01HZ9X3Q4R5M6N7P8V2K0W1J"
                     }
                 }
             },
@@ -14952,6 +15455,11 @@
                         "type": "string",
                         "example": "2026-04-01T10:00:05Z"
                     },
+                    "queue_id": {
+                        "description": "ID of the Queue the post is in. null when the post is not queued.",
+                        "type": "string",
+                        "example": "que_01J9Z8Y7X6W5V4T3S2R1Q0P9N8"
+                    },
                     "retry_count": {
                         "type": "integer",
                         "example": 0
@@ -15301,6 +15809,31 @@
                     },
                     "text": {
                         "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.QueueListResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Queue"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.QueuePreviewResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.QueuedTime"
+                        }
                     }
                 }
             },
@@ -16183,6 +16716,11 @@
                         "type": "object",
                         "additionalProperties": {}
                     },
+                    "queue_id": {
+                        "description": "QueueID moves the post to another Queue, which gives it that Queue's earliest free time and frees its old one. Send null to take the post out of its Queue and keep its time. Send \"default\" for the Brand's default Queue.",
+                        "type": "string",
+                        "example": "que_01J9Z8Y7X6W5V4T3S2R1Q0P9N8"
+                    },
                     "scheduled_at": {
                         "description": "ScheduledAt changes the scheduled publication time (RFC3339).",
                         "type": "string",
@@ -16227,6 +16765,59 @@
                             "logged_in"
                         ],
                         "example": "public"
+                    }
+                }
+            },
+            "api_endpoints.UpdateQueueResponse": {
+                "type": "object",
+                "properties": {
+                    "active": {
+                        "description": "False when the Queue is paused: no new post can join it.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "brand_id": {
+                        "description": "ID of the Brand the Queue belongs to.",
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "description": "When the Queue was created.",
+                        "type": "string"
+                    },
+                    "id": {
+                        "description": "Queue ID.",
+                        "type": "string",
+                        "example": "que_01J9Z8Y7X6W5V4T3S2R1Q0P9N8"
+                    },
+                    "is_default": {
+                        "description": "True for the Brand's default Queue, the one queue_id \"default\" refers to.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "name": {
+                        "description": "Queue name.",
+                        "type": "string",
+                        "example": "Evenings"
+                    },
+                    "reshuffled_count": {
+                        "description": "Number of queued posts moved to the new times. Present only when the request sent reshuffle_existing: true.",
+                        "type": "integer"
+                    },
+                    "slots": {
+                        "description": "Weekly posting times, sorted by day (Monday first) then time.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Slot"
+                        }
+                    },
+                    "timezone": {
+                        "description": "IANA timezone the slots are expressed in.",
+                        "type": "string",
+                        "example": "Europe/Paris"
+                    },
+                    "updated_at": {
+                        "description": "When the Queue was last changed.",
+                        "type": "string"
                     }
                 }
             },
@@ -16409,7 +17000,7 @@
                         "example": "control"
                     },
                     "facebook_page_selection": {
-                        "description": "FacebookPageSelection, when true, enables the Facebook Page selection\nconnect flow in the dashboard. Read-only here.",
+                        "description": "FacebookPageSelection, when true, makes a Facebook connection (and an\nInstagram connection through Facebook Login) end with\nstatus=selection_required so you choose the Pages. Read-only.",
                         "type": "boolean",
                         "example": false
                     },
@@ -18931,6 +19522,42 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.CreateQueueParams": {
+                "type": "object",
+                "properties": {
+                    "active": {
+                        "description": "Set false to create the Queue paused. Defaults to true.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "brand_id": {
+                        "description": "ID of the Brand to create the Queue on. Required.",
+                        "type": "string"
+                    },
+                    "is_default": {
+                        "description": "Set true to make this the Brand's default Queue. The Brand's first Queue is always the default.",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "name": {
+                        "description": "Queue name. Required.",
+                        "type": "string",
+                        "example": "Evenings"
+                    },
+                    "slots": {
+                        "description": "Weekly posting times, 1 to 100. Required.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Slot"
+                        }
+                    },
+                    "timezone": {
+                        "description": "IANA timezone the slots are expressed in. Required.",
+                        "type": "string",
+                        "example": "Europe/Paris"
+                    }
+                }
+            },
             "social-api_ai_core_api_service.DeliveryAttempt": {
                 "type": "object",
                 "properties": {
@@ -19328,6 +19955,75 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.Queue": {
+                "type": "object",
+                "properties": {
+                    "active": {
+                        "description": "False when the Queue is paused: no new post can join it.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "brand_id": {
+                        "description": "ID of the Brand the Queue belongs to.",
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "description": "When the Queue was created.",
+                        "type": "string"
+                    },
+                    "id": {
+                        "description": "Queue ID.",
+                        "type": "string",
+                        "example": "que_01J9Z8Y7X6W5V4T3S2R1Q0P9N8"
+                    },
+                    "is_default": {
+                        "description": "True for the Brand's default Queue, the one queue_id \"default\" refers to.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "name": {
+                        "description": "Queue name.",
+                        "type": "string",
+                        "example": "Evenings"
+                    },
+                    "slots": {
+                        "description": "Weekly posting times, sorted by day (Monday first) then time.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Slot"
+                        }
+                    },
+                    "timezone": {
+                        "description": "IANA timezone the slots are expressed in.",
+                        "type": "string",
+                        "example": "Europe/Paris"
+                    },
+                    "updated_at": {
+                        "description": "When the Queue was last changed.",
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.QueuedTime": {
+                "type": "object",
+                "properties": {
+                    "day": {
+                        "description": "Lowercase English weekday name.",
+                        "type": "string",
+                        "example": "tuesday"
+                    },
+                    "slot_time": {
+                        "description": "The slot's time of day as HH:MM.",
+                        "type": "string",
+                        "example": "19:00"
+                    },
+                    "time": {
+                        "description": "The time as RFC 3339 with the Queue's local offset.",
+                        "type": "string",
+                        "example": "2026-10-20T19:00:00+02:00"
+                    }
+                }
+            },
             "social-api_ai_core_api_service.SchedulingConstraints": {
                 "type": "object",
                 "properties": {
@@ -19338,6 +20034,30 @@
                     "supported": {
                         "description": "whether scheduled_at is accepted for this platform",
                         "type": "boolean"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.Slot": {
+                "type": "object",
+                "properties": {
+                    "day": {
+                        "description": "Lowercase English weekday name.",
+                        "type": "string",
+                        "enum": [
+                            "monday",
+                            "tuesday",
+                            "wednesday",
+                            "thursday",
+                            "friday",
+                            "saturday",
+                            "sunday"
+                        ],
+                        "example": "tuesday"
+                    },
+                    "time": {
+                        "description": "Time of day as HH:MM, 24-hour, in the Queue's timezone.",
+                        "type": "string",
+                        "example": "19:00"
                     }
                 }
             },
@@ -19473,6 +20193,43 @@
                         "items": {
                             "$ref": "#/components/schemas/social-api_ai_core_api_service.Step"
                         }
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.UpdateQueueParams": {
+                "type": "object",
+                "properties": {
+                    "active": {
+                        "description": "False pauses the Queue, true resumes it.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "is_default": {
+                        "description": "Only true is accepted: it makes this the Brand's default Queue.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "name": {
+                        "description": "New name.",
+                        "type": "string",
+                        "example": "Evenings"
+                    },
+                    "reshuffle_existing": {
+                        "description": "Set true to move the Queue's posts onto the new slots, in their current order. The response then carries reshuffled_count.",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "slots": {
+                        "description": "Weekly posting times. Replaces the whole list when sent; omit to keep the current list.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.Slot"
+                        }
+                    },
+                    "timezone": {
+                        "description": "New IANA timezone.",
+                        "type": "string",
+                        "example": "Europe/Paris"
                     }
                 }
             },

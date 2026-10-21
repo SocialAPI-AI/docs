@@ -70,10 +70,10 @@ Response (HTTP 202):
 }
 ```
 
-After the person authorizes, the redirect carries `status=success` and the brand's Facebook account. That account holds every Page the login granted that none of your other brands already holds. A Page that another of your brands holds stays with that brand.
+After the person authorizes, the redirect carries `status=selection_required` and a `connection_id`: choose the Pages that join the brand as described in [Choose Facebook Pages](/guides/connect-accounts#choose-facebook-pages). When `facebook_page_selection` is `false` on your SocialAPI account (`GET /v1/users/me`), or the connection started from an invite link, the redirect carries `status=success` and the brand's Facebook account instead. That account holds every Page the login granted that none of your other brands already holds. A Page that another of your brands holds stays with that brand.
 
 - A login that grants no Page ends with `status=error` and `error=platform.facebook.no_pages` on your `redirect_uri`.
-- A login whose every Page belongs to another of your brands ends with `status=error` and `error=platform.facebook.no_assignable_pages`.
+- Without a selection step, a login whose every Page belongs to another of your brands ends with `status=error` and `error=platform.facebook.no_assignable_pages`.
 - A brand whose Facebook account is connected through a different login ends with `status=error` and `error=account.different_login`. Disconnect the brand's Facebook account first.
 - Reconnecting the same login refreshes the access for every brand that uses it, not only the brand you reconnected from.
 
@@ -137,6 +137,7 @@ Response (HTTP 201):
 |---|---|---|
 | 400 | `validation.field_required` | The body has no `brand_id` |
 | 400 | `validation.page_not_granted` | The Page is not accessible through this login |
+| 403 | `platform.facebook.page_cap` | `facebook_page_selection` is `true` on your SocialAPI account and the brand already holds as many Facebook Pages as your plan allows. See [Facebook Pages per brand](/guides/plans#facebook-pages-per-brand) |
 | 404 | `resource.not_found` | The login does not exist |
 | 404 | `brand.not_found` | The brand does not exist or your key cannot reach it |
 | 409 | `account.different_login` | The brand's Facebook account uses a different login |

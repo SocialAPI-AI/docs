@@ -6,7 +6,7 @@ description: "Connect Instagram, Facebook, TikTok, YouTube, LinkedIn, X, and mor
 
 A connected account is one social account (an Instagram account, a Facebook login with its Pages, a YouTube channel, a Telegram bot) that SocialAPI can act on for you. You start a connection with `POST /v1/accounts/connect`, send the person to the platform's consent screen, and SocialAPI redirects them back to your app with the new account's ID. SocialAPI keeps the platform's access tokens, so you never receive or refresh them.
 
-The same flow serves every platform. Telegram and Bluesky skip the consent screen and connect in one request. Google Business Profile can pause so you choose which location to connect. Facebook connects every Page at once, and you can assign Pages to brands afterwards (see [Facebook](/platforms/facebook)). Connecting, reconnecting, and disconnecting cost no credits.
+The same flow serves every platform. Telegram and Bluesky skip the consent screen and connect in one request. Google Business Profile can pause so you choose which location to connect. Facebook can pause so you choose which Pages join the brand (see [Facebook Pages](#facebook-pages)), and you can move Pages between brands afterwards. Connecting, reconnecting, and disconnecting cost no credits.
 
 ## Endpoints
 
@@ -103,8 +103,8 @@ flowchart TD
   <Step title="Read the result on your redirect URI">
     SocialAPI completes the authorization with the platform and redirects the person to your `redirect_uri` with `status` and the parameters below. Check `status` first, then compare `state` with the value you sent.
   </Step>
-  <Step title="Choose a Google Business Profile, if asked">
-    When `status` is `selection_required`, no account exists yet. Read the candidates and choose within 30 minutes, as described in [Choose a Google Business Profile](#choose-a-google-business-profile).
+  <Step title="Choose a Google Business Profile or Facebook Pages, if asked">
+    When `status` is `selection_required`, read the candidates and choose within 30 minutes, as described in [Choose a Google Business Profile](#choose-a-google-business-profile) and [Choose Facebook Pages](#choose-facebook-pages).
   </Step>
 </Steps>
 
@@ -124,7 +124,7 @@ flowchart TD
 `error` holds one of these values:
 
 - **The platform's own code** when the person declines or the platform refuses the request, for example `access_denied`.
-- **A `platform.*` or other SocialAPI error code** when the platform or SocialAPI refuses the connection, for example `billing.brands_limit` (your plan's brand allowance is used up), `account.already_linked` (the brand already holds a different account on this platform), `account.different_login` (the brand's Facebook is connected through a different login), `byok.credentials_missing` (no X app credentials saved), `byok.credentials_invalid` (X rejected the saved credentials), or `byok.app_access_denied` (X refused your app access to its API). Each code is listed in [Errors](/guides/errors).
+- **A `platform.*` or other SocialAPI error code** when the platform or SocialAPI refuses the connection, for example `billing.brands_limit` (your plan's brand allowance is used up), `account.already_linked` (the brand already holds a different account on this platform, or `lock_accounts_to_brand` blocked a move between brands), `account.different_login` (the brand's Facebook is connected through a different login), `byok.credentials_missing` (no X app credentials saved), `byok.credentials_invalid` (X rejected the saved credentials), or `byok.app_access_denied` (X refused your app access to its API). Each code is listed in [Errors](/guides/errors).
 - **`missing_code`** when the platform returned neither a code nor an error.
 - **`exchange_failed`** when the failure has no code.
 
@@ -227,26 +227,107 @@ Response (HTTP 201):
 | Field | Description |
 |---|---|
 | `connection_id` | The pending connection's ID |
-| `platform` | `google` |
+| `platform` | `google`, `facebook`, or `instagram` |
 | `expires_at` | When the pending connection expires, 30 minutes after it was created |
-| `profiles[]` | The Business Profiles the login manages, each with `platform_account_id`, `display_name`, `username`, `profile_picture_url`, and `bio` |
-| `login_id` | The Google login behind the connection. Use it to connect more locations later without a new consent screen: see [Google Business Profile locations](/platforms/google/locations) |
+| `profiles[]` | Google: the Business Profiles the login manages, each with `platform_account_id`, `display_name`, `username`, `profile_picture_url`, and `bio`. Facebook and Instagram: an empty array |
+| `pages[]` | Facebook and Instagram only: the candidates to choose from. See [Choose Facebook Pages](#choose-facebook-pages). Absent for Google |
+| `lost_access[]` | Facebook and Instagram only: Pages this login no longer grants. See [When reconnecting Facebook removes Pages](#when-reconnecting-facebook-removes-pages). Absent when empty |
+| `login_id` | The login behind the connection. For Google, use it to connect more locations later without a new consent screen: see [Google Business Profile locations](/platforms/google/locations). For Facebook, see [One login, many brands](/platforms/facebook#one-login-many-brands) |
+
+The response has no `data` wrapper: every field is at the top level.
 
 ### Selection rules
 
-- **A pending connection expires 30 minutes after it is created** and works once. The first successful `select` consumes it. A second `select`, or a call after expiry, returns `404 resource.not_found`.
-- **A `400` keeps the pending connection.** Fix the request and send it again within the 30 minutes.
+- **A pending connection expires 30 minutes after it is created** and works once. The first `select` that succeeds consumes it. On a Facebook or Instagram connection, some failed `select` calls consume it too: see [Choose Facebook Pages](#choose-facebook-pages). A second `select`, or a call after expiry, returns `404 resource.not_found`.
+- **A `400` keeps the pending connection.** On a Facebook or Instagram connection, only the three `400` codes listed in [Choose Facebook Pages](#choose-facebook-pages) keep it. Fix the request and send it again within the 30 minutes.
 - **A `platform_account_id` that is not in `profiles[]`** returns `400 validation.profile_not_in_set`.
 - **A body without `platform_account_id`** returns `400 validation.field_required`.
 
 ## Facebook Pages
 
-A Facebook connection has no selection step. SocialAPI adds every Page the login granted that none of your other brands holds to the brand's Facebook account, and the redirect carries `status=success`.
+A Facebook connection pauses with `status=selection_required` so you choose which granted Pages join the brand. The same applies to Instagram connected with `metadata.connection_type: "facebook_login"`, where each candidate is an Instagram account. Instagram connected through Instagram Login has no selection step.
+
+`GET /v1/users/me` returns `facebook_page_selection`, which is `true` on new SocialAPI accounts and which the API cannot change. When it is `false` on your SocialAPI account, a Facebook connection has no selection step: SocialAPI adds every granted Page that none of your other brands holds to the brand's account, and the redirect carries `status=success`. A connection started from an [invite link](#let-someone-else-connect-an-account) never has a selection step, whatever the setting.
 
 - A login that grants no Page ends with `status=error` and `error=platform.facebook.no_pages` on your `redirect_uri`.
-- A login whose every Page belongs to another of your brands ends with `status=error` and `error=platform.facebook.no_assignable_pages` on your `redirect_uri`.
+- Without a selection step, a login whose every Page belongs to another of your brands ends with `status=error` and `error=platform.facebook.no_assignable_pages` (`platform.instagram.no_assignable_pages` for Instagram). With a selection step, those Pages come back with `assignable: false` instead.
 
-To assign a Page to another brand after connecting, see [Facebook](/platforms/facebook).
+To move a Page to another brand after connecting, see [One login, many brands](/platforms/facebook#one-login-many-brands).
+
+### Choose Facebook Pages
+
+Read the candidates with `GET /v1/accounts/pending/{connection_id}`:
+
+```bash
+curl https://api.social-api.ai/v1/accounts/pending/pc_7d2e9a4c1f8b3e60a5d2c9f4b1e8a3d7 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "connection_id": "pc_7d2e9a4c1f8b3e60a5d2c9f4b1e8a3d7",
+  "platform": "facebook",
+  "expires_at": "2026-10-13T09:30:00Z",
+  "profiles": [],
+  "login_id": "cred_01J8X3Q4R5M6N7P8V2K0W1J",
+  "pages": [
+    {
+      "platform_page_id": "104857392011223",
+      "name": "Acme Bakery",
+      "category": "Bakery",
+      "assignable": true
+    },
+    {
+      "platform_page_id": "104857392011987",
+      "name": "Acme Catering",
+      "assigned_brand_id": "4d8a2c7e-91b3-4f6a-a2d5-7e0c3b9f1a64",
+      "assigned_brand_name": "Acme Events",
+      "assigned_account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W3C",
+      "assignable": false
+    }
+  ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `pages[].platform_page_id`, `name` | Facebook's Page ID and the Page's name. For Instagram, the Instagram account's ID and name |
+| `pages[].picture_url`, `category` | Each is omitted when Facebook returns none |
+| `pages[].assignable` | `true` when none of your brands holds the Page. `false` in three cases: another of your brands holds it, the connecting brand already holds it (you can still select it), or, for Instagram, you hold the account through Instagram Login. In the first two cases, `assigned_brand_id`, `assigned_brand_name`, and `assigned_account_id` name the brand and its account |
+
+Finish the connection by sending the chosen Page IDs:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/pending/pc_7d2e9a4c1f8b3e60a5d2c9f4b1e8a3d7/select \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"page_ids": ["104857392011223"]}'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "platform": "facebook",
+  "username": "Maria Lopez",
+  "display_name": "Maria Lopez"
+}
+```
+
+`username` and `display_name` are the name on the Facebook login, not a Page name. The selected Pages are on the account: list them with `GET /v1/accounts/{id}/pages`.
+
+The [selection rules](#selection-rules) on expiry, single use, and `400` apply. Also:
+
+- **`page_ids` empty or missing** returns `400 validation.field_required`.
+- **A Page ID that is not in `pages[]`** returns `400 validation.page_not_in_set`, with the ID in `meta.platform_page_id`.
+- **A Page that another of your brands holds** returns `400 validation.page_already_assigned`, with `meta.brand_id` naming that brand. A Page the connecting brand already holds can be selected. To take a Page from another brand, move it with the assign call in [One login, many brands](/platforms/facebook#one-login-many-brands).
+- **More Pages than your plan allows per brand** returns `403 platform.facebook.page_cap`, with the allowance in `meta.limit`. On a Facebook connection, the count includes the Pages the brand already holds. The allowance per plan is in [Plans and usage](/guides/plans#facebook-pages-per-brand).
+- **An Instagram account you already connected through Instagram Login** returns `409 platform.instagram.flow_conflict`. `meta.accounts` is a comma-separated string of the Instagram account IDs concerned. Disconnect that account first.
+- **On a Facebook or Instagram connection, only `400 validation.field_required`, `400 validation.page_not_in_set`, and `400 validation.page_already_assigned` keep the pending connection.** Any other error, including `400 validation.page_not_granted`, `403 platform.facebook.page_cap`, and `409 platform.instagram.flow_conflict`, consumes it. Start a new connection to choose again.
+- **No call cancels a pending connection.** An unused one expires after 30 minutes.
 
 ### When reconnecting Facebook removes Pages
 
@@ -285,7 +366,7 @@ Response (HTTP 201):
 - `metadata.state` is the `state` that `POST /v1/accounts/connect` returned. It works once, for 1 hour, and only with the API key that started the connection. An unknown, expired, or used `state` returns `400 validation.state_invalid`. A `state` started with a different API key returns `403 auth.state_mismatch`.
 - A missing `platform` or `code` returns `400 validation.field_required`, and so does a missing `metadata.state`.
 - When one authorization connects more than one account, the response (HTTP 201) is `{"data": [...], "count": 2}` with one entry per account.
-- When the connection needs a choice, the response is HTTP 200 with `"status": "selection_required"`, the `connection_id`, and the same `profiles` and `login_id` fields as `GET /v1/accounts/pending/{connection_id}`.
+- When the connection needs a choice, the response is HTTP 200 with `"status": "selection_required"`, the `connection_id`, and the same `profiles`, `pages`, `lost_access`, and `login_id` fields as `GET /v1/accounts/pending/{connection_id}`, without `expires_at`.
 
 ## Account status
 
@@ -374,11 +455,13 @@ SocialAPI updates the existing account in place:
 - The account keeps its `permissions` unless you send `permissions` on the reconnect. A narrower list deletes the data the removed permissions covered: see [Removing a permission deletes data](/guides/permissions#removing-a-permission-deletes-data).
 - SocialAPI sends `account.connected` again.
 
+A Facebook reconnect, or an Instagram reconnect through Facebook Login, can end with `status=selection_required` like a first connection: see [Facebook Pages](#facebook-pages).
+
 Always pass `brand_id` when you reconnect. Without it, SocialAPI creates a new brand for the connection and moves the account into it, which leaves the old brand without the account.
 
 Connecting a platform account that another of your brands already holds moves it to the brand you name. These cases do not move it:
 
-- **Facebook, and Instagram connected through Facebook Login.** A Page or Instagram account that another of your brands holds is not taken. A login whose every Page or Instagram account belongs to another brand ends with `error=platform.facebook.no_assignable_pages` or `error=platform.instagram.no_assignable_pages`. You assign Pages to brands as described in [Facebook](/platforms/facebook).
+- **Facebook, and Instagram connected through Facebook Login.** A Page or Instagram account that another of your brands holds is not taken. With a selection step, it comes back with `assignable: false`. Without a selection step, a login whose every Page or Instagram account belongs to another brand ends with `error=platform.facebook.no_assignable_pages` or `error=platform.instagram.no_assignable_pages`. You assign Pages to brands as described in [Facebook](/platforms/facebook).
 - **Google Business Profile locations assigned with the assign call.** `POST /v1/platforms/google/logins/{loginId}/locations/{locationId}/assign` returns `400 validation.location_already_assigned` for a location that another brand holds. See [Google locations](/platforms/google/locations).
 - **`lock_accounts_to_brand` set to `true` on your SocialAPI account** (`PATCH /v1/users/me`). A connect that would move an account to a different brand ends with `error=account.already_linked`, or returns `409 account.already_linked`. The default is `false`. The lock does not apply to Facebook.
 
@@ -427,7 +510,7 @@ Send `url` to the person. They approve on the platform's consent screen, SocialA
 
 - A `brand_id` that is not one of your brands returns `404 resource.not_found`.
 - A brand that already holds an account on that platform, or that already has an unused, unexpired invite for that platform, returns `409 resource.conflict`.
-- A Facebook invite connects every Page of the person's login that none of your other brands holds. The person cannot choose Pages.
+- A Facebook invite connects every Page of the person's login that none of your other brands holds. The person cannot choose Pages. When `facebook_page_selection` is `true`, more Pages than [your plan allows per brand](/guides/plans#facebook-pages-per-brand) end the invite with `platform.facebook.page_cap`.
 - An expired, used, or revoked link shows the person a SocialAPI error page.
 - `GET /v1/invites?brand_id={brand_id}` lists the brand's invites, newest first, each with `id`, `platform`, `token`, `url`, `is_active`, `expires_at`, `created_at`, and `permissions`. A missing `brand_id` returns `400 validation.field_required`.
 - `DELETE /v1/invites/{id}` revokes an invite and returns HTTP 204 with no body. An unknown or already used invite returns `404 resource.not_found`.
@@ -505,7 +588,7 @@ Payloads are in [Webhook events](/guides/webhook-events).
 | `social_api_connect_account` | Starts a connection and returns the link to open. Accepts `permissions` |
 | `social_api_list_accounts` | Lists connected accounts with their status |
 | `social_api_list_pending_profiles` | Reads a pending connection's candidates |
-| `social_api_select_pending_profile` | Finishes a pending connection |
+| `social_api_select_pending_profile` | Finishes a pending connection. Takes `page_ids` for Facebook and for Instagram connected through Facebook Login |
 | `social_api_update_account_permissions` | Replaces an account's permissions |
 | `social_api_disconnect_account` | Disconnects an account |
 | `social_api_create_invite`, `social_api_list_invites`, `social_api_revoke_invite` | Create, list, and revoke invite links. Creating accepts `permissions` |

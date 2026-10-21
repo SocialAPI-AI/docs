@@ -1,13 +1,13 @@
 ---
 title: "Rate limits"
-description: "Stay within SocialAPI's posting velocity caps and each platform's own limits, and handle HTTP 429 with Retry-After."
+description: "Stay within SocialAPI's request rate limit, posting velocity caps, and each platform's own limits, and handle HTTP 429 with Retry-After."
 ---
 
-SocialAPI applies a rate limit of its own: a posting velocity cap per publish target. Each platform also applies its own limits. All of them answer HTTP 429. Read the `Retry-After` header when it is present and wait that many seconds before you send the request again.
+SocialAPI applies two rate limits of its own: a [request rate limit](#request-rate-limit) per SocialAPI account, and a [posting velocity cap](#posting-velocity-caps) per publish target. Each platform also applies its own limits. All of them answer HTTP 429. Read the `Retry-After` header when it is present and wait that many seconds before you send the request again.
 
-These limits are the same on every plan, and upgrading does not raise them. Post and interaction allowances per billing period are on [Plans and usage](/guides/plans).
+These limits do not depend on your plan, and upgrading does not raise them. The request rate limit grows with your connected accounts. Post and interaction allowances per billing period are on [Plans and usage](/guides/plans).
 
-A 429 from SocialAPI's own limits uses the standard error envelope. `error.meta.retry_after_seconds` holds the same number of seconds as the `Retry-After` header:
+A 429 from SocialAPI's own limits on `/v1` uses the standard error envelope. `error.meta.retry_after_seconds` holds the same number of seconds as the `Retry-After` header:
 
 ```json
 {
@@ -29,13 +29,34 @@ A 429 from SocialAPI's own limits uses the standard error envelope. `error.meta.
 
 | Code | What it limits | Retry-After |
 |---|---|---|
+| `ratelimit.exceeded` | [Requests per minute](#request-rate-limit) for your SocialAPI account | Yes |
 | `publishing.velocity_limit` | [Posts per hour and per 24 hours](#posting-velocity-caps) for one publish target | Yes |
 | `platform.{platform}.rate_limit` | The [platform's own limit](#platform-limits) | When the platform reports a wait |
 | `inbox.sync_rate_limited` | Repeated `POST /v1/inbox/sync` for the same target. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually) | Yes |
 | `accounts.sync_rate_limited` | Repeated `POST /v1/accounts/{id}/sync` for the same connected account. See [Analytics](/guides/analytics) | Yes |
 | `validation.post_limit_exhausted`, `validation.interaction_limit_exhausted`, `billing.post_limit`, `billing.export_limit`, `billing.export_cooldown`, `billing.export_concurrent` | Plan allowances. See [Plans and usage](/guides/plans) | No |
 
-A request refused by `publishing.velocity_limit` never reaches the platform and spends no credit.
+A request refused by `ratelimit.exceeded` or `publishing.velocity_limit` never reaches the platform and spends no credit.
+
+## Request rate limit
+
+Every authenticated request to `/v1` and to the MCP server counts against one per-minute budget for your SocialAPI account. Every API key, dashboard session, and AI agent connection of the account shares that budget, so spreading requests over more API keys does not raise it.
+
+| Connected accounts on your SocialAPI account | Requests per minute |
+|---|---|
+| 0 to 2 | 60 |
+| 3 to 2,000 | 600 |
+| More than 2,000 | 1,200 |
+
+Authenticated responses can carry three headers:
+
+| Header | Description |
+|---|---|
+| `X-RateLimit-Limit` | Your budget in requests per minute |
+| `X-RateLimit-Remaining` | Requests left before your budget resets |
+| `X-RateLimit-Reset` | Whole seconds until your budget resets |
+
+A request to `/v1` past the budget returns `429 ratelimit.exceeded`, with `Retry-After` and `error.meta.retry_after_seconds` set to the seconds until your budget resets, and `error.meta.limit` set to your budget. On the MCP server, the 429 body is `{"error":"rate limit exceeded","code":"ratelimit.exceeded"}`, with the same `Retry-After` and `X-RateLimit-*` headers and no `meta`. A request rejected with `401` does not count and carries none of the three headers. Read the headers only when they are present.
 
 ## Posting velocity caps
 
@@ -106,7 +127,7 @@ Zalo no longer reports its message quota: do not rely on `remain` and `total`. E
 
 ### Reads and platform limits
 
-Reading comments, reviews, mentions, and posts costs no credits, and SocialAPI applies no rate limit of its own to ordinary reads. The two sync endpoints in the table above have their own cooldowns. Reads still count against the platform's limit for the account. To detect new comments and messages, subscribe to [webhook events](/guides/webhook-events) instead of polling. If your interface fetches the same page of results repeatedly, cache it on your side.
+Reading comments, reviews, mentions, and posts costs no credits. Reads count against the [request rate limit](#request-rate-limit) like every other request. The two sync endpoints in the table above have their own cooldowns. Reads still count against the platform's limit for the account. To detect new comments and messages, subscribe to [webhook events](/guides/webhook-events) instead of polling. If your interface fetches the same page of results repeatedly, cache it on your side.
 
 ## Handling 429
 

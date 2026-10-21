@@ -48,6 +48,7 @@ The first segment of a code tells you which part of the system refused the reque
 | `automation.*` | Automations |
 | `whatsapp.*`, `telegram.*`, `google.*` | Errors specific to those platforms |
 | `messaging.*`, `inbox.*` | Messaging and sync rate limits |
+| `ratelimit.*` | Your SocialAPI account's request budget per minute |
 | `system.internal` | The request failed on SocialAPI's side |
 | `http.<status>` | A routing or transport error, such as an unknown path |
 
@@ -106,6 +107,7 @@ Rate-limit codes are `429` and are covered in [Rate limits](/guides/rate-limits)
 
 | HTTP | Code | When it occurs |
 |---|---|---|
+| 429 | `ratelimit.exceeded` | Your SocialAPI account used its request budget for the current minute. `meta.limit` is the budget and `meta.retry_after_seconds` the wait. See [Request rate limit](/guides/rate-limits#request-rate-limit) |
 | 429 | `publishing.velocity_limit` | A publish target reached its post cap per hour or per 24 hours. `meta.window` is `hour` or `day` |
 | 429 | `platform.<name>.rate_limit` | The platform's own limit. Wait, then retry with backoff. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 | 429 | `inbox.sync_rate_limited` | `POST /v1/inbox/sync` ran again before the wait for the same target ended. `meta.retry_after_seconds` is set |
@@ -145,15 +147,17 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | 400 | `validation.redirect_uri_not_whitelisted` | `redirect_uri` is not registered. Register it in the dashboard first |
 | 400 | `validation.state_invalid` | A connection `state` is unknown or expired |
 | 400 | `validation.profile_not_in_set` | The `platform_account_id` you selected is not one of the candidates for this connection |
-| 400 | `validation.page_not_in_set` | The `page_id` you selected is not one of the candidates for this connection |
-| 400 | `validation.page_already_assigned` | The Facebook Page already belongs to another brand |
+| 400 | `validation.page_not_in_set` | A Page ID in `page_ids` is not one of the candidates for this connection. `meta.platform_page_id` names it |
+| 400 | `validation.page_already_assigned` | The Facebook Page already belongs to another brand. `meta.brand_id` names that brand |
+| 403 | `platform.facebook.page_cap` | The selection or assignment would give the brand more Facebook Pages than your plan allows per brand. `meta.limit` is the allowance. See [Facebook Pages per brand](/guides/plans#facebook-pages-per-brand) |
+| 409 | `platform.instagram.flow_conflict` | You hold the Instagram account through the other login path: you selected it with Facebook Login while you hold it through Instagram Login, or the reverse. `meta.accounts` is a comma-separated string of the Instagram account IDs. Disconnect the account first. On Instagram Login it reaches your `redirect_uri` as `error=platform.instagram.flow_conflict` |
 | 400 | `validation.page_not_granted` | The Facebook Page is not accessible with this login |
 | 400 | `validation.location_not_granted` | The Google location is not accessible with this login |
 | 400 | `validation.location_already_assigned` | The Google location already belongs to another brand |
 | 400 | `validation.invalid_account_id` | The Google account ID has an invalid format |
 | 400 | `validation.invalid_location_id` | The Google location ID is not valid |
 | 400 | `validation.auth_code_expired` | The TikTok authorization code expired or was already used. Start the connection again |
-| 409 | `account.already_linked` | The brand already holds a different account on this platform. Telegram, Bluesky, and choosing a Google location with `POST /v1/accounts/pending/{connection_id}/select` return the 409. On a platform with a consent screen it reaches your `redirect_uri` as `error=account.already_linked` |
+| 409 | `account.already_linked` | The brand already holds a different account on this platform, or `lock_accounts_to_brand` is `true` and the account belongs to another of your brands (see [Reconnect an account](/guides/connect-accounts#reconnect-an-account)). In the 409 response, `meta.brand_id` is the brand you named, or with the lock, the brand that holds the account. Telegram, Bluesky, and choosing a Google location with `POST /v1/accounts/pending/{connection_id}/select` return the 409. On a platform with a consent screen it reaches your `redirect_uri` as `error=account.already_linked` |
 | 409 | `account.different_login` | The brand's Facebook, or its Instagram connected through Facebook Login, is connected through a different login. Disconnect it first. During a connection it reaches your `redirect_uri` as `error=account.different_login`; assigning a Page returns the 409 |
 | 403 | `account.reconnection_required` | The platform token is no longer usable. Reconnect with `POST /v1/accounts/connect`, passing the existing connected account's brand and platform: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account) |
 | 400 | `account.unsupported_platform` | The platform value is not recognized |
@@ -162,8 +166,8 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | Redirect | `platform.google.no_locations` | The Google login has no Business Profile locations |
 | Redirect | `platform.youtube.no_channels` | The Google login has no YouTube channels |
 | 404 | `platform.youtube.no_uploads_playlist` | The YouTube channel has no uploads playlist |
-| Redirect | `platform.facebook.no_assignable_pages` | Every Page on the login already belongs to another brand |
-| Redirect | `platform.instagram.no_assignable_pages` | Every Instagram account on the Facebook login already belongs to another brand, or you hold it through Instagram Login |
+| Redirect | `platform.facebook.no_assignable_pages` | On a connection without a [selection step](/guides/connect-accounts#facebook-pages), every Page on the login already belongs to another brand |
+| Redirect | `platform.instagram.no_assignable_pages` | On a connection without a selection step, every Instagram account on the Facebook login already belongs to another brand, or you hold it through Instagram Login |
 | 409 | `platform.google.brand_has_account` | Assigning a location when the brand already has a Google Business Profile connected. Disconnect it first, or choose another brand |
 | 502 | `platform.instagram.api_error` | Instagram's token exchange failed during connection |
 | 400 | `account.page_not_found` | The `page_id` matches no Page of the account |

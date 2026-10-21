@@ -47,6 +47,12 @@ Two features depend on the plan rather than on an allowance:
 
 On the Pro (Full Send) and Business (Empire) plans, your brand allowance grows in Profile packs of 50 brands. When your brand count reaches the scale threshold of your allowance (90% by default), SocialAPI adds a pack, within the pack budget you set. Packs you no longer need are released at the end of the billing period. Set the threshold and the budget in the dashboard under **Billing**. Each pack held raises `brands_limit` in `GET /v1/usage` by 50.
 
+## Facebook Pages per brand
+
+When `facebook_page_selection` is `true` on your SocialAPI account (`GET /v1/users/me`), each brand holds at most 2 active Facebook Pages on Free, 5 on Starter, 10 on Pro, 20 on Business, and any number on Enterprise. A Page is active when `is_active` is `true` in `GET /v1/accounts/{id}/pages`. Choosing or assigning more returns `403 platform.facebook.page_cap`, with the allowance in `error.meta.limit`. Pages cost no credits. When `facebook_page_selection` is `false`, no Page cap applies.
+
+When `facebook_page_selection` is `true` and you change to a plan with a lower allowance, or a cancellation moves your SocialAPI account to the Free plan, SocialAPI sets `is_active` to `false` on the Pages of each brand above the new allowance, starting from the last Page added, and keeps the Pages added first. A Page with `is_active: false` cannot be published to.
+
 ## History and export allowances
 
 | Allowance | Free | Starter | Pro | Business | Enterprise |
@@ -262,6 +268,7 @@ Change or cancel your plan in the dashboard under **Billing**. A cancelled subsc
 When a plan change lowers your allowances:
 
 - Brands above the new allowance stay. Creating another brand returns `403 billing.brands_limit` until you are below the allowance.
+- When `facebook_page_selection` is `true`, Facebook Pages above the new per-brand allowance stop being active, starting from the last Page added. See [Facebook Pages per brand](#facebook-pages-per-brand).
 
 ## Past-due accounts
 
@@ -287,7 +294,7 @@ Pay the open invoice in the dashboard under **Billing** to restore access. Acces
 
 ## Related
 
-- [Rate limits](/guides/rate-limits): posting velocity caps, and platform limits that apply on every plan
+- [Rate limits](/guides/rate-limits): the request rate limit, posting velocity caps, and platform limits that apply on every plan
 - [Errors](/guides/errors): every `billing.*` code with its status
 - [Media](/guides/media): uploads, storage, and the storage quota
 - [Webhooks](/guides/webhooks): event delivery and the delivery log

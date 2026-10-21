@@ -109,14 +109,14 @@ Response (HTTP 202):
 }
 ```
 
-The person signs in to Facebook, not Instagram, and approves the scopes in [Facebook Login scopes](#facebook-login-scopes). The redirect then carries `status=success` and the brand's Instagram account, as described in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+The person signs in to Facebook, not Instagram, and approves the scopes in [Facebook Login scopes](#facebook-login-scopes). The redirect then carries `status=selection_required`, and you choose which Instagram accounts join the brand as described in [Choose Facebook Pages](/guides/connect-accounts#choose-facebook-pages). When `facebook_page_selection` is `false` on your SocialAPI account (`GET /v1/users/me`), or the connection started from an invite link, the redirect carries `status=success` and the brand's Instagram account instead.
 
 ### More than one Instagram account under one login
 
-A Facebook login can administer more than one Instagram account. The brand's Instagram account holds every Instagram account the login granted that none of your other brands holds, each as a Page. The `platform_page_id` of such a Page is the Instagram account ID. List the Pages with `GET /v1/accounts/{id}/pages`, and publish to one with `page_id` on the post target: see [Delivery](/guides/delivery). A Facebook Page with no linked Instagram account is not listed.
+A Facebook login can administer more than one Instagram account. The brand's Instagram account holds each Instagram account you select (or, without a selection step, every Instagram account the login granted that none of your other brands holds), each as a Page. The `platform_page_id` of such a Page is the Instagram account ID. List the Pages with `GET /v1/accounts/{id}/pages`, and publish to one with `page_id` on the post target: see [Delivery](/guides/delivery). A Facebook Page with no linked Instagram account is not listed.
 
 - A login that grants no Instagram account ends with `status=error` and `error=platform.instagram.no_pages` on your `redirect_uri`.
-- A login whose every Instagram account belongs to another of your brands, or is already held through Instagram Login, ends with `status=error` and `error=platform.instagram.no_assignable_pages`.
+- Without a selection step, a login whose every Instagram account belongs to another of your brands, or is already held through Instagram Login, ends with `status=error` and `error=platform.instagram.no_assignable_pages`.
 - A brand whose Instagram account is connected through a different Facebook login ends with `status=error` and `error=account.different_login`. Disconnect the brand's Instagram account first.
 
 ### Requirements
@@ -127,7 +127,7 @@ A Facebook login can administer more than one Instagram account. The brand's Ins
 
 ### One path per Instagram account
 
-Hold each Instagram account through one path. Connecting through Facebook Login does not add an account that you hold through Instagram Login: if no account remains, the connection ends with `status=error` and `error=platform.instagram.no_assignable_pages`. To switch an account to Facebook Login, disconnect it, then connect it again with `connection_type: "facebook_login"`.
+Hold each Instagram account through one path. Connecting through Facebook Login does not add an account that you hold through Instagram Login: such an account comes back with `assignable: false` in the [selection step](/guides/connect-accounts#choose-facebook-pages), and selecting it returns `409 platform.instagram.flow_conflict`. Without a selection step, a connection with no other account to add ends with `status=error` and `error=platform.instagram.no_assignable_pages`. To switch an account to Facebook Login, disconnect it, then connect it again with `connection_type: "facebook_login"`.
 
 ### Differences from Instagram Login
 
