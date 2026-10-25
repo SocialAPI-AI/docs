@@ -3725,7 +3725,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sends a direct message to the author of a comment. Only supported on Instagram and Facebook. Meta allows one private reply per comment, within 7 days of the comment; a second attempt or an expired window returns HTTP 400 with error code platform.instagram.private_reply_ineligible or platform.facebook.private_reply_ineligible. Once a comment has spent its one reply, or the comment is older than 7 days, further attempts are refused and do not count against your outbound message rate; the error carries a reason of already_replied, platform_refused or window_expired. The 400 is terminal: retrying it will never succeed. Set buttons (1 to 3) to send the reply as a button template with text as its body; a tap on a postback button arrives as a dm.postback event. You cannot message the commenter again until they respond; once they do, the conversation continues within the standard 24-hour messaging window. Check the can_private_reply capability flag.",
+                "description": "Sends a direct message to the author of a comment. Only supported on Instagram and Facebook. Meta allows one private reply per comment, within 7 days of the comment; a second attempt or an expired window returns HTTP 400 with error code platform.instagram.private_reply_ineligible or platform.facebook.private_reply_ineligible. Once a comment has spent its one reply, or the comment is older than 7 days, further attempts are refused and do not count against your outbound message rate; the error carries a reason of already_replied, platform_refused or window_expired. The 400 is terminal: retrying it will never succeed. Set buttons (1 to 3) to send the reply as a button template with text as its body; a tap on a postback button arrives as a dm.postback event. Set attachment instead of text to send one image, video, audio or file: a private reply is a single message, so it carries either text (with optional buttons) or one attachment, never both. You cannot message the commenter again until they respond; once they do, the conversation continues within the standard 24-hour messaging window. Check the can_private_reply capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -3775,7 +3775,7 @@
                         }
                     },
                     "400": {
-                        "description": "Missing required fields, or comment not eligible for a private reply (platform.instagram.private_reply_ineligible, platform.facebook.private_reply_ineligible)",
+                        "description": "Missing required fields, attachment combined with text or buttons (validation.attachment_conflict), or comment not eligible for a private reply (platform.instagram.private_reply_ineligible, platform.facebook.private_reply_ineligible)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12926,6 +12926,11 @@
                         "type": "string",
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
+                    "brand_id": {
+                        "description": "BrandID is the brand the account was connected to. When the connect request named no brand, this is the brand created for it.",
+                        "type": "string",
+                        "example": "b7e3c1a2-4f5d-4e8a-9b1c-2d3e4f5a6b7c"
+                    },
                     "display_name": {
                         "type": "string",
                         "example": "Acme Corp"
@@ -15794,11 +15799,50 @@
                     }
                 }
             },
+            "api_endpoints.PrivateReplyAttachmentInput": {
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "description": "Source is the attachment reference; its meaning is given by source_type.",
+                        "type": "string",
+                        "example": "https://cdn.example.com/guide.pdf"
+                    },
+                    "source_type": {
+                        "description": "SourceType selects how Source is interpreted:\n  - \"url\": Source is a publicly reachable media URL the platform fetches directly.\n  - \"media_id\": Source is a file id in your SocialAPI media library\n    (GET /v1/media).\n  - \"platform_attachment_id\": Source is an id of media already uploaded to the\n    target platform (for example a Meta attachment_id).",
+                        "type": "string",
+                        "enum": [
+                            "url",
+                            "media_id",
+                            "platform_attachment_id"
+                        ],
+                        "example": "url"
+                    },
+                    "type": {
+                        "description": "Type is the media kind. Optional for url and media_id sources (inferred from\nthe file), required for platform_attachment_id.",
+                        "type": "string",
+                        "enum": [
+                            "image",
+                            "video",
+                            "audio",
+                            "file"
+                        ],
+                        "example": "file"
+                    }
+                }
+            },
             "api_endpoints.PrivateReplyRequest": {
                 "type": "object",
                 "properties": {
                     "account_id": {
                         "type": "string"
+                    },
+                    "attachment": {
+                        "description": "Attachment sends one image, video, audio or file as the private reply,\ninstead of text. Leave text and buttons empty when you set it.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/api_endpoints.PrivateReplyAttachmentInput"
+                            }
+                        ]
                     },
                     "buttons": {
                         "description": "Buttons renders a button template (1-3 buttons); uses text as the bubble body.",

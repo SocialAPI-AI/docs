@@ -224,8 +224,21 @@ Response (HTTP 200):
 | Field | Description |
 |---|---|
 | `account_id` | Required. The connected account that sends it |
-| `text` | Required. The message. With `buttons`, it is the body of the button template (640 characters at most). On Instagram, the text holds 1,000 bytes of UTF-8 at most |
+| `text` | Required unless you send `attachment`. The message. With `buttons`, it is the body of the button template (640 characters at most). On Instagram, the text holds 1,000 bytes of UTF-8 at most |
 | `buttons` | 1 to 3 buttons, sent as a button template. Fields and limits are in [Buttons](/guides/direct-messages#buttons). A tap on a `postback` button arrives as a `dm.postback` event |
+| `attachment` | One image, video, audio file, or document sent as the private reply instead of text. `source_type` is `url`, `media_id` (a file from your [media library](/guides/media)), or `platform_attachment_id`, `source` holds the reference, and `type` (`image`, `video`, `audio`, or `file`) is required only with `platform_attachment_id` |
+
+A private reply is a single message, so it carries either `text` (with optional `buttons`) or one `attachment`. Sending `attachment` with `text` or `buttons` returns `400 validation.attachment_conflict`. To send a PDF as the first message:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/17895695668004550/17858893269577012/private-reply" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "attachment": { "source_type": "url", "source": "https://cdn.example.com/guide.pdf", "type": "file" }
+  }'
+```
 
 Private replies exist on Instagram and Facebook. The platform allows 1 private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.instagram.private_reply_ineligible` or `400 platform.facebook.private_reply_ineligible`. `error.meta.reason` says why: `already_replied`, `platform_refused`, or `window_expired`. This 400 is final, so retrying never succeeds. Every other platform returns `501 resource.not_supported`.
 
