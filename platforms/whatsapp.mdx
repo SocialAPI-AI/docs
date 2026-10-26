@@ -38,90 +38,99 @@ You do **not** need to submit your own Meta App Review or complete business veri
 
 ## Connecting
 
-WhatsApp uses Meta's Embedded Signup, a three-leg flow that you drive from your own backend and frontend with your API key. Your customer only ever interacts with Meta's hosted popup; your API key stays server-side the whole time. (You can also connect from our dashboard, which runs this same flow for you.)
+WhatsApp connects like every other platform with a consent screen: your backend asks for an `auth_url`, you send your customer there, and they come back to your `redirect_uri` with the connected account. Meta's signup runs on Meta's own pages, so there is nothing to embed or host on your side and no domain to register: it works from any domain. Your API key stays on your backend the whole time. (You can also connect from our dashboard.)
 
-### Leg 1: start the connection (your backend)
+### 1. Get the signup link (your backend)
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
   -H "Authorization: Bearer $SOCIALAPI_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "platform": "whatsapp" }'
+  -d '{
+    "platform": "whatsapp",
+    "redirect_uri": "https://app.example.com/oauth/callback",
+    "state": "session_abc123"
+  }'
 ```
 
 Response (HTTP 202):
 
 ```json
 {
-  "auth_url": "",
-  "state": "<CSRF token, bound to your API key, 10-minute TTL>",
-  "metadata": {
-    "app_id": "...",
-    "config_id": "...",
-    "solution_id": "..."
-  }
+  "auth_url": "https://www.facebook.com/v26.0/dialog/oauth?client_id=...",
+  "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "message": "Open this link to connect your whatsapp account. Once you've authorized, the account will be connected automatically."
 }
 ```
 
-The `metadata` is exactly what Meta's JavaScript SDK needs to launch the popup. Pass `state` through to your frontend, hold onto it for leg 3.
+Always set `redirect_uri`: it is where your customer lands with the result, and the only way to receive the number choice described below. See [Redirect URI rules](/guides/connect-accounts#redirect-uri-rules). `state` is optional and comes back unchanged on the redirect.
 
-`solution_id` can come back empty. That is expected: it is optional, and when it is empty you omit the `extras` object from the `FB.login` call in leg 2. The rest of the flow is unchanged.
+`onboarding` picks the signup Meta shows:
 
-### Leg 2: launch the Meta popup (browser)
+| `onboarding` | Meta shows | Result |
+|---|---|---|
+| `cloud_api` (default) | The WhatsApp Business Account and phone number picker | The number is used through the API only. Use it for a new number or one already on the Cloud API. |
+| `business_app` | "Connect your existing WhatsApp Business app" | The number keeps working in the WhatsApp Business app too. See [Keep using the WhatsApp Business app](#keep-using-the-whatsapp-business-app). |
 
-Load Facebook's JavaScript SDK and call `FB.login` with the `config_id` and `solution_id` from leg 1:
+### 2. Send your customer to `auth_url` (browser)
 
-```javascript
-FB.login(
-  (response) => {
-    const code = response.authResponse?.code;
-    // send code (plus waba_id + phone_number_id from the event below) to your backend
-  },
-  {
-    config_id: CONFIG_ID,
-    response_type: "code",
-    override_default_response_type: true,
-    extras: { setup: { solutionID: SOLUTION_ID } },
-  },
-);
+Redirect the browser to `auth_url`, or open it in a new tab. Your customer signs in with Facebook, picks or creates their business portfolio, WhatsApp Business Account and phone number, and verifies the number if it is new.
+
+### 3. Read the result on your `redirect_uri`
+
+On success, your customer lands on your `redirect_uri` with the account appended:
+
+```
+https://app.example.com/oauth/callback?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&platform=whatsapp&state=session_abc123&status=success
 ```
 
-As the customer completes the popup, Meta fires the `WA_EMBEDDED_SIGNUP` message event carrying their `waba_id` and `phone_number_id`. Capture the `code` and both IDs, and send them to your backend. See Meta's [Embedded Signup](https://developers.facebook.com/docs/whatsapp/embedded-signup) docs for the exact SDK and event wiring.
+`account_id` is the ID every WhatsApp call takes from here on. The number's messages now flow into your inbox.
 
-### Leg 3: complete the connection (your backend)
+On failure, the redirect carries `status=error` with `error` and `error_description`. The WhatsApp-specific values are:
+
+| `error` | Meaning |
+|---|---|
+| `whatsapp.no_waba` | No WhatsApp Business Account was shared during signup. Start a new connection. |
+| `whatsapp.no_phone_number` | The WhatsApp Business Account has no phone number yet. Add one in Meta Business Manager, then connect again. |
+| `whatsapp.number_banned` | Meta has banned this number. Connecting again does not help until Meta lifts the ban. |
+
+See [Redirect parameters](/guides/connect-accounts#redirect-parameters) for the full list.
+
+### Choose a number
+
+When the WhatsApp Business Account holds more than one phone number, the redirect carries `status=selection_required` and a `connection_id` instead of an `account_id`. Read the numbers with `GET /v1/accounts/pending/{connection_id}`:
 
 ```bash
-curl -X POST https://api.social-api.ai/v1/oauth/exchange \
-  -H "Authorization: Bearer $SOCIALAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "platform": "whatsapp",
-    "code": "<from the popup>",
-    "metadata": {
-      "state": "<from leg 1>",
-      "waba_id": "<from the popup>",
-      "phone_number_id": "<from the popup>"
-    }
-  }'
+curl https://api.social-api.ai/v1/accounts/pending/pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2 \
+  -H "Authorization: Bearer $SOCIALAPI_KEY"
 ```
 
-We validate `state` against the one we issued to your API key, exchange the `code` for the customer's token, store the account, and return HTTP 201 with the connected account. The number's messages now flow into your inbox.
+```json
+{
+  "connection_id": "pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
+  "platform": "whatsapp",
+  "expires_at": "2026-10-26T12:30:00Z",
+  "profiles": [
+    { "platform_account_id": "106540352242922", "display_name": "Acme Support", "username": "+1 555-010-0199", "profile_picture_url": "", "bio": "" },
+    { "platform_account_id": "106540352242923", "display_name": "Acme Sales", "username": "+1 555-010-0200", "profile_picture_url": "", "bio": "" }
+  ]
+}
+```
+
+Each entry in `profiles` is one number: `platform_account_id` is its phone number ID, `display_name` the verified business name, and `username` the phone number. Connect one with `POST /v1/accounts/pending/{connection_id}/select`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/pending/pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2/select \
+  -H "Authorization: Bearer $SOCIALAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "platform_account_id": "106540352242922" }'
+```
+
+The response (HTTP 201) is the connected account. Choose within 30 minutes; after that the connection expires and returns 404, and your customer runs the signup again. Only the number you choose is connected.
 
 ### Keep using the WhatsApp Business app
 
-To connect a number the business already uses in the WhatsApp Business app, and keep using it there, add `featureType` and `sessionInfoVersion` to `extras` in leg 2:
-
-```javascript
-extras: {
-  setup: { solutionID: SOLUTION_ID },
-  featureType: "whatsapp_business_app_onboarding",
-  sessionInfoVersion: "3",
-},
-```
-
-Without `featureType`, Meta rejects such a number at the phone-number step with error #2655115 ("this account type does not support partner sharing"). The phone needs WhatsApp Business app 2.24.17 or later, and Meta decides at that step whether the number is eligible.
-
-This flow ends with the `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` event, which carries `waba_id` but no `phone_number_id`. In leg 3, send `waba_id` and leave `phone_number_id` out. If the WhatsApp Business account holds more than one number, the exchange fails with `whatsapp.ambiguous_phone_number`, and you pass `phone_number_id` explicitly.
+To connect a number the business already uses in the WhatsApp Business app, and keep using it there, send `"onboarding": "business_app"` in step 1. Meta then walks your customer through linking the app, including scanning a QR code with their phone. The phone needs WhatsApp Business app 2.24.17 or later, and Meta decides during signup whether the number is eligible.
 
 Once the number is connected:
 
@@ -130,12 +139,6 @@ Once the number is connected:
 - Sending is capped at 20 messages per second, Meta's fixed limit for these numbers.
 - The number is already registered, so you never call `register` for it. `status` reports it as registered, and `register` refuses it with `409 whatsapp.business_app_number`.
 - The `deregister` endpoint does not work for these numbers. The business disconnects the number from the WhatsApp Business app's settings.
-
-### Registering your domain
-
-The popup runs against our Meta app, and Meta's Login-for-Business SDK enforces an allowlist of domains that are permitted to launch it. To run `FB.login` from your own domain (for example, `app.yourcompany.com`), we have to register that domain in our Meta app first, so contact us to add it.
-
-If you would rather not host the popup yourself, connect from our dashboard instead. It runs the flow on our domain and works for any customer without a per-domain step.
 
 ## The 24-hour service window
 

@@ -16,7 +16,6 @@ The same flow serves every platform. Telegram and Bluesky skip the consent scree
 | `GET` | `/v1/accounts` | List your connected accounts and their status. Filter to one brand with `brand_id` |
 | `GET` | `/v1/accounts/pending/{connection_id}` | Read a connection that waits for you to choose a location |
 | `POST` | `/v1/accounts/pending/{connection_id}/select` | Choose the location and finish the connection |
-| `POST` | `/v1/oauth/exchange` | Finish a connection whose authorization code your own page received |
 | `PATCH` | `/v1/accounts/{id}` | Change the account's permissions: see [Account permissions](/guides/permissions) |
 | `DELETE` | `/v1/accounts/{id}` | Disconnect an account |
 | `POST` | `/v1/invites` | Create a single-use link that lets someone else connect an account to a brand |
@@ -72,7 +71,7 @@ Store `account_id` against your user. The account is usable at once.
 
 `POST /v1/accounts/connect` answers in one of two ways:
 
-- **HTTP 202** for platforms with a consent screen: `auth_url` (send the person there), `state` (SocialAPI's own value for this connection, needed only for [`POST /v1/oauth/exchange`](#finish-a-connection-from-your-own-page)), and `message`. For WhatsApp, `metadata` carries the values your page needs to open Meta's signup popup, and `auth_url` is empty. See [WhatsApp](/platforms/whatsapp).
+- **HTTP 202** for platforms with a consent screen: `auth_url` (send the person there), `state` (SocialAPI's own value for this connection), and `message`. WhatsApp works the same way: `auth_url` opens Meta's signup. See [WhatsApp](/platforms/whatsapp).
 - **HTTP 201** for Telegram and Bluesky, which connect without a consent screen: `account_id`, `platform`, `username`, and `display_name`.
 
 The person has 1 hour from your request to finish on the platform. After 1 hour, the platform's redirect reaches a SocialAPI error page instead of your `redirect_uri`, and you start a new connection.
@@ -103,8 +102,8 @@ flowchart TD
   <Step title="Read the result on your redirect URI">
     SocialAPI completes the authorization with the platform and redirects the person to your `redirect_uri` with `status` and the parameters below. Check `status` first, then compare `state` with the value you sent.
   </Step>
-  <Step title="Choose a Google Business Profile or Facebook Pages, if asked">
-    When `status` is `selection_required`, read the candidates and choose within 30 minutes, as described in [Choose a Google Business Profile](#choose-a-google-business-profile) and [Choose Facebook Pages](#choose-facebook-pages).
+  <Step title="Choose a Google Business Profile, Facebook Pages, or a WhatsApp number, if asked">
+    When `status` is `selection_required`, read the candidates and choose within 30 minutes, as described in [Choose a Google Business Profile](#choose-a-google-business-profile), [Choose Facebook Pages](#choose-facebook-pages), and [Choose a WhatsApp number](/platforms/whatsapp#choose-a-number).
   </Step>
 </Steps>
 
@@ -148,7 +147,7 @@ The `platform` field takes one of these values:
 | `youtube` | YouTube | Consent screen |
 | `pinterest` | Pinterest | Consent screen |
 | `zalo` | Zalo | Consent screen |
-| `whatsapp` | WhatsApp | Meta's signup popup on your page, then `POST /v1/oauth/exchange` |
+| `whatsapp` | WhatsApp | Meta's signup through `auth_url`, then a number choice when the account holds several |
 | `telegram` | Telegram | One request with a bot token, no consent screen |
 | `bluesky` | Bluesky | One request with an app password, no consent screen |
 
@@ -332,41 +331,6 @@ The [selection rules](#selection-rules) on expiry, single use, and `400` apply. 
 ### When reconnecting Facebook removes Pages
 
 Facebook grants Page access per app, not per brand. When a person reconnects a Facebook login and unchecks a Page on Facebook's consent screen, every brand that used that Page through this login loses it. The affected account gets `status: reconnect_recommended` with `reconnect_reason: page_access_lost`. The Page stays assigned to its brand. When the login grants the Page again (the person reconnects and keeps the Page checked), the Page works again on the same brand with no further step.
-
-## Finish a connection from your own page
-
-`POST /v1/oauth/exchange` finishes a connection when your page, not SocialAPI, receives the authorization code. WhatsApp works this way: your page opens Meta's signup popup and receives the code. The [WhatsApp](/platforms/whatsapp) page has the full sequence.
-
-```bash
-curl -X POST https://api.social-api.ai/v1/oauth/exchange \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "platform": "whatsapp",
-    "code": "AQDtbPB9XkLm2",
-    "metadata": {
-      "state": "4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2",
-      "waba_id": "102290129340398",
-      "phone_number_id": "106540352242922"
-    }
-  }'
-```
-
-Response (HTTP 201):
-
-```json
-{
-  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-  "platform": "whatsapp",
-  "username": "+1 555-010-0199",
-  "display_name": "Acme Support"
-}
-```
-
-- `metadata.state` is the `state` that `POST /v1/accounts/connect` returned. It works once, for 1 hour, and only with the API key that started the connection. An unknown, expired, or used `state` returns `400 validation.state_invalid`. A `state` started with a different API key returns `403 auth.state_mismatch`.
-- A missing `platform` or `code` returns `400 validation.field_required`, and so does a missing `metadata.state`.
-- When one authorization connects more than one account, the response (HTTP 201) is `{"data": [...], "count": 2}` with one entry per account.
-- When the connection needs a choice, the response is HTTP 200 with `"status": "selection_required"`, the `connection_id`, and the same `profiles`, `pages`, `lost_access`, and `login_id` fields as `GET /v1/accounts/pending/{connection_id}`, without `expires_at`.
 
 ## Account status
 
