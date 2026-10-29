@@ -130,7 +130,7 @@ curl -X POST "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J
 
 ## Insights
 
-`GET /v1/platforms/threads/insights` returns post-level or account-level metrics. It needs `threads_manage_insights`.
+`GET /v1/platforms/threads/insights` returns post-level or account-level metrics. It needs `threads_manage_insights`. An account without it returns `403 platform.threads.insights_scope_missing` until it is reconnected.
 
 Post-level metrics for one post:
 
@@ -268,7 +268,7 @@ SocialAPI's Meta Threads app requests these scopes at connect. You apply for no 
 
 Threads asks for publishing and deleting as 1 pair of scopes shared by `posts.write` and `comments.write`, so the consent screen can show more than you selected. The account stays limited to the permissions you selected.
 
-`threads_manage_mentions`, `threads_manage_replies`, and `threads_manage_insights` are requested since 2026-10-17. An account connected before that date does not hold them: a call that needs one returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. Reconnect the account to add them.
+`threads_manage_mentions`, `threads_manage_replies`, and `threads_manage_insights` are requested since 2026-10-17. An account connected before that date does not hold them: an insights call returns `403 platform.threads.insights_scope_missing`, and any other call that needs one returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. Reconnect the account to add them.
 
 ### Beta scopes
 

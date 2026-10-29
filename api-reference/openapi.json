@@ -8281,7 +8281,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns engagement metrics for a single Threads post (level=media) or for the connected account (level=account). An account connected before 2026-10-17 gets an authorization error until it is reconnected. Media metrics are views, likes, replies, reposts, quotes and shares. Account metrics are those five plus clicks, followers_count and follower_demographics. shares is media-only and clicks is account-only. follower_demographics requires exactly one breakdown (country, city, age or gender) and rejects since or until.",
+                "description": "Returns engagement metrics for a single Threads post (level=media) or for the connected account (level=account). An account connected before 2026-10-17 returns 403 platform.threads.insights_scope_missing until it is reconnected. Media metrics are views, likes, replies, reposts, quotes and shares. Account metrics are those five plus clicks, followers_count and follower_demographics. shares is media-only and clicks is account-only. follower_demographics requires exactly one breakdown (country, city, age or gender) and rejects since or until.",
                 "tags": [
                     "Threads"
                 ],
@@ -8369,6 +8369,16 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The account was connected without the insights permission (platform.threads.insights_scope_missing); reconnect the account",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10370,7 +10380,7 @@
                         }
                     },
                     "422": {
-                        "description": "publishing.delivery.all_failed (fast completion)",
+                        "description": "A target account's platform does not support publishing posts, such as Telegram or WhatsApp (account.platform_unsupported), or publishing.delivery.all_failed (fast completion)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10780,6 +10790,16 @@
                     },
                     "409": {
                         "description": "Post is not in an editable state, or the Queue is paused, has no free time, or already holds a post at the requested time (queue.paused, queue.full, queue.slot_conflict)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A target account's platform does not support publishing posts, such as Telegram or WhatsApp (account.platform_unsupported)",
                         "content": {
                             "application/json": {
                                 "schema": {
