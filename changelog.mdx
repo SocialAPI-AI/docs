@@ -4,6 +4,66 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-10-30" description="Accounts" tags={["Accounts"]}>
+  ## brand_id on the selection_required redirect
+
+  A `selection_required` redirect now carries `brand_id` when you sent `brand_id` on `POST /v1/accounts/connect`. Without it, the select response returns the brand. See [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+</Update>
+
+<Update label="2026-10-30" description="Threads" tags={["Threads", "Rate limits"]}>
+  ## Threads per-profile limit returns 429
+
+  When Threads refuses a call because too many calls were made for one Threads profile, the response is now `429 platform.threads.rate_limit` instead of `502 platform.threads.80016`. Wait for `Retry-After` when it is present, or at least 60 seconds, then retry with backoff. See [Platform limits](/guides/rate-limits#platform-limits).
+</Update>
+
+<Update label="2026-10-29" description="Billing" tags={["Billing"]}>
+  ## billing_currency on /users/me
+
+  `GET /v1/users/me` now returns `billing_currency`, the currency your subscription is billed in: `usd`, `eur`, or an empty string when you never subscribed. See [Plans](/guides/plans).
+</Update>
+
+<Update label="2026-10-29" description="Threads" tags={["Threads", "Analytics", "Errors"]}>
+  ## platform.threads.insights_scope_missing
+
+  Threads insights on an account that does not hold `threads_manage_insights` now return `403 platform.threads.insights_scope_missing` until the account is reconnected. Before, these calls returned `422 platform.threads.10` or a `403` with a `platform.threads.<code>` error code. See [Threads scopes](/platforms/threads#scopes).
+</Update>
+
+<Update label="2026-10-29" description="Analytics" tags={["Analytics"]}>
+  ## Empty series list when there is no history
+
+  The account, brand, and post history endpoints now return `"series": []` instead of `"series": null` for a range with no stored points, in the REST API and the MCP tools. See [Read stored history](/guides/analytics#read-stored-history).
+</Update>
+
+<Update label="2026-10-28" description="Plans" tags={["Billing"]}>
+  ## Plans in EUR
+
+  Every paid plan is now sold in USD and in EUR, and you pick the currency at checkout. A subscription keeps the currency it started in, including when you change plan. `GET /v1/billing/plans` returns `monthly_price_eur` and `annual_price_eur`. See [Plans](/guides/plans).
+</Update>
+
+<Update label="2026-10-26" description="Threads" tags={["Threads", "Webhooks"]}>
+  ## Threads comment and mention events delivered
+
+  Threads accounts now deliver `comment.received` when a person replies to one of your posts, and `mention.received` when another account mentions yours. Before, neither event reached your endpoint. Your account's own replies under its posts do not emit `comment.received`. See [Threads webhook events](/platforms/threads#webhook-events).
+</Update>
+
+<Update label="2026-10-26" description="Rate limits" tags={["Rate limits", "Facebook", "Instagram", "Threads"]}>
+  ## Meta posting blocks return 429
+
+  When Meta temporarily blocks a Facebook, Instagram, or Threads account from posting (Meta error code 368), the response is now `429 platform.{platform}.rate_limit` instead of a `502`. Facebook error codes 9 and 613 also return `429 platform.facebook.rate_limit` now. Wait for `Retry-After` when it is present, or at least 60 seconds, then retry with backoff. See [Platform limits](/guides/rate-limits#platform-limits).
+</Update>
+
+<Update label="2026-10-26" description="Publishing" tags={["Publishing", "Telegram"]}>
+  ## Posts to Telegram accounts are refused
+
+  `POST /v1/posts` and `PATCH /v1/posts/{pid}` now return `422 account.platform_unsupported` when a target account is on Telegram, which does not publish posts. `error.meta.account_id` names the target to remove. Before, the post was accepted and its target failed later. See [Publish a post errors](/guides/errors#publish-a-post).
+</Update>
+
+<Update label="2026-10-26" description="Facebook" tags={["Facebook", "Direct messages", "Errors"]}>
+  ## Closed Messenger window reported as window_closed
+
+  A Facebook DM refused because the 24-hour messaging window is closed now returns `400 platform.facebook.window_closed` when Messenger reports the window as closed with error subcode 2018278. Before, that refusal returned `403 platform.facebook.permission_denied`. See [Inbox errors](/guides/errors#inbox-comments-messages-and-reviews).
+</Update>
+
 <Update label="2026-10-26" description="WhatsApp" tags={["WhatsApp", "Accounts"]}>
   ## Connect WhatsApp with a redirect
 
@@ -16,6 +76,12 @@ rss: true
   A private reply can now send an image, video, audio file, or document instead of text, on Instagram and Facebook. Set `attachment` on `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` with a `url`, `media_id`, or `platform_attachment_id` source. A private reply is one message, so `attachment` cannot be combined with `text` or `buttons`. See [Send a private reply](/guides/comments#send-a-private-reply).
 
   A media URL the platform cannot fetch or accept now returns `422 platform.instagram.attachment_failed` or `422 platform.facebook.attachment_failed`, on DMs and private replies. It returned `404 platform.instagram.100` or `404 platform.facebook.100` on a DM before, and `400 private_reply_ineligible` on a private reply. See [Errors](/guides/errors).
+</Update>
+
+<Update label="2026-10-23" description="Accounts" tags={["Accounts"]}>
+  ## brand_id on the connect response and redirect
+
+  A connect that completes without a consent screen (HTTP 201 from `POST /v1/accounts/connect`, for Telegram and Bluesky) now returns `brand_id`, and a successful connect redirect carries `brand_id` with `account_id`. When one authorization connects more than one account, the redirect carries `brand_ids` with `account_ids`, in the same order. See [Redirect parameters](/guides/connect-accounts#redirect-parameters).
 </Update>
 
 <Update label="2026-10-21" description="Rate limits" tags={["Rate limits"]}>

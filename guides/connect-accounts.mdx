@@ -72,7 +72,7 @@ Store `account_id` against your user. The account is usable at once.
 `POST /v1/accounts/connect` answers in one of two ways:
 
 - **HTTP 202** for platforms with a consent screen: `auth_url` (send the person there), `state` (SocialAPI's own value for this connection), and `message`. WhatsApp works the same way: `auth_url` opens Meta's signup. See [WhatsApp](/platforms/whatsapp).
-- **HTTP 201** for Telegram and Bluesky, which connect without a consent screen: `account_id`, `platform`, `username`, and `display_name`.
+- **HTTP 201** for Telegram and Bluesky, which connect without a consent screen: `account_id`, `brand_id`, `platform`, `username`, and `display_name`. `brand_id` is the brand the account joined, or the brand created for it when you sent no `brand_id`.
 
 The person has 1 hour from your request to finish on the platform. After 1 hour, the platform's redirect reaches a SocialAPI error page instead of your `redirect_uri`, and you start a new connection.
 
@@ -116,6 +116,8 @@ flowchart TD
 | `state` | When you sent `state` | Your value, unchanged |
 | `account_id` | `success` with one account | The connected account's SocialAPI ID |
 | `account_ids` | `success` with more than one account | Comma-separated SocialAPI IDs, when one authorization connects more than one account, for example a Google login with more than one YouTube channel |
+| `brand_id` | `success` with one account, and `selection_required` when you sent `brand_id` | The brand the account joins. Without a `brand_id` on the connect, a `selection_required` redirect has none: the select response returns it |
+| `brand_ids` | `success` with more than one account | Comma-separated brand IDs, in the same order as `account_ids` |
 | `connection_id` | `selection_required` | The pending connection to finish with `POST /v1/accounts/pending/{connection_id}/select` |
 | `error` | `error` | The reason, see below |
 | `error_description` | `error`, when there is one | A sentence you can show the person |
