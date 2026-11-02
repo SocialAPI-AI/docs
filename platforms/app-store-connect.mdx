@@ -3,12 +3,9 @@ title: "App Store Connect API"
 sidebarTitle: "App Store Connect"
 description: "Connect an App Store Connect API key to read your app's App Store reviews and post developer responses through one reviews API."
 icon: "app-store-ios"
-tag: "Beta"
 ---
 
 SocialAPI connects an app in App Store Connect with your own App Store Connect API key. It lists the app's customer reviews and posts your developer response to a review. App Store Connect has no consent screen: you create an API key in App Store Connect, send it to SocialAPI in one request, and there is no OAuth redirect and no app to register. [Platform apps](/guides/platform-credentials) lists which app connects each platform.
-
-App Store Connect is in beta. A SocialAPI account without beta access gets `403 billing.platform_not_available` when it connects an app. Request access from the App Store Connect card on the dashboard's Accounts page.
 
 ## At a glance
 
@@ -18,14 +15,14 @@ App Store Connect is in beta. A SocialAPI account without beta access gets `403 
 | Auth | Your App Store Connect API key. No OAuth |
 | Platform API | App Store Connect API |
 | Connected account | 1 app |
-| Status | Beta |
+| Status | Available on every plan |
 
 ## Capabilities
 
 | Feature | Status | Condition |
 |---|---|---|
-| List reviews | Beta | Written reviews of iOS, macOS, and visionOS apps. App Store Connect has no written reviews for tvOS apps |
-| Reply to a review | Beta | A review has 1 developer response. A new reply replaces it |
+| List reviews | Yes | Written reviews of iOS, macOS, and visionOS apps. App Store Connect has no written reviews for tvOS apps |
+| Reply to a review | Yes | A review has 1 developer response. A new reply replaces it |
 | Edit or delete a reply | No | Send a new reply to change it. Delete a response in App Store Connect |
 | Review summary | Partial | `total_count` and `last_review_at`. `average_rating` is always `0`: App Store Connect reports no average rating |
 | Publishing | No | `POST /v1/posts` and `PATCH /v1/posts/{pid}` with an App Store Connect target return `422 account.platform_unsupported` |
@@ -121,7 +118,6 @@ When the key can see more than 1 app and the request has no `app_id`, the call r
 | 400 | `validation.field_invalid` | `private_key` is not the contents of an App Store Connect private key file, the key can see no app with that `app_id`, or the key can see no app. `meta.field` names the field |
 | 400 | `validation.app_store_connect_rejected` | App Store Connect refused the app lookup as invalid. `error.message` carries App Store Connect's reason |
 | 401 | `platform.app_store_connect.auth` | App Store Connect rejected the key: check the Key ID, the Issuer ID, and that the key is not revoked |
-| 403 | `billing.platform_not_available` | Your SocialAPI account has no beta access to App Store Connect |
 | 403 | `platform.app_store_connect.forbidden` | App Store Connect refused the request for the key's role. Check the role the key was created with |
 | 409 | `account.already_linked` | The brand already holds an App Store Connect app |
 | 429 | `platform.app_store_connect.rate_limit` | The key's hourly request limit on App Store Connect is used up. Wait, then retry |
