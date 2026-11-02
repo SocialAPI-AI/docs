@@ -1,11 +1,11 @@
 ---
 title: Reviews
-description: List the reviews of your connected business locations, read their rating summaries, and post the business's public reply through one reviews API.
+description: List the reviews of your connected business locations and apps, read their rating summaries, and post the business's public reply through one reviews API.
 ---
 
-SocialAPI's reviews API lists the reviews left on a connected business location, reports its rating summary, and posts the business's public reply. Google Business Profile is the only platform with reviews. A call for an account on any other platform returns `422 account.platform_unsupported`.
+SocialAPI's reviews API lists the reviews left on a connected business location or app, reports its rating summary, and posts the business's public reply. Google Business Profile and App Store Connect (beta) have reviews. A call for an account on any other platform returns `422 account.platform_unsupported`.
 
-A reply costs 1 interaction credit, and reads cost nothing. Google moderates every reply: a reply is accepted first and goes live only after Google approves it.
+A reply costs 1 interaction credit, and reads cost nothing. Google moderates every reply: a reply is accepted first and goes live only after Google approves it. An App Store Connect reply returns no `state`, and can take up to 24 hours to appear on the App Store.
 
 ## Endpoints
 
@@ -21,7 +21,7 @@ Reviews cannot be created or deleted through the API, and a reply cannot be edit
 
 The two `GET` endpoints answer different questions.
 
-- **`GET /v1/inbox/reviews`** returns 1 row per review-capable account: its name, average rating, review count, and the time of its newest review. Use it to build a list of locations. Add `platform=google` to filter.
+- **`GET /v1/inbox/reviews`** returns 1 row per review-capable account: its name, average rating, review count, and the time of its newest review. Use it to build a list of locations and apps. Add `platform=google` or `platform=app_store_connect` to filter.
 - **`GET /v1/inbox/reviews/{account_id}`** returns the reviews of the 1 account you name. Use it to read, sort, and page through them.
 
 ```bash
@@ -47,7 +47,7 @@ Response (HTTP 200):
 }
 ```
 
-`status` is `ok`, `reconnection_required` (the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account)), or `error` (the platform did not answer in time). The rating fields and `last_review_at` are `null` unless `status` is `ok`. A failing account never fails the whole list.
+`status` is `ok`, `reconnection_required` (the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account)), or `error` (the platform refused the request or did not answer in time). The rating fields and `last_review_at` are `null` unless `status` is `ok`. A failing account never fails the whole list.
 
 ## List the reviews of an account
 
@@ -82,7 +82,7 @@ Response (HTTP 200):
 }
 ```
 
-`summary` covers the whole location, not the page. Every field of a review, including `media` and `reply_url`, is in [Google Business Profile reviews](/platforms/google/reviews#list-the-reviews-of-a-location). Paging follows [Pagination](/guides/pagination#paginated-endpoints).
+`summary` covers the whole location or app, not the page. Every field of a review, including `media` and `reply_url`, is in [Google Business Profile reviews](/platforms/google/reviews#list-the-reviews-of-a-location). App Store Connect reviews also carry `title`, the reviewer's headline, and report an `average_rating` of `0`: see [App Store Connect reviews](/platforms/app-store-connect#reviews). Paging follows [Pagination](/guides/pagination#paginated-endpoints).
 
 ## Reply to a review
 
@@ -106,10 +106,10 @@ Response (HTTP 200):
 }
 ```
 
-`{id}` is the review's `sapi_rev_` ID or the platform's review ID. `account_id` and `text` are required: a missing one returns `400 validation.field_required`. `state` is the reply's moderation state.
+`{id}` is the review's `sapi_rev_` ID or the platform's review ID. `account_id` and `text` are required: a missing one returns `400 validation.field_required`. `state` is the reply's moderation state on Google. App Store Connect returns no `state`.
 
 <Warning>
-  **A successful reply is not yet published.** `success: true` means Google accepted the reply for review. Nobody can see it until its `state` is `APPROVED`.
+  **On Google Business Profile, a successful reply is not yet published.** `success: true` means Google accepted the reply for review. Nobody can see it until its `state` is `APPROVED`. On App Store Connect, the reply returns no `state` and can take up to 24 hours to appear on the App Store.
 </Warning>
 
 ## Moderation of replies
@@ -126,7 +126,7 @@ SocialAPI sends a [`review.updated`](/guides/webhook-events#review-updated) even
 
 ## Platform support
 
-Google Business Profile is the only platform with reviews. SocialAPI does not read Facebook reviews (Meta deprecated Page recommendations in Graph API v22.0), Instagram has none, and Trustpilot is not available in SocialAPI: see [Trustpilot](/platforms/trustpilot). The [capability matrix](/platforms/overview) shows every platform. Google's connect rules, location data, and review limits are in [Google Business Profile reviews](/platforms/google/reviews).
+Google Business Profile and App Store Connect (beta) have reviews. SocialAPI does not read Facebook reviews (Meta deprecated Page recommendations in Graph API v22.0), Instagram has none, and Trustpilot is not available in SocialAPI: see [Trustpilot](/platforms/trustpilot). The [capability matrix](/platforms/overview) shows every platform. Google's connect rules, location data, and review limits are in [Google Business Profile reviews](/platforms/google/reviews), and App Store Connect's in [App Store Connect](/platforms/app-store-connect#reviews).
 
 ## Limits
 
@@ -134,20 +134,21 @@ Google Business Profile is the only platform with reviews. SocialAPI does not re
 |---|---|
 | Reviews per page | Default 20, up to 50 |
 | Replies per review | 1. A new reply replaces the old one |
-| Reply text | 4,096 bytes on Google. The MCP tool accepts 2,200 bytes |
+| Reply text | 4,096 bytes on Google. No SocialAPI limit on App Store Connect: see [App Store Connect limits](/platforms/app-store-connect#limits). The MCP tool accepts 2,200 bytes |
 | Cost of a reply | 1 interaction credit |
 
 ## Errors and debugging
 
 Check these in order when a review call fails:
 
-1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
-2. **`404 account.not_found`, `403 account.reconnection_required`.** The `acc_` ID is not yours, or the account needs reconnecting.
-3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `reviews.read` to list the reviews of an account, and `reviews.write` to reply. `error.meta.permission` names it.
-4. **`422 account.platform_unsupported`.** The account's platform has no reviews.
-5. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The review ID is not a review ID, or it belongs to another platform.
-6. **`400 validation.field_required`, `400 validation.field_invalid`.** `account_id` or `text` is missing, or `limit` or `order` is wrong.
-7. **`429 validation.interaction_limit_exhausted`.** The plan's interaction allowance is used up.
+1. **`401`, `403 auth.insufficient_scope`.** Your SocialAPI API key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
+2. **`401 platform.app_store_connect.unauthorized`, `403 platform.app_store_connect.forbidden`, `429 platform.app_store_connect.rate_limit`.** App Store Connect rejected the App Store Connect API key, refused its role, or the key's hourly limit is used up. See [App Store Connect review errors](/platforms/app-store-connect#review-errors).
+3. **`404 account.not_found`, `403 account.reconnection_required`.** The `acc_` ID is not yours, or the account needs reconnecting.
+4. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `reviews.read` to list the reviews of an account, and `reviews.write` to reply. `error.meta.permission` names it.
+5. **`422 account.platform_unsupported`.** The account's platform has no reviews.
+6. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The review ID is not a review ID, or it belongs to another platform.
+7. **`400 validation.field_required`, `400 validation.field_invalid`.** `account_id` or `text` is missing, or `limit` or `order` is wrong.
+8. **`429 validation.interaction_limit_exhausted`.** The plan's interaction allowance is used up.
 
 The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
 
@@ -168,13 +169,14 @@ SocialAPI sends [`review.received`](/guides/webhook-events#review-received) when
 |---|---|
 | `social_api_list_review_accounts` | List review-capable accounts with their rating summaries |
 | `social_api_get_reviews` | List the reviews of one account |
-| `social_api_reply_to_review` | Reply to a review. On Google Business Profile, a new reply replaces the old one |
+| `social_api_reply_to_review` | Reply to a review. On Google Business Profile and App Store Connect, a new reply replaces the old one |
 
-No platform lets you delete a business reply. See [MCP tools](/integrations/tools#reviews).
+SocialAPI has no endpoint to delete a business reply. See [MCP tools](/integrations/tools#reviews).
 
 ## Related
 
 - [Google Business Profile reviews](/platforms/google/reviews): review fields, reply moderation, and review events.
+- [App Store Connect](/platforms/app-store-connect#reviews): review titles, replies, and limits for App Store reviews.
 - [Webhook events](/guides/webhook-events#reviews): the `review.received` and `review.updated` payloads.
 - [Comments](/guides/comments): Google Business Profile has no comments, so use this guide for review replies.
 - [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit.

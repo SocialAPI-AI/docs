@@ -4747,7 +4747,7 @@
                 "parameters": [
                     {
                         "example": "google",
-                        "description": "Filter by platform (google)",
+                        "description": "Filter by platform (google, app_store_connect)",
                         "name": "platform",
                         "in": "query",
                         "schema": {
@@ -4786,7 +4786,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns one page of reviews for a single connected Account, newest first by default. Currently only Google Business Profile returns reviews.",
+                "description": "Returns one page of reviews for a single connected Account, newest first by default. Supported on Google Business Profile and App Store Connect. App Store Connect reviews also carry a title; App Store Connect does not report an average rating, so summary.average_rating is 0 for those Accounts.",
                 "tags": [
                     "Inbox Reviews"
                 ],
@@ -4894,7 +4894,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Posts a public reply to a review on the platform (e.g. Google Business Profile). Consumes 1 interaction credit. On Google, replies are moderated: a successful response returns state PENDING and the reply is not publicly visible until it becomes APPROVED. A rejected reply is never published, and the reason is reported as policy_violation on the review.",
+                "description": "Posts a public reply to a review on the platform (Google Business Profile, App Store Connect). Consumes 1 interaction credit. On Google, replies are moderated: a successful response returns state PENDING and the reply is not publicly visible until it becomes APPROVED. A rejected reply is never published, and the reason is reported as policy_violation on the review. On App Store Connect, replying again replaces your earlier response, and a response can take up to 24 hours to appear on the App Store.",
                 "tags": [
                     "Inbox Reviews"
                 ],
@@ -16100,6 +16100,11 @@
                         "type": "string",
                         "example": "Great school"
                     },
+                    "title": {
+                        "description": "Title is the review's headline, on platforms whose reviews have one (App Store Connect).",
+                        "type": "string",
+                        "example": "Love it"
+                    },
                     "updated_at": {
                         "type": "string",
                         "example": "2026-06-20T18:24:31Z"
@@ -16131,7 +16136,7 @@
                         "type": "object"
                     },
                     "state": {
-                        "description": "State is the moderation outcome: PENDING, APPROVED, or REJECTED.\nOmitted on platforms that publish replies synchronously.",
+                        "description": "State is the moderation outcome: PENDING, APPROVED, or REJECTED.\nOmitted on platforms that report no moderation state (App Store Connect).",
                         "type": "string",
                         "example": "APPROVED"
                     },

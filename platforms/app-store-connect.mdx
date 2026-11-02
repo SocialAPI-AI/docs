@@ -1,0 +1,192 @@
+---
+title: "App Store Connect API"
+sidebarTitle: "App Store Connect"
+description: "Connect an App Store Connect API key to read your app's App Store reviews and post developer responses through one reviews API."
+icon: "app-store-ios"
+tag: "Beta"
+---
+
+SocialAPI connects an app in App Store Connect with your own App Store Connect API key. It lists the app's customer reviews and posts your developer response to a review. App Store Connect has no consent screen: you create an API key in App Store Connect, send it to SocialAPI in one request, and there is no OAuth redirect and no app to register. [Platform apps](/guides/platform-credentials) lists which app connects each platform.
+
+App Store Connect is in beta. A SocialAPI account without beta access gets `403 billing.platform_not_available` when it connects an app. Request access from the App Store Connect card on the dashboard's Accounts page.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Platform slug | `app_store_connect` |
+| Auth | Your App Store Connect API key. No OAuth |
+| Platform API | App Store Connect API |
+| Connected account | 1 app |
+| Status | Beta |
+
+## Capabilities
+
+| Feature | Status | Condition |
+|---|---|---|
+| List reviews | Beta | Written reviews of iOS, macOS, and visionOS apps. App Store Connect has no written reviews for tvOS apps |
+| Reply to a review | Beta | A review has 1 developer response. A new reply replaces it |
+| Edit or delete a reply | No | Send a new reply to change it. Delete a response in App Store Connect |
+| Review summary | Partial | `total_count` and `last_review_at`. `average_rating` is always `0`: App Store Connect reports no average rating |
+| Publishing | No | `POST /v1/posts` and `PATCH /v1/posts/{pid}` with an App Store Connect target return `422 account.platform_unsupported` |
+| Comments, DMs, mentions | No | `501 resource.not_supported` |
+| Analytics | No | No post metrics, account summary, or stored history |
+| Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
+| Platform quota | No | `GET /v1/accounts/{id}/limits` returns `501 resource.not_supported` |
+| Webhook events | Partial | Account events. No `review.received` or `review.updated`: read reviews with the list endpoint |
+
+The capability matrix for every platform is on [Supported platforms](/platforms/overview).
+
+## Connect an account
+
+One connected account is one app. You send an API key and, when the key can see more than 1 app, the app to connect.
+
+<Steps>
+  <Step title="Create an API key">
+    In App Store Connect, open **Users and Access**, then **Integrations**, then **App Store Connect API**. Generate a Team key with the **Customer Support** or **Admin** role. Generating a Team key needs the Account Holder or Admin role. An Individual key from your user profile also works when your own role is Customer Support, Admin, or Account Holder, and your user has the **Generate Individual API Keys** permission. Replying to reviews needs one of these roles.
+  </Step>
+  <Step title="Download the key and note its IDs">
+    Download the private key file. App Store Connect lets you download it once. Note the key's **Key ID**, and for a Team key the **Issuer ID** shown on the **App Store Connect API** page.
+  </Step>
+  <Step title="Connect the app">
+    Send the contents of the private key file as `metadata.private_key`, with line breaks escaped as `\n`:
+
+    ```bash
+    curl -X POST https://api.social-api.ai/v1/accounts/connect \
+      -H "Authorization: Bearer $SOCAPI_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "platform": "app_store_connect",
+        "metadata": {
+          "key_id": "2X9R4HXF34",
+          "issuer_id": "57246542-96fe-1a63-e053-0824d011072a",
+          "private_key": "-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMGByqGSM49...\n-----END PRIVATE KEY-----",
+          "app_id": "1234567890"
+        }
+      }'
+    ```
+
+    Response (HTTP 201):
+
+    ```json
+    {
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+      "platform": "app_store_connect",
+      "username": "com.example.myapp",
+      "display_name": "My App"
+    }
+    ```
+  </Step>
+</Steps>
+
+| Field | Required | Description |
+|---|---|---|
+| `metadata.key_id` | Yes | The API key's Key ID |
+| `metadata.private_key` | Yes | The full contents of the private key file, from `-----BEGIN PRIVATE KEY-----` to `-----END PRIVATE KEY-----` |
+| `metadata.issuer_id` | Team keys | The Issuer ID. Omit it for an Individual key |
+| `metadata.app_id` | When the key sees more than 1 app | The app's ID in App Store Connect. A request without it lists the IDs the key can see in `meta.apps`: see [Connect more than one app](#connect-more-than-one-app) |
+
+Every field is a JSON string. Send `app_id` in quotes: a number is read as missing.
+
+`username` is the app's bundle ID and `display_name` is its name. Without `brand_id` in the request, SocialAPI creates a brand for the app. SocialAPI also sends `account.connected` to your webhook endpoints.
+
+### Connect more than one app
+
+A brand holds 1 account per platform, so each app goes into its own brand. Send one connect request per app, each with its `app_id` and a different `brand_id`, or with no `brand_id`. Connecting a second app into a brand that already holds one returns `409 account.already_linked`. Each brand counts toward your plan's brand allowance: see [Plans](/guides/plans).
+
+When the key can see more than 1 app and the request has no `app_id`, the call returns `400 validation.field_required` with `meta.field` set to `app_id` and `meta.apps` listing up to 200 of the apps the key can see:
+
+```json
+{
+  "error": {
+    "code": "validation.field_required",
+    "message": "This API key can access several apps. Pass app_id to choose one; each app is a separate account.",
+    "meta": {
+      "field": "app_id",
+      "apps": [
+        { "app_id": "1234567890", "name": "My App" },
+        { "app_id": "1234567891", "name": "My Other App" }
+      ]
+    }
+  }
+}
+```
+
+### Connect errors
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.field_required` | `key_id` or `private_key` is missing, or `app_id` is missing while the key sees more than 1 app. `meta.field` names it |
+| 400 | `validation.field_invalid` | `private_key` is not the contents of an App Store Connect private key file, the key can see no app with that `app_id`, or the key can see no app. `meta.field` names the field |
+| 400 | `validation.app_store_connect_rejected` | App Store Connect refused the app lookup as invalid. `error.message` carries App Store Connect's reason |
+| 401 | `platform.app_store_connect.auth` | App Store Connect rejected the key: check the Key ID, the Issuer ID, and that the key is not revoked |
+| 403 | `billing.platform_not_available` | Your SocialAPI account has no beta access to App Store Connect |
+| 403 | `platform.app_store_connect.forbidden` | App Store Connect refused the request for the key's role. Check the role the key was created with |
+| 409 | `account.already_linked` | The brand already holds an App Store Connect app |
+| 429 | `platform.app_store_connect.rate_limit` | The key's hourly request limit on App Store Connect is used up. Wait, then retry |
+| 502 | `platform.app_store_connect.<code>` | App Store Connect returned an error SocialAPI does not map. `<code>` is App Store Connect's error code, or `api_error` when it sends none. `error.message` carries App Store Connect's reason. Retry later |
+
+### Disconnect and revoke
+
+Disconnecting the account (`DELETE /v1/accounts/{account_id}`) deletes the API key from SocialAPI. App Store Connect offers no way to revoke a key from outside, so the key stays valid. To cut off access completely, revoke the key in App Store Connect: a Team key under **Users and Access**, **Integrations**, and an Individual key in your user profile, under **Individual API Key**.
+
+## Reviews
+
+You list an app's reviews with `GET /v1/inbox/reviews/{account_id}` and reply with `POST /v1/inbox/reviews/{id}/reply`. The parameters, response fields, and cost are on [Reviews](/guides/reviews). These rules are specific to App Store Connect:
+
+- **Reviews carry a title.** Each review has `title`, the reviewer's headline, next to `text`, the review body.
+- **The author is a nickname.** `author.name` is the reviewer's App Store nickname. `author.avatar_url` is absent.
+- **No edit time.** `updated_at` is the same as `created_at`.
+- **No average rating.** `average_rating` is `0` in the list of review accounts and in the `summary` of a reviews page. `total_count` is the app's number of written reviews.
+- **No reply state.** `reply` has `text` and `updated_at`, and no `state`. A reply response has no `state` either.
+- **A reply replaces the previous one.** A review has 1 developer response. Replying again replaces it.
+- **Replies are not visible at once.** A response can take up to 24 hours to appear on the App Store.
+
+```json
+{
+  "id": "sapi_rev_KQ2M7XW4RT9BCDFHJLNPSV3YZ5G8A6E1",
+  "rating": 5,
+  "title": "Love it",
+  "text": "Does exactly what I need, every day.",
+  "author": { "name": "happycamper42" },
+  "reply": {
+    "text": "Thank you! Glad it helps.",
+    "updated_at": "2026-10-02T09:15:00Z"
+  },
+  "created_at": "2026-10-01T17:00:00Z",
+  "updated_at": "2026-10-01T17:00:00Z"
+}
+```
+
+### Review errors
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.app_store_connect_rejected` | App Store Connect refused the request as invalid: a reply, or a reviews page request such as one with a `cursor` it does not accept. `error.message` carries App Store Connect's reason. On a reply, the interaction credit is refunded |
+| 401 | `platform.app_store_connect.unauthorized` | App Store Connect rejected the key. If it repeats, check the key in App Store Connect, then connect the app again with a working key and the account's `brand_id` (see [Reconnect an account](/guides/connect-accounts#reconnect-an-account)) |
+| 403 | `platform.app_store_connect.forbidden` | App Store Connect refused the key's role. Replies need the Customer Support, Admin, or Account Holder role |
+| 404 | `resource.not_found` | The app or the review no longer exists, or the key cannot see it |
+| 429 | `platform.app_store_connect.rate_limit` | The key's hourly request limit on App Store Connect is used up. Wait, then retry |
+| 502 | `platform.app_store_connect.<code>` | App Store Connect returned an error SocialAPI does not map. `<code>` is App Store Connect's error code, or `api_error` when it sends none. `error.message` carries App Store Connect's reason. Retry later |
+
+A reply that fails with a `validation.*` code gets its interaction credit back. See [When a credit comes back](/guides/plans#when-a-credit-comes-back) for the other cases.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Requests per API key (App Store Connect) | An hourly limit set by Apple, shared by every app the key can see and by every other tool that uses the key. Apple's example is 3,500 requests per rolling hour, and Apple states the actual limit can vary |
+| Reviews per page | 1 to 50, the same as every platform: see [Reviews](/guides/reviews) |
+| Reply text | SocialAPI sets no length limit on `POST /v1/inbox/reviews/{id}/reply`. A reply App Store Connect refuses returns `400 validation.app_store_connect_rejected`. The MCP tool `social_api_reply_to_review` accepts up to 2,200 bytes |
+
+## Scopes
+
+App Store Connect has no OAuth scopes. The key's role sets what SocialAPI can do: replying needs the Customer Support, Admin, or Account Holder role, and a call the role does not allow returns `403 platform.app_store_connect.forbidden`. The account supports the `reviews.read` and `reviews.write` [permissions](/guides/permissions), which SocialAPI alone enforces.
+
+## Related
+
+- [Reviews](/guides/reviews): list reviews and reply, across platforms
+- [Supported platforms](/platforms/overview): what each platform supports
+- [Connect accounts](/guides/connect-accounts): the connect flow and the account object
+- [Platform apps](/guides/platform-credentials): which app connects each platform

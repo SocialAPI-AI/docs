@@ -123,7 +123,7 @@ Allowances and billing periods are defined in [Plans and usage](/guides/plans).
 | 429 | `validation.interaction_limit_exhausted` | The interaction allowance for the billing period is used up |
 | 429 | `billing.post_limit` | `POST /v1/posts/import` holds more posts than the allowance has credits left. `error.message` gives the credits needed and remaining |
 | 403 | `billing.brands_limit` | Creating the brand would exceed your plan's brand allowance |
-| 403 | `billing.platform_not_available` | The platform slug is not one of the connectable platform slugs, such as `trustpilot` |
+| 403 | `billing.platform_not_available` | The platform slug is not one of the connectable platform slugs, such as `trustpilot`, or the platform is in beta and your account has no beta access (App Store Connect) |
 | 413 | `billing.storage_quota` | The upload would exceed your plan's media storage |
 | 429 | `billing.export_limit` | You reached your plan's number of exports per billing period |
 | 429 | `billing.export_cooldown` | The account was exported within your plan's cooldown period |
@@ -157,7 +157,7 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | 400 | `validation.invalid_account_id` | The Google account ID has an invalid format |
 | 400 | `validation.invalid_location_id` | The Google location ID is not valid |
 | 400 | `validation.auth_code_expired` | The TikTok authorization code expired or was already used. Start the connection again |
-| 409 | `account.already_linked` | The brand already holds a different account on this platform, or `lock_accounts_to_brand` is `true` and the account belongs to another of your brands (see [Reconnect an account](/guides/connect-accounts#reconnect-an-account)). In the 409 response, `meta.brand_id` is the brand you named, or with the lock, the brand that holds the account. Telegram, Bluesky, and choosing a Google location with `POST /v1/accounts/pending/{connection_id}/select` return the 409. On a platform with a consent screen it reaches your `redirect_uri` as `error=account.already_linked` |
+| 409 | `account.already_linked` | The brand already holds a different account on this platform, or `lock_accounts_to_brand` is `true` and the account belongs to another of your brands (see [Reconnect an account](/guides/connect-accounts#reconnect-an-account)). In the 409 response, `meta.brand_id` is the brand you named, or with the lock, the brand that holds the account. Telegram, Bluesky, App Store Connect, and choosing a Google location with `POST /v1/accounts/pending/{connection_id}/select` return the 409. On a platform with a consent screen it reaches your `redirect_uri` as `error=account.already_linked` |
 | 409 | `account.different_login` | The brand's Facebook, or its Instagram connected through Facebook Login, is connected through a different login. Disconnect it first. During a connection it reaches your `redirect_uri` as `error=account.different_login`; assigning a Page returns the 409 |
 | 403 | `account.reconnection_required` | The platform token is no longer usable. Reconnect with `POST /v1/accounts/connect`, passing the existing connected account's brand and platform: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account) |
 | 400 | `account.unsupported_platform` | The platform value is not recognized |
@@ -222,7 +222,7 @@ These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post life
 | 409 | `resource.conflict` | The same account has a post with the same title and text that was created in the last 24 hours and is now `published`. Send `skip_duplicate_check: true` to publish the content again |
 | 409 | `post.state_invalid` | The post's status does not allow the call. Edit works on `draft`, `scheduled`, or `failed`. Publish works on `draft` or `scheduled`. Retry works on `failed` or `partial`. Delete does not work on a `publishing` post. `meta.state` is the current status |
 | 400 | `post.no_retryable_deliveries` | The post has no failed targets to retry |
-| 422 | `account.platform_unsupported` | `POST /v1/posts` or `PATCH /v1/posts/{pid}` names a target account on Telegram, which does not publish posts. `error.meta.account_id` names it. Remove that target |
+| 422 | `account.platform_unsupported` | `POST /v1/posts` or `PATCH /v1/posts/{pid}` names a target account on Telegram or App Store Connect, which do not publish posts. `error.meta.account_id` names it. Remove that target |
 | 422 | `publishing.media.missing_source` | A media item has no source |
 | 422 | `publishing.media.invalid_source_type` | `source_type` is not `url`, `media_id`, or `platform_attachment_id` |
 | 422 | `publishing.media.missing_type` | A `platform_attachment_id` item has no `type` (`image`, `video`, `audio`, or `file`) |
@@ -534,6 +534,21 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 | 400 | `validation.platform_param` | Bluesky rejected a parameter. `error.message` carries Bluesky's reason |
 
 `platform.bluesky.dm_scope_missing` affects only the DM endpoints. Treat it as a failure of one capability, not a dead connection.
+
+### App Store Connect
+
+| HTTP | Code | When it occurs |
+|---|---|---|
+| 400 | `validation.field_required` | A connect request has no `key_id` or `private_key`, or the key can see more than 1 app and the request has no `app_id`. `meta.field` names the field. When `app_id` is missing, `meta.apps` lists up to 200 of the apps the key can see. See [Connect more than one app](/platforms/app-store-connect#connect-more-than-one-app) |
+| 400 | `validation.field_invalid` | `private_key` is not the contents of an App Store Connect private key file, the key can see no app with the `app_id` sent, or the key can see no app. `meta.field` names the field |
+| 400 | `validation.app_store_connect_rejected` | App Store Connect refused the request as invalid: a reply, a reviews page request, or the app lookup on connect. `error.message` carries App Store Connect's reason. On a reply, the interaction credit is refunded |
+| 401 | `platform.app_store_connect.auth` | App Store Connect rejected the API key on connect. Check the Key ID, the Issuer ID, and that the key is not revoked |
+| 401 | `platform.app_store_connect.unauthorized` | App Store Connect rejected the API key on a later call. If it repeats, check the key in App Store Connect, then connect the app again with a working key and the account's `brand_id` (see [Reconnect an account](/guides/connect-accounts#reconnect-an-account)) |
+| 403 | `billing.platform_not_available` | Your SocialAPI account has no beta access to App Store Connect |
+| 403 | `platform.app_store_connect.forbidden` | App Store Connect refused the API key's role. Replies need the Customer Support, Admin, or Account Holder role |
+| 404 | `resource.not_found` | On a reviews list or a reply: the app or the review no longer exists, or the key cannot see it |
+| 429 | `platform.app_store_connect.rate_limit` | The API key's hourly request limit on App Store Connect is used up. Wait, then retry |
+| 502 | `platform.app_store_connect.<code>` | App Store Connect returned an error SocialAPI does not map. `<code>` is App Store Connect's error code, or `api_error` when it sends none. `error.message` carries App Store Connect's reason. Retry later |
 
 ### Pinterest
 
