@@ -87,7 +87,7 @@ A range longer than 400 days returns `400 validation.range_too_wide`. A `from` o
 | `replies_failed` | `flow` | `owned` | Account, brand | Replies, private replies, DMs, review replies, and mention replies that failed |
 | `comments_moderated` | `flow` | `owned` | Account, brand | Comments you hid, showed again, deleted, liked, or unliked |
 
-- **Post history:** SocialAPI adds a point each time it syncs the post's account: when you connect it, and when you call `POST /v1/accounts/{id}/sync`. An account without `analytics.read` adds no points. SocialAPI also refreshes post metrics in the background for every platform except X, LinkedIn member and profile connections, WhatsApp, and Pinterest. History starts when SocialAPI first tracks the post, so a post that was published long ago has no earlier points. A post with 2 or more targets returns one series per metric, summed across its targets. Pinterest posts are not synced, so they have no history.
+- **Post history:** SocialAPI adds a point each time it syncs the post's account: when you connect it, and when you call `POST /v1/accounts/{id}/sync`. An account without `analytics.read` adds no points. On every platform except X, LinkedIn member profiles, WhatsApp, and Pinterest, post history also gains points without a sync call. History starts when SocialAPI first tracks the post, so a post that was published long ago has no earlier points. A post with 2 or more targets returns one series per metric, summed across its targets. Pinterest posts are not synced, so they have no history.
 - **Action counts:** SocialAPI counts the replies, DMs, and moderation actions you send through the API, MCP tools, and Automations, per account and per day (UTC). Today's count can be up to 24 hours behind. An account without `analytics.read` is not counted.
 - **Platform metrics:** follower, reach, and view history from the platforms is not stored. Read current figures from the platform insight endpoints below.
 
@@ -179,7 +179,7 @@ Response (HTTP 200):
 
 - **Depth:** Instagram covers up to the 500 most recent posts, Facebook up to the 500 most recent per Page, TikTok and Zalo the 20 most recent, and other platforms the 25 most recent. The TikTok platform route has its own cooldown: see [TikTok](/platforms/tiktok#sync-videos).
 - **Cooldown:** SocialAPI allows 1 sync per account every 5 minutes. The 5-minute window starts when you connect the account and on every sync request, including one that returns `501`. A request inside the window returns `429 accounts.sync_rate_limited`, with `Retry-After` and `error.meta.retry_after_seconds` set to the seconds left.
-- **Unsupported platforms:** a platform that cannot list posts, such as a LinkedIn member or profile connection or WhatsApp, returns `501 resource.not_supported`.
+- **Unsupported platforms:** a platform that cannot list posts, such as a LinkedIn member profile or WhatsApp, returns `501 resource.not_supported`.
 - **Pinterest:** `POST /v1/accounts/{id}/sync` returns 200 `{"success": true}` and refreshes nothing: Pins are read live.
 - **Other errors:** `404 account.not_found` for an account your key cannot reach, `403 account.permission_missing` for an account without `posts.read`, and `502` with a `platform.{platform}.*` code when the platform fails.
 
@@ -198,7 +198,7 @@ These endpoints return live figures from one platform:
 | YouTube | Channel counts. See [YouTube channel stats](/platforms/youtube#read-videos-and-channel-stats) |
 | Pinterest | Profile counts. See [Pinterest account summary](/platforms/pinterest#account-summary) |
 | Google Business Profile | Daily performance metrics and search keywords. See [Google performance metrics](/platforms/google#performance-metrics) |
-| LinkedIn | Follower count and per-post counts for a company Page or a profile connection. `GET /v1/platforms/linkedin/insights`. See [LinkedIn insights](/platforms/linkedin#insights) |
+| LinkedIn | Follower count and per-post counts for a company Page or a member profile. `GET /v1/platforms/linkedin/insights`. See [LinkedIn insights](/platforms/linkedin#insights) |
 
 ## Scopes
 

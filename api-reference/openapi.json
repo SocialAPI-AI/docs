@@ -8042,7 +8042,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the follower count plus per-post performance for a connected LinkedIn account. For a company Page, `posts` covers the Page's recent posts. For a personal profile connected with `connection_type` `profile`, `posts` covers the 5 most recent posts published to it through SocialAPI, and `clicks` and `engagement_rate` are always 0. `kind` is `organization` for a Page and `member` for a profile.",
+                "description": "Returns the follower count plus per-post performance for a connected LinkedIn account. For a company Page, `posts` covers the Page's recent posts. For a personal profile, `posts` covers the 5 most recent posts published to it through SocialAPI, and `clicks` and `engagement_rate` are always 0. `kind` is `organization` for a Page and `member` for a profile.",
                 "tags": [
                     "LinkedIn"
                 ],
@@ -8101,6 +8101,140 @@
                     },
                     "502": {
                         "description": "Upstream LinkedIn API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/linkedin/logins/{loginId}/profiles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the member profile and every company Page a LinkedIn login can connect, live from LinkedIn, with assignment state. A Page the member started administering after the last authorization appears without re-authenticating. A login authorized with connection_type profile lists the member only. loginId is the login_id of any LinkedIn account connected through that login.",
+                "tags": [
+                    "LinkedIn"
+                ],
+                "summary": "List the profile and Pages of a LinkedIn login",
+                "parameters": [
+                    {
+                        "description": "LinkedIn login ID",
+                        "name": "loginId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.LinkedInLoginProfilesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown login",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Connects the member profile or one company Page of a LinkedIn login to the given brand, without re-doing OAuth. Each LinkedIn account belongs to one brand. A brand can hold several LinkedIn accounts.",
+                "tags": [
+                    "LinkedIn"
+                ],
+                "summary": "Connect a LinkedIn profile or Page from a login",
+                "parameters": [
+                    {
+                        "description": "LinkedIn login ID",
+                        "name": "loginId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "platform_account_id from the profiles list, URL-encoded (urn%3Ali%3Aorganization%3A123456)",
+                        "name": "profileId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.AssignLinkedInProfileRequest"
+                            }
+                        }
+                    },
+                    "description": "Target brand",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AssignLocationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Account is not accessible through this login, or already belongs to another brand",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown login or brand",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12667,6 +12801,15 @@
                     }
                 }
             },
+            "api_endpoints.AssignLinkedInProfileRequest": {
+                "type": "object",
+                "properties": {
+                    "brand_id": {
+                        "type": "string",
+                        "example": "b7f9..."
+                    }
+                }
+            },
             "api_endpoints.AssignLocationRequest": {
                 "type": "object",
                 "properties": {
@@ -13053,7 +13196,7 @@
                         "example": "b_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "metadata": {
-                        "description": "Metadata contains platform-specific connection data. For tiktok, connection_type \"creator\" connects through TikTok's Content Posting API instead of the default Business API (\"business\"). For linkedin_page, connection_type \"profile\" connects a LinkedIn member profile (posting, comment replies and analytics) instead of the default company Page.",
+                        "description": "Metadata contains platform-specific connection data. For tiktok, connection_type \"creator\" connects through TikTok's Content Posting API instead of the default Business API (\"business\"). For linkedin, connection_type \"profile\" or \"organization\" limits the connect to the member profile or to company Pages; without it, one authorization offers both, and the user picks one when there are several.",
                         "type": "object",
                         "additionalProperties": {}
                     },
@@ -14691,6 +14834,71 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.PageInsights"
+                    }
+                }
+            },
+            "api_endpoints.LinkedInLoginProfile": {
+                "type": "object",
+                "properties": {
+                    "assignable": {
+                        "type": "boolean"
+                    },
+                    "assigned_account_id": {
+                        "type": "string"
+                    },
+                    "assigned_brand_id": {
+                        "type": "string"
+                    },
+                    "assigned_brand_name": {
+                        "type": "string"
+                    },
+                    "connection_type": {
+                        "description": "ConnectionType is \"profile\" for the member, \"organization\" for a company Page.",
+                        "type": "string",
+                        "enum": [
+                            "profile",
+                            "organization"
+                        ],
+                        "example": "organization"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Acme Corp"
+                    },
+                    "picture_url": {
+                        "type": "string"
+                    },
+                    "platform_account_id": {
+                        "type": "string",
+                        "example": "urn:li:organization:123456"
+                    },
+                    "username": {
+                        "type": "string",
+                        "example": "acme-corp"
+                    }
+                }
+            },
+            "api_endpoints.LinkedInLoginProfilesResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "login_id": {
+                        "type": "string",
+                        "example": "cred_01J..."
+                    },
+                    "login_name": {
+                        "description": "LoginName is the name of the LinkedIn member who authorized the login.",
+                        "type": "string",
+                        "example": "Jane Doe"
+                    },
+                    "profiles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.LinkedInLoginProfile"
+                        }
                     }
                 }
             },
@@ -17953,10 +18161,11 @@
                         "type": "string"
                     },
                     "connection_type": {
-                        "description": "[optional] \"profile\" for a LinkedIn personal profile connected with connection_type \"profile\". Absent for every other account",
+                        "description": "[optional] LinkedIn only: \"profile\" for a member profile, \"organization\" for a company Page. Absent for every other account",
                         "type": "string",
                         "enum": [
-                            "profile"
+                            "profile",
+                            "organization"
                         ],
                         "example": "profile"
                     },
@@ -18972,7 +19181,7 @@
                         "additionalProperties": {}
                     },
                     "permalink": {
-                        "description": "[platform: instagram, facebook, threads, tiktok, youtube, google, linkedin, linkedin_page]",
+                        "description": "[platform: instagram, facebook, threads, tiktok, youtube, google, linkedin]",
                         "type": "string"
                     },
                     "platform": {

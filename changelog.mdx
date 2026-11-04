@@ -4,6 +4,28 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-11-05" description="LinkedIn" tags={["Accounts", "LinkedIn", "Publishing"]}>
+  ## One LinkedIn connect for member profiles and company Pages
+
+  Breaking: `platform: "linkedin_page"` now returns `400 validation.platform_invalid` on `POST /v1/accounts/connect` and `POST /v1/invites`. What to change:
+
+  - Connect member profiles and company Pages with `platform: "linkedin"`.
+  - Send company Page publish options in `platform_data.linkedin`. Keys under `platform_data.linkedin_page` are ignored without a warning.
+  - Company Pages connected before this change keep their `acc_` IDs and now have `platform: "linkedin"` in `GET /v1/accounts`, on posts, and in webhook payloads. `GET /v1/accounts` also returns `connection_type: "organization"` for them.
+  - Filter posts and the inbox on `platform=linkedin`: `platform=linkedin_page` matches nothing there. In `GET /v1/events`, events recorded before this change keep `platform: "linkedin_page"`.
+  - Reconnect member profiles connected with `platform: "linkedin"` before this change to add comment replies and insights to them.
+
+  What is new:
+
+  - One LinkedIn authorization offers the member profile and every company Page the member administers. When it offers more than one, the redirect carries `status=selection_required` and you choose one with `POST /v1/accounts/pending/{connection_id}/select`. `metadata.connection_type` (`profile` or `organization`) narrows the offer.
+  - `GET /v1/accounts` returns `connection_type` (`profile` or `organization`) on every LinkedIn account, and `login_id` on LinkedIn accounts connected from this change on, with the exception described on [LinkedIn](/platforms/linkedin#connect-more-profiles-and-pages-from-a-login).
+  - `GET /v1/platforms/linkedin/logins/{loginId}/profiles` and `POST /v1/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign` connect the login's other profile and Pages to any brand with no new consent screen.
+  - A brand can hold more than one LinkedIn account.
+  - `visibility: "connections_only"` now works on member profiles. Company Page posts are now checked against the LinkedIn file and text limits before publishing.
+
+  See [LinkedIn](/platforms/linkedin#connect-an-account) and [LinkedIn publishing](/platforms/linkedin/publishing).
+</Update>
+
 <Update label="2026-11-04" description="LinkedIn" tags={["Accounts", "LinkedIn"]}>
   ## LinkedIn Pages and profile connections open to every SocialAPI account
 

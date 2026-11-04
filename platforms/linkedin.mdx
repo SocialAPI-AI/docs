@@ -1,17 +1,17 @@
 ---
 title: LinkedIn API
 sidebarTitle: "Overview"
-description: Connect a LinkedIn member profile or company Page to publish posts, and on a Page read and answer comments and mentions.
+description: Connect LinkedIn member profiles and company Pages to publish posts, answer comments and mentions, and read follower and post insights.
 icon: "linkedin"
 ---
 
-The LinkedIn API in SocialAPI connects a LinkedIn member (`linkedin`), a member profile with comment replies and analytics (`linkedin_page` with `connection_type: "profile"`), and a company Page (`linkedin_page`). A member connection publishes text, image, video, multi-image, and link posts as the person. A profile connection also replies to, likes, and deletes comments and returns analytics. A Page connection publishes as the Page and adds comments, mentions, and analytics. SocialAPI's own LinkedIn app connects all three, so you register nothing: see [Platform apps](/guides/platform-credentials).
+The LinkedIn API in SocialAPI connects a LinkedIn member profile and the company Pages that member administers, all under the platform slug `linkedin`. A member profile publishes text, image, video, multi-image, and link posts as the person, replies to, likes, and deletes comments, and returns insights. A company Page publishes as the Page, returns insights, and adds comment listing, mentions, and the Page's posts made outside SocialAPI. SocialAPI's own LinkedIn app connects both, so you register nothing: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
 | Field | Value |
 |---|---|
-| Platform slug | `linkedin` to connect a member. `linkedin_page` to connect a company Page, or a profile with `metadata.connection_type: "profile"`. `GET /v1/accounts` lists a profile as `linkedin` |
+| Platform slug | `linkedin`, for member profiles and company Pages. `GET /v1/accounts` tells them apart with `connection_type`: `profile` or `organization` |
 | Auth | OAuth 2.0 (LinkedIn) |
 | Platform API | LinkedIn Posts API |
 | Status | Available |
@@ -27,20 +27,20 @@ An unsupported call returns `501 resource.not_supported`.
 | First comment on a post | No | `first_comment` is ignored |
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
 | Delete a published post | Yes | |
-| List posts | Partial | Page connection: the Page's posts, including posts made outside SocialAPI. Member and profile connections: only the posts you published through SocialAPI |
-| Comments | Conditional | Page connection (`linkedin_page`): list, reply, like, and delete. Profile connection (`connection_type: "profile"`): reply, like, and delete only, because LinkedIn does not allow reading comments on a member's posts: listing returns `501 resource.not_supported`. The default member connection returns `501 resource.not_supported` for every comment call. Hide and private reply are not supported |
-| Analytics | Conditional | `GET /v1/platforms/linkedin/insights` on a Page connection or on a profile connection: see [Insights](#insights). The default member connection has none. Live post metrics return `501 resource.not_supported` |
+| List posts | Partial | Company Page: the Page's posts, including posts made outside SocialAPI. Member profile: only the posts you published through SocialAPI |
+| Comments | Conditional | Company Page: list, reply, like, and delete. Member profile: reply, like, and delete only, because LinkedIn does not allow reading comments on a member's posts: listing returns `501 resource.not_supported`. Hide and private reply are not supported |
+| Analytics | Conditional | `GET /v1/platforms/linkedin/insights` on a company Page or a member profile: see [Insights](#insights). Live post metrics return `501 resource.not_supported`. Stored post history covers company Page posts only: see [Analytics](/guides/analytics) |
 | DMs | No | `501 resource.not_supported` |
-| Mentions | Conditional | Page connection only: `GET /v1/accounts/{id}/mentions` returns posts and comments that mention the Page from the last 60 days, and `POST /v1/accounts/{id}/mentions/reply` answers them as the Page. Member and profile connections return `501 resource.not_supported` |
+| Mentions | Conditional | Company Page only: `GET /v1/accounts/{id}/mentions` returns posts and comments that mention the Page from the last 60 days, and `POST /v1/accounts/{id}/mentions/reply` answers them as the Page. A member profile returns `501 resource.not_supported` |
 | Reviews | No | LinkedIn has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
-| Webhook events | Partial | `account.connected`, `account.updated`, the `post.*` events, and on a company Page connection `account.disconnected` and `mention.received` |
+| Webhook events | Partial | `account.connected`, `account.updated`, the `post.*` events, and on a company Page `account.disconnected` and `mention.received` |
 
 The cross-platform matrix is on [Platforms](/platforms/overview).
 
 ## Connect an account
 
-Connect with `POST /v1/accounts/connect`: `"platform": "linkedin"` for a member connection, `"platform": "linkedin_page"` for a profile or company Page connection (rules below). The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+Connect with `POST /v1/accounts/connect` and `"platform": "linkedin"`. One LinkedIn authorization offers the member profile of the person who signs in and every company Page that person administers. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
@@ -48,6 +48,7 @@ curl -X POST https://api.social-api.ai/v1/accounts/connect \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "linkedin",
+    "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
     "redirect_uri": "https://app.example.com/oauth/callback",
     "state": "session_abc123"
   }'
@@ -65,18 +66,115 @@ Response (HTTP 202):
 
 LinkedIn-specific rules:
 
-- **Member connection.** The connected account is the person who signed in. Posts publish to that person's feed.
-- **Profile connection.** Connect with `"platform": "linkedin_page"` and `"metadata": {"connection_type": "profile"}` to post, reply to comments, and read analytics as the member. A `"platform": "linkedin"` request ignores `connection_type` and creates a member connection. `GET /v1/accounts` returns these accounts with `platform: "linkedin"` and `connection_type: "profile"`, and omits `connection_type` on every other account. To reconnect a profile connection, send `"platform": "linkedin_page"` with `"metadata": {"connection_type": "profile"}` and the same `brand_id` again. A `"platform": "linkedin"` request does not reconnect it. A brand holds 1 member or profile connection, not both: disconnect one before you connect the other. See [Insights](#insights).
-- **Company Page connection.** Connect with `"platform": "linkedin_page"` to act as a company Page you administer. `GET /v1/accounts` returns these accounts with `platform: "linkedin_page"`. The account publishes as the Page and supports comments, mentions, and [insights](#insights). A member who administers no company Page ends with `status=error` and `error=platform.linkedin.no_pages` on your `redirect_uri`.
-- **Token lifetime.** LinkedIn access tokens last 60 days and cannot be refreshed. When one expires, the first call that fails returns `401 platform.linkedin.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **One account per connect.** When the authorization offers exactly 1 account, it connects at once with `status=success`. When it offers more than 1, the redirect carries `status=selection_required` and you choose one, as described in [Choose a LinkedIn profile or Page](/guides/connect-accounts#choose-a-linkedin-profile-or-page). Connect the others from the same login with [the login endpoints](#connect-more-profiles-and-pages-from-a-login), with no new consent screen.
+- **Narrow the connect with `metadata.connection_type`.** `"profile"` requests the member profile scopes only and offers the member profile only. `"organization"` requests the company Page scopes only and offers the member's company Pages only. Without `connection_type`, the connect requests both sets and offers both. Any other value returns `400 validation.connection_type_invalid`.
+- **No company Page.** A connect with `"organization"` by a member who administers no company Page ends with `status=error` and `error=platform.linkedin.no_pages` on your `redirect_uri`.
+- **The account.** `GET /v1/accounts` returns every LinkedIn account with `platform: "linkedin"` and `connection_type`: `profile` for a member profile, `organization` for a company Page. In the selection candidates, the login's profile list, and the assign response, `platform_account_id` is LinkedIn's URN: `urn:li:person:...` for a member profile, `urn:li:organization:...` for a company Page.
+- **More than 1 LinkedIn account per brand.** A brand can hold more than 1 LinkedIn account, for example a member profile and the company Pages that member administers. Every other platform holds 1 account per brand. Each LinkedIn account belongs to 1 brand.
+- **Reconnect.** Send the same connect request with `"platform": "linkedin"` and the account's `brand_id`, and choose the same profile or Page if asked. A reconnect that grants every scope the account's login holds renews that login: each other LinkedIn account with the same `login_id` that is `token_expired` returns to `active` too. A reconnect that grants fewer scopes than the login holds renews only the account you reconnect, and removes its `login_id`. For example, a `"profile"` or `"organization"` reconnect of an account whose login was authorized without `connection_type`, or a reconnect with a shorter `permissions` list. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+- **Token lifetime.** LinkedIn access tokens last 60 days and cannot be refreshed. When LinkedIn reports that the token is invalid, expired, or revoked, the call returns `401 platform.linkedin.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. A `401` that does not name the token returns `401 platform.linkedin.unauthorized` and the account stays usable: see [Account status](/guides/connect-accounts#account-status).
 - **Disconnect.** LinkedIn offers apps no way to end an authorization. Disconnecting an account removes it from SocialAPI, and the person removes SocialAPI's app in their LinkedIn settings.
+
+`POST /v1/accounts/connect` and `POST /v1/invites` return `400 validation.platform_invalid` for `platform: "linkedin_page"`.
+
+## Connect more profiles and Pages from a login
+
+A login is one LinkedIn member's authorization. Every LinkedIn account connected through it carries the same `login_id` in `GET /v1/accounts`. Use it to connect the member profile or another company Page of that member to any of your brands, with no new consent screen.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/platforms/linkedin/logins/{loginId}/profiles` | List the member profile and the company Pages the login can connect, with their brand |
+| `POST` | `/v1/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign` | Connect one of them to a brand |
+
+`GET /v1/platforms/linkedin/logins/{loginId}/profiles` includes company Pages the member started administering after the authorization. A login authorized with `connection_type: "profile"` lists no company Page. The list leaves out the member profile when the login cannot publish as the member: a login authorized with `"organization"`, or with a `permissions` list that leaves out `posts.write`.
+
+```bash
+curl https://api.social-api.ai/v1/platforms/linkedin/logins/cred_01J9K4R5M6N7P8V2K0W1J3QX/profiles \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "login_id": "cred_01J9K4R5M6N7P8V2K0W1J3QX",
+  "login_name": "Jane Doe",
+  "profiles": [
+    {
+      "platform_account_id": "urn:li:person:8fA3kLm2Qx",
+      "connection_type": "profile",
+      "name": "Jane Doe",
+      "username": "janedoe",
+      "picture_url": "https://media.licdn.com/dms/image/v2/jane-doe.jpg",
+      "assigned_brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+      "assigned_brand_name": "Jane Doe",
+      "assigned_account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "assignable": false
+    },
+    {
+      "platform_account_id": "urn:li:organization:12345678",
+      "connection_type": "organization",
+      "name": "Acme Corp",
+      "username": "acme-corp",
+      "assignable": true
+    }
+  ],
+  "count": 2
+}
+```
+
+| Field | Description |
+|---|---|
+| `login_id`, `login_name` | The login, and the name of the LinkedIn member who authorized it |
+| `count` | The number of items in `profiles` |
+| `profiles[].platform_account_id` | LinkedIn's URN for the member profile or the company Page. Use it as `{profileId}` to assign it |
+| `profiles[].connection_type` | `profile` for the member profile, `organization` for a company Page |
+| `profiles[].name`, `username`, `picture_url` | The name, LinkedIn vanity name, and picture. `username` and `picture_url` are absent when LinkedIn returns none |
+| `profiles[].assignable` | `true` when none of your brands holds the account. `false` when a brand holds it: `assigned_brand_id`, `assigned_brand_name`, and `assigned_account_id` then name the brand and its account |
+
+`POST /v1/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign` connects one of them to a brand. `{profileId}` is the `platform_account_id`, sent as it is or URL-encoded.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/platforms/linkedin/logins/cred_01J9K4R5M6N7P8V2K0W1J3QX/profiles/urn%3Ali%3Aorganization%3A12345678/assign" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f"}'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1K",
+  "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+  "platform_account_id": "urn:li:organization:12345678"
+}
+```
+
+The new account is usable at once, and SocialAPI sends `account.connected`. The rules:
+
+- **One brand per LinkedIn account.** Assigning an account that another of your brands holds returns `400 validation.profile_already_assigned`, with `meta.brand_id` naming that brand. Assigning it to the brand that already holds it returns HTTP 201 with the same `account_id`.
+- **The login must still reach the account.** A company Page the login's member does not administer, any company Page when the login was authorized with `connection_type: "profile"`, or a member profile other than that member's own, returns `400 validation.profile_not_granted`, with the URN in `meta.platform_account_id`.
+- **The brand must be yours.** A missing `brand_id` returns `400 validation.field_required`. A brand that is not yours, or that is outside your [brand-restricted key](/guides/scoped-keys)'s brands, returns `404 brand.not_found`.
+- **The login must be yours.** An unknown `{loginId}` returns `404 resource.not_found` on both endpoints.
+- **The request must be well formed.** A body that is not valid JSON returns `400 validation.body_invalid`, and a `{profileId}` with broken URL encoding returns `400 validation.invalid_profile_id`.
+- **The login must still be authorized.** When LinkedIn refuses the login, both endpoints return `401 platform.linkedin.auth` or `401 platform.linkedin.unauthorized`: reconnect an account of that member with every scope the login holds. LinkedIn's own rate limit returns `429 platform.linkedin.rate_limit`, and other refusals by LinkedIn return a [platform error](/guides/errors#platform-errors). These errors do not change the status of any account.
+- **A login ends with its last account.** Disconnecting the last LinkedIn account on a login removes the login: both endpoints then return `404 resource.not_found` for its `login_id`.
+- **Cost.** Listing and assigning cost no credits.
+- **Scopes.** Listing needs the `accounts:read` scope, and assigning needs `accounts:manage`.
+- **AI agents.** No MCP tool covers the login endpoints. Call them through the REST API.
+
+A LinkedIn account has no `login_id` in two cases:
+
+- **The connect granted fewer scopes than the member's login holds.** The login holds the scopes of the connect that gave that member's other LinkedIn accounts their `login_id`. For example, a `"profile"` connect when the login was authorized without `connection_type`, an `"organization"` connect when it was authorized with `"profile"`, or a shorter `permissions` list. Use the `login_id` of that member's other LinkedIn accounts instead, or reconnect the account with the same `connection_type` and `permissions` as the connect that authorized the login.
+- **The account was connected before 2026-11-05.** Reconnect it to get a `login_id`. The first case applies to that reconnect too. See the [changelog](/changelog).
 
 ## Insights
 
-`GET /v1/platforms/linkedin/insights?account_id={id}` returns the follower count and per-post counts for a company Page or for a profile connected with `connection_type` `profile`. `kind` tells them apart: `member` for a profile, `organization` for a Page. On a Page, `posts` covers the Page's 50 most recent posts.
+`GET /v1/platforms/linkedin/insights?account_id={id}` returns the follower count and per-post counts for a company Page or a member profile. `kind` tells them apart: `member` for a member profile, `organization` for a company Page. On a Page, `posts` covers the Page's 50 most recent posts.
 
-- On a profile, `posts` covers the 5 most recent posts published to the profile through SocialAPI. It is an empty array until you publish one, and `follower_count` is returned either way.
-- Each profile post returns `impressions`, `unique_views`, `likes`, `comments`, and `shares`. `clicks` and `engagement_rate` are always 0 for a profile.
+- On a member profile, `posts` covers the 5 most recent posts published to the profile through SocialAPI. It is an empty array until you publish one, and `follower_count` is returned either way.
+- Each member profile post returns `impressions`, `unique_views`, `likes`, `comments`, and `shares`. `clicks` and `engagement_rate` are always 0 for a member profile.
 - A count LinkedIn cannot return for a post is 0.
 - The route requires the `analytics.read` [permission](/guides/permissions).
 
@@ -84,11 +182,11 @@ LinkedIn-specific rules:
 
 | Event | When it fires |
 |---|---|
-| `account.connected` | The account was connected |
+| `account.connected` | The account was connected, through the connect flow or the assign endpoint |
 | `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
-| `account.disconnected` | Company Page connection only: LinkedIn refused a read of the Page's posts because the login needs renewing (`reason` is `posts_sync_auth_failed`). Reconnect the account |
-| `mention.received` | Company Page connection only: you listed mentions with `GET /v1/accounts/{id}/mentions` and the call returned at least one item. See [Mentions you list](/guides/webhook-events#mentions-you-list) |
+| `account.disconnected` | Company Page only: LinkedIn refused a read of the Page's posts because the login needs renewing (`reason` is `posts_sync_auth_failed`). Reconnect the account |
+| `mention.received` | Company Page only: you listed mentions with `GET /v1/accounts/{id}/mentions` and the call returned at least one item. See [Mentions you list](/guides/webhook-events#mentions-you-list) |
 
 Every event is described in [Webhook events](/guides/webhook-events).
 
@@ -103,23 +201,18 @@ Every event is described in [Webhook events](/guides/webhook-events).
 
 ## Scopes
 
-SocialAPI's LinkedIn app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected.
+SocialAPI's LinkedIn app requests these scopes at connect. You apply for no app review. Each scope belongs to the account [permissions](/guides/permissions) in the last column, and the consent screen asks for the scopes of the permissions you selected. A connect without `connection_type` requests the scopes of both tables, `"profile"` the member profile table only, and `"organization"` the company Page table only.
 
-| Scope | Used for | Permissions |
-|---|---|---|
-| `openid`, `profile` | Identify the member: name, picture, and ID | Every account |
-| `w_member_social` | Publish posts as the member | `posts.write` |
-
-A profile connected with `connection_type: "profile"` requests these scopes instead:
+Member profile scopes:
 
 | Scope | Used for | Permissions |
 |---|---|---|
 | `r_basicprofile` | Identify the member: name, picture, and ID | Every account |
 | `w_member_social` | Publish posts as the member | `posts.write` |
-| `w_member_social_feed` | Reply to comments on the member's posts | `comments.write` |
+| `w_member_social_feed` | Reply to, like, and delete comments as the member | `comments.write` |
 | `r_member_postAnalytics`, `r_member_profileAnalytics` | Post counts and the follower count | `analytics.read` |
 
-A company Page connection (`linkedin_page`) requests these scopes:
+Company Page scopes:
 
 | Scope | Used for | Permissions |
 |---|---|---|
@@ -127,12 +220,12 @@ A company Page connection (`linkedin_page`) requests these scopes:
 | `r_organization_social` | Read the Page's posts | `posts.read` |
 | `w_organization_social` | Publish posts as the Page | `posts.write` |
 | `r_organization_social_feed` | Read comments on the Page's posts | `comments.read` |
-| `w_organization_social_feed` | Reply to, like, and delete comments | `comments.write` |
+| `w_organization_social_feed` | Reply to, like, and delete comments as the Page | `comments.write` |
 | `r_organization_followers` | Follower count and post statistics | `analytics.read` |
 
 ## Related
 
 - [LinkedIn publishing](/platforms/linkedin/publishing): fields, media rules, text formatting, and quirks for publishing
-- [Connect accounts](/guides/connect-accounts): the shared connect flow
+- [Connect accounts](/guides/connect-accounts): the shared connect flow and the profile or Page choice
 - [Platforms](/platforms/overview): the capability matrix
 - [Errors](/guides/errors): every error code
