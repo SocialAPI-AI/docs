@@ -223,6 +223,7 @@ These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post life
 | 409 | `post.state_invalid` | The post's status does not allow the call. Edit works on `draft`, `scheduled`, or `failed`. Publish works on `draft` or `scheduled`. Retry works on `failed` or `partial`. Delete does not work on a `publishing` post. `meta.state` is the current status |
 | 400 | `post.no_retryable_deliveries` | The post has no failed targets to retry |
 | 422 | `account.platform_unsupported` | `POST /v1/posts` or `PATCH /v1/posts/{pid}` names a target account on Telegram or App Store Connect, which do not publish posts. `error.meta.account_id` names it. Remove that target |
+| 403 | `account.reconnection_required` | A publish that would go out now names a target account that must be reconnected: `POST /v1/posts` without `scheduled_at` or `queue_id`, `POST /v1/posts/{pid}/publish`, or `POST /v1/posts/{pid}/retry`. `error.meta.id` names the account. Nothing is published and the post keeps its status. [Reconnect the account](/guides/connect-accounts#reconnect-an-account), then send the request again |
 | 422 | `publishing.media.missing_source` | A media item has no source |
 | 422 | `publishing.media.invalid_source_type` | `source_type` is not `url`, `media_id`, or `platform_attachment_id` |
 | 422 | `publishing.media.missing_type` | A `platform_attachment_id` item has no `type` (`image`, `video`, `audio`, or `file`) |
