@@ -5,14 +5,14 @@ description: Connect a LinkedIn member profile or company Page to publish posts,
 icon: "linkedin"
 ---
 
-The LinkedIn API in SocialAPI connects a LinkedIn member profile (`linkedin`) and, with beta access, a company Page (`linkedin_page`). A member connection publishes text, image, video, multi-image, and link posts as the person. A Page connection publishes as the Page and adds comments, mentions, and analytics. SocialAPI's own LinkedIn app connects both the profile and the Page, so you register nothing: see [Platform apps](/guides/platform-credentials).
+The LinkedIn API in SocialAPI connects a LinkedIn member (`linkedin`), a member profile with comment replies and analytics (`linkedin_page` with `connection_type: "profile"`), and a company Page (`linkedin_page`). A member connection publishes text, image, video, multi-image, and link posts as the person. A profile connection also replies to, likes, and deletes comments and returns analytics. A Page connection publishes as the Page and adds comments, mentions, and analytics. SocialAPI's own LinkedIn app connects all three, so you register nothing: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
 | Field | Value |
 |---|---|
-| Platform slug | `linkedin` |
-| Auth | OAuth 2.0 with LinkedIn Sign In (OpenID Connect) |
+| Platform slug | `linkedin` to connect a member. `linkedin_page` to connect a company Page, or a profile with `metadata.connection_type: "profile"`. `GET /v1/accounts` lists a profile as `linkedin` |
+| Auth | OAuth 2.0 (LinkedIn) |
 | Platform API | LinkedIn Posts API |
 | Status | Available |
 
@@ -27,20 +27,20 @@ An unsupported call returns `501 resource.not_supported`.
 | First comment on a post | No | `first_comment` is ignored |
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
 | Delete a published post | Yes | |
-| List posts | Partial | Returns the posts you published through SocialAPI, not a live read from LinkedIn |
-| Comments | Beta | Page connection (`linkedin_page`, beta access): list, reply, like, and delete. Profile connection (`connection_type: "profile"`, beta access): reply, like, and delete only, because LinkedIn does not allow reading comments on a member's posts: listing returns `501 resource.not_supported`. The default member connection returns `501 resource.not_supported` for every comment call. Hide and private reply are not supported |
-| Analytics | Beta | `GET /v1/platforms/linkedin/insights` on a Page connection or on a profile connection: see [Insights](#insights-beta). The default member connection has none. Live post metrics return `501 resource.not_supported` |
+| List posts | Partial | Page connection: the Page's posts, including posts made outside SocialAPI. Member and profile connections: only the posts you published through SocialAPI |
+| Comments | Conditional | Page connection (`linkedin_page`): list, reply, like, and delete. Profile connection (`connection_type: "profile"`): reply, like, and delete only, because LinkedIn does not allow reading comments on a member's posts: listing returns `501 resource.not_supported`. The default member connection returns `501 resource.not_supported` for every comment call. Hide and private reply are not supported |
+| Analytics | Conditional | `GET /v1/platforms/linkedin/insights` on a Page connection or on a profile connection: see [Insights](#insights). The default member connection has none. Live post metrics return `501 resource.not_supported` |
 | DMs | No | `501 resource.not_supported` |
-| Mentions | Beta | Page connection only (beta access): `GET /v1/accounts/{id}/mentions` returns posts and comments that mention the Page from the last 60 days, and `POST /v1/accounts/{id}/mentions/reply` answers them as the Page. Member and profile connections return `501 resource.not_supported` |
+| Mentions | Conditional | Page connection only: `GET /v1/accounts/{id}/mentions` returns posts and comments that mention the Page from the last 60 days, and `POST /v1/accounts/{id}/mentions/reply` answers them as the Page. Member and profile connections return `501 resource.not_supported` |
 | Reviews | No | LinkedIn has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
-| Webhook events | Partial | `account.connected` and the `post.*` events |
+| Webhook events | Partial | `account.connected`, `account.updated`, the `post.*` events, and on a company Page connection `account.disconnected` and `mention.received` |
 
 The cross-platform matrix is on [Platforms](/platforms/overview).
 
 ## Connect an account
 
-Connect with `POST /v1/accounts/connect` and `"platform": "linkedin"`. The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
+Connect with `POST /v1/accounts/connect`: `"platform": "linkedin"` for a member connection, `"platform": "linkedin_page"` for a profile or company Page connection (rules below). The shared flow, request fields, and result are in [Connect accounts](/guides/connect-accounts), and the redirect parameters are in [Redirect parameters](/guides/connect-accounts#redirect-parameters).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
@@ -66,12 +66,12 @@ Response (HTTP 202):
 LinkedIn-specific rules:
 
 - **Member connection.** The connected account is the person who signed in. Posts publish to that person's feed.
-- **Profile connection (beta).** Send `"metadata": {"connection_type": "profile"}` to connect the member for posting, replying to comments, and analytics as that person. This option is in beta and available to accounts with beta access. `GET /v1/accounts` returns `connection_type: "profile"` on these accounts and omits the field on every other account. See [Insights](#insights-beta).
-- **Company Page connection (beta).** Connect with `"platform": "linkedin_page"` to act as a company Page you administer. This option is in beta and available to accounts with beta access. The account publishes as the Page and supports comments, mentions, and [insights](#insights-beta).
+- **Profile connection.** Connect with `"platform": "linkedin_page"` and `"metadata": {"connection_type": "profile"}` to post, reply to comments, and read analytics as the member. A `"platform": "linkedin"` request ignores `connection_type` and creates a member connection. `GET /v1/accounts` returns these accounts with `platform: "linkedin"` and `connection_type: "profile"`, and omits `connection_type` on every other account. To reconnect a profile connection, send `"platform": "linkedin_page"` with `"metadata": {"connection_type": "profile"}` and the same `brand_id` again. A `"platform": "linkedin"` request does not reconnect it. A brand holds 1 member or profile connection, not both: disconnect one before you connect the other. See [Insights](#insights).
+- **Company Page connection.** Connect with `"platform": "linkedin_page"` to act as a company Page you administer. `GET /v1/accounts` returns these accounts with `platform: "linkedin_page"`. The account publishes as the Page and supports comments, mentions, and [insights](#insights). A member who administers no company Page ends with `status=error` and `error=platform.linkedin.no_pages` on your `redirect_uri`.
 - **Token lifetime.** LinkedIn access tokens last 60 days and cannot be refreshed. When one expires, the first call that fails returns `401 platform.linkedin.auth` and the account is marked `token_expired`. Every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 - **Disconnect.** LinkedIn offers apps no way to end an authorization. Disconnecting an account removes it from SocialAPI, and the person removes SocialAPI's app in their LinkedIn settings.
 
-## Insights (beta)
+## Insights
 
 `GET /v1/platforms/linkedin/insights?account_id={id}` returns the follower count and per-post counts for a company Page or for a profile connected with `connection_type` `profile`. `kind` tells them apart: `member` for a profile, `organization` for a Page. On a Page, `posts` covers the Page's 50 most recent posts.
 
@@ -87,6 +87,8 @@ LinkedIn-specific rules:
 | `account.connected` | The account was connected |
 | `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
+| `account.disconnected` | Company Page connection only: LinkedIn refused a read of the Page's posts because the login needs renewing (`reason` is `posts_sync_auth_failed`). Reconnect the account |
+| `mention.received` | Company Page connection only: you listed mentions with `GET /v1/accounts/{id}/mentions` and the call returned at least one item. See [Mentions you list](/guides/webhook-events#mentions-you-list) |
 
 Every event is described in [Webhook events](/guides/webhook-events).
 
@@ -108,7 +110,7 @@ SocialAPI's LinkedIn app requests these scopes at connect. You apply for no app 
 | `openid`, `profile` | Identify the member: name, picture, and ID | Every account |
 | `w_member_social` | Publish posts as the member | `posts.write` |
 
-A profile connected with `connection_type: "profile"` (beta) requests these scopes instead:
+A profile connected with `connection_type: "profile"` requests these scopes instead:
 
 | Scope | Used for | Permissions |
 |---|---|---|
@@ -117,7 +119,7 @@ A profile connected with `connection_type: "profile"` (beta) requests these scop
 | `w_member_social_feed` | Reply to comments on the member's posts | `comments.write` |
 | `r_member_postAnalytics`, `r_member_profileAnalytics` | Post counts and the follower count | `analytics.read` |
 
-A company Page connection (`linkedin_page`, beta) requests these scopes:
+A company Page connection (`linkedin_page`) requests these scopes:
 
 | Scope | Used for | Permissions |
 |---|---|---|

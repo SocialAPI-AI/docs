@@ -65,7 +65,7 @@ Store `account_id` against your user. The account is usable at once.
 | `redirect_uri` | string | No | Where SocialAPI sends the person after the consent screen. See [Redirect URI rules](#redirect-uri-rules). Without it, the person sees a SocialAPI page that says the account is connected (or why it failed). Platforms that connect without a consent screen ignore it |
 | `state` | string | No | Your own value, up to 512 characters, returned unchanged on the redirect. Use it to match the redirect to the session that started it |
 | `permissions` | array of strings | No | The [permissions](/guides/permissions#the-permissions) to request: `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, `messages.write`, `reviews.read`, `reviews.write`, `analytics.read`. Omit it to keep the brand's current selection for this platform, or to request every permission when the brand has none. An empty list returns `400 validation.permissions_empty`, and an unknown name returns `400 validation.permission_unknown` |
-| `metadata` | object | No | Platform-specific connect options, documented on each platform's page: `bot_token` for Telegram, `identifier`, `app_password`, and `auth_factor_token` for Bluesky, `key_id`, `issuer_id`, `private_key`, and `app_id` for [App Store Connect](/platforms/app-store-connect#connect-an-account), `connection_type` for [TikTok](/platforms/tiktok#creator-connection), and `connection_type: "facebook_login"` for [Instagram](/platforms/instagram#connect-through-facebook-login) |
+| `metadata` | object | No | Platform-specific connect options, documented on each platform's page: `bot_token` for Telegram, `identifier`, `app_password`, and `auth_factor_token` for Bluesky, `key_id`, `issuer_id`, `private_key`, and `app_id` for [App Store Connect](/platforms/app-store-connect#connect-an-account), `connection_type` for [TikTok](/platforms/tiktok#creator-connection) and [LinkedIn](/platforms/linkedin#connect-an-account), and `connection_type: "facebook_login"` for [Instagram](/platforms/instagram#connect-through-facebook-login) |
 
 ### Response fields
 
@@ -145,6 +145,7 @@ The `platform` field takes one of these values:
 | `google` | Google Business Profile | Consent screen, then a choice of location when the login manages more than one |
 | `tiktok` | TikTok | Consent screen |
 | `linkedin` | LinkedIn | Consent screen |
+| `linkedin_page` | LinkedIn company Page, or a LinkedIn profile with `metadata.connection_type: "profile"` | Consent screen. See [LinkedIn](/platforms/linkedin#connect-an-account) |
 | `twitter` | X / Twitter | Consent screen through your own X app. `x` is accepted as the same slug |
 | `youtube` | YouTube | Consent screen |
 | `pinterest` | Pinterest | Consent screen |
@@ -402,7 +403,7 @@ Treat a `reconnect_reason` you do not recognize as a request to reconnect.
 
 ## Reconnect an account
 
-To reconnect an account, call `POST /v1/accounts/connect` again with the same `platform` and the account's current `brand_id` (the `brand_id` that `GET /v1/accounts` returns), and send the person through the consent screen with the same platform login:
+To reconnect an account, call `POST /v1/accounts/connect` again with the same `platform` and the account's current `brand_id` (the `brand_id` that `GET /v1/accounts` returns), and send the person through the consent screen with the same platform login. A LinkedIn account that `GET /v1/accounts` returns with `connection_type: "profile"` is the exception to the same-`platform` rule: send `"platform": "linkedin_page"` and `"metadata": {"connection_type": "profile"}`, with the same `brand_id` (see [LinkedIn](/platforms/linkedin#connect-an-account)).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \

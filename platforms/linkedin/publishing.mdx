@@ -6,11 +6,15 @@ description: Full reference for publishing LinkedIn posts via SocialAPI, includi
 
 ## 1. Overview
 
-LinkedIn posts publish as the connected member (`linkedin`).
+LinkedIn posts publish as the connected member (`linkedin`, including a profile connected with `linkedin_page` and `connection_type: "profile"`), or as the connected company Page (`linkedin_page`). This page describes member targets. Profile and company Page targets follow the same rules, with these differences:
+
+- **Profile and company Page:** `visibility: "connections_only"` returns `400 publishing.validation_failed` on the field `visibility`.
+- **Company Page only:** platform data goes in `platform_data.linkedin_page`, or flat in the target's `platform_data`. Keys under `platform_data.linkedin` do not apply to a company Page target.
+- **Company Page only:** a post that breaks a rule in [section 2](#2-supported-media) (file type, file size, video length or frame rate, text length, more than 20 images, or a `media_id` video among other items) returns no `400` before publishing. A post that LinkedIn refuses fails the target at publish time.
 
 | Field | Value |
 |---|---|
-| Platform slug | `linkedin` |
+| Platform slug | `linkedin` (member or profile), `linkedin_page` (company Page) |
 | Auth type | OAuth 2.0 (LinkedIn) |
 | API | LinkedIn Posts API |
 | Create post | Yes |
@@ -93,7 +97,7 @@ Response (HTTP 201):
 | Value | LinkedIn audience |
 |---|---|
 | `public` (default) | Anyone on or off LinkedIn |
-| `connections_only` | The member's connections |
+| `connections_only` | The member's connections. A profile (`connection_type: "profile"`) or company Page target returns `400 publishing.validation_failed` on the field `visibility` |
 | `logged_in` | Any logged-in LinkedIn member |
 
 Any other value fails validation on the field `visibility`.
@@ -137,7 +141,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Platform data fields
 
-Send these keys in `platform_data.linkedin` on the post, which applies them to every LinkedIn target. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `linkedin` key). When both set the same key, the target's value wins.
+Send these keys in `platform_data.linkedin` on the post, which applies them to every LinkedIn member and profile target (`platform_data.linkedin_page` for company Page targets). To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `linkedin` key). When both set the same key, the target's value wins.
 
 | Key | Type | Applies to | Notes |
 |---|---|---|---|
@@ -151,7 +155,7 @@ Send these keys in `platform_data.linkedin` on the post, which applies them to e
 | `media_title` | string | single image, single video | Title of the attached file |
 | `disable_reshare` | boolean | every post | When `true`, others cannot reshare the post |
 
-SocialAPI forwards any additional keys in `platform_data.linkedin` that the table above lists, and no others. LinkedIn has no other publish options that SocialAPI passes through: an unlisted key is ignored without a warning. A malformed `article_url`, a `cta_label` outside the list, or a `cta_label` or `cta_url` without `article_url` fails validation on that field.
+SocialAPI forwards any additional keys in `platform_data.linkedin` (or `platform_data.linkedin_page`) that the table above lists, and no others. LinkedIn has no other publish options that SocialAPI passes through: an unlisted key is ignored without a warning. A malformed `article_url`, a `cta_label` outside the list, or a `cta_label` or `cta_url` without `article_url` fails validation on that field.
 
 ### Scheduling
 
@@ -186,9 +190,9 @@ curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1
 
 ## 6. Retrieve posts
 
-`GET /v1/posts?platform=linkedin&account_ids={id}` lists posts.
+`GET /v1/posts?platform=linkedin&account_ids={id}` lists a member or profile connection's posts, and `platform=linkedin_page` a company Page's.
 
-The list holds the posts you published through SocialAPI. LinkedIn gives apps no read of a member's own posts, so a post published on LinkedIn directly never appears. A LinkedIn post has no metrics.
+For a member or profile connection, the list holds the posts you published through SocialAPI. LinkedIn gives apps no read of a member's own posts, so a post published on LinkedIn directly never appears, and these posts have no metrics. For a company Page, the list also holds the Page's posts made outside SocialAPI.
 
 ---
 
@@ -288,10 +292,12 @@ Response (HTTP 200) once published:
 
 ## 9. Required OAuth scopes
 
-SocialAPI's LinkedIn app requests these scopes during the OAuth flow. You configure nothing. The full list is in [LinkedIn scopes](/platforms/linkedin#scopes).
+SocialAPI's LinkedIn app requests these scopes during the OAuth flow: `w_member_social` for member and profile connections, the other two for company Page connections. You configure nothing. The full list is in [LinkedIn scopes](/platforms/linkedin#scopes).
 
 | Scope | Purpose |
 |---|---|
 | `w_member_social` | Publish posts as the member |
+| `w_organization_social` | Publish posts as the company Page |
+| `r_organization_social` | Read the company Page's posts |
 
 The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).
