@@ -153,11 +153,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the candidate Google Business Profiles for a pending connection created when a Google login manages more than one Profile. Choose one with the select endpoint.",
+                "description": "Returns the candidates of a pending connection: the Google Business Profiles of a Google login that manages more than one, the LinkedIn member profile and company Pages of a LinkedIn authorization that offers more than one, or the phone numbers of a WhatsApp Business account that holds several. Choose one with the select endpoint.",
                 "tags": [
                     "Accounts"
                 ],
-                "summary": "Get a pending Google Profile selection",
+                "summary": "Get a pending account selection",
                 "parameters": [
                     {
                         "description": "Pending connection ID",
@@ -200,11 +200,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Promotes a pending connection into a connected account. For Google, pass platform_account_id to choose exactly one candidate Profile. For Facebook, pass page_ids with the subset of candidate Pages to assign to the brand. First selection wins; the pending connection is then consumed.",
+                "description": "Promotes a pending connection into a connected account. For Google, LinkedIn and WhatsApp, pass platform_account_id to choose exactly one candidate. For Facebook, pass page_ids with the subset of candidate Pages to assign to the brand. First selection wins; the pending connection is then consumed.",
                 "tags": [
                     "Accounts"
                 ],
-                "summary": "Select a Google Business Profile or Facebook Pages to connect",
+                "summary": "Select the account or Pages to connect from a pending connection",
                 "parameters": [
                     {
                         "description": "Pending connection ID",
@@ -8119,7 +8119,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists the member profile and every company Page a LinkedIn login can connect, live from LinkedIn, with assignment state. A Page the member started administering after the last authorization appears without re-authenticating. A login authorized with connection_type profile lists the member only. loginId is the login_id of any LinkedIn account connected through that login.",
+                "description": "Lists the member profile and every company Page a LinkedIn login can connect, with assignment state. A Page the member started administering after the last authorization appears without re-authenticating. A login authorized with connection_type profile lists the member only, and one authorized with connection_type organization lists its Pages only. loginId is the login_id of any LinkedIn account connected through that login.",
                 "tags": [
                     "LinkedIn"
                 ],
@@ -11985,7 +11985,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the authenticated user's profile. Supports setting onboarding=false to mark onboarding as complete, and optionally recording use_case, referral and job_role. The response reflects the current billing_blocked state, unaffected by this update. The response includes the caller's team role: \"admin\", \"developer\", or \"\" for the account owner.",
+                "description": "Updates the authenticated user's profile. Supports setting onboarding=false to mark onboarding as complete, and optionally recording use_case, referral, job_role and signup_metadata. The response reflects the current billing_blocked state, unaffected by this update. The response includes the caller's team role: \"admin\", \"developer\", or \"\" for the account owner.",
                 "tags": [
                     "Users"
                 ],
@@ -15457,6 +15457,11 @@
                         "type": "string",
                         "example": "Google search"
                     },
+                    "signup_metadata": {
+                        "description": "SignupMetadata adds keys to the signup answers on record: a shallow\nmerge, so keys sent replace the same keys and others are kept. At most\n4096 bytes once encoded.",
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
                     "use_case": {
                         "type": "string",
                         "example": "Managing my own brand's social accounts"
@@ -15474,7 +15479,7 @@
                         "example": "2026-07-04T12:30:00Z"
                     },
                     "login_id": {
-                        "description": "login_id identifies the login and is set for both Facebook and Google.\npages and lost_access are Facebook page-selection only.",
+                        "description": "login_id identifies the login and is set for Facebook, Google and LinkedIn.\npages and lost_access are Facebook page-selection only.",
                         "type": "string"
                     },
                     "lost_access": {
@@ -15509,7 +15514,7 @@
                         "example": "pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
                     },
                     "login_id": {
-                        "description": "login_id identifies the login and is set for both Facebook and Google.\npages and lost_access are Facebook page-selection only.",
+                        "description": "login_id identifies the login and is set for Facebook, Google and LinkedIn.\npages and lost_access are Facebook page-selection only.",
                         "type": "string"
                     },
                     "lost_access": {
@@ -17371,6 +17376,11 @@
                         "type": "string",
                         "example": "admin"
                     },
+                    "signup_metadata": {
+                        "description": "SignupMetadata holds open-ended answers recorded at signup, such as\nreferral_source and search_query. An empty object until answered.",
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
                     "use_case": {
                         "type": "string",
                         "example": "Managing clients' accounts (agency)"
@@ -18182,7 +18192,7 @@
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "login_id": {
-                        "description": "[optional] Login id shared by accounts connected in the same authorization (e.g. facebook)",
+                        "description": "[optional] Login id shared by accounts connected in the same authorization (facebook, google, linkedin)",
                         "type": "string"
                     },
                     "metadata": {
