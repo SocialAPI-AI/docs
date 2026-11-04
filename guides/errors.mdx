@@ -92,7 +92,7 @@ These codes apply to any endpoint. `error.meta.field` names the offending input 
 |---|---|---|
 | 404 | `resource.not_found` | The object does not exist or is not visible to your key. `meta.resource` names the type (for example `post`, `automation`, `brand`) and `meta.id` the ID |
 | 404 | `account.not_found` | The `acc_` ID is not a connected account of your SocialAPI account |
-| 404 | `brand.not_found` | The brand is outside the brands your [brand-restricted key](/guides/scoped-keys) can reach |
+| 404 | `brand.not_found` | The brand is outside the brands your [brand-restricted key](/guides/scoped-keys) can reach. The Facebook, Google, and LinkedIn assign calls also return it for a brand that does not exist or is not yours |
 | 404 | `conversation.not_found` | The conversation does not exist or is not yours |
 | 404 | `media.not_found` | The media item does not exist or is not yours |
 | 409 | `resource.conflict` | The request conflicts with current state. Duplicate post content and invite creation use it: see below |
@@ -139,7 +139,8 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 400 | `validation.connection_type_invalid` | `metadata.connection_type` on a TikTok connect is present but is not the string `business` or `creator`. `meta.field` is `connection_type` |
+| 400 | `validation.connection_type_invalid` | `metadata.connection_type` is present but is not one of the platform's values: `business` or `creator` on TikTok, `profile` or `organization` on LinkedIn. `meta.field` is `connection_type` |
+| 400 | `validation.platform_invalid` | `platform` is `linkedin_page` on `POST /v1/accounts/connect` or `POST /v1/invites`. Connect LinkedIn member profiles and company Pages with `linkedin`. `meta.field` is `platform` |
 | 400 | `validation.customer_state_too_long` | `state` is longer than 512 characters |
 | 400 | `validation.permission_unknown` | A value in `permissions` is not a [permission](/guides/permissions#the-permissions). `meta.permission` names it. `POST /v1/accounts/connect`, `POST /v1/invites`, and `PATCH /v1/accounts/{id}` return it |
 | 400 | `validation.permissions_empty` | `permissions` is an empty list. Send at least one permission, or omit the field. `PATCH /v1/accounts/{id}` also returns it, where `null` gives the account every permission |
@@ -156,14 +157,19 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | 400 | `validation.location_already_assigned` | The Google location already belongs to another brand |
 | 400 | `validation.invalid_account_id` | The Google account ID has an invalid format |
 | 400 | `validation.invalid_location_id` | The Google location ID is not valid |
+| 400 | `validation.profile_not_granted` | The LinkedIn member profile or company Page is not accessible with this login. `meta.platform_account_id` names it |
+| 400 | `validation.profile_already_assigned` | The LinkedIn member profile or company Page already belongs to another brand. `meta.brand_id` names that brand |
+| 400 | `validation.invalid_profile_id` | The LinkedIn `{profileId}` in the path is not a valid URL-encoded value |
 | 400 | `validation.auth_code_expired` | The TikTok authorization code expired or was already used. Start the connection again |
-| 409 | `account.already_linked` | The brand already holds a different account on this platform, or `lock_accounts_to_brand` is `true` and the account belongs to another of your brands (see [Reconnect an account](/guides/connect-accounts#reconnect-an-account)). In the 409 response, `meta.brand_id` is the brand you named, or with the lock, the brand that holds the account. Telegram, Bluesky, App Store Connect, and choosing a Google location with `POST /v1/accounts/pending/{connection_id}/select` return the 409. On a platform with a consent screen it reaches your `redirect_uri` as `error=account.already_linked` |
+| 409 | `account.already_linked` | The brand already holds a different account on this platform (never on LinkedIn, where a brand holds any number of accounts), or `lock_accounts_to_brand` is `true` and the account belongs to another of your brands (see [Reconnect an account](/guides/connect-accounts#reconnect-an-account)). In the 409 response, `meta.brand_id` is the brand you named, or with the lock, the brand that holds the account. Telegram, Bluesky, App Store Connect, and choosing a Google location or a LinkedIn member profile or company Page with `POST /v1/accounts/pending/{connection_id}/select` return the 409. On a platform with a consent screen it reaches your `redirect_uri` as `error=account.already_linked` |
 | 409 | `account.different_login` | The brand's Facebook, or its Instagram connected through Facebook Login, is connected through a different login. Disconnect it first. During a connection it reaches your `redirect_uri` as `error=account.different_login`; assigning a Page returns the 409 |
 | 403 | `account.reconnection_required` | The platform token is no longer usable. Reconnect with `POST /v1/accounts/connect`, passing the existing connected account's brand and platform: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account) |
 | 400 | `account.unsupported_platform` | The platform value is not recognized |
 | Redirect | `platform.facebook.no_pages` | The Facebook login has no Pages |
+| Redirect | `platform.linkedin.no_pages` | A LinkedIn connect with `metadata.connection_type: "organization"` by a member who administers no company Page |
 | Redirect | `platform.instagram.no_pages` | The Facebook login has no Instagram account: see [Connect through Facebook Login](/platforms/instagram#connect-through-facebook-login) |
 | Redirect | `platform.google.no_locations` | The Google login has no Business Profile locations |
+| Redirect | `platform.google.insufficient_scope` | The person left the Business Profile permission unticked on Google's consent screen. Start a new connection and allow every permission |
 | Redirect | `platform.youtube.no_channels` | The Google login has no YouTube channels |
 | 404 | `platform.youtube.no_uploads_playlist` | The YouTube channel has no uploads playlist |
 | Redirect | `platform.facebook.no_assignable_pages` | On a connection without a [selection step](/guides/connect-accounts#facebook-pages), every Page on the login already belongs to another brand |
@@ -223,6 +229,7 @@ These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post life
 | 409 | `post.state_invalid` | The post's status does not allow the call. Edit works on `draft`, `scheduled`, or `failed`. Publish works on `draft` or `scheduled`. Retry works on `failed` or `partial`. Delete does not work on a `publishing` post. `meta.state` is the current status |
 | 400 | `post.no_retryable_deliveries` | The post has no failed targets to retry |
 | 422 | `account.platform_unsupported` | `POST /v1/posts` or `PATCH /v1/posts/{pid}` names a target account on Telegram or App Store Connect, which do not publish posts. `error.meta.account_id` names it. Remove that target |
+| 403 | `account.reconnection_required` | A publish that would go out now names a target account that must be reconnected: `POST /v1/posts` without `scheduled_at` or `queue_id`, `POST /v1/posts/{pid}/publish`, or `POST /v1/posts/{pid}/retry`. `error.meta.id` names the account. Nothing is published and the post keeps its status. [Reconnect the account](/guides/connect-accounts#reconnect-an-account), then send the request again |
 | 422 | `publishing.media.missing_source` | A media item has no source |
 | 422 | `publishing.media.invalid_source_type` | `source_type` is not `url`, `media_id`, or `platform_attachment_id` |
 | 422 | `publishing.media.missing_type` | A `platform_attachment_id` item has no `type` (`image`, `video`, `audio`, or `file`) |
@@ -465,7 +472,7 @@ A TikTok code that this table does not list returns `502` with the code after `p
 | 402 | `platform.twitter.usage_capped` | Your own X developer app is out of API credits or reached its X usage cap. Add credits or raise the spending limit in the X Developer Console. Waiting does not clear it |
 | 422 | `platform.linkedin.processing_failed` | LinkedIn failed to process the media |
 | 504 | `platform.linkedin.upload_timeout`, `platform.linkedin.processing_timeout` | A LinkedIn image upload or video processing timed out |
-| 403 | `platform.linkedin.access_denied` | LinkedIn denied access |
+| 403 | `platform.linkedin.access_denied` | LinkedIn refused the action for this account. Reconnecting does not change it. Read `message` |
 | 400 | `validation.video_url` | A YouTube video URL is not accessible |
 | 400 | `validation.video_size` | The size of the YouTube video file could not be determined |
 | 403 | `platform.youtube.insufficientPermissions` | The connection lacks a scope the call needs. Reconnect the account to grant it |

@@ -4,6 +4,46 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-11-05" description="LinkedIn" tags={["Accounts", "LinkedIn", "Publishing"]}>
+  ## One LinkedIn connect for member profiles and company Pages
+
+  Breaking: `platform: "linkedin_page"` now returns `400 validation.platform_invalid` on `POST /v1/accounts/connect` and `POST /v1/invites`. What to change:
+
+  - Connect member profiles and company Pages with `platform: "linkedin"`.
+  - Send company Page publish options in `platform_data.linkedin`. Keys under `platform_data.linkedin_page` are ignored without a warning.
+  - Company Pages connected before this change keep their `acc_` IDs and now have `platform: "linkedin"` in `GET /v1/accounts`, on posts, and in webhook payloads. `GET /v1/accounts` also returns `connection_type: "organization"` for them.
+  - Filter posts and the inbox on `platform=linkedin`: `platform=linkedin_page` matches nothing there. In `GET /v1/events`, events recorded before this change keep `platform: "linkedin_page"`.
+  - Reconnect member profiles connected with `platform: "linkedin"` before this change to add comment replies and insights to them.
+
+  What is new:
+
+  - One LinkedIn authorization offers the member profile and every company Page the member administers. When it offers more than one, the redirect carries `status=selection_required` and you choose one with `POST /v1/accounts/pending/{connection_id}/select`. `metadata.connection_type` (`profile` or `organization`) narrows the offer.
+  - `GET /v1/accounts` returns `connection_type` (`profile` or `organization`) on every LinkedIn account, and `login_id` on LinkedIn accounts connected from this change on, with the exception described on [LinkedIn](/platforms/linkedin#connect-more-profiles-and-pages-from-a-login).
+  - `GET /v1/platforms/linkedin/logins/{loginId}/profiles` and `POST /v1/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign` connect the login's other profile and Pages to any brand with no new consent screen.
+  - A brand can hold more than one LinkedIn account.
+  - `visibility: "connections_only"` now works on member profiles. Company Page posts are now checked against the LinkedIn file and text limits before publishing.
+
+  See [LinkedIn](/platforms/linkedin#connect-an-account) and [LinkedIn publishing](/platforms/linkedin/publishing).
+</Update>
+
+<Update label="2026-11-04" description="LinkedIn" tags={["Accounts", "LinkedIn"]}>
+  ## LinkedIn Pages and profile connections open to every SocialAPI account
+
+  A company Page connection (`platform: "linkedin_page"`) and a profile connection (`platform: "linkedin_page"` with `metadata.connection_type: "profile"`) no longer need beta access and no longer return `403 billing.platform_not_available`. Page comments, mentions, and insights, and profile comment replies, likes, deletes, and insights, are available to every SocialAPI account. See [LinkedIn](/platforms/linkedin).
+</Update>
+
+<Update label="2026-11-04" description="Publishing" tags={["Publishing", "Errors"]}>
+  ## Publishing now to an account that needs reconnecting returns 403
+
+  `POST /v1/posts` without `scheduled_at` or `queue_id`, `POST /v1/posts/{pid}/publish`, and `POST /v1/posts/{pid}/retry` now return `403 account.reconnection_required` when a target account must be reconnected, and publish nothing. Before, the request was accepted and the target then failed with `publishing.delivery.account_load_failed`. `error.meta.id` names the account. Scheduled posts and drafts are still accepted. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+</Update>
+
+<Update label="2026-11-02" description="TikTok" tags={["TikTok", "Comments"]}>
+  ## Hidden TikTok comments listed again
+
+  TikTok leaves hidden comments out of its comment list. `GET /v1/inbox/comments/{postId}` now adds back, with `is_hidden: true`, a top-level comment that appeared in the list and that you then hid with `POST /v1/inbox/comments/{postId}/{commentId}/hide`, when the first page of results has `pagination.has_more: false` and the request uses the default filters. A comment hidden in the TikTok app is not added back. See [TikTok comments](/platforms/tiktok#comments).
+</Update>
+
 <Update label="2026-11-02" description="App Store Connect" tags={["App Store Connect", "Reviews"]}>
   ## App Store Connect reviews
 
@@ -165,7 +205,7 @@ rss: true
 <Update label="2026-10-15" description="LinkedIn" tags={["Accounts", "LinkedIn", "Beta"]}>
   ## LinkedIn profile analytics (beta)
 
-  `GET /v1/platforms/linkedin/insights` now returns `kind` (`organization` or `member`). A LinkedIn personal profile connected with `connection_type` `profile` returns its follower count and counts for its 5 most recent posts published through SocialAPI, and `GET /v1/accounts` returns `connection_type` on these accounts. The profile connection requires beta access: an account without it gets `403 billing.platform_not_available`. See [Profile analytics](/platforms/linkedin#insights-beta).
+  `GET /v1/platforms/linkedin/insights` now returns `kind` (`organization` or `member`). A LinkedIn personal profile connected with `connection_type` `profile` returns its follower count and counts for its 5 most recent posts published through SocialAPI, and `GET /v1/accounts` returns `connection_type` on these accounts. The profile connection requires beta access: an account without it gets `403 billing.platform_not_available`. See [Profile analytics](/platforms/linkedin#insights).
 </Update>
 
 <Update label="2026-10-14" description="Publishing" tags={["Publishing"]}>

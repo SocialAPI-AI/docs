@@ -153,11 +153,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the candidate Google Business Profiles for a pending connection created when a Google login manages more than one Profile. Choose one with the select endpoint.",
+                "description": "Returns the candidates of a pending connection: the Google Business Profiles of a Google login that manages more than one, the LinkedIn member profile and company Pages of a LinkedIn authorization that offers more than one, or the phone numbers of a WhatsApp Business account that holds several. Choose one with the select endpoint.",
                 "tags": [
                     "Accounts"
                 ],
-                "summary": "Get a pending Google Profile selection",
+                "summary": "Get a pending account selection",
                 "parameters": [
                     {
                         "description": "Pending connection ID",
@@ -200,11 +200,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Promotes a pending connection into a connected account. For Google, pass platform_account_id to choose exactly one candidate Profile. For Facebook, pass page_ids with the subset of candidate Pages to assign to the brand. First selection wins; the pending connection is then consumed.",
+                "description": "Promotes a pending connection into a connected account. For Google, LinkedIn and WhatsApp, pass platform_account_id to choose exactly one candidate. For Facebook, pass page_ids with the subset of candidate Pages to assign to the brand. First selection wins; the pending connection is then consumed.",
                 "tags": [
                     "Accounts"
                 ],
-                "summary": "Select a Google Business Profile or Facebook Pages to connect",
+                "summary": "Select the account or Pages to connect from a pending connection",
                 "parameters": [
                     {
                         "description": "Pending connection ID",
@@ -2975,7 +2975,7 @@
                     },
                     {
                         "example": 25,
-                        "description": "Max results per page (default 25)",
+                        "description": "Results per page (default 25). Some platforms return fewer, and on TikTok the first page can return more",
                         "name": "limit",
                         "in": "query",
                         "schema": {
@@ -2992,7 +2992,7 @@
                     },
                     {
                         "example": "held_for_review",
-                        "description": "Filter by moderation status: published (default), held_for_review, likely_spam. YouTube only; ignored by other platforms.",
+                        "description": "Filter by moderation status: published (default), held_for_review, likely_spam. YouTube only; other platforms do not filter by it.",
                         "name": "moderation_status",
                         "in": "query",
                         "schema": {
@@ -3001,7 +3001,7 @@
                     },
                     {
                         "example": "relevance",
-                        "description": "Order: recent (default) or relevance. YouTube only; ignored by other platforms.",
+                        "description": "Order: recent (default) or relevance. YouTube only; other platforms do not sort by it.",
                         "name": "order",
                         "in": "query",
                         "schema": {
@@ -3010,7 +3010,7 @@
                     },
                     {
                         "example": "great video",
-                        "description": "Keyword search across comment text (max 256 chars). YouTube only; ignored by other platforms.",
+                        "description": "Keyword search across comment text (max 256 chars). YouTube only; other platforms do not filter by it.",
                         "name": "q",
                         "in": "query",
                         "schema": {
@@ -3285,7 +3285,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, Threads, and YouTube. Check the can_hide capability flag. On Threads, an account connected before 2026-10-17 gets an authorization error until it is reconnected.",
+                "description": "Hides a comment on the platform so it is not visible to the public, and marks it hidden in the inbox. Supported on Instagram, Facebook, Threads (replies from other accounts), X (replies to the account's own posts), YouTube, Bluesky (replies in threads the account started), and TikTok (default connection, not a creator connection; comments written by other people). Check the can_hide capability flag. On Threads, an account connected before 2026-10-17 gets an authorization error until it is reconnected.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -3397,7 +3397,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on Instagram, Facebook, Threads, and YouTube. On Threads, an account connected before 2026-10-17 gets an authorization error until it is reconnected.",
+                "description": "Restores a previously hidden comment so it is publicly visible again. Supported on the same platforms as hiding: Instagram, Facebook, Threads, X, YouTube, Bluesky, and TikTok. On Threads, an account connected before 2026-10-17 gets an authorization error until it is reconnected.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -8042,11 +8042,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Beta. Returns the follower count plus per-post performance for a connected LinkedIn account. For a company Page, `posts` covers the Page's recent posts. For a personal profile connected with `connection_type` `profile`, `posts` covers the 5 most recent posts published to it through SocialAPI, and `clicks` and `engagement_rate` are always 0. `kind` is `organization` for a Page and `member` for a profile. The response shape may change without notice while this endpoint is in beta.",
+                "description": "Returns the follower count plus per-post performance for a connected LinkedIn account. For a company Page, `posts` covers the Page's recent posts. For a personal profile, `posts` covers the 5 most recent posts published to it through SocialAPI, and `clicks` and `engagement_rate` are always 0. `kind` is `organization` for a Page and `member` for a profile.",
                 "tags": [
                     "LinkedIn"
                 ],
-                "summary": "Get LinkedIn insights (beta)",
+                "summary": "Get LinkedIn insights",
                 "parameters": [
                     {
                         "description": "Connected account ID",
@@ -8101,6 +8101,140 @@
                     },
                     "502": {
                         "description": "Upstream LinkedIn API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/linkedin/logins/{loginId}/profiles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the member profile and every company Page a LinkedIn login can connect, with assignment state. A Page the member started administering after the last authorization appears without re-authenticating. A login authorized with connection_type profile lists the member only, and one authorized with connection_type organization lists its Pages only. loginId is the login_id of any LinkedIn account connected through that login.",
+                "tags": [
+                    "LinkedIn"
+                ],
+                "summary": "List the profile and Pages of a LinkedIn login",
+                "parameters": [
+                    {
+                        "description": "LinkedIn login ID",
+                        "name": "loginId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.LinkedInLoginProfilesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown login",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Connects the member profile or one company Page of a LinkedIn login to the given brand, without re-doing OAuth. Each LinkedIn account belongs to one brand. A brand can hold several LinkedIn accounts.",
+                "tags": [
+                    "LinkedIn"
+                ],
+                "summary": "Connect a LinkedIn profile or Page from a login",
+                "parameters": [
+                    {
+                        "description": "LinkedIn login ID",
+                        "name": "loginId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "platform_account_id from the profiles list, URL-encoded (urn%3Ali%3Aorganization%3A123456)",
+                        "name": "profileId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.AssignLinkedInProfileRequest"
+                            }
+                        }
+                    },
+                    "description": "Target brand",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AssignLocationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Account is not accessible through this login, or already belongs to another brand",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown login or brand",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10359,6 +10493,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "A target account must be reconnected before it can publish now (account.reconnection_required; the error names the account). Scheduled posts and drafts are still accepted.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "queue_id names a Queue that does not exist, or the Brand has no default Queue (queue.not_found)",
                         "content": {
@@ -11025,6 +11169,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "A target account must be reconnected before it can publish (account.reconnection_required)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Post not found",
                         "content": {
@@ -11114,6 +11268,16 @@
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "A target account must be reconnected before it can publish (account.reconnection_required)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11821,7 +11985,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the authenticated user's profile. Supports setting onboarding=false to mark onboarding as complete, and optionally recording use_case, referral and job_role. The response reflects the current billing_blocked state, unaffected by this update. The response includes the caller's team role: \"admin\", \"developer\", or \"\" for the account owner.",
+                "description": "Updates the authenticated user's profile. Supports setting onboarding=false to mark onboarding as complete, and optionally recording use_case, referral, job_role and signup_metadata. The response reflects the current billing_blocked state, unaffected by this update. The response includes the caller's team role: \"admin\", \"developer\", or \"\" for the account owner.",
                 "tags": [
                     "Users"
                 ],
@@ -12637,6 +12801,15 @@
                     }
                 }
             },
+            "api_endpoints.AssignLinkedInProfileRequest": {
+                "type": "object",
+                "properties": {
+                    "brand_id": {
+                        "type": "string",
+                        "example": "b7f9..."
+                    }
+                }
+            },
             "api_endpoints.AssignLocationRequest": {
                 "type": "object",
                 "properties": {
@@ -13023,7 +13196,7 @@
                         "example": "b_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "metadata": {
-                        "description": "Metadata contains platform-specific connection data. For tiktok, connection_type \"creator\" connects through TikTok's Content Posting API instead of the default Business API (\"business\").",
+                        "description": "Metadata contains platform-specific connection data. For tiktok, connection_type \"creator\" connects through TikTok's Content Posting API instead of the default Business API (\"business\"). For linkedin, connection_type \"profile\" or \"organization\" limits the connect to the member profile or to company Pages; without it, one authorization offers both, and the user picks one when there are several.",
                         "type": "object",
                         "additionalProperties": {}
                     },
@@ -14664,6 +14837,71 @@
                     }
                 }
             },
+            "api_endpoints.LinkedInLoginProfile": {
+                "type": "object",
+                "properties": {
+                    "assignable": {
+                        "type": "boolean"
+                    },
+                    "assigned_account_id": {
+                        "type": "string"
+                    },
+                    "assigned_brand_id": {
+                        "type": "string"
+                    },
+                    "assigned_brand_name": {
+                        "type": "string"
+                    },
+                    "connection_type": {
+                        "description": "ConnectionType is \"profile\" for the member, \"organization\" for a company Page.",
+                        "type": "string",
+                        "enum": [
+                            "profile",
+                            "organization"
+                        ],
+                        "example": "organization"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Acme Corp"
+                    },
+                    "picture_url": {
+                        "type": "string"
+                    },
+                    "platform_account_id": {
+                        "type": "string",
+                        "example": "urn:li:organization:123456"
+                    },
+                    "username": {
+                        "type": "string",
+                        "example": "acme-corp"
+                    }
+                }
+            },
+            "api_endpoints.LinkedInLoginProfilesResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "login_id": {
+                        "type": "string",
+                        "example": "cred_01J..."
+                    },
+                    "login_name": {
+                        "description": "LoginName is the name of the LinkedIn member who authorized the login.",
+                        "type": "string",
+                        "example": "Jane Doe"
+                    },
+                    "profiles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.LinkedInLoginProfile"
+                        }
+                    }
+                }
+            },
             "api_endpoints.ListWebhookEventsResponse": {
                 "type": "object",
                 "properties": {
@@ -15219,6 +15457,11 @@
                         "type": "string",
                         "example": "Google search"
                     },
+                    "signup_metadata": {
+                        "description": "SignupMetadata adds keys to the signup answers on record: a shallow\nmerge, so keys sent replace the same keys and others are kept. At most\n4096 bytes once encoded.",
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
                     "use_case": {
                         "type": "string",
                         "example": "Managing my own brand's social accounts"
@@ -15236,7 +15479,7 @@
                         "example": "2026-07-04T12:30:00Z"
                     },
                     "login_id": {
-                        "description": "login_id identifies the login and is set for both Facebook and Google.\npages and lost_access are Facebook page-selection only.",
+                        "description": "login_id identifies the login and is set for Facebook, Google and LinkedIn.\npages and lost_access are Facebook page-selection only.",
                         "type": "string"
                     },
                     "lost_access": {
@@ -15271,7 +15514,7 @@
                         "example": "pc_4a8f2c1e9b3d7f06a5c2e8b4d1f3a7e2"
                     },
                     "login_id": {
-                        "description": "login_id identifies the login and is set for both Facebook and Google.\npages and lost_access are Facebook page-selection only.",
+                        "description": "login_id identifies the login and is set for Facebook, Google and LinkedIn.\npages and lost_access are Facebook page-selection only.",
                         "type": "string"
                     },
                     "lost_access": {
@@ -17133,6 +17376,11 @@
                         "type": "string",
                         "example": "admin"
                     },
+                    "signup_metadata": {
+                        "description": "SignupMetadata holds open-ended answers recorded at signup, such as\nreferral_source and search_query. An empty object until answered.",
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
                     "use_case": {
                         "type": "string",
                         "example": "Managing clients' accounts (agency)"
@@ -17923,10 +18171,11 @@
                         "type": "string"
                     },
                     "connection_type": {
-                        "description": "[optional] \"profile\" for a LinkedIn personal profile connected with connection_type \"profile\" (beta). Absent for every other account",
+                        "description": "[optional] LinkedIn only: \"profile\" for a member profile, \"organization\" for a company Page. Absent for every other account",
                         "type": "string",
                         "enum": [
-                            "profile"
+                            "profile",
+                            "organization"
                         ],
                         "example": "profile"
                     },
@@ -17943,7 +18192,7 @@
                         "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
                     },
                     "login_id": {
-                        "description": "[optional] Login id shared by accounts connected in the same authorization (e.g. facebook)",
+                        "description": "[optional] Login id shared by accounts connected in the same authorization (facebook, google, linkedin)",
                         "type": "string"
                     },
                     "metadata": {
@@ -18942,7 +19191,7 @@
                         "additionalProperties": {}
                     },
                     "permalink": {
-                        "description": "[platform: instagram, facebook, threads, tiktok, youtube, google, linkedin, linkedin_page]",
+                        "description": "[platform: instagram, facebook, threads, tiktok, youtube, google, linkedin]",
                         "type": "string"
                     },
                     "platform": {

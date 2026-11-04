@@ -6,7 +6,7 @@ description: "Connect Instagram, Facebook, TikTok, YouTube, LinkedIn, X, and mor
 
 A connected account is one social account (an Instagram account, a Facebook login with its Pages, a YouTube channel, a Telegram bot) that SocialAPI can act on for you. You start a connection with `POST /v1/accounts/connect`, send the person to the platform's consent screen, and SocialAPI redirects them back to your app with the new account's ID. SocialAPI keeps the platform's access tokens, so you never receive or refresh them.
 
-The same flow serves every platform. Telegram, Bluesky, and App Store Connect skip the consent screen and connect in one request. Google Business Profile can pause so you choose which location to connect. Facebook can pause so you choose which Pages join the brand (see [Facebook Pages](#facebook-pages)), and you can move Pages between brands afterwards. Connecting, reconnecting, and disconnecting cost no credits.
+The same flow serves every platform. Telegram, Bluesky, and App Store Connect skip the consent screen and connect in one request. Google Business Profile can pause so you choose which location to connect, and LinkedIn so you choose a member profile or a company Page. Facebook can pause so you choose which Pages join the brand (see [Facebook Pages](#facebook-pages)), and you can move Pages between brands afterwards. Connecting, reconnecting, and disconnecting cost no credits.
 
 ## Endpoints
 
@@ -14,8 +14,8 @@ The same flow serves every platform. Telegram, Bluesky, and App Store Connect sk
 |---|---|---|
 | `POST` | `/v1/accounts/connect` | Start a connection, or reconnect an existing account |
 | `GET` | `/v1/accounts` | List your connected accounts and their status. Filter to one brand with `brand_id` |
-| `GET` | `/v1/accounts/pending/{connection_id}` | Read a connection that waits for you to choose a location |
-| `POST` | `/v1/accounts/pending/{connection_id}/select` | Choose the location and finish the connection |
+| `GET` | `/v1/accounts/pending/{connection_id}` | Read a connection that waits for you to choose a location, a LinkedIn profile or Page, or Facebook Pages |
+| `POST` | `/v1/accounts/pending/{connection_id}/select` | Make the choice and finish the connection |
 | `PATCH` | `/v1/accounts/{id}` | Change the account's permissions: see [Account permissions](/guides/permissions) |
 | `DELETE` | `/v1/accounts/{id}` | Disconnect an account |
 | `POST` | `/v1/invites` | Create a single-use link that lets someone else connect an account to a brand |
@@ -65,7 +65,7 @@ Store `account_id` against your user. The account is usable at once.
 | `redirect_uri` | string | No | Where SocialAPI sends the person after the consent screen. See [Redirect URI rules](#redirect-uri-rules). Without it, the person sees a SocialAPI page that says the account is connected (or why it failed). Platforms that connect without a consent screen ignore it |
 | `state` | string | No | Your own value, up to 512 characters, returned unchanged on the redirect. Use it to match the redirect to the session that started it |
 | `permissions` | array of strings | No | The [permissions](/guides/permissions#the-permissions) to request: `posts.read`, `posts.write`, `comments.read`, `comments.write`, `messages.read`, `messages.write`, `reviews.read`, `reviews.write`, `analytics.read`. Omit it to keep the brand's current selection for this platform, or to request every permission when the brand has none. An empty list returns `400 validation.permissions_empty`, and an unknown name returns `400 validation.permission_unknown` |
-| `metadata` | object | No | Platform-specific connect options, documented on each platform's page: `bot_token` for Telegram, `identifier`, `app_password`, and `auth_factor_token` for Bluesky, `key_id`, `issuer_id`, `private_key`, and `app_id` for [App Store Connect](/platforms/app-store-connect#connect-an-account), `connection_type` for [TikTok](/platforms/tiktok#creator-connection), and `connection_type: "facebook_login"` for [Instagram](/platforms/instagram#connect-through-facebook-login) |
+| `metadata` | object | No | Platform-specific connect options, documented on each platform's page: `bot_token` for Telegram, `identifier`, `app_password`, and `auth_factor_token` for Bluesky, `key_id`, `issuer_id`, `private_key`, and `app_id` for [App Store Connect](/platforms/app-store-connect#connect-an-account), `connection_type` for [TikTok](/platforms/tiktok#creator-connection) and [LinkedIn](/platforms/linkedin#connect-an-account), and `connection_type: "facebook_login"` for [Instagram](/platforms/instagram#connect-through-facebook-login) |
 
 ### Response fields
 
@@ -78,7 +78,7 @@ The person has 1 hour from your request to finish on the platform. After 1 hour,
 
 ## How a connection works
 
-A connection either completes at once, pauses for a choice of location, or fails. Every outcome reaches your `redirect_uri` as query parameters.
+A connection either completes at once, pauses for a choice (a Google location, a LinkedIn member profile or company Page, Facebook Pages, or a WhatsApp number), or fails. Every outcome reaches your `redirect_uri` as query parameters.
 
 ```mermaid
 flowchart TD
@@ -102,8 +102,8 @@ flowchart TD
   <Step title="Read the result on your redirect URI">
     SocialAPI completes the authorization with the platform and redirects the person to your `redirect_uri` with `status` and the parameters below. Check `status` first, then compare `state` with the value you sent.
   </Step>
-  <Step title="Choose a Google Business Profile, Facebook Pages, or a WhatsApp number, if asked">
-    When `status` is `selection_required`, read the candidates and choose within 30 minutes, as described in [Choose a Google Business Profile](#choose-a-google-business-profile), [Choose Facebook Pages](#choose-facebook-pages), and [Choose a WhatsApp number](/platforms/whatsapp#choose-a-number).
+  <Step title="Choose a Google Business Profile, a LinkedIn profile or Page, Facebook Pages, or a WhatsApp number, if asked">
+    When `status` is `selection_required`, read the candidates and choose within 30 minutes, as described in [Choose a Google Business Profile](#choose-a-google-business-profile), [Choose a LinkedIn profile or Page](#choose-a-linkedin-profile-or-page), [Choose Facebook Pages](#choose-facebook-pages), and [Choose a WhatsApp number](/platforms/whatsapp#choose-a-number).
   </Step>
 </Steps>
 
@@ -128,6 +128,9 @@ flowchart TD
 - **A `platform.*` or other SocialAPI error code** when the platform or SocialAPI refuses the connection, for example `billing.brands_limit` (your plan's brand allowance is used up), `account.already_linked` (the brand already holds a different account on this platform, or `lock_accounts_to_brand` blocked a move between brands), `account.different_login` (the brand's Facebook is connected through a different login), `byok.credentials_missing` (no X app credentials saved), `byok.credentials_invalid` (X rejected the saved credentials), or `byok.app_access_denied` (X refused your app access to its API). Each code is listed in [Errors](/guides/errors).
 - **`missing_code`** when the platform returned neither a code nor an error.
 - **`exchange_failed`** when the failure has no code.
+- **`internal_error`** when the connection failed on our side. Start a new connection.
+
+A `platform.*.insufficient_scope` code means the person left a permission unticked on the consent screen. Ask them to connect again and allow every permission.
 
 After any error, start a new connection: the old `auth_url` is spent.
 
@@ -144,7 +147,7 @@ The `platform` field takes one of these values:
 | `threads` | Threads | Consent screen |
 | `google` | Google Business Profile | Consent screen, then a choice of location when the login manages more than one |
 | `tiktok` | TikTok | Consent screen |
-| `linkedin` | LinkedIn | Consent screen |
+| `linkedin` | LinkedIn member profile or company Page | Consent screen, then a choice of member profile or company Page when the login offers more than one. See [LinkedIn](/platforms/linkedin#connect-an-account) |
 | `twitter` | X / Twitter | Consent screen through your own X app. `x` is accepted as the same slug |
 | `youtube` | YouTube | Consent screen |
 | `pinterest` | Pinterest | Consent screen |
@@ -154,7 +157,7 @@ The `platform` field takes one of these values:
 | `bluesky` | Bluesky | One request with an app password, no consent screen |
 | `app_store_connect` | App Store Connect | One request with your App Store Connect API key, no consent screen. One app per account |
 
-A slug not in this table, including `trustpilot`, returns `403 billing.platform_not_available`. Which app each platform connects through (SocialAPI's or your own) is listed in [Platform apps](/guides/platform-credentials).
+A slug not in this table, including `trustpilot`, returns `403 billing.platform_not_available`. `linkedin_page` returns `400 validation.platform_invalid`: connect LinkedIn company Pages with `linkedin`. Which app each platform connects through (SocialAPI's or your own) is listed in [Platform apps](/guides/platform-credentials).
 
 ## Redirect URI rules
 
@@ -218,6 +221,7 @@ Response (HTTP 201):
 ```json
 {
   "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
   "platform": "google",
   "username": "",
   "display_name": "Joe's Pizza (Downtown)"
@@ -229,12 +233,12 @@ Response (HTTP 201):
 | Field | Description |
 |---|---|
 | `connection_id` | The pending connection's ID |
-| `platform` | `google`, `facebook`, or `instagram` |
+| `platform` | `google`, `linkedin`, `whatsapp`, `facebook`, or `instagram` |
 | `expires_at` | When the pending connection expires, 30 minutes after it was created |
-| `profiles[]` | Google: the Business Profiles the login manages, each with `platform_account_id`, `display_name`, `username`, `profile_picture_url`, and `bio`. Facebook and Instagram: an empty array |
-| `pages[]` | Facebook and Instagram only: the candidates to choose from. See [Choose Facebook Pages](#choose-facebook-pages). Absent for Google |
+| `profiles[]` | Google: the Business Profiles the login manages. LinkedIn: the member profile and the company Pages the login offers (see [Choose a LinkedIn profile or Page](#choose-a-linkedin-profile-or-page)). Each has `platform_account_id`, `display_name`, `username`, `profile_picture_url`, and `bio`. Facebook and Instagram: an empty array |
+| `pages[]` | Facebook and Instagram only: the candidates to choose from. See [Choose Facebook Pages](#choose-facebook-pages). Absent for Google and LinkedIn |
 | `lost_access[]` | Facebook and Instagram only: Pages this login no longer grants. See [When reconnecting Facebook removes Pages](#when-reconnecting-facebook-removes-pages). Absent when empty |
-| `login_id` | The login behind the connection. For Google, use it to connect more locations later without a new consent screen: see [Google Business Profile locations](/platforms/google/locations). For Facebook, see [One login, many brands](/platforms/facebook#one-login-many-brands) |
+| `login_id` | The login behind the connection. For Google, use it to connect more locations later without a new consent screen: see [Google Business Profile locations](/platforms/google/locations). For LinkedIn, see [Connect more profiles and Pages from a login](/platforms/linkedin#connect-more-profiles-and-pages-from-a-login). For Facebook, see [One login, many brands](/platforms/facebook#one-login-many-brands) |
 
 The response has no `data` wrapper: every field is at the top level.
 
@@ -244,6 +248,67 @@ The response has no `data` wrapper: every field is at the top level.
 - **A `400` keeps the pending connection.** On a Facebook or Instagram connection, only the three `400` codes listed in [Choose Facebook Pages](#choose-facebook-pages) keep it. Fix the request and send it again within the 30 minutes.
 - **A `platform_account_id` that is not in `profiles[]`** returns `400 validation.profile_not_in_set`.
 - **A body without `platform_account_id`** returns `400 validation.field_required`.
+
+## Choose a LinkedIn profile or Page
+
+A LinkedIn connection pauses with `status=selection_required` when the authorization offers more than one account: the member profile of the person who signed in, and each company Page that person administers. You choose exactly one. An authorization that offers a single account connects at once. `metadata.connection_type` on the connect narrows the offer: see [LinkedIn](/platforms/linkedin#connect-an-account).
+
+Read the candidates with `GET /v1/accounts/pending/{connection_id}`:
+
+```bash
+curl https://api.social-api.ai/v1/accounts/pending/pc_9b3e7a1d5c2f8e40b6a1d7c3f9e2b5a8 \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "connection_id": "pc_9b3e7a1d5c2f8e40b6a1d7c3f9e2b5a8",
+  "platform": "linkedin",
+  "expires_at": "2026-11-05T09:30:00Z",
+  "profiles": [
+    {
+      "platform_account_id": "urn:li:person:8fA3kLm2Qx",
+      "display_name": "Jane Doe",
+      "username": "janedoe",
+      "profile_picture_url": "https://media.licdn.com/dms/image/v2/jane-doe.jpg",
+      "bio": ""
+    },
+    {
+      "platform_account_id": "urn:li:organization:12345678",
+      "display_name": "Acme Corp",
+      "username": "acme-corp",
+      "profile_picture_url": "",
+      "bio": "Industrial tools since 1998"
+    }
+  ],
+  "login_id": "cred_01J9K4R5M6N7P8V2K0W1J3QX"
+}
+```
+
+A `platform_account_id` that starts with `urn:li:person:` is the member profile, and one that starts with `urn:li:organization:` is a company Page. Finish the connection by sending the chosen `platform_account_id`:
+
+```bash
+curl -X POST https://api.social-api.ai/v1/accounts/pending/pc_9b3e7a1d5c2f8e40b6a1d7c3f9e2b5a8/select \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"platform_account_id": "urn:li:organization:12345678"}'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1K",
+  "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+  "platform": "linkedin",
+  "username": "acme-corp",
+  "display_name": "Acme Corp"
+}
+```
+
+The [selection rules](#selection-rules) apply. To connect the candidates you did not choose, use the `login_id`, when the response has one, with [the LinkedIn login endpoints](/platforms/linkedin#connect-more-profiles-and-pages-from-a-login): they need no new consent screen.
 
 ## Facebook Pages
 
@@ -313,6 +378,7 @@ Response (HTTP 201):
 ```json
 {
   "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+  "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
   "platform": "facebook",
   "username": "Maria Lopez",
   "display_name": "Maria Lopez"
@@ -376,7 +442,8 @@ Response (HTTP 200):
 | `brand_id` | The brand that holds the account |
 | `status` | `active`, `reconnect_recommended`, or `token_expired`, see below |
 | `reconnect_reason` | Why the account needs reconnecting. Absent when `status` is `active` or when SocialAPI has no reason to give |
-| `login_id` | The platform login shared by every account connected in the same authorization. Present for Facebook and Google accounts |
+| `login_id` | The platform login shared by every account connected in the same authorization. Present for Facebook, Google, and LinkedIn accounts. For the LinkedIn exception, see [Connect more profiles and Pages from a login](/platforms/linkedin#connect-more-profiles-and-pages-from-a-login) |
+| `connection_type` | LinkedIn only: `profile` for a member profile, `organization` for a company Page. Absent on every other platform |
 | `permissions` | The [permissions](/guides/permissions) requested for this account. `null` means every permission, including ones added later. Always present |
 | `effective_permissions` | The permissions the account can use now: the requested ones that the platform supports and the person connecting granted. An empty list when none apply. Always present |
 
@@ -402,7 +469,7 @@ Treat a `reconnect_reason` you do not recognize as a request to reconnect.
 
 ## Reconnect an account
 
-To reconnect an account, call `POST /v1/accounts/connect` again with the same `platform` and the account's current `brand_id` (the `brand_id` that `GET /v1/accounts` returns), and send the person through the consent screen with the same platform login:
+To reconnect an account, call `POST /v1/accounts/connect` again with the same `platform` and the account's current `brand_id` (the `brand_id` that `GET /v1/accounts` returns), and send the person through the consent screen with the same platform login.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/connect \
@@ -422,7 +489,7 @@ SocialAPI updates the existing account in place:
 - The account keeps its `permissions` unless you send `permissions` on the reconnect. A narrower list deletes the data the removed permissions covered: see [Removing a permission deletes data](/guides/permissions#removing-a-permission-deletes-data).
 - SocialAPI sends `account.connected` again.
 
-A Facebook reconnect, or an Instagram reconnect through Facebook Login, can end with `status=selection_required` like a first connection: see [Facebook Pages](#facebook-pages).
+A Facebook reconnect, or an Instagram reconnect through Facebook Login, can end with `status=selection_required` like a first connection: see [Facebook Pages](#facebook-pages). A LinkedIn reconnect can too: choose the same member profile or company Page, as described in [Choose a LinkedIn profile or Page](#choose-a-linkedin-profile-or-page).
 
 Always pass `brand_id` when you reconnect. Without it, SocialAPI creates a new brand for the connection and moves the account into it, which leaves the old brand without the account.
 
@@ -430,11 +497,12 @@ Connecting a platform account that another of your brands already holds moves it
 
 - **Facebook, and Instagram connected through Facebook Login.** A Page or Instagram account that another of your brands holds is not taken. With a selection step, it comes back with `assignable: false`. Without a selection step, a login whose every Page or Instagram account belongs to another brand ends with `error=platform.facebook.no_assignable_pages` or `error=platform.instagram.no_assignable_pages`. You assign Pages to brands as described in [Facebook](/platforms/facebook).
 - **Google Business Profile locations assigned with the assign call.** `POST /v1/platforms/google/logins/{loginId}/locations/{locationId}/assign` returns `400 validation.location_already_assigned` for a location that another brand holds. See [Google locations](/platforms/google/locations).
+- **LinkedIn member profiles and company Pages assigned with the assign call.** `POST /v1/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign` returns `400 validation.profile_already_assigned` for an account that another brand holds. See [LinkedIn](/platforms/linkedin#connect-more-profiles-and-pages-from-a-login).
 - **`lock_accounts_to_brand` set to `true` on your SocialAPI account** (`PATCH /v1/users/me`). A connect that would move an account to a different brand ends with `error=account.already_linked`, or returns `409 account.already_linked`. The default is `false`. The lock does not apply to Facebook.
 
 Each of those errors leaves the account in its current brand.
 
-A brand holds one connected account per platform. Connecting a different account of the same platform into a brand that already has one ends with `status=error` and `error=account.already_linked` on your `redirect_uri`. Telegram, Bluesky, and App Store Connect, which connect in one request, return `409 account.already_linked` from `POST /v1/accounts/connect`, and so does `POST /v1/accounts/pending/{connection_id}/select` for a Google location. On Facebook, connecting a brand whose account came from a different Facebook login ends with `error=account.different_login` on your `redirect_uri`.
+A brand holds one connected account per platform, except LinkedIn, where a brand can hold any number of LinkedIn member profiles and company Pages. Connecting a different account of the same platform into a brand that already has one ends with `status=error` and `error=account.already_linked` on your `redirect_uri`. Telegram, Bluesky, and App Store Connect, which connect in one request, return `409 account.already_linked` from `POST /v1/accounts/connect`, and so does `POST /v1/accounts/pending/{connection_id}/select` for a Google location. On LinkedIn, the select call returns `409 account.already_linked` only when `lock_accounts_to_brand` is `true` and another of your brands holds the chosen member profile or company Page. On Facebook, connecting a brand whose account came from a different Facebook login ends with `error=account.different_login` on your `redirect_uri`.
 
 A Google login with more than one YouTube channel connects every channel in one authorization, and the redirect carries every account in `account_ids`. Without `brand_id`, each channel connects into its own new brand named after the channel. With a `brand_id`, the brand takes one channel, and each further channel ends the connection with `status=error` and `error=account.already_linked` on your `redirect_uri`. Channels connected before the error stay connected.
 
@@ -476,7 +544,8 @@ Send `url` to the person. They approve on the platform's consent screen, SocialA
 | `permissions` | array of strings | No | The [permissions](/guides/permissions#the-permissions) the connected account gets. Omit it to keep the brand's current selection for this platform, or to give every permission when the brand has none. An empty list returns `400 validation.permissions_empty`, and an unknown name returns `400 validation.permission_unknown`. The response and the invite list return it as you set it, `null` when you omitted it |
 
 - A `brand_id` that is not one of your brands returns `404 resource.not_found`.
-- A brand that already holds an account on that platform, or that already has an unused, unexpired invite for that platform, returns `409 resource.conflict`.
+- A brand that already holds an account on that platform, or that already has an unused, unexpired invite for that platform, returns `409 resource.conflict`. A LinkedIn account in the brand does not block a LinkedIn invite: only an unused, unexpired LinkedIn invite does.
+- `platform: "linkedin_page"` returns `400 validation.platform_invalid`. Use `linkedin`.
 - A Facebook invite connects every Page of the person's login that none of your other brands holds. The person cannot choose Pages. When `facebook_page_selection` is `true`, more Pages than [your plan allows per brand](/guides/plans#facebook-pages-per-brand) end the invite with `platform.facebook.page_cap`.
 - An expired, used, or revoked link shows the person a SocialAPI error page.
 - `GET /v1/invites?brand_id={brand_id}` lists the brand's invites, newest first, each with `id`, `platform`, `token`, `url`, `is_active`, `expires_at`, `created_at`, and `permissions`. A missing `brand_id` returns `400 validation.field_required`.
@@ -516,6 +585,8 @@ Disconnecting an account:
 - A missing `platform` returns `400 validation.field_required`.
 - A `state` longer than 512 characters returns `400 validation.customer_state_too_long`.
 - A slug not in the platform slugs table, including `trustpilot`, returns `403 billing.platform_not_available`.
+- `linkedin_page` returns `400 validation.platform_invalid`, with `meta.field` set to `platform`.
+- A `metadata.connection_type` that the platform does not accept returns `400 validation.connection_type_invalid`: on LinkedIn, anything but `profile` or `organization`; on TikTok, anything but `business` or `creator`.
 - A request without `brand_id` when your plan's brand allowance is used up returns `403 billing.brands_limit`.
 - A `brand_id` that is not one of your brands returns `404 resource.not_found`, with `meta.resource` set to `brand`. A `brand_id` that is one of your brands but outside your [brand-restricted key](/guides/scoped-keys)'s brands returns `404 brand.not_found`.
 - A malformed or unregistered `redirect_uri` returns `400 validation.redirect_uri_invalid_format` or `400 validation.redirect_uri_not_whitelisted`.

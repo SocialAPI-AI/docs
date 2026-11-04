@@ -6,11 +6,11 @@ description: Full reference for publishing LinkedIn posts via SocialAPI, includi
 
 ## 1. Overview
 
-LinkedIn posts publish as the connected member (`linkedin`).
+LinkedIn posts publish as the connected member profile (`connection_type: "profile"`) or as the connected company Page (`connection_type: "organization"`). Both are `linkedin` accounts and follow the publishing rules on this page, with one difference when publishing: `visibility: "connections_only"` on a company Page target returns `400 publishing.validation_failed` on the field `visibility`. Listing posts differs too: see [Retrieve posts](#6-retrieve-posts).
 
 | Field | Value |
 |---|---|
-| Platform slug | `linkedin` |
+| Platform slug | `linkedin` (member profile and company Page) |
 | Auth type | OAuth 2.0 (LinkedIn) |
 | API | LinkedIn Posts API |
 | Create post | Yes |
@@ -93,7 +93,7 @@ Response (HTTP 201):
 | Value | LinkedIn audience |
 |---|---|
 | `public` (default) | Anyone on or off LinkedIn |
-| `connections_only` | The member's connections |
+| `connections_only` | The member's connections. Member profile targets only: a company Page target returns `400 publishing.validation_failed` on the field `visibility` |
 | `logged_in` | Any logged-in LinkedIn member |
 
 Any other value fails validation on the field `visibility`.
@@ -137,7 +137,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Platform data fields
 
-Send these keys in `platform_data.linkedin` on the post, which applies them to every LinkedIn target. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `linkedin` key). When both set the same key, the target's value wins.
+Send these keys in `platform_data.linkedin` on the post, which applies them to every LinkedIn target, member profile and company Page alike. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `linkedin` key). When both set the same key, the target's value wins.
 
 | Key | Type | Applies to | Notes |
 |---|---|---|---|
@@ -186,9 +186,9 @@ curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1
 
 ## 6. Retrieve posts
 
-`GET /v1/posts?platform=linkedin&account_ids={id}` lists posts.
+`GET /v1/posts?platform=linkedin&account_ids={id}` lists the posts of a member profile or a company Page.
 
-The list holds the posts you published through SocialAPI. LinkedIn gives apps no read of a member's own posts, so a post published on LinkedIn directly never appears. A LinkedIn post has no metrics.
+For a member profile, the list holds the posts you published through SocialAPI. LinkedIn gives apps no read of a member's own posts, so a post published on LinkedIn directly never appears, and `GET /v1/posts` returns no metrics for these posts. Read counts for the 5 most recent ones from [LinkedIn insights](/platforms/linkedin#insights). For a company Page, the list also holds the Page's posts made outside SocialAPI.
 
 ---
 
@@ -210,7 +210,8 @@ LinkedIn builds no preview for a link post. Set `article_title`, `article_descri
 
 A publish that fails after the request returned puts a structured error on the target, in `targets[].error`, with its `code`. Every code is in [Errors](/guides/errors).
 
-- `401 platform.linkedin.auth`: the access token expired or was revoked. LinkedIn tokens last 60 days and cannot be refreshed. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
+- `401 platform.linkedin.auth`: LinkedIn reported that the access token is invalid, expired, or revoked. LinkedIn tokens last 60 days and cannot be refreshed. The account is marked `token_expired`, and every later call that acts on the account returns `403 account.reconnection_required` until you reconnect it.
+- `401 platform.linkedin.unauthorized`: LinkedIn refused the call as unauthorized without naming the token. The account stays usable, with `status: reconnect_recommended`. Reconnect it if the error repeats.
 - `403 platform.linkedin.access_denied`: LinkedIn refused the action for this account. Reconnecting does not change it. Read `message`.
 - `429 platform.linkedin.rate_limit`: LinkedIn's own limit. Wait, then retry.
 
@@ -288,10 +289,12 @@ Response (HTTP 200) once published:
 
 ## 9. Required OAuth scopes
 
-SocialAPI's LinkedIn app requests these scopes during the OAuth flow. You configure nothing. The full list is in [LinkedIn scopes](/platforms/linkedin#scopes).
+SocialAPI's LinkedIn app requests these scopes during the OAuth flow: `w_member_social` for member profiles, the other two for company Pages. You configure nothing. The full list is in [LinkedIn scopes](/platforms/linkedin#scopes).
 
 | Scope | Purpose |
 |---|---|
 | `w_member_social` | Publish posts as the member |
+| `w_organization_social` | Publish posts as the company Page |
+| `r_organization_social` | Read the company Page's posts |
 
 The scopes a scoped API key needs, the credit cost of a post, and the MCP tools that publish are on [Publishing](/guides/publishing).
