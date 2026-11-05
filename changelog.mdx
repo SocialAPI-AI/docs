@@ -4,6 +4,14 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-11-05" description="Accounts" tags={["Accounts", "Analytics"]}>
+  ## Account post sync runs in the background
+
+  Breaking: `POST /v1/accounts/{id}/sync` now returns `202` at once with the sync's `state`, instead of `200 {"success": true}` when the refresh finished. Poll the new `GET /v1/accounts/{id}/sync` until `state` is no longer `syncing`, then read the posts. A platform failure now shows as `state: "failed"` with the reason in `error`, instead of a `502`. A `POST` while a sync is running returns that sync.
+
+  The per-account cooldown is now 15 minutes, and each plan has a daily limit of 10 syncs per brand it includes (Enterprise has none). A request past it returns `429 accounts.sync_daily_limit` with `Retry-After`. See [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts).
+</Update>
+
 <Update label="2026-11-05" description="Analytics" tags={["Analytics", "MCP"]}>
   ## Analytics overview
 

@@ -1408,17 +1408,17 @@
             }
         },
         "/accounts/{id}/sync": {
-            "post": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Refreshes one connected account's posts: new posts appear, engagement counts update, and Instagram and Facebook media links in platform_media are renewed. Instagram covers up to the 500 most recent posts, Facebook up to the 500 most recent per Page; other platforms cover up to the 25 most recent. Available on platforms that support listing posts. Returns once the refresh completes. Each account can be synced once every 5 minutes.",
+                "description": "Reports whether a post sync is running for the account and when its posts were last refreshed. Poll this after POST /accounts/{id}/sync until state leaves \"syncing\". A failed sync carries the reason in error.",
                 "tags": [
                     "Accounts"
                 ],
-                "summary": "Re-sync a connected account's posts",
+                "summary": "Get the post sync status of a connected account",
                 "parameters": [
                     {
                         "description": "Connected account ID",
@@ -1432,20 +1432,92 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Current sync state",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "boolean"
-                                    }
+                                    "$ref": "#/components/schemas/api_endpoints.AccountPostsSyncResponse"
                                 }
                             }
                         }
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The account was not granted the posts.read permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Refreshes one connected account's posts: new posts appear, engagement counts update, and Instagram and Facebook media links in platform_media are renewed. Instagram covers up to the 500 most recent posts, Facebook up to the 500 most recent per Page; other platforms cover up to the 25 most recent. Returns immediately: poll GET /accounts/{id}/sync until state leaves \"syncing\", then read the posts. A sync already running for the account is returned as-is. Each account can start a sync once every 15 minutes, and each day your plan allows 10 syncs per brand it includes (Enterprise is unlimited); the count resets at midnight UTC.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Start a sync of a connected account's posts",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Sync started, or already running",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AccountPostsSyncResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The account was not granted the posts.read permission",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1465,7 +1537,7 @@
                         }
                     },
                     "429": {
-                        "description": "This account was synced less than 5 minutes ago. The Retry-After header carries the seconds to wait.",
+                        "description": "accounts.sync_rate_limited: this account was synced less than 15 minutes ago. accounts.sync_daily_limit: the plan's daily sync limit is reached. The Retry-After header carries the seconds to wait.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1475,7 +1547,7 @@
                         }
                     },
                     "501": {
-                        "description": "Platform cannot list posts (e.g. LinkedIn, WhatsApp)",
+                        "description": "Platform cannot list posts",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1484,8 +1556,8 @@
                             }
                         }
                     },
-                    "502": {
-                        "description": "Upstream platform API error",
+                    "503": {
+                        "description": "The sync could not be started. Retry later.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12837,6 +12909,43 @@
                     },
                     "verification_status": {
                         "type": "string"
+                    }
+                }
+            },
+            "api_endpoints.AccountPostsSyncResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/api_endpoints.AccountPostsSyncStatus"
+                    }
+                }
+            },
+            "api_endpoints.AccountPostsSyncStatus": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "description": "Error says why the last sync failed. Empty unless State is \"failed\".",
+                        "type": "string",
+                        "example": ""
+                    },
+                    "finished_at": {
+                        "type": "string"
+                    },
+                    "last_synced_at": {
+                        "type": "string"
+                    },
+                    "started_at": {
+                        "type": "string"
+                    },
+                    "state": {
+                        "description": "State is \"idle\", \"syncing\", or \"failed\". A finished sync is idle with a\nnewer LastSyncedAt.",
+                        "type": "string",
+                        "enum": [
+                            "idle",
+                            "syncing",
+                            "failed"
+                        ],
+                        "example": "syncing"
                     }
                 }
             },

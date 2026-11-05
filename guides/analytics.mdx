@@ -16,7 +16,8 @@ Analytics requests cost no credits. An account needs the `analytics.read` [permi
 | `GET` | `/v1/brands/{id}/analytics` | Stored daily history for a brand, summed across its accounts |
 | `GET` | `/v1/posts/{pid}/analytics` | Stored daily history for one published post |
 | `GET` | `/v1/posts/{pid}/metrics` | Live engagement figures for a published post |
-| `POST` | `/v1/accounts/{id}/sync` | Refresh an account's posts and their counts now |
+| `POST` | `/v1/accounts/{id}/sync` | Start refreshing an account's posts and their counts |
+| `GET` | `/v1/accounts/{id}/sync` | Read the state of an account's post sync |
 
 ## Read an overview
 
@@ -271,26 +272,41 @@ A figure a platform does not report is `0`, except Instagram insights, which are
 
 ## Refresh an account's posts
 
-`POST /v1/accounts/{id}/sync` pulls the account's posts from the platform now, so new posts and fresh counts appear without waiting for the background sync. It returns when the refresh finishes.
+`POST /v1/accounts/{id}/sync` starts pulling the account's posts from the platform, so new posts and fresh counts appear without waiting for the background sync. It returns at once with HTTP 202 while the sync runs.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/sync \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Response (HTTP 200):
+Response (HTTP 202):
 
 ```json
 {
-  "success": true
+  "data": {
+    "state": "syncing",
+    "started_at": "2026-11-05T16:00:00Z",
+    "finished_at": null,
+    "last_synced_at": null,
+    "error": ""
+  }
 }
 ```
 
+To wait for the result, poll `GET /v1/accounts/{id}/sync` until `state` is no longer `syncing`, then read the posts again. A finished sync is `idle` with a newer `last_synced_at`. A sync that failed is `failed`, and `error` says why.
+
+```bash
+curl https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/sync \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
 - **Depth:** Instagram covers up to the 500 most recent posts, Facebook up to the 500 most recent per Page, TikTok and Zalo the 20 most recent, and other platforms the 25 most recent. The TikTok platform route has its own cooldown: see [TikTok](/platforms/tiktok#sync-videos).
-- **Cooldown:** SocialAPI allows 1 sync per account every 5 minutes. The 5-minute window starts when you connect the account and on every sync request, including one that returns `501`. A request inside the window returns `429 accounts.sync_rate_limited`, with `Retry-After` and `error.meta.retry_after_seconds` set to the seconds left.
+- **Already running:** a `POST` for an account that is already syncing returns that sync and starts no second one. Connecting an account starts a sync too.
+- **Cooldown:** SocialAPI allows 1 sync per account every 15 minutes. The window starts when you connect the account and when a sync starts. A request inside the window returns `429 accounts.sync_rate_limited`, with `Retry-After` and `error.meta.retry_after_seconds` set to the seconds left.
+- **Daily limit:** each day, your plan allows 10 syncs for every brand it includes, so Side Hustle allows 100, Full Send 500 (500 more per Profile pack), and Enterprise has no limit. The count resets at midnight UTC. A request past it returns `429 accounts.sync_daily_limit`, with `Retry-After` and `error.meta.retry_after_seconds` set to the seconds until midnight UTC, and `error.meta.limit` set to your plan's daily limit. SocialAPI already refreshes every account's recent posts in the background, so most integrations never need the limit.
 - **Unsupported platforms:** a platform that cannot list posts, such as a LinkedIn member profile or WhatsApp, returns `501 resource.not_supported`.
-- **Pinterest:** `POST /v1/accounts/{id}/sync` returns 200 `{"success": true}` and refreshes nothing: Pins are read live.
-- **Other errors:** `404 account.not_found` for an account your key cannot reach, `403 account.permission_missing` for an account without `posts.read`, and `502` with a `platform.{platform}.*` code when the platform fails.
+- **Pinterest:** a sync starts and refreshes nothing: Pins are read live.
+- **Other errors:** `404 account.not_found` for an account your key cannot reach, and `403 account.permission_missing` for an account without `posts.read`. A platform failure during the sync leaves `state` at `failed` with the reason in `error`.
 
 TikTok and YouTube also have their own sync routes. See [TikTok](/platforms/tiktok#sync-videos) and [YouTube](/platforms/youtube).
 

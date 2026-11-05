@@ -314,11 +314,11 @@ An Instagram target includes `platform_media`: every image and video on the publ
 | `url` | string | Link to the file, hosted by Instagram. |
 | `thumbnail_url` | string | Link to a video's cover image. Absent on images. |
 
-The links expire. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{id}/sync`, then read the post again.
+The links expire. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{id}/sync`, wait until `GET /v1/accounts/{id}/sync` is no longer `syncing`, then read the post again.
 
 `url` is absent when Instagram withholds the file, for example a video with licensed audio. The cover image is still included.
 
-`POST /v1/accounts/{id}/sync` covers up to the 500 most recent posts on an Instagram account. Each account can be synced once every 5 minutes; an earlier call returns `429 accounts.sync_rate_limited` with a `Retry-After` header. The account needs the `posts.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
+`POST /v1/accounts/{id}/sync` covers up to the 500 most recent posts on an Instagram account. It returns at once and the sync runs in the background: poll `GET /v1/accounts/{id}/sync` until `state` is no longer `syncing`. Each account can be synced once every 15 minutes, and your plan sets a daily limit; see [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts). The account needs the `posts.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
 
 `platform_media` is separate from `media`, which lists what you sent when publishing through SocialAPI and is empty for posts published elsewhere.
 
