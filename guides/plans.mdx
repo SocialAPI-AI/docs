@@ -27,7 +27,7 @@ Compare prices on the [pricing page](https://social-api.ai/pricing) and change y
 | Business (`business`) | Empire | 200 | Unlimited | Unlimited | Unlimited | $349 / €311 | $3,348 / €2,980 |
 | Enterprise (`enterprise`) | Enterprise | Unlimited | Unlimited | Unlimited | Unlimited | Custom | Custom |
 
-Every paid plan is sold in USD and in EUR; pick the currency at checkout. A subscription keeps the currency it started in, including when you change plan. `GET /v1/users/me` returns it as `billing_currency`: `usd`, `eur`, or an empty string when you never subscribed. 100 MB is 104,857,600 bytes.
+Every paid plan is sold in USD and in EUR; pick the currency at checkout. A subscription keeps the currency it started in, including when you change plan. `billing_currency` in `GET /v1/users/me` gives that currency: `usd` or `eur`. It stays set after a cancellation, and it is an empty string when you never subscribed. 100 MB is 104,857,600 bytes.
 
 What each limit returns when you reach it:
 
@@ -262,6 +262,8 @@ Over the post or interaction allowance, the request returns HTTP 429 and nothing
 ```
 
 The interaction allowance returns the same shape with `validation.interaction_limit_exhausted`. Both reset at `period_end`. To continue before then, upgrade your plan.
+
+Through the MCP server, a failed tool call for a limit that a higher plan lifts (post and interaction credits, brands, storage, exports, Pages per brand, paid-only features) also carries `upgrade_url`, the plans page of your dashboard, and a `hint` sentence your agent can show the user. Opening the link asks you to sign in first.
 
 `POST /v1/posts/import` checks the allowance before it creates anything. When the CSV holds more valid rows than you have post credits left, drafts included, it returns `429 billing.post_limit` and creates no post.
 
