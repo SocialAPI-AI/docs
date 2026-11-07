@@ -176,7 +176,7 @@ Response (HTTP 200):
 | `attachments` | A list of attachments, described below |
 | `attachment_url` | Deprecated shorthand for one attachment, ignored when `attachments` is set. A public media URL |
 | `reply_to_message_id` | Facebook and Zalo: make the first message a reply to the message with this `platform_id`. On Instagram connected through Instagram Login, the send fails with `422 platform.instagram.invalid_parameter`. Other platforms ignore the field |
-| `message_tag` | Instagram Login: `HUMAN_AGENT`, see [The messaging window](#the-messaging-window). Not sent on Facebook or on Instagram connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login) |
+| `message_tag` | Instagram Login only, and only `HUMAN_AGENT`, on a reply a person on your team writes. It must be enabled for your SocialAPI account: see [The human agent tag](#the-human-agent-tag). Any other value, or a `message_tag` on any other platform or on Instagram connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login), returns `422 messaging.tag_not_supported` |
 | `quick_replies`, `buttons`, `cards` | Interactive content, described in [Interactive messages](#interactive-messages). Set 1 of the 3. A Facebook send delivers only `text` and ignores these fields |
 | `list_sections`, `list_button` | WhatsApp only: a list menu. See [WhatsApp](/platforms/whatsapp) |
 
@@ -292,12 +292,68 @@ Response (HTTP 200):
 
 Most platforms let you message a person only for a limited time after their last message. A send outside the window fails, and SocialAPI sends nothing.
 
-- **Instagram and Facebook:** 24 hours from the person's last message. Outside it, the send returns `400 platform.instagram.window_closed` or `400 platform.facebook.window_closed`. On Instagram Login, `message_tag: "HUMAN_AGENT"` extends the window to 7 days. Instagram Login accepts no other tag: any other value returns `400 validation.invalid_message_tag`. A Facebook Page, and an Instagram account connected through Facebook Login, send no `message_tag`: the DM goes out untagged.
+- **Instagram and Facebook:** 24 hours from the person's last message. Outside it, the send returns `400 platform.instagram.window_closed` or `400 platform.facebook.window_closed`. On Instagram Login, a reply a person on your team writes can go out up to 7 days after the person's last message with the `HUMAN_AGENT` tag: see [The human agent tag](#the-human-agent-tag).
 - **WhatsApp:** a free-form message needs the 24-hour service window, and outside it the send returns `400 whatsapp.window_closed`. An approved template is the way to reach the person: see [WhatsApp](/platforms/whatsapp#the-24-hour-service-window).
 - **Zalo:** the person must have interacted with the Official Account in the last 7 days. Outside it, the send returns `422 platform.zalo.not_deliverable`: see [Zalo](/platforms/zalo#the-7-day-messaging-window).
 - **Telegram:** the person must have messaged the bot first. Before that, the send returns `403 telegram.cannot_message`: see [Telegram](/platforms/telegram).
 
-After Instagram or Facebook refuses a conversation for a closed window, SocialAPI refuses further sends on it with the same code until the person messages you again or 24 hours pass. These refusals cost no credit. An Instagram Login send with `message_tag` is not refused this way. A send on Instagram connected through Facebook Login goes out untagged, so it is refused. A [private reply](/guides/comments#send-a-private-reply) does not clear the refusal. The person's next message does.
+After Instagram or Facebook refuses a conversation for a closed window, SocialAPI refuses further sends on it with the same code until the person messages you again or 24 hours pass. These refusals cost no credit. A send that goes out with the `HUMAN_AGENT` tag is not refused this way. A [private reply](/guides/comments#send-a-private-reply) does not clear the refusal. The person's next message does.
+
+## The human agent tag
+
+The `HUMAN_AGENT` message tag lets a person on your team answer an Instagram DM between 24 hours and 7 days after the person's last message. Only Instagram accounts connected through Instagram Login accept it. Your SocialAPI account must be enabled for it: email [support@social-api.ai](mailto:support@social-api.ai) to request it. Until then, a request with `message_tag` returns `403 messaging.tag_not_enabled`.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Your replacement order shipped this morning. Tracking: 1Z999AA10123456784.",
+    "message_tag": "HUMAN_AGENT"
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_K7QW2NPXR4TBZ8LMCE3VHJ6YD9AFS1GU",
+  "message_ids": ["sapi_dm_K7QW2NPXR4TBZ8LMCE3VHJ6YD9AFS1GU"]
+}
+```
+
+What happens to a request with `message_tag: "HUMAN_AGENT"` depends on when the person last messaged the account:
+
+| Person's last message | Request with `message_tag: "HUMAN_AGENT"` | Reply sent from the SocialAPI dashboard |
+|---|---|---|
+| Less than 24 hours ago | Sent without the tag, as an ordinary reply | Sent without the tag |
+| 24 hours to 7 days ago | Sent with the tag | Sent with the tag, with no action from you |
+| More than 7 days ago | `400 messaging.human_agent_window_closed`, nothing is sent. The person must message you first | Sent without the tag, so Instagram refuses it as outside the messaging window |
+| No message from the person in the conversation | Sent without the tag | Sent without the tag |
+
+Replies sent from the SocialAPI dashboard need no enablement. A refused request costs no credit.
+
+### Use it only for replies a person writes
+
+You are responsible for following [Meta's messaging policy](https://developers.facebook.com/docs/messenger-platform/policy/policy-overview) on every message you send with the tag. Send the tag only on a reply that a person on your team writes to answer the person. Never send it from:
+
+- workflows or [Automations](/guides/automations) (an Automation never sends the tag)
+- bots, or AI agents acting on their own
+- broadcasts
+- promotions
+- re-engagement messages
+
+### When tagging is paused or revoked
+
+Misuse of the tag pauses tagging on the connected account until 00:00 UTC, and SocialAPI emails you when it happens. Instagram reporting a messaging policy violation on a tagged send pauses tagging the same way. While tagging is paused:
+
+- A request with `message_tag` returns `429 messaging.tag_rate_limited`. `Retry-After` and `error.meta.retry_after_seconds` give the seconds until 00:00 UTC. Send without `message_tag`, or wait.
+- A `429 messaging.tag_rate_limited` without `Retry-After` has no set end time. Send without `message_tag`.
+- Replies sent from the SocialAPI dashboard go out without the tag.
+
+Misuse can also revoke tag access for your SocialAPI account. Requests with `message_tag` then return `403 messaging.tag_not_enabled`, and dashboard replies go out without the tag. Meta can also restrict the Instagram account itself.
 
 ## Limits
 
@@ -327,10 +383,11 @@ Check these in order when a send fails:
 3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `messages.write` to send a message or a reaction, and `messages.read` to start or read an inbox sync. `error.meta.permission` names it. The conversation and message lists return what SocialAPI stored and never return this error: an account without `messages.read` stores no new messages.
 4. **`400 validation.*`.** The body is wrong. `error.meta.field` names the field. The codes are in [Send a message](#send-a-message) and [Interactive messages](#interactive-messages).
 5. **`400 platform.instagram.window_closed`, `400 platform.facebook.window_closed`, `400 whatsapp.window_closed`, `422 platform.zalo.not_deliverable`, `403 telegram.cannot_message`.** The messaging window is closed: see [The messaging window](#the-messaging-window).
-6. **`422 platform.instagram.thread_unavailable`, `422 platform.facebook.thread_unavailable`.** The platform refused to deliver to this conversation, which can be restricted or unavailable.
-7. **`403 platform.instagram.permission_denied`, `403 platform.facebook.permission_denied`.** The platform scopes granted at connect do not cover the action. Reconnect the account and approve every scope.
-8. **`429 validation.interaction_limit_exhausted`, `429 platform.{platform}.rate_limit`.** Your allowance, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
-9. **`501 resource.not_supported`.** The platform has no DMs, or no reactions.
+6. **`422 messaging.tag_not_supported`, `403 messaging.tag_not_enabled`, `400 messaging.human_agent_window_closed`, `429 messaging.tag_rate_limited`.** The request carries `message_tag` and the tag cannot be sent: see [The human agent tag](#the-human-agent-tag).
+7. **`422 platform.instagram.thread_unavailable`, `422 platform.facebook.thread_unavailable`.** The platform refused to deliver to this conversation, which can be restricted or unavailable.
+8. **`403 platform.instagram.permission_denied`, `403 platform.facebook.permission_denied`.** The platform scopes granted at connect do not cover the action. Reconnect the account and approve every scope.
+9. **`429 validation.interaction_limit_exhausted`, `429 platform.{platform}.rate_limit`.** Your allowance, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
+10. **`501 resource.not_supported`.** The platform has no DMs, or no reactions.
 
 When a conversation or a message is missing from a list, force a refresh with [`POST /v1/inbox/sync`](/guides/inbox#refresh-the-inbox-manually). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
 
@@ -352,7 +409,7 @@ SocialAPI sends DM events to your [webhook endpoint](/guides/webhooks): [`dm.rec
 | `social_api_list_conversations` | List conversations, most recent activity first |
 | `social_api_get_conversation` | Get one conversation |
 | `social_api_list_messages` | List the messages of a conversation, newest first |
-| `social_api_send_dm` | Send a text message with optional quick replies or buttons. On Facebook the tool delivers only the text. The text is 1,000 bytes at most. The tool sends no attachments and no cards: use the REST endpoint for them |
+| `social_api_send_dm` | Send a text message with optional quick replies or buttons. On Facebook the tool delivers only the text. The text is 1,000 bytes at most. The tool sends no attachments and no cards: use the REST endpoint for them. It accepts `message_tag` under the rules in [The human agent tag](#the-human-agent-tag): the reply must be written by a person, never by an AI agent acting on its own |
 | `social_api_update_conversation` | Archive a conversation, or set it back to `active` |
 | `social_api_mark_conversation_read` | Mark a conversation as read |
 

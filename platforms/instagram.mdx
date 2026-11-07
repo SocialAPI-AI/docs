@@ -137,7 +137,7 @@ Hold each Instagram account through one path. Connecting through Facebook Login 
 | Instagram accounts per connection | One | Every account the login administers, each as a Page of the brand's Instagram account |
 | Delete a published post | No | Yes: `DELETE /v1/posts/{pid}` deletes it, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI |
 | Like a comment | No | Yes |
-| `message_tag: "HUMAN_AGENT"` on a DM | Extends the window to 7 days | Not sent: the DM goes out untagged and the 24-hour window applies |
+| `message_tag: "HUMAN_AGENT"` on a DM | Accepted once enabled for your SocialAPI account: see [The human agent tag](#the-human-agent-tag) | Returns `422 messaging.tag_not_supported`. The 24-hour window applies |
 | `content_type` on a post | Required | Optional. `stories` and `carousel` apply as given. Otherwise, including `feed` and `reel`, the media decides: one video publishes as a Reel, one image as a feed post, 2 or more items as a carousel |
 | Paid-partnership label | Either key fails validation | `platform_data.is_paid_partnership` (`true` or `false`) and `platform_data.branded_content_sponsor_ids` (1 or 2 numeric Instagram account IDs) |
 | Scope names | `instagram_business_*` | `instagram_*` and `pages_*` |
@@ -183,13 +183,23 @@ A private reply sends a DM to the person who commented. Send it with `POST /v1/i
 
 ## Direct messages and the messaging window
 
-An Instagram account can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.instagram.window_closed`. On Instagram Login, send `message_tag: "HUMAN_AGENT"` to reply up to 7 days after the person's last message. Instagram Login accepts no other tag: any other value returns `400 validation.invalid_message_tag`. On [Facebook Login](#connect-through-facebook-login), `message_tag` is not sent: the DM goes out untagged and the 24-hour window applies.
+An Instagram account can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.instagram.window_closed`. On Instagram Login, a reply a person on your team writes can go out up to 7 days after the person's last message with the `HUMAN_AGENT` tag: see [The human agent tag](#the-human-agent-tag). On [Facebook Login](#connect-through-facebook-login), any `message_tag` returns `422 messaging.tag_not_supported`.
 
 - **Message types.** Text, attachments, quick replies, buttons, and cards. Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
 - **Size limits.** Instagram sets them and refuses a larger message: text up to 1,000 bytes of UTF-8; images in PNG or JPEG up to 8 MB; video in MP4, OGG, AVI, MOV, or WebM up to 25 MB; audio in AAC, M4A, WAV, or MP4 up to 25 MB; files in PDF up to 25 MB.
 - **Unsending.** Instagram does not let apps unsend or delete a sent DM. When the other person unsends a message, you receive a `dm.deleted` event and the message disappears from the conversation.
 - **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` reacts to a message with any emoji, and `DELETE` on the same path removes the reaction.
 - **Story mentions.** A story that mentions your account arrives as `dm.received` with an attachment of type `story_mention`, not as `mention.received`.
+
+### The human agent tag
+
+`message_tag: "HUMAN_AGENT"` lets a person on your team answer a DM between 24 hours and 7 days after the person's last message, on Instagram Login only. The full request and responses are in [The human agent tag](/guides/direct-messages#the-human-agent-tag).
+
+- **Enablement.** Your SocialAPI account must be enabled for the tag: email [support@social-api.ai](mailto:support@social-api.ai) to request it. Until then, a request with `message_tag` returns `403 messaging.tag_not_enabled`.
+- **When the tag applies.** Inside 24 hours of the person's last message, the reply is sent without the tag. After 7 days, a request with the tag returns `400 messaging.human_agent_window_closed` and nothing is sent.
+- **Dashboard replies.** A reply sent from the SocialAPI dashboard between 24 hours and 7 days after the person's last message carries the tag automatically, with no enablement.
+- **Forbidden uses.** Never send the tag from workflows, Automations, bots, AI agents acting on their own, broadcasts, promotions, or re-engagement messages. You are responsible for following [Meta's messaging policy](https://developers.facebook.com/docs/messenger-platform/policy/policy-overview).
+- **Misuse.** Misuse pauses tagging on the account until 00:00 UTC (requests with the tag return `429 messaging.tag_rate_limited` with `Retry-After`), or revokes tag access for your SocialAPI account. Meta can also restrict the Instagram account.
 
 ### Participant profile
 

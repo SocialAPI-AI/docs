@@ -1408,17 +1408,17 @@
             }
         },
         "/accounts/{id}/sync": {
-            "post": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Refreshes one connected account's posts: new posts appear, engagement counts update, and Instagram and Facebook media links in platform_media are renewed. Instagram covers up to the 500 most recent posts, Facebook up to the 500 most recent per Page; other platforms cover up to the 25 most recent. Available on platforms that support listing posts. Returns once the refresh completes. Each account can be synced once every 5 minutes.",
+                "description": "Reports whether a post sync is running for the account and when its posts were last refreshed. Poll this after POST /accounts/{id}/sync until state leaves \"syncing\". A failed sync carries the reason in error.",
                 "tags": [
                     "Accounts"
                 ],
-                "summary": "Re-sync a connected account's posts",
+                "summary": "Get the post sync status of a connected account",
                 "parameters": [
                     {
                         "description": "Connected account ID",
@@ -1432,20 +1432,92 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Current sync state",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "boolean"
-                                    }
+                                    "$ref": "#/components/schemas/api_endpoints.AccountPostsSyncResponse"
                                 }
                             }
                         }
                     },
                     "401": {
                         "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The account was not granted the posts.read permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Refreshes one connected account's posts: new posts appear, engagement counts update, and Instagram and Facebook media links in platform_media are renewed. Instagram covers up to the 500 most recent posts, Facebook up to the 500 most recent per Page; other platforms cover up to the 25 most recent. Returns immediately: poll GET /accounts/{id}/sync until state leaves \"syncing\", then read the posts. A sync already running for the account is returned as-is. Each account can start a sync once every 15 minutes, and each day your plan allows 10 syncs per brand it includes (Enterprise is unlimited); the count resets at midnight UTC.",
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Start a sync of a connected account's posts",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Sync started, or already running",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AccountPostsSyncResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The account was not granted the posts.read permission",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1465,7 +1537,7 @@
                         }
                     },
                     "429": {
-                        "description": "This account was synced less than 5 minutes ago. The Retry-After header carries the seconds to wait.",
+                        "description": "accounts.sync_rate_limited: this account was synced less than 15 minutes ago. accounts.sync_daily_limit: the plan's daily sync limit is reached. The Retry-After header carries the seconds to wait.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1475,7 +1547,7 @@
                         }
                     },
                     "501": {
-                        "description": "Platform cannot list posts (e.g. LinkedIn, WhatsApp)",
+                        "description": "Platform cannot list posts",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1484,8 +1556,126 @@
                             }
                         }
                     },
-                    "502": {
-                        "description": "Upstream platform API error",
+                    "503": {
+                        "description": "The sync could not be started. Retry later.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/overview": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Summarises how the posts published in a range performed: totals against the previous range of equal length, engagement per publish day, breakdowns by platform and media type, the top posts, the hours your posts did best in, and the daily replies, DMs and moderation SocialAPI performed. Covers every account the key can read, or one account, brand, or platform.\nEngagements are likes + comments + shares + saves. Views are reported apart, by the platforms that publish them. Counters are the ones SocialAPI last synced (see metrics_synced_at), so this makes no platform call and costs no credits. Accounts without the analytics.read permission are left out and counted in accounts_excluded.",
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Get analytics overview",
+                "parameters": [
+                    {
+                        "example": "2026-10-07",
+                        "description": "First day, YYYY-MM-DD, in tz. Defaults to 29 days before to.",
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "2026-11-05",
+                        "description": "Last day, YYYY-MM-DD, in tz. Defaults to today in tz.",
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "Europe/Paris",
+                        "description": "IANA time zone that days and hours are cut in. Defaults to UTC.",
+                        "name": "tz",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Narrow to one connected account",
+                        "name": "account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Narrow to one brand",
+                        "name": "brand_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "example": "instagram",
+                        "description": "Narrow to one platform",
+                        "name": "platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Order of top_posts: engagements (default), likes, comments, shares, or views",
+                        "name": "sort",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.AnalyticsOverviewResponseWrapper"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed or inverted range, a range wider than 400 days, an unknown tz, or an unknown sort",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Account or brand not found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4290,7 +4480,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid request body, missing required fields, or messaging window closed (platform.instagram.window_closed / platform.facebook.window_closed: the recipient must message you first to reopen the 24-hour window). After the platform refuses a thread for a closed window, later untagged sends on it are refused here with the same code and blocked_locally in the meta, until an inbound message reopens it or 24 hours pass; no credit is charged for those.",
+                        "description": "Invalid request body, missing required fields, or messaging window closed (platform.instagram.window_closed / platform.facebook.window_closed: the recipient must message you first to reopen the 24-hour window). After the platform refuses a thread for a closed window, later untagged sends on it are refused here with the same code and blocked_locally in the meta, until an inbound message reopens it or 24 hours pass; no credit is charged for those. messaging.human_agent_window_closed: message_tag was sent after the human agent window closed, so the person must message you first.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4310,7 +4500,7 @@
                         }
                     },
                     "403": {
-                        "description": "Platform rejected the request (e.g. platform.instagram.permission_denied), or account requires reconnection (account.reconnection_required)",
+                        "description": "Platform rejected the request (e.g. platform.instagram.permission_denied), or account requires reconnection (account.reconnection_required), or message_tag was sent but human agent tagging is not enabled for your account (messaging.tag_not_enabled): contact support to request it.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4330,7 +4520,7 @@
                         }
                     },
                     "422": {
-                        "description": "The platform could not fetch or accept an attachment (platform.instagram.attachment_failed, platform.facebook.attachment_failed): check that the URL is publicly reachable and the file type and size are supported",
+                        "description": "The platform could not fetch or accept an attachment (platform.instagram.attachment_failed, platform.facebook.attachment_failed): check that the URL is publicly reachable and the file type and size are supported. messaging.tag_not_supported: message_tag is not HUMAN_AGENT, or this account does not accept message tags; send without message_tag.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4340,7 +4530,7 @@
                         }
                     },
                     "429": {
-                        "description": "Platform rate limit exceeded",
+                        "description": "Platform rate limit exceeded, or human agent tagging is paused for this account (messaging.tag_rate_limited): send without message_tag, or retry after retry_after_seconds when it is present.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12722,6 +12912,43 @@
                     }
                 }
             },
+            "api_endpoints.AccountPostsSyncResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/api_endpoints.AccountPostsSyncStatus"
+                    }
+                }
+            },
+            "api_endpoints.AccountPostsSyncStatus": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "description": "Error says why the last sync failed. Empty unless State is \"failed\".",
+                        "type": "string",
+                        "example": ""
+                    },
+                    "finished_at": {
+                        "type": "string"
+                    },
+                    "last_synced_at": {
+                        "type": "string"
+                    },
+                    "started_at": {
+                        "type": "string"
+                    },
+                    "state": {
+                        "description": "State is \"idle\", \"syncing\", or \"failed\". A finished sync is idle with a\nnewer LastSyncedAt.",
+                        "type": "string",
+                        "enum": [
+                            "idle",
+                            "syncing",
+                            "failed"
+                        ],
+                        "example": "syncing"
+                    }
+                }
+            },
             "api_endpoints.AccountsListResponse": {
                 "type": "object",
                 "properties": {
@@ -12734,6 +12961,14 @@
                         "items": {
                             "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.Account"
                         }
+                    }
+                }
+            },
+            "api_endpoints.AnalyticsOverviewResponseWrapper": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.AnalyticsOverview"
                     }
                 }
             },
@@ -16528,7 +16763,7 @@
                         }
                     },
                     "message_tag": {
-                        "description": "MessageTag sends the DM outside the standard 24-hour window. Instagram\nconnected through Instagram Login only, which accepts only HUMAN_AGENT and\nextends the window to 7 days; any other value returns 400\nvalidation.invalid_message_tag. On Facebook, on Instagram connected\nthrough Facebook Login, and on every other platform, the DM is sent\nuntagged and the 24-hour window applies.",
+                        "description": "Optional. Only `HUMAN_AGENT` is accepted, on Instagram accounts connected with Instagram Login, for replies a person types between 24 hours and 7 days after the person's last message. It must not be used by workflows, automations, bots, AI agents acting on their own, broadcasts, promotions or re-engagement. It needs to be enabled for your account by support. Inside 24 hours the message is sent without the tag. Misuse pauses or revokes access and can get the account restricted by Meta.",
                         "type": "string",
                         "example": "HUMAN_AGENT"
                     },
@@ -19630,6 +19865,78 @@
                     }
                 }
             },
+            "social-api_ai_core_api_service.AnalyticsOverview": {
+                "type": "object",
+                "properties": {
+                    "accounts_excluded": {
+                        "description": "AccountsExcluded is how many accounts in scope were left out because\nthey lack the analytics.read permission.",
+                        "type": "integer",
+                        "example": 0
+                    },
+                    "activity": {
+                        "description": "Activity is the daily count of replies, DMs and moderation SocialAPI\nperformed for the accounts in scope, the same series shape as the\nhistory routes.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.MetricSeries"
+                        }
+                    },
+                    "best_times": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.OverviewBestTimes"
+                    },
+                    "by_day": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.OverviewDay"
+                        }
+                    },
+                    "by_format": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.OverviewFormat"
+                        }
+                    },
+                    "by_platform": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.OverviewPlatform"
+                        }
+                    },
+                    "from": {
+                        "type": "string",
+                        "example": "2026-10-07"
+                    },
+                    "metrics_synced_at": {
+                        "description": "MetricsSyncedAt is the most recent counter refresh among the posts in\nrange. Absent when none has been refreshed yet.",
+                        "type": "string",
+                        "example": "2026-11-05T08:00:00Z"
+                    },
+                    "previous": {
+                        "description": "Previous is the same figures for the window of equal length that ends\nthe day before from.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_service.OverviewTotals"
+                            }
+                        ]
+                    },
+                    "to": {
+                        "type": "string",
+                        "example": "2026-11-05"
+                    },
+                    "top_posts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.OverviewTopPost"
+                        }
+                    },
+                    "totals": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.OverviewTotals"
+                    },
+                    "tz": {
+                        "type": "string",
+                        "example": "Europe/Paris"
+                    }
+                }
+            },
             "social-api_ai_core_api_service.AnalyticsPoint": {
                 "type": "object",
                 "properties": {
@@ -20279,6 +20586,219 @@
                         "description": "Source is reported, sampled, owned, or mixed when a rollup combines more\nthan one.",
                         "type": "string",
                         "example": "reported"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.OverviewBestTimeCell": {
+                "type": "object",
+                "properties": {
+                    "avg_engagements": {
+                        "description": "AvgEngagements is the mean engagements of the posts published in this\nhour. It describes your past posts, not when your audience is online.",
+                        "type": "number",
+                        "example": 118.4
+                    },
+                    "hour": {
+                        "description": "Hour is 0 to 23.",
+                        "type": "integer",
+                        "example": 9
+                    },
+                    "posts": {
+                        "type": "integer",
+                        "example": 5
+                    },
+                    "weekday": {
+                        "description": "Weekday is 1 (Monday) to 7 (Sunday).",
+                        "type": "integer",
+                        "example": 4
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.OverviewBestTimes": {
+                "type": "object",
+                "properties": {
+                    "cells": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_service.OverviewBestTimeCell"
+                        }
+                    },
+                    "posts_considered": {
+                        "type": "integer",
+                        "example": 42
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.OverviewDay": {
+                "type": "object",
+                "properties": {
+                    "day": {
+                        "type": "string",
+                        "example": "2026-10-14"
+                    },
+                    "engagements": {
+                        "type": "integer",
+                        "example": 290
+                    },
+                    "posts": {
+                        "type": "integer",
+                        "example": 3
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.OverviewFormat": {
+                "type": "object",
+                "properties": {
+                    "engagements": {
+                        "type": "integer",
+                        "example": 1900
+                    },
+                    "media_type": {
+                        "description": "MediaType is the platform's own media kind, lowercased (image, video,\nreel, carousel_album, ...), or unknown when the platform did not say.",
+                        "type": "string",
+                        "example": "reel"
+                    },
+                    "posts": {
+                        "type": "integer",
+                        "example": 12
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.OverviewPlatform": {
+                "type": "object",
+                "properties": {
+                    "comments": {
+                        "type": "integer",
+                        "example": 412
+                    },
+                    "engagements": {
+                        "type": "integer",
+                        "example": 3810
+                    },
+                    "likes": {
+                        "type": "integer",
+                        "example": 3120
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "instagram"
+                    },
+                    "posts": {
+                        "type": "integer",
+                        "example": 42
+                    },
+                    "saves": {
+                        "type": "integer",
+                        "example": 77
+                    },
+                    "shares": {
+                        "type": "integer",
+                        "example": 201
+                    },
+                    "views": {
+                        "type": "integer",
+                        "example": 58200
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.OverviewPostMetrics": {
+                "type": "object",
+                "properties": {
+                    "comments": {
+                        "type": "integer",
+                        "example": 52
+                    },
+                    "engagements": {
+                        "type": "integer",
+                        "example": 512
+                    },
+                    "likes": {
+                        "type": "integer",
+                        "example": 430
+                    },
+                    "saves": {
+                        "type": "integer",
+                        "example": 9
+                    },
+                    "shares": {
+                        "type": "integer",
+                        "example": 21
+                    },
+                    "views": {
+                        "type": "integer",
+                        "example": 10400
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.OverviewTopPost": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "media_type": {
+                        "type": "string",
+                        "example": "reel"
+                    },
+                    "metrics": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_service.OverviewPostMetrics"
+                    },
+                    "permalink": {
+                        "type": "string",
+                        "example": "https://www.instagram.com/p/C1a2b3c4d5/"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "example": "instagram"
+                    },
+                    "post_id": {
+                        "type": "string",
+                        "example": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "example": "2026-10-14T09:30:00Z"
+                    },
+                    "text": {
+                        "type": "string",
+                        "example": "Our autumn menu is here"
+                    },
+                    "thumbnail": {
+                        "type": "string",
+                        "example": "https://scontent.cdninstagram.com/v/t51.29350-15/456_n.jpg"
+                    }
+                }
+            },
+            "social-api_ai_core_api_service.OverviewTotals": {
+                "type": "object",
+                "properties": {
+                    "comments": {
+                        "type": "integer",
+                        "example": 412
+                    },
+                    "engagements": {
+                        "type": "integer",
+                        "example": 3810
+                    },
+                    "likes": {
+                        "type": "integer",
+                        "example": 3120
+                    },
+                    "posts": {
+                        "type": "integer",
+                        "example": 42
+                    },
+                    "saves": {
+                        "type": "integer",
+                        "example": 77
+                    },
+                    "shares": {
+                        "type": "integer",
+                        "example": 201
+                    },
+                    "views": {
+                        "type": "integer",
+                        "example": 58200
                     }
                 }
             },
