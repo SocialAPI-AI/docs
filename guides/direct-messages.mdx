@@ -349,9 +349,9 @@ You are responsible for following [Meta's messaging policy](https://developers.f
 
 Misuse of the tag pauses tagging on the connected account until 00:00 UTC, and SocialAPI emails you when it happens. Instagram reporting a messaging policy violation on a tagged send pauses tagging the same way. While tagging is paused:
 
-- A request with `message_tag` returns `429 messaging.tag_rate_limited`. `Retry-After` and `error.meta.retry_after_seconds` give the seconds until 00:00 UTC. Send without `message_tag`, or wait.
-- A `429 messaging.tag_rate_limited` without `Retry-After` has no set end time. Send without `message_tag`.
-- Replies sent from the SocialAPI dashboard go out without the tag.
+- Replies inside 24 hours of the person's last message still work, from the API and from the SocialAPI dashboard.
+- Replies that need the tag, between 24 hours and 7 days after the person's last message, are refused until 00:00 UTC with `429 messaging.tag_rate_limited`, from the API and from the SocialAPI dashboard. Nothing is sent and no credit is charged. `Retry-After` and `error.meta.retry_after_seconds` give the seconds until 00:00 UTC.
+- A `429 messaging.tag_rate_limited` without `Retry-After` has no set end time: replies that need the tag cannot be sent until it ends.
 
 Misuse can also revoke tag access for your SocialAPI account. Requests with `message_tag` then return `403 messaging.tag_not_enabled`, and dashboard replies go out without the tag. Meta can also restrict the Instagram account itself.
 
