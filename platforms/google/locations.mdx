@@ -314,10 +314,10 @@ Each item carries an `attribution` block with `profile_name`, `profile_photo_url
 
 Attributes are the facts shown on a listing: outdoor seating, Wi-Fi, accepted payment methods, a wheelchair accessible entrance. Which attributes a location accepts depends on its category and country.
 
-`GET /v1/platforms/google/accounts/{id}/attributes/available` lists them, with display names in `language_code` (English by default):
+`GET /v1/platforms/google/accounts/{id}/attributes/available` lists them:
 
 ```bash
-curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/attributes/available?language_code=fr" \
+curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/attributes/available" \
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
@@ -327,14 +327,14 @@ curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7
     {
       "name": "has_outdoor_seating",
       "value_type": "BOOL",
-      "display_name": "Terrasse",
-      "group_display_name": "Services",
-      "values": [{ "bool_value": true, "display_name": "Oui" }, { "bool_value": false, "display_name": "Non" }]
+      "display_name": "Outdoor seating",
+      "group_display_name": "Amenities",
+      "values": [{ "bool_value": true, "display_name": "Yes" }, { "bool_value": false, "display_name": "No" }]
     },
     {
       "name": "pay_credit_card_types_accepted",
       "value_type": "REPEATED_ENUM",
-      "display_name": "Cartes de crédit",
+      "display_name": "Credit cards",
       "repeatable": true,
       "values": [{ "enum_value": "visa", "display_name": "Visa" }]
     }
@@ -379,7 +379,7 @@ Response (HTTP 200): the updated attributes, in the shape of the read. Like ever
 
 ## Food menus
 
-Restaurants and cafés can show their menus on the listing. Only locations whose [details](#read-a-locations-details) report `can_have_food_menus: true` support them; on any other location these endpoints return `501 resource.not_supported`.
+Restaurants and cafés can show their menus on the listing. Only locations whose [details](#read-a-locations-details) report `can_have_food_menus: true` support them. Check it before you write: Google refuses menus on any other location.
 
 `GET /v1/platforms/google/accounts/{id}/food-menus` returns every menu. A location without menus returns `"menus": []`.
 
@@ -476,7 +476,7 @@ Response (HTTP 201): the new link. Only one link per type can be preferred; `is_
 | `400 validation.uri_invalid` | `uri` is not an absolute http or https URL |
 | `400 validation.place_action_type_invalid` | The type is not one of the values above |
 | `400 validation.no_fields_to_update` | A `PATCH` with none of the three fields |
-| `403 platform.google.access_denied` | The link belongs to a provider (`is_editable: false`) |
+| Google refuses the change | The link belongs to a provider (`is_editable: false`). It cannot be changed or deleted here |
 | `404 resource.not_found` | No link with that `linkId` on this location |
 | `409 platform.google.already_exists` | The location already has a link with this `uri` and type |
 
