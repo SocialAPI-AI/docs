@@ -27,10 +27,10 @@ TikTok accepts a post as a job and finishes it later, so a TikTok target stays `
 | Content type | How to trigger | Notes |
 |---|---|---|
 | Single video | `media_type: "video"`, or omit it for one video | One `media` entry. MP4, MOV, or WebM. Publishes publicly |
-| Photo carousel | `media_type: "photo"`, or omit it for 2 or more images | 2 to 35 images. JPEG or WebP only. Needs `privacy_level` |
+| Photo post | `media_type: "photo"`, or omit it for 1 or more images | 1 to 35 images. JPEG or WebP only. Needs `privacy_level` |
 | Draft in the TikTok app | `post_mode: "inbox"` | Video or photo carousel. The creator finishes the post in the TikTok app |
 
-Single images are not supported, and a post cannot mix a video with images. When you omit `media_type`, 2 or more images with no video publish as a photo carousel, and anything else publishes as a video.
+A post cannot mix a video with images. When you omit `media_type`, 1 or more images with no video publish as a photo post, and anything else publishes as a video.
 
 **File limits for media you send to SocialAPI** (`source_type: "media_id"` or `"url"`): videos must be MP4, MOV, or WebM, at most 1 GB, and at least 3 seconds long. Images must be JPEG or WebP and at most 20 MB each. A file outside these limits fails validation with `400 publishing.validation_failed`. The longest video depends on the account: read `max_video_duration_sec` from [Creator info](/platforms/tiktok#creator-info). SocialAPI checks that limit when it knows the video's duration, and a longer video fails validation the same way.
 
@@ -298,13 +298,13 @@ Every video publishes publicly, and TikTok takes no privacy setting for it. Omit
 
 A photo carousel needs `privacy_level`. A photo without it fails with `400 validation.privacy_level_required`. `PUBLIC_TO_EVERYONE` is always the safe choice. TikTok can allow other levels for the account (`MUTUAL_FOLLOW_FRIENDS`, `FOLLOWER_OF_CREATOR`, `SELF_ONLY`), and a photo carousel accepts those. [Creator info](/platforms/tiktok#creator-info) lists only `PUBLIC_TO_EVERYONE`, so it does not show them. A level the account does not allow fails with `400 validation.invalid_privacy_level`, which carries the value you sent in `meta.privacy_level`. A draft needs no `privacy_level`.
 
-### Photo carousels need 2 to 35 images
+### Photo posts need 1 to 35 images
 
-A photo post with fewer than 2 or more than 35 images fails with `400 validation.media_count`. TikTok has no single-image post.
+A photo post with no images or more than 35 images fails with `400 validation.media_count`. A single image is a valid photo post.
 
 ### Media type must match the file
 
-TikTok will not build a video out of an image. A single image with no `media_type` resolves to a video, and a post like that fails with `400 validation.media_type_mismatch` before anything is sent. Set `media_type` to `"photo"` and attach 2 or more JPEG or WebP images. A `media_type` that is neither `video` nor `photo` fails with `400 validation.unsupported_media_type`. A video post with no media fails with `400 validation.media_required`.
+TikTok will not build a video out of an image. An image sent with `media_type: "video"` fails with `400 validation.media_type_mismatch` before anything is sent. Set `media_type` to `"photo"`, or omit it, and attach 1 to 35 JPEG or WebP images. A `media_type` that is neither `video` nor `photo` fails with `400 validation.unsupported_media_type`. A video post with no media fails with `400 validation.media_required`.
 
 ### Photo posts accept only JPEG and WebP
 
