@@ -25,12 +25,16 @@ An unsupported call returns `501 resource.not_supported`.
 | Publish a local post | Yes | Update, event, offer, or alert posts. Text, plus at most 1 JPEG or PNG image. See [Google Business Profile publishing](/platforms/google/publishing) |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | No | Google Business Profile has no post comments. SocialAPI ignores `first_comment` on a Google target |
-| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid`. Delete the post and publish a new one |
+| Update a published post | Partial | `PATCH /v1/posts/{pid}` changes the text and the button (`callToAction`). The image and post type cannot change: delete the post and publish a new one. See [Update post](/platforms/google/publishing#4-update-post) |
 | Delete a published post | Yes | Removes the local post from Google |
 | List posts | Yes | The location's local posts |
 | Read a location's details | Yes | See [Locations](/platforms/google/locations) |
-| Update a location | Yes | Google moderates the edit, and allows 10 location updates per minute per Business Profile |
+| Update a location | Yes | Google moderates the edit, and allows 10 profile edits per minute per Business Profile |
 | Photos and videos on the profile | Yes | List, add, and remove. Customer photos are read-only |
+| Services | Yes | Read on the location details, written with the location update. Google refuses the write when `can_modify_service_list` is false |
+| Attributes | Yes | Outdoor seating, payment methods, accessibility and more. See [Attributes](/platforms/google/locations#attributes) |
+| Food menus | Yes | Locations with `can_have_food_menus: true` only. See [Food menus](/platforms/google/locations#food-menus) |
+| Reservation and ordering links | Yes | The reserve, order and book buttons. See [Reservation and ordering links](/platforms/google/locations#reservation-and-ordering-links) |
 | List reviews | Yes | Verified locations only. See [Reviews](/platforms/google/reviews) |
 | Reply to a review | Yes | Google moderates the reply. It is `PENDING` until Google approves it |
 | Edit or delete a reply, delete a review | No | SocialAPI has no endpoint for them. A new reply replaces the old one |

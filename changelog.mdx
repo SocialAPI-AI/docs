@@ -4,6 +4,19 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-11-09" description="Google Business Profile" tags={["Google Business Profile", "Publishing"]}>
+  ## Attributes, food menus, reservation and ordering links, services, and published post edits
+
+  New endpoints manage more of a Google Business Profile location. Each takes the connected account ID and needs `accounts:read` to read and `accounts:manage` to write:
+
+  - Attributes (outdoor seating, payment methods, accessibility): `GET` and `PUT /v1/platforms/google/accounts/{id}/attributes`, and `GET .../attributes/available` for the attribute ids and values a location accepts. See [Attributes](/platforms/google/locations#attributes).
+  - Food menus: `GET` and `PUT /v1/platforms/google/accounts/{id}/food-menus`. A `PUT` replaces every menu. Locations with `can_have_food_menus: false` return `501 resource.not_supported`. See [Food menus](/platforms/google/locations#food-menus).
+  - Reservation, ordering and booking buttons: `GET` and `POST /v1/platforms/google/accounts/{id}/place-action-links`, `PATCH` and `DELETE .../place-action-links/{linkId}`, and `GET .../place-action-types`. A duplicate link returns `409 platform.google.already_exists`. See [Reservation and ordering links](/platforms/google/locations#reservation-and-ordering-links).
+  - Services: `PUT /v1/platforms/google/accounts/{id}` now accepts `service_items`, which replaces the location's whole list of services.
+
+  `PATCH /v1/posts/{pid}` now edits a `published` or `partial` post that is live on Google Business Profile alone: send `text`, `platform_data.google.callToAction`, or both. Any other field returns `400 validation.field_not_editable`, and a post also live on another platform returns `409 post.state_invalid`. See [Edit a published post](/platforms/google/publishing#edit-a-published-post).
+</Update>
+
 <Update label="2026-11-05" description="Accounts" tags={["Accounts", "Analytics"]}>
   ## Account post sync runs in the background
 

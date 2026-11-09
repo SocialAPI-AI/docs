@@ -6893,7 +6893,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Writes the location's public profile: name, description, phone numbers, address, website, categories, opening hours, service area. Only the fields you send are touched. A field you omit is left as it is, and a field you send with an empty value is CLEARED, which is how you remove a phone number or a website. Fields Google owns are not writable and are rejected: place_id, maps_uri, new_review_uri and the status flags are output-only, and language_code is fixed when the location is created. Google moderates these edits, so a 200 means the change was accepted for review rather than already live on Search and Maps; read the location back to see what is live and check has_pending_edits. Google allows 10 edits per minute per Business Profile and that limit cannot be raised. Pass validate_only=true to have Google check the change without applying it, which is the only way to test against a real profile since the API has no sandbox.",
+                "description": "Writes the location's public profile: name, description, phone numbers, address, website, categories, opening hours, service area, services. Only the fields you send are touched. A field you omit is left as it is, and a field you send with an empty value is CLEARED, which is how you remove a phone number or a website. Fields Google owns are not writable and are rejected: place_id, maps_uri, new_review_uri and the status flags are output-only, and language_code is fixed when the location is created. service_items replaces the whole list of services, and Google refuses it on a location whose details report can_modify_service_list=false. Google moderates these edits, so a 200 means the change was accepted for review rather than already live on Search and Maps; read the location back to see what is live and check has_pending_edits. Google allows 10 edits per minute per Business Profile and that limit cannot be raised. Pass validate_only=true to have Google check the change without applying it, which is the only way to test against a real profile since the API has no sandbox.",
                 "tags": [
                     "Google"
                 ],
@@ -6981,6 +6981,427 @@
                     },
                     "502": {
                         "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/attributes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the attributes set on a location, such as outdoor seating, accepted payment methods or a wheelchair accessible entrance. value_type says which value field is filled: bool_value for BOOL, enum_value for ENUM, uri_values for URL, repeated_enum_value for REPEATED_ENUM.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "List a Google Business Profile location's attributes",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleAttributesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets the attributes you list and leaves every other attribute as it is. Set the one value field that matches the attribute's value_type: bool_value, enum_value, uri_values or repeated_enum_value. An attribute sent with no value field is removed from the location. Attribute ids and accepted values come from GET /platforms/google/accounts/{id}/attributes/available and depend on the location's category and country. Google moderates profile edits, so a 200 means the change was accepted for review rather than already live on Search and Maps. Google allows 10 edits per minute per Business Profile.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "Update a Google Business Profile location's attributes",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.UpdateGoogleAttributesRequest"
+                            }
+                        }
+                    },
+                    "description": "Attributes to change",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleAttributesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Empty list, duplicate attribute, or more than one value field on an attribute",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Google's 10 edits per minute per profile exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Google rejected the attribute or value",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/attributes/available": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns every attribute available for the location's category and country, with its value_type, display names and accepted values. Use it to find the attribute ids and values to send when updating attributes. Attributes marked deprecated still read but should no longer be set.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "List the attributes a Google Business Profile location accepts",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "BCP 47 language for display names, English by default",
+                        "name": "language_code",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleAvailableAttributesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/food-menus": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the location's menus with their sections, dishes, prices and dish details. A location with no menus returns an empty list. Only locations whose details report can_have_food_menus=true support menus; others return 501.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "Get a Google Business Profile location's food menus",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleFoodMenusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "The location does not support food menus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Replaces every menu on the location with the menus you send, so send the full list each time. An empty menus list removes all menus. Every menu, section, dish and option needs at least one label with a display_name (up to 140 characters, description up to 1000), every menu needs a section, every section needs a dish, and every dish needs a price. Values such as cuisines, allergen, dietary_restriction and preparation_methods take Google's enum names, for example ITALIAN, PEANUT, VEGAN or GRILLED. media_keys reference photos already on the location's profile. Only locations whose details report can_have_food_menus=true support menus; others return 501.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "Replace a Google Business Profile location's food menus",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPFoodMenus"
+                            }
+                        }
+                    },
+                    "description": "The complete set of menus",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GoogleFoodMenusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "A menu, section, dish or label breaks the rules above",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Google's 10 edits per minute per profile exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "The location does not support food menus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Google rejected a value",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7374,6 +7795,428 @@
                     },
                     "404": {
                         "description": "Unknown account or media item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/place-action-links": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the booking, reservation and ordering links shown as buttons on the location's profile. Links with is_editable=false were added by a third-party provider and cannot be changed or deleted here.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "List a Google Business Profile location's action links",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GooglePlaceActionLinksResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds a booking, reservation or ordering button that opens uri. uri and place_action_type are required; place_action_type is one of APPOINTMENT, ONLINE_APPOINTMENT, DINING_RESERVATION, FOOD_ORDERING, FOOD_DELIVERY, FOOD_TAKEOUT or SHOP_ONLINE, and GET /platforms/google/accounts/{id}/place-action-types lists the ones the location can offer. A location cannot hold two links with the same uri and type (409). Only one link per type can be preferred: is_preferred=true picks the one Google shows first.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "Add an action link to a Google Business Profile location",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPPlaceActionLinkInput"
+                            }
+                        }
+                    },
+                    "description": "The link to add",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GooglePlaceActionLinkResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing uri or place_action_type, or an invalid value",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "A link with this uri and type already exists",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/place-action-links/{linkId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes one link. Links with is_editable=false belong to a third-party provider and are refused.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "Remove an action link from a Google Business Profile location",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Link ID from the list endpoint",
+                        "name": "linkId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Deleted"
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The link cannot be deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account or link",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Changes the uri, place_action_type or is_preferred of one link. Only the fields you send change. Links with is_editable=false belong to a third-party provider and are refused.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "Update an action link on a Google Business Profile location",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Link ID from the list endpoint",
+                        "name": "linkId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPPlaceActionLinkInput"
+                            }
+                        }
+                    },
+                    "description": "Fields to change",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GooglePlaceActionLinkResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "No field sent, or an invalid value",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The link cannot be edited",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account or link",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "A link with this uri and type already exists",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platforms/google/accounts/{id}/place-action-types": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the place_action_type values available to the location, with a display name, so you only offer buttons Google will accept for it.",
+                "tags": [
+                    "Google"
+                ],
+                "summary": "List the action link types a Google Business Profile location can offer",
+                "parameters": [
+                    {
+                        "description": "Connected account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "BCP 47 language for display names, English by default",
+                        "name": "language_code",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.GooglePlaceActionTypesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream Google API error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11054,7 +11897,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the text, media, schedule time, targets, or hidden status of a pending post.\nOnly posts in `draft`, `scheduled`, or `failed` status can be updated. Updating a failed post does not republish it: call `POST /posts/{pid}/retry` afterwards.\n`queue_id` moves the post to another Queue, and `queue_id: null` takes it out of its Queue and keeps its time.\nOmit `targets` to keep the current ones. Sending `targets` replaces them all.\n`scheduled_at` must be in the future, and a scheduled post must keep at least one target.",
+                "description": "Updates the text, media, schedule time, targets, or hidden status of a pending post.\nPosts in `draft`, `scheduled`, or `failed` status accept every field. Updating a failed post does not republish it: call `POST /posts/{pid}/retry` afterwards.\nA `published` or `partial` post can be edited only when it is live on Google Business Profile alone. Send `text`, `platform_data.google.callToAction`, or both: any other field returns `400 validation.field_not_editable`. A post also live on another platform returns `409 post.state_invalid`.\nWhen the post is live on several Google locations and only some accept the edit, the response is the error from the first location that refused, and `error.meta` lists `updated_account_ids` and `not_updated_account_ids`. Send the same request again to finish the edit.\n`queue_id` moves the post to another Queue, and `queue_id: null` takes it out of its Queue and keeps its time.\nOmit `targets` to keep the current ones. Sending `targets` replaces them all.\n`scheduled_at` must be in the future, and a scheduled post must keep at least one target.",
                 "tags": [
                     "Posts"
                 ],
@@ -11093,7 +11936,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid body",
+                        "description": "Invalid body, or a field a published post cannot change (validation.field_not_editable)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11123,7 +11966,7 @@
                         }
                     },
                     "409": {
-                        "description": "Post is not in an editable state, or the Queue is paused, has no free time, or already holds a post at the requested time (queue.paused, queue.full, queue.slot_conflict)",
+                        "description": "Post is not in an editable state, a published post is live on a platform other than Google Business Profile, or the Queue is paused, has no free time, or already holds a post at the requested time (queue.paused, queue.full, queue.slot_conflict)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14490,6 +15333,36 @@
                     }
                 }
             },
+            "api_endpoints.GoogleAttributesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPAttribute"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.GoogleAvailableAttributesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPAttributeMetadata"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.GoogleFoodMenusResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPFoodMenus"
+                    }
+                }
+            },
             "api_endpoints.GoogleInsightsResponse": {
                 "type": "object",
                 "properties": {
@@ -14648,6 +15521,36 @@
                         "description": "TotalCount is the total number of media items on the location, across all\npages. Zero means an empty gallery.",
                         "type": "integer",
                         "example": 42
+                    }
+                }
+            },
+            "api_endpoints.GooglePlaceActionLinkResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPPlaceActionLink"
+                    }
+                }
+            },
+            "api_endpoints.GooglePlaceActionLinksResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPPlaceActionLink"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.GooglePlaceActionTypesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPPlaceActionType"
+                        }
                     }
                 }
             },
@@ -17183,6 +18086,18 @@
                     }
                 }
             },
+            "api_endpoints.UpdateGoogleAttributesRequest": {
+                "type": "object",
+                "properties": {
+                    "attributes": {
+                        "description": "Attributes to write. Each one replaces that attribute's value; one sent\nwith no value field is removed. Attributes not listed are left as they are.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPAttribute"
+                        }
+                    }
+                }
+            },
             "api_endpoints.UpdateGoogleLocationResponse": {
                 "type": "object",
                 "properties": {
@@ -18586,6 +19501,111 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.GBPAttribute": {
+                "type": "object",
+                "properties": {
+                    "bool_value": {
+                        "description": "BoolValue is set for a BOOL attribute. False is a real answer.",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "enum_value": {
+                        "description": "EnumValue is set for an ENUM attribute.",
+                        "type": "string"
+                    },
+                    "name": {
+                        "description": "Name is the attribute id, as listed by the available-attributes endpoint.",
+                        "type": "string",
+                        "example": "has_outdoor_seating"
+                    },
+                    "repeated_enum_value": {
+                        "description": "RepeatedEnumValue is set for a REPEATED_ENUM attribute.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPRepeatedEnumValue"
+                            }
+                        ]
+                    },
+                    "uri_values": {
+                        "description": "URIValues is set for a URL attribute.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "value_type": {
+                        "description": "ValueType is BOOL, ENUM, URL or REPEATED_ENUM. It is ignored on write.",
+                        "type": "string",
+                        "example": "BOOL"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPAttributeMetadata": {
+                "type": "object",
+                "properties": {
+                    "deprecated": {
+                        "description": "Deprecated attributes still read but should no longer be written.",
+                        "type": "boolean"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "example": "Outdoor seating"
+                    },
+                    "group_display_name": {
+                        "type": "string",
+                        "example": "Amenities"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "has_outdoor_seating"
+                    },
+                    "repeatable": {
+                        "description": "Repeatable is true when the attribute accepts more than one value.",
+                        "type": "boolean"
+                    },
+                    "value_type": {
+                        "type": "string",
+                        "example": "BOOL"
+                    },
+                    "values": {
+                        "description": "Values lists the accepted values of an ENUM or REPEATED_ENUM attribute,\nand true/false for a BOOL one.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPAttributeValueMetadata"
+                        }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPAttributeValueMetadata": {
+                "type": "object",
+                "properties": {
+                    "bool_value": {
+                        "type": "boolean"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "example": "Yes"
+                    },
+                    "enum_value": {
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPCaloriesFact": {
+                "type": "object",
+                "properties": {
+                    "lower_amount": {
+                        "type": "integer"
+                    },
+                    "unit": {
+                        "type": "string",
+                        "example": "CALORIE"
+                    },
+                    "upper_amount": {
+                        "type": "integer"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.GBPCategoriesUpdate": {
                 "type": "object",
                 "properties": {
@@ -18612,6 +19632,156 @@
                     "name": {
                         "type": "string",
                         "example": "categories/gcid:pizza_restaurant"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPFoodMenu": {
+                "type": "object",
+                "properties": {
+                    "cuisines": {
+                        "description": "Cuisines are Google's Cuisine values, for example ITALIAN or PIZZA.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "labels": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMenuLabel"
+                        }
+                    },
+                    "sections": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPFoodMenuSection"
+                        }
+                    },
+                    "source_url": {
+                        "type": "string",
+                        "example": "https://joes.example/menu"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPFoodMenuItem": {
+                "type": "object",
+                "properties": {
+                    "attributes": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPFoodMenuItemAttribute"
+                    },
+                    "labels": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMenuLabel"
+                        }
+                    },
+                    "options": {
+                        "description": "Options are variants of the dish (sizes, fillings). An option's unset\nattributes are taken from the dish.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPFoodMenuItemOption"
+                        }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPFoodMenuItemAttribute": {
+                "type": "object",
+                "properties": {
+                    "allergen": {
+                        "description": "Allergen lists Google's Allergen values, for example DAIRY or PEANUT.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "dietary_restriction": {
+                        "description": "DietaryRestriction lists Google's values, for example VEGAN or HALAL.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "ingredients": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMenuIngredient"
+                        }
+                    },
+                    "media_keys": {
+                        "description": "MediaKeys reference photos of the dish from the location's photo gallery.",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "nutrition_facts": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPNutritionFacts"
+                    },
+                    "portion_size": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMenuPortionSize"
+                    },
+                    "preparation_methods": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "price": {
+                        "description": "Price is required on a dish. On an option it may be omitted to keep the\ndish's price.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMoney"
+                            }
+                        ]
+                    },
+                    "serves_num_people": {
+                        "type": "integer"
+                    },
+                    "spiciness": {
+                        "description": "Spiciness is MILD, MEDIUM or HOT.",
+                        "type": "string"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPFoodMenuItemOption": {
+                "type": "object",
+                "properties": {
+                    "attributes": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPFoodMenuItemAttribute"
+                    },
+                    "labels": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMenuLabel"
+                        }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPFoodMenuSection": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPFoodMenuItem"
+                        }
+                    },
+                    "labels": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMenuLabel"
+                        }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPFoodMenus": {
+                "type": "object",
+                "properties": {
+                    "menus": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPFoodMenu"
+                        }
                     }
                 }
             },
@@ -18901,6 +20071,13 @@
                     "service_area": {
                         "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPServiceAreaUpdate"
                     },
+                    "service_items": {
+                        "description": "ServiceItems replaces the whole list of services the location offers; an\nempty list removes them all. Google refuses it on a location whose\ndetails report can_modify_service_list=false.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPServiceItem"
+                        }
+                    },
                     "special_hours": {
                         "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPSpecialHoursUpdate"
                     },
@@ -18918,6 +20095,49 @@
                     "website_uri": {
                         "type": "string",
                         "example": "https://joes.example"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPMenuIngredient": {
+                "type": "object",
+                "properties": {
+                    "labels": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMenuLabel"
+                        }
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPMenuLabel": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "example": "Tomato, mozzarella, basil"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "example": "Margherita"
+                    },
+                    "language_code": {
+                        "description": "LanguageCode is a BCP 47 code. English is assumed when absent.",
+                        "type": "string",
+                        "example": "en"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPMenuPortionSize": {
+                "type": "object",
+                "properties": {
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "unit": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPMenuLabel"
+                        }
                     }
                 }
             },
@@ -18970,6 +20190,44 @@
                     }
                 }
             },
+            "social-api_ai_core_api_connectors_base.GBPNutritionFact": {
+                "type": "object",
+                "properties": {
+                    "lower_amount": {
+                        "type": "number"
+                    },
+                    "unit": {
+                        "type": "string",
+                        "example": "GRAM"
+                    },
+                    "upper_amount": {
+                        "type": "number"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPNutritionFacts": {
+                "type": "object",
+                "properties": {
+                    "calories": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPCaloriesFact"
+                    },
+                    "cholesterol": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPNutritionFact"
+                    },
+                    "protein": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPNutritionFact"
+                    },
+                    "sodium": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPNutritionFact"
+                    },
+                    "total_carbohydrate": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPNutritionFact"
+                    },
+                    "total_fat": {
+                        "$ref": "#/components/schemas/social-api_ai_core_api_connectors_base.GBPNutritionFact"
+                    }
+                }
+            },
             "social-api_ai_core_api_connectors_base.GBPPhoneNumbersUpdate": {
                 "type": "object",
                 "properties": {
@@ -18983,6 +20241,73 @@
                     "primary_phone": {
                         "type": "string",
                         "example": "+33 1 23 45 67 89"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPPlaceActionLink": {
+                "type": "object",
+                "properties": {
+                    "create_time": {
+                        "type": "string",
+                        "example": "2026-11-09T10:00:00Z"
+                    },
+                    "id": {
+                        "type": "string",
+                        "example": "7341992850181928347"
+                    },
+                    "is_editable": {
+                        "description": "IsEditable is false for a link added by a third-party provider, which\ncannot be changed or deleted here.",
+                        "type": "boolean"
+                    },
+                    "is_preferred": {
+                        "description": "IsPreferred marks the link Google shows first for its action type.",
+                        "type": "boolean"
+                    },
+                    "place_action_type": {
+                        "type": "string",
+                        "example": "DINING_RESERVATION"
+                    },
+                    "provider_type": {
+                        "description": "ProviderType is MERCHANT or AGGREGATOR_3P.",
+                        "type": "string",
+                        "example": "MERCHANT"
+                    },
+                    "update_time": {
+                        "type": "string",
+                        "example": "2026-11-09T10:00:00Z"
+                    },
+                    "uri": {
+                        "type": "string",
+                        "example": "https://book.example/joes"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPPlaceActionLinkInput": {
+                "type": "object",
+                "properties": {
+                    "is_preferred": {
+                        "type": "boolean"
+                    },
+                    "place_action_type": {
+                        "type": "string",
+                        "example": "DINING_RESERVATION"
+                    },
+                    "uri": {
+                        "type": "string",
+                        "example": "https://book.example/joes"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPPlaceActionType": {
+                "type": "object",
+                "properties": {
+                    "display_name": {
+                        "type": "string",
+                        "example": "Reserve a table"
+                    },
+                    "type": {
+                        "type": "string",
+                        "example": "DINING_RESERVATION"
                     }
                 }
             },
@@ -19060,6 +20385,23 @@
                     "relation_type": {
                         "type": "string",
                         "example": "DEPARTMENT_OF"
+                    }
+                }
+            },
+            "social-api_ai_core_api_connectors_base.GBPRepeatedEnumValue": {
+                "type": "object",
+                "properties": {
+                    "set_values": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "unset_values": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     }
                 }
             },

@@ -11,7 +11,7 @@ SocialAPI publishes local posts to one connected Google Business Profile locatio
 | Feature | Supported | Notes |
 |---|---|---|
 | Create post | Yes | Text, plus at most 1 JPEG or PNG image |
-| Update post | Partial | Before publishing only: `PATCH /v1/posts/{pid}` edits a `draft`, `scheduled`, or `failed` post. A published local post cannot be edited: delete it and publish a new one |
+| Update post | Yes | Before publishing, every field. After publishing, the text and the button (`callToAction`) only |
 | Delete post | Yes | Removes the local post from Google |
 | Schedule | Yes | Google has no scheduling of its own. SocialAPI holds the post and creates it on Google at `scheduled_at` |
 | First comment | No | Google Business Profile has no comments. SocialAPI ignores `first_comment` on Google targets |
@@ -136,8 +136,6 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ## 4. Update post
 
-A local post cannot be edited after it is published. To change a published post, delete it (section 5) and publish a new one.
-
 Before publishing, `PATCH /v1/posts/{pid}` edits a post in `draft`, `scheduled`, or `failed` status. The change applies when the post publishes:
 
 ```bash
@@ -149,7 +147,42 @@ curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f
   }'
 ```
 
-The response (HTTP 200) is the updated post, in the same shape as the create response. A `PATCH` on a published post returns `409 post.state_invalid` ("Only draft, scheduled, or failed posts can be edited"). See [Scheduling](/guides/scheduling) for rescheduling and the full list of editable fields.
+The response (HTTP 200) is the updated post, in the same shape as the create response. See [Scheduling](/guides/scheduling) for rescheduling and the full list of editable fields.
+
+### Edit a published post
+
+The same `PATCH` edits a `published` or `partial` post on Google. It accepts two fields:
+
+- `text`: the new text of the local post.
+- `platform_data.google.callToAction`: the new button, in the same shape as on create.
+
+Send either one or both. A field you leave out keeps its current value on Google:
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Spring menu now served until 10 pm.",
+    "platform_data": {
+      "google": {
+        "callToAction": { "actionType": "BOOK", "url": "https://joes-pizza.example/book" }
+      }
+    }
+  }'
+```
+
+| Response | Meaning | What to do |
+|---|---|---|
+| `200` | Google accepted the edit on every location. The response is the updated post | Nothing |
+| `400 validation.field_not_editable` | The request changes a field a published post cannot change, named in `error.meta.field` (image, post type, schedule, targets, and the rest) | Delete the post and publish a new one |
+| `400 validation.no_fields_to_update` | The request has neither `text` nor a `callToAction` | Send at least one |
+| `400 publishing.validation_failed` | The new text or button breaks a Google rule, such as the 1,500 character limit | Fix the field named in the response |
+| `409 post.state_invalid` | The post is also live on another platform. Only a post live on Google alone can be edited | Delete and publish again, or edit a Google-only post |
+
+Targets that failed to publish take the new text and button too, so a later `POST /v1/posts/{pid}/retry` publishes the edited version.
+
+When a post is live on several locations and only some accept the edit, the response is the error from the first location that refused. `error.meta.updated_account_ids` lists the locations that show the new version, and `error.meta.not_updated_account_ids` the ones that still show the old one. Fix the cause, then send the same request again.
 
 ---
 
@@ -239,9 +272,9 @@ Response (HTTP 200):
 
 Google publishes a local post the moment it is created and has no scheduling of its own. With `scheduled_at`, SocialAPI keeps the post as `scheduled` and creates it on Google at that time. Until then the post exists only in SocialAPI, and you can still edit or cancel it.
 
-### A published post cannot be edited
+### A published post keeps its image and type
 
-`PATCH /v1/posts/{pid}` works only before publishing. A published local post keeps its text, image, and button until you delete it.
+After publishing, `PATCH /v1/posts/{pid}` changes the text and the button only. The image, the post type (`topicType`), and the event or offer details stay as published until you delete the post. A post that is also live on another platform cannot be edited at all, because the other platform would keep the old text.
 
 ### The location must allow posting
 
