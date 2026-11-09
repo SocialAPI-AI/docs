@@ -4480,7 +4480,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid request body, missing required fields, or messaging window closed (platform.instagram.window_closed / platform.facebook.window_closed: the recipient must message you first to reopen the 24-hour window). After the platform refuses a thread for a closed window, later untagged sends on it are refused here with the same code and blocked_locally in the meta, until an inbound message reopens it or 24 hours pass; no credit is charged for those.",
+                        "description": "Invalid request body, missing required fields, or messaging window closed (platform.instagram.window_closed / platform.facebook.window_closed: the recipient must message you first to reopen the 24-hour window). After the platform refuses a thread for a closed window, later untagged sends on it are refused here with the same code and blocked_locally in the meta, until an inbound message reopens it or 24 hours pass; no credit is charged for those. messaging.human_agent_window_closed: message_tag was sent after the human agent window closed, so the person must message you first.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4500,7 +4500,7 @@
                         }
                     },
                     "403": {
-                        "description": "Platform rejected the request (e.g. platform.instagram.permission_denied), or account requires reconnection (account.reconnection_required)",
+                        "description": "Platform rejected the request (e.g. platform.instagram.permission_denied), or account requires reconnection (account.reconnection_required), or message_tag was sent but human agent tagging is not enabled for your account (messaging.tag_not_enabled): contact support to request it.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4520,7 +4520,7 @@
                         }
                     },
                     "422": {
-                        "description": "The platform could not fetch or accept an attachment (platform.instagram.attachment_failed, platform.facebook.attachment_failed): check that the URL is publicly reachable and the file type and size are supported",
+                        "description": "The platform could not fetch or accept an attachment (platform.instagram.attachment_failed, platform.facebook.attachment_failed): check that the URL is publicly reachable and the file type and size are supported. messaging.tag_not_supported: message_tag is not HUMAN_AGENT, or this account does not accept message tags; send without message_tag.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4530,7 +4530,7 @@
                         }
                     },
                     "429": {
-                        "description": "Platform rate limit exceeded",
+                        "description": "Platform rate limit exceeded, or human agent tagging is paused for this account (messaging.tag_rate_limited): replies that need the tag cannot be sent until the pause ends; retry after retry_after_seconds when it is present. Replies inside 24 hours of the person's last message still work.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11054,7 +11054,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the text, media, schedule time, targets, or hidden status of a pending post.\nOnly posts in `draft`, `scheduled`, or `failed` status can be updated.\n`queue_id` moves the post to another Queue, and `queue_id: null` takes it out of its Queue and keeps its time.\nOmit `targets` to keep the current ones. Sending `targets` replaces them all.\n`scheduled_at` must be in the future, and a scheduled post must keep at least one target.",
+                "description": "Updates the text, media, schedule time, targets, or hidden status of a pending post.\nOnly posts in `draft`, `scheduled`, or `failed` status can be updated. Updating a failed post does not republish it: call `POST /posts/{pid}/retry` afterwards.\n`queue_id` moves the post to another Queue, and `queue_id: null` takes it out of its Queue and keeps its time.\nOmit `targets` to keep the current ones. Sending `targets` replaces them all.\n`scheduled_at` must be in the future, and a scheduled post must keep at least one target.",
                 "tags": [
                     "Posts"
                 ],
@@ -11419,7 +11419,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Re-attempts publication of a post in `failed` or `partial` status. Consumes 1 post credit.",
+                "description": "Re-attempts publication of a post in `failed` or `partial` status, for every target that failed or was edited since. Consumes 1 post credit.\nEditing a failed post does not publish it: call this route after the edit.",
                 "tags": [
                     "Posts"
                 ],
@@ -16763,7 +16763,7 @@
                         }
                     },
                     "message_tag": {
-                        "description": "MessageTag sends the DM outside the standard 24-hour window. Instagram\nconnected through Instagram Login only, which accepts only HUMAN_AGENT and\nextends the window to 7 days; any other value returns 400\nvalidation.invalid_message_tag. On Facebook, on Instagram connected\nthrough Facebook Login, and on every other platform, the DM is sent\nuntagged and the 24-hour window applies.",
+                        "description": "Optional. Only `HUMAN_AGENT` is accepted, on Instagram accounts connected with Instagram Login, for replies a person types between 24 hours and 7 days after the person's last message. It must not be used by workflows, automations, bots, AI agents acting on their own, broadcasts, promotions or re-engagement. It needs to be enabled for your account by support. Inside 24 hours the message is sent without the tag. Misuse pauses or revokes access and can get the account restricted by Meta.",
                         "type": "string",
                         "example": "HUMAN_AGENT"
                     },
