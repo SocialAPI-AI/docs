@@ -1,11 +1,11 @@
 ---
 title: Direct messages
-description: List DM conversations, read messages, send text, attachments, and buttons, react to messages, and respect each platform's messaging window through one API.
+description: List DM conversations, read and send messages, react, and show typing indicators and seen receipts across platforms through one API.
 ---
 
 SocialAPI's direct message (DM) API lists the conversations of your connected accounts, reads their messages, and sends replies. A conversation is one person talking to one connected account. The endpoints are the same on every platform that supports DMs: Instagram, Facebook, X, WhatsApp, Telegram, Zalo, and Bluesky. A send on any other platform returns `501 resource.not_supported`.
 
-A DM request costs 1 interaction credit, however many messages it sends. Reads and reactions cost nothing. Each platform decides when you can message a person: see [The messaging window](#the-messaging-window).
+A DM request costs 1 interaction credit, however many messages it sends. Reads, reactions, typing indicators, and seen receipts cost nothing. Each platform decides when you can message a person: see [The messaging window](#the-messaging-window).
 
 ## Endpoints
 
@@ -14,7 +14,8 @@ A DM request costs 1 interaction credit, however many messages it sends. Reads a
 | `GET` | `/v1/inbox/conversations` | List conversations |
 | `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
 | `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
-| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read |
+| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
+| `POST` | `/v1/inbox/conversations/{id}/sender-action` | Show the person a typing indicator, or mark their messages seen |
 | `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
 | `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message |
 | `POST` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | React to a message |
@@ -288,6 +289,37 @@ Response (HTTP 200):
 
 `reaction` is the emoji character itself, a single emoji. Anything else returns `400 validation.invalid_reaction`. `DELETE` on the same path, with `account_id` as a query parameter, removes the reaction. A reaction costs no credit.
 
+## Typing indicators and seen receipts
+
+`POST /v1/inbox/conversations/{id}/sender-action` shows the person a typing indicator, or marks their messages as seen, without sending a message. It works on Instagram, Facebook, and WhatsApp. Other platforms return `501 resource.not_supported`. It costs no credit.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/sender-action" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "action": "typing_on" }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+Both fields are required. `action` is one of:
+
+| `action` | What the person sees | Instagram | Facebook | WhatsApp |
+|---|---|---|---|---|
+| `typing_on` | A typing indicator | Yes. It clears after 20 seconds or when you send a message | Yes. It clears after 20 seconds or when you send a message | Yes. It clears after 25 seconds or when you send a message, and it also marks the person's latest message as read |
+| `typing_off` | The typing indicator disappears | Yes | Yes | No: returns `400 validation.action_unsupported` |
+| `mark_seen` | Your account has seen their messages | Yes | Yes | Yes. The person's latest message, and every earlier one, shows as read (blue ticks) |
+
+Any other `action` returns `400 validation.invalid_action`. On WhatsApp, `typing_on` and `mark_seen` need at least one message from the person in the conversation, or the call returns `400 validation.no_inbound_message`. On Instagram and Facebook, the action is accepted only within 24 hours of the person's last message. Outside it, the call returns `400 platform.instagram.window_closed` or `400 platform.facebook.window_closed`.
+
+`POST /v1/inbox/conversations/{id}/read` is different: it sets the conversation's `unread_count` to 0 in SocialAPI, and the person sees nothing. To let the person see that you read their messages, send `mark_seen`.
+
+The reverse direction works through webhooks: `dm.status.read` tells you the person read a message you sent, on Instagram, Facebook, and WhatsApp. Instagram, Facebook, and WhatsApp do not report when the person is typing, so SocialAPI has no event for it.
+
 ## The messaging window
 
 Most platforms let you message a person only for a limited time after their last message. A send outside the window fails, and SocialAPI sends nothing.
@@ -324,13 +356,13 @@ Check these in order when a send fails:
 
 1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks `dms:send`.
 2. **`404 conversation.not_found`, `404 account.not_found`, `403 account.reconnection_required`.** The conversation is not yours or belongs to another connected account than `account_id`, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
-3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `messages.write` to send a message or a reaction, and `messages.read` to start or read an inbox sync. `error.meta.permission` names it. The conversation and message lists return what SocialAPI stored and never return this error: an account without `messages.read` stores no new messages.
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `messages.write` to send a message, a reaction, a typing indicator, or a seen receipt, and `messages.read` to start or read an inbox sync. `error.meta.permission` names it. The conversation and message lists return what SocialAPI stored and never return this error: an account without `messages.read` stores no new messages.
 4. **`400 validation.*`.** The body is wrong. `error.meta.field` names the field. The codes are in [Send a message](#send-a-message) and [Interactive messages](#interactive-messages).
 5. **`400 platform.instagram.window_closed`, `400 platform.facebook.window_closed`, `400 whatsapp.window_closed`, `422 platform.zalo.not_deliverable`, `403 telegram.cannot_message`.** The messaging window is closed: see [The messaging window](#the-messaging-window).
 6. **`422 platform.instagram.thread_unavailable`, `422 platform.facebook.thread_unavailable`.** The platform refused to deliver to this conversation, which can be restricted or unavailable.
 7. **`403 platform.instagram.permission_denied`, `403 platform.facebook.permission_denied`.** The platform scopes granted at connect do not cover the action. Reconnect the account and approve every scope.
 8. **`429 validation.interaction_limit_exhausted`, `429 platform.{platform}.rate_limit`.** Your allowance, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
-9. **`501 resource.not_supported`.** The platform has no DMs, or no reactions.
+9. **`501 resource.not_supported`.** The platform has no DMs, no reactions, or no typing indicators and seen receipts.
 
 When a conversation or a message is missing from a list, force a refresh with [`POST /v1/inbox/sync`](/guides/inbox#refresh-the-inbox-manually). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
 
@@ -339,7 +371,7 @@ When a conversation or a message is missing from a list, force a refresh with [`
 | Scope | Operations |
 |---|---|
 | `dms:read` | List and get conversations, list messages, start or read an inbox sync |
-| `dms:send` | Send a message, add or remove a reaction |
+| `dms:send` | Send a message, add or remove a reaction, show a typing indicator, mark messages seen |
 
 ## Events
 
@@ -354,7 +386,8 @@ SocialAPI sends DM events to your [webhook endpoint](/guides/webhooks): [`dm.rec
 | `social_api_list_messages` | List the messages of a conversation, newest first |
 | `social_api_send_dm` | Send a text message with optional quick replies or buttons. The text is 1,000 bytes at most. The tool sends no attachments and no cards: use the REST endpoint for them |
 | `social_api_update_conversation` | Archive a conversation, or set it back to `active` |
-| `social_api_mark_conversation_read` | Mark a conversation as read |
+| `social_api_mark_conversation_read` | Mark a conversation as read in SocialAPI |
+| `social_api_send_sender_action` | Show a typing indicator, or mark the person's messages seen |
 
 There is no tool for reactions or for inbox sync. See [MCP tools](/integrations/tools#direct-messages).
 

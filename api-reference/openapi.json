@@ -4844,6 +4844,115 @@
                 }
             }
         },
+        "/inbox/conversations/{id}/sender-action": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Shows the other participant a typing indicator, or marks their messages as seen, without sending a message. Free: no interaction credit is used.\n\nSupported on Instagram, Facebook Messenger and WhatsApp. On Instagram and Messenger the typing indicator clears after 20 seconds or when you send a message. On WhatsApp, typing_on also marks the contact's latest message as read, clears after 25 seconds or when you reply, and needs at least one message from the contact. WhatsApp has no typing_off and returns 400. Marking a message seen on WhatsApp also marks every earlier message in the chat as read.\n\nInstagram and Messenger only accept these actions within 24 hours of the person's last message.",
+                "tags": [
+                    "Inbox Conversations"
+                ],
+                "summary": "Show typing or mark seen",
+                "parameters": [
+                    {
+                        "example": "conv_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "description": "Conversation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/api_endpoints.SenderActionRequest"
+                            }
+                        }
+                    },
+                    "description": "Account and action",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Action sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body, missing account_id, unknown action, or an action the platform does not offer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Conversation or account not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "501": {
+                        "description": "Platform does not support sender actions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream platform API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/inbox/media/{id}": {
             "get": {
                 "security": [
@@ -17681,6 +17790,30 @@
                     "success": {
                         "type": "boolean",
                         "example": true
+                    }
+                }
+            },
+            "api_endpoints.SenderActionRequest": {
+                "type": "object",
+                "required": [
+                    "account_id",
+                    "action"
+                ],
+                "properties": {
+                    "account_id": {
+                        "description": "Connected account ID that owns the conversation.",
+                        "type": "string",
+                        "example": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J"
+                    },
+                    "action": {
+                        "description": "What to show the other participant: typing_on, typing_off, or mark_seen.",
+                        "type": "string",
+                        "enum": [
+                            "typing_on",
+                            "typing_off",
+                            "mark_seen"
+                        ],
+                        "example": "typing_on"
                     }
                 }
             },
