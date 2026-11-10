@@ -33,7 +33,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Hide, unhide, delete a comment | Yes | |
 | Like or unlike a comment | Yes | The Page likes the comment |
 | Private reply to a comment | Yes | One per comment, within 7 days of the comment |
-| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text and attachments. A send ignores `quick_replies`, `buttons`, and `cards` |
+| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text, attachments, quick replies, buttons, and cards |
 | React to a DM | Yes | |
 | Mentions | Partial | `GET /v1/accounts/{id}/mentions` returns posts that tag the Page. A mention in a comment arrives as a `mention.received` event |
 | Reply to a mention | Yes | A public comment on the mention |
@@ -158,7 +158,7 @@ A private reply sends a one-time DM to the person who commented. Send it with `P
 
 A Page can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.facebook.window_closed`.
 
-- **Message types.** Text and attachments. A DM send ignores `quick_replies`, `buttons`, and `cards`: it delivers only the text. Buttons work on a [private reply](/guides/comments#send-a-private-reply). Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
+- **Message types.** Text, attachments, and [interactive content](/guides/direct-messages#interactive-messages): `quick_replies`, `buttons`, or `cards`. A tap on a quick reply or a `postback` button sends a `dm.postback` event with your `payload`. Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
 - **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` reacts to a message, and `DELETE` on the same path removes the reaction.
 - **Delivery status.** `dm.status.sent`, `dm.status.delivered`, and `dm.status.read` events follow each DM you send.
 - **No message tags.** A `message_tag` on a Facebook DM, including `HUMAN_AGENT`, is not sent: the DM goes out untagged and the 24-hour window applies.
