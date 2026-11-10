@@ -138,7 +138,7 @@ Once the number is connected:
 - The chat history the business chooses to share in the app (up to six months) appears in its conversations as WhatsApp delivers it. Imported messages raise no webhook events, and their attachments carry `attachment_type` without an `attachment_url`.
 - Messages the business sends from the phone app appear in the conversation and raise `dm.sent`, like messages sent through the API.
 - Sending is capped at 20 messages per second, Meta's fixed limit for these numbers.
-- The number is already registered, so you never call `register` for it. `status` reports it as registered, and `register` refuses it with `409 whatsapp.business_app_number`.
+- The number is already verified and registered, so you never call `request-code`, `verify-code` or `register` for it: each refuses it with `409 whatsapp.business_app_number`. `status` returns `"business_app": true`, `"verified": true` and `"registered": true`. This also applies to a number connected from the dashboard, so read `business_app` from `status` to tell which kind of number an account holds.
 - The `deregister` endpoint does not work for these numbers. The business disconnects the number from the WhatsApp Business app's settings.
 
 ## The 24-hour service window
@@ -335,7 +335,7 @@ WhatsApp exposes inbound media only to the connected account, never to an extern
 | 400 | `whatsapp.undeliverable` | The recipient is not a WhatsApp user. |
 | 403 | `whatsapp.paid_plan_required` | A template was sent on the Free plan. Template sends need a paid plan: see [Plans](/guides/plans). Replies inside the 24-hour window work on every plan. |
 | 403 | `whatsapp.user_opted_out` | The recipient has opted out of messages from this business. |
-| 409 | `whatsapp.business_app_number` | `register` was called for a number that stays on the WhatsApp Business app. It is already registered: do not retry. |
+| 409 | `whatsapp.business_app_number` | `request-code`, `verify-code` or `register` was called for a number that stays on the WhatsApp Business app. It is already verified and registered: do not retry. |
 | 429 | `whatsapp.frequency_cap` | The recipient has hit their daily marketing-message limit. |
 | 429 | `whatsapp.pair_rate_limit` | Too many messages sent to this same recipient. |
 | 429 | `whatsapp.throughput_exceeded` | The number's messaging throughput limit was exceeded. |

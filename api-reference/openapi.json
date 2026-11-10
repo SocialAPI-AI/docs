@@ -10448,7 +10448,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Asks WhatsApp to send a one-time verification code to the phone number via SMS or voice call. The code is delivered to the underlying phone line, not to the API caller; follow up with verify-code once the user receives it. Step 1 of the phone-number registration flow (request-code, verify-code, register).",
+                "description": "Asks WhatsApp to send a one-time verification code to the phone number via SMS or voice call. The code is delivered to the underlying phone line, not to the API caller; follow up with verify-code once the user receives it. Step 1 of the phone-number registration flow (request-code, verify-code, register). A number that stays on the WhatsApp Business app is already verified and is refused with 409 whatsapp.business_app_number.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -10510,6 +10510,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Number is in use in the WhatsApp Business app and needs no verification",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "502": {
                         "description": "WhatsApp/Meta upstream error",
                         "content": {
@@ -10530,7 +10540,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns whether a phone number is verified and registered with WhatsApp Business. Used by client UIs to decide which step of the registration flow to show.",
+                "description": "Returns whether a phone number is verified and registered with WhatsApp Business, and whether it stays on the WhatsApp Business app (business_app). A number with registered true can send and receive messages. A business_app number is always verified and registered and skips the request-code, verify-code and register steps.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -10598,7 +10608,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Submits the 6-digit code received via SMS or voice to prove ownership of the phone number. Once verified, the phone number can be registered with WhatsApp Business. Codes expire quickly; if verification fails, request a new code.",
+                "description": "Submits the 6-digit code received via SMS or voice to prove ownership of the phone number. Once verified, the phone number can be registered with WhatsApp Business. Codes expire quickly; if verification fails, request a new code. A number that stays on the WhatsApp Business app is already verified and is refused with 409 whatsapp.business_app_number.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -10652,6 +10662,16 @@
                     },
                     "404": {
                         "description": "Account not found or not owned by caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Number is in use in the WhatsApp Business app and needs no verification",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -21043,10 +21063,16 @@
             "social-api_ai_core_api_connectors_whatsapp.PhoneNumberStatusResponse": {
                 "type": "object",
                 "properties": {
+                    "business_app": {
+                        "description": "True for a number that stays on the WhatsApp Business app alongside the API (coexistence). It is already verified and registered: request-code, verify-code and register are refused with 409 whatsapp.business_app_number.",
+                        "type": "boolean"
+                    },
                     "registered": {
+                        "description": "True when the number can send and receive messages.",
                         "type": "boolean"
                     },
                     "verified": {
+                        "description": "True once the number has proven ownership, either with verify-code or in the WhatsApp Business app.",
                         "type": "boolean"
                     }
                 }
