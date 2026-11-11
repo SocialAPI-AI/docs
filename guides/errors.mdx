@@ -71,6 +71,7 @@ Every `/v1` request needs `Authorization: Bearer <API key>`. See [Authentication
 | 403 | `account.permission_missing` | The connected account does not have the [permission](/guides/permissions) the call needs. `meta.permission` names it. Add it with `PATCH /v1/accounts/{id}`, or reconnect the account when the platform has not granted it. Publishing, post removal, live post metrics, and the stored inbox lists answer differently: see [Account permissions](/guides/permissions#what-an-account-can-do-right-now) |
 | 400 | `auth.oauth.invalid_client` | The MCP client's `client_id` is unknown. See [OAuth for MCP clients](/integrations/oauth) |
 | 400 | `auth.oauth.invalid_redirect` | The MCP client's `redirect_uri` is not registered for its `client_id` |
+| 503 | `system.internal` | Your credentials could not be verified at that moment. They are not invalid: keep them and retry the request |
 
 The `/oauth/token` endpoint answers errors in the OAuth format (`error`, `error_description`) instead of this envelope: see [OAuth for MCP clients](/integrations/oauth#token-endpoint-errors).
 
@@ -235,6 +236,7 @@ These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post life
 | 422 | `publishing.media.invalid_source_type` | `source_type` is not `url`, `media_id`, or `platform_attachment_id` |
 | 422 | `publishing.media.missing_type` | A `platform_attachment_id` item has no `type` (`image`, `video`, `audio`, or `file`) |
 | 422 | `publishing.media.untyped_url` | The media type cannot be read from the `url`. Use a URL with an extension such as `.jpg` or `.mp4`, or upload the file |
+| 422 | `publishing.media.url_unreachable` | The `url` answered `401`, `404`, or `410`, so the platform cannot fetch it either. Check that the link is public and has not expired, or upload the file |
 | 422 | `publishing.media.unsupported_source` | The platform does not accept `platform_attachment_id` media. Only Instagram, Threads, LinkedIn, and X do |
 | 422 | `publishing.media.mixing_unsupported` | Instagram or Threads cannot combine a `platform_attachment_id` with other media. It must be the only item |
 | 500 | `publishing.media.proxy_unavailable` | SocialAPI could not prepare the media for the platform. Retry the request |
@@ -594,6 +596,7 @@ Branch on the prefix and suffix: `platform.` with `.auth` means reconnect, with 
 |---|---|---|
 | 500 | `system.internal` | The request failed on SocialAPI's side. Retry idempotent requests. If it persists, send the `request_id` to support |
 | 503 | `system.internal` | The host of a media URL in the request could not be looked up at that moment. `meta.field` is `media`. Nothing was created or changed. Retry the request |
+| 503 | `system.internal` | Your credentials could not be verified at that moment. Nothing was run. Retry the request; do not replace the API key or token |
 
 ## Handling errors
 
