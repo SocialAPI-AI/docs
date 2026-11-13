@@ -41,7 +41,7 @@ A post cannot mix a video with images. When you omit `media_type`, 1 or more ima
 | Video | Width and height of at least 360 pixels. Frame rate from 23 to 60 FPS |
 | Photo | Each image at most 1080 x 1920 or 1920 x 1080 pixels |
 
-**Text limits:** a video caption holds 2,200 UTF-16 characters, with at most 30 mentions. For a photo carousel, the post `text` is the title and holds 90 UTF-16 characters.
+**Text limits:** a video caption holds 2,200 UTF-16 characters, with at most 30 mentions. For a photo carousel, the post `text` is the title and holds 90 UTF-16 characters, and `platform_data.tiktok.description` is the caption and holds 4,000 UTF-16 characters.
 
 <Warning>
   Attach media through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, or `url` for a public `http(s)` URL. TikTok pulls the file while the post publishes, so keep the file reachable until the target is `published`. A `platform_attachment_id` source returns `422 publishing.media.unsupported_source` on TikTok. To upload first, see [Media](/guides/media).
@@ -123,7 +123,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Draft in the TikTok app
 
-Set `post_mode` to `"inbox"` to send a video or a photo carousel to the creator's TikTok drafts. TikTok then asks the creator for the audience, interaction settings, and disclosures in the app, so SocialAPI ignores `privacy_level`, the `disable_*` fields, `auto_add_music`, the branding fields, `is_aigc`, and `video_cover_timestamp_ms` on a draft. A video draft carries no caption: the creator writes it in the app. A photo draft keeps the post `text` as its title. A draft needs the `video.upload` scope, and it returns no public post ID and no permalink.
+Set `post_mode` to `"inbox"` to send a video or a photo carousel to the creator's TikTok drafts. TikTok then asks the creator for the audience, interaction settings, and disclosures in the app, so SocialAPI ignores `privacy_level`, the `disable_*` fields, `auto_add_music`, the branding fields, `is_aigc`, and `video_cover_timestamp_ms` on a draft. A video draft carries no caption: the creator writes it in the app. A photo draft keeps the post `text` as its title and `description` as its caption. A draft needs the `video.upload` scope, and it returns no public post ID and no permalink.
 
 ```json
 {
@@ -156,6 +156,7 @@ Send these keys in `platform_data.tiktok` on the post, which applies them to eve
 | `video_cover_timestamp_ms` | number, 0 or more | No | video | Millisecond offset of the cover frame. An offset past the end of the video fails the target |
 | `photo_cover_index` | number, 0 or more | No | photo | 0-based index of the cover image. Defaults to `0` |
 | `auto_add_music` | boolean | No | photo | Adds music TikTok recommends |
+| `description` | string | No | photo | The carousel caption, with hashtags and mentions, up to 4,000 UTF-16 characters. The post `text` stays the title. A longer value, or one that is not a string, fails validation on the field `description`. Ignored on a video: its caption is the post `text` |
 
 SocialAPI forwards any additional keys in `platform_data.tiktok` that the table above lists, and no others. TikTok has no other publish options that SocialAPI passes through: an unlisted key is ignored without a warning.
 
@@ -312,7 +313,7 @@ A photo carousel that holds a PNG, AVIF, GIF, or a video fails with `400 validat
 
 ### Photo titles hold 90 characters
 
-A photo carousel whose `text` is longer than 90 UTF-16 characters fails validation on the field `title`.
+A photo carousel whose `text` is longer than 90 UTF-16 characters fails validation on the field `title`. Put the full caption, hashtags, and mentions in `platform_data.tiktok.description`, which holds 4,000.
 
 ### disable_duet and disable_stitch are ignored on photo posts
 
