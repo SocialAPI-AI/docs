@@ -16,6 +16,7 @@ Analytics requests cost no credits. An account needs the `analytics.read` [permi
 | `GET` | `/v1/brands/{id}/analytics` | Stored daily history for a brand, summed across its accounts |
 | `GET` | `/v1/posts/{pid}/analytics` | Stored daily history for one published post |
 | `GET` | `/v1/posts/{pid}/metrics` | Live engagement figures for a published post |
+| `GET` | `/v1/posts/metrics` | Live engagement figures for up to 20 published posts in one call |
 | `POST` | `/v1/accounts/{id}/sync` | Start refreshing an account's posts and their counts |
 | `GET` | `/v1/accounts/{id}/sync` | Read the state of an account's post sync |
 
@@ -226,7 +227,7 @@ Response (HTTP 200):
       {
         "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
         "platform": "tiktok",
-        "status": "",
+        "status": "published",
         "metrics": {
           "likes": 142,
           "comments": 23,
@@ -269,6 +270,48 @@ Each published target has `metrics` or, when its platform cannot report them, an
 | Google Business Profile | Local posts report no engagement counts, so every count is `0`. Use [performance metrics](/platforms/google#performance-metrics) |
 
 A figure a platform does not report is `0`, except Instagram insights, which are absent when Instagram does not report them. A target that cannot be read returns the platform's error, for example `404 resource.not_found` when the platform no longer returns the post. A target whose account lacks `analytics.read` returns `resource.not_found` in its `error`, with a message that says the account could not be loaded.
+
+### Several posts at once
+
+`GET /v1/posts/metrics` reads up to 20 posts in one call. Pass the IDs comma-separated in `post_ids`: SocialAPI post IDs, platform post IDs, or a mix. A repeated ID is returned once.
+
+```bash
+curl "https://api.social-api.ai/v1/posts/metrics?post_ids=7c9e6679-7425-40de-944b-e07fc1f90ae7,18115621681871648" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "post_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "targets": [
+        {
+          "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+          "platform": "tiktok",
+          "status": "published",
+          "metrics": { "likes": 142, "comments": 23, "shares": 8, "saves": 0, "views": 5120, "extra": { "views": 5120 } },
+          "metrics_synced_at": "2026-10-13T09:30:00Z"
+        }
+      ]
+    },
+    {
+      "post_id": "18115621681871648",
+      "targets": [],
+      "error": {
+        "code": "resource.not_found",
+        "message": "Post not found",
+        "category": "resource",
+        "caused_by": "user"
+      }
+    }
+  ]
+}
+```
+
+Items come back in the order of `post_ids`, each with the same `targets` as `GET /v1/posts/{pid}/metrics`. A post that cannot be read gets an `error` on its item, and the request still returns 200: `resource.not_found` for an unknown post or one your key cannot see, `ambiguous_post_id` for a platform post ID that matches more than one post. A missing `post_ids` returns `400 validation.field_required`. More than 20 IDs, or an ID longer than 100 characters, returns `400 validation.field_invalid`.
 
 ## Refresh an account's posts
 
@@ -330,7 +373,7 @@ These endpoints return live figures from one platform:
 | Scope | Grants |
 |---|---|
 | `accounts:read` | `GET /v1/accounts/{id}/analytics` and `GET /v1/brands/{id}/analytics`, and the platform account summaries |
-| `posts:read` | `GET /v1/analytics/overview`, `GET /v1/posts/{pid}/analytics`, and `GET /v1/posts/{pid}/metrics` |
+| `posts:read` | `GET /v1/analytics/overview`, `GET /v1/posts/{pid}/analytics`, `GET /v1/posts/{pid}/metrics`, and `GET /v1/posts/metrics` |
 | `accounts:manage` | `POST /v1/accounts/{id}/sync` |
 | `analytics:read` | The events log, exports, Threads insights, Threads profile lookups, and LinkedIn insights, not history. Refused to brand-restricted keys |
 
@@ -349,6 +392,7 @@ Analytics exports build a report of an account's videos and their metrics. Expor
 | `social_api_get_brand_analytics` | Reads a brand's daily history |
 | `social_api_get_post_analytics` | Reads a post's daily history |
 | `social_api_get_post_metrics` | Reads a post's live figures |
+| `social_api_get_posts_metrics` | Reads the live figures of up to 20 posts in one call |
 
 `POST /v1/accounts/{id}/sync` has no tool. See [MCP tools](/integrations/tools).
 
