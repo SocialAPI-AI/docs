@@ -100,7 +100,7 @@ These codes apply to any endpoint. `error.meta.field` names the offending input 
 | 409 | `ambiguous_post_id` | The platform post ID you passed matches more than one post. Use the SocialAPI post ID |
 | 501 | `resource.not_supported` | The operation does not exist on this account's platform. `meta.platform` names it. See the [capability matrix](/platforms/overview) |
 | 422 | `account.platform_unsupported` | The account's platform has no reviews, and the request was for reviews |
-| 4xx, 5xx | `http.<status>` | A routing or transport error. `http.404` is an unknown path. `GET /v1/inbox/media/{id}` also returns `http.404` (unknown media), `http.410` (media expired), `http.503` (too many waiting requests, retry after 1 second), and `http.504` (media still being fetched, send the request again until you get 200 or 410) |
+| 4xx, 5xx | `http.<status>` | A routing or transport error. `http.404` is an unknown path. `GET /v1/inbox/media/{id}` also returns `http.404` (unknown media), `http.410` (media expired), and `http.503` (the media is still being fetched, or too many requests are waiting: send the request again, after the `Retry-After` delay when the response carries one, until you get 200 or 410) |
 
 ## Rate limits
 
@@ -177,7 +177,7 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | Redirect | `platform.facebook.no_assignable_pages` | On a connection without a [selection step](/guides/connect-accounts#facebook-pages), every Page on the login already belongs to another brand |
 | Redirect | `platform.instagram.no_assignable_pages` | On a connection without a selection step, every Instagram account on the Facebook login already belongs to another brand, or you hold it through Instagram Login |
 | 409 | `platform.google.brand_has_account` | Assigning a location when the brand already has a Google Business Profile connected. Disconnect it first, or choose another brand |
-| 502 | `platform.instagram.api_error` | Instagram's token exchange failed during connection |
+| 503 | `platform.instagram.api_error` | Instagram's token exchange failed during connection |
 | 400 | `account.page_not_found` | The `page_id` matches no Page of the account |
 | 400 | `account.no_active_page` | The account has no active default Page |
 | 400 | `account.page_inactive` | The Page is deactivated |
@@ -269,6 +269,7 @@ See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [R
 | 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: it is older than 7 days, or already received one |
 | 422 | `platform.instagram.attachment_failed`, `platform.facebook.attachment_failed` | The platform could not fetch or accept an attachment on a DM or a private reply. Check that the URL is publicly reachable and the file type and size are supported, then send again. A private reply refused this way leaves the comment eligible |
 | 422 | `platform.instagram.thread_unavailable`, `platform.facebook.thread_unavailable` | The platform refused to deliver to this conversation. It can be restricted or unavailable |
+| 422 | `platform.facebook.comment_not_hideable` | Facebook refused to hide or unhide the comment, for example a comment the Page's moderation filters already hid. Retrying does not help |
 | 409 | `platform.instagram.no_page` | A DM or private reply on a Facebook Login account with no Facebook Page linked to it. Reconnect the account |
 | 422 | `platform.instagram.invalid_parameter` | Instagram rejected a parameter. Retrying unchanged will not help |
 | 403 | `platform.instagram.permission_denied`, `platform.facebook.permission_denied`, `platform.whatsapp.permission_denied` | The scopes granted to the connected account do not cover the action |
@@ -416,7 +417,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 |---|---|---|
 | 422 | `platform.instagram.container_failed` | Instagram could not process the media. Check the file against Instagram's specifications |
 | 422 | `platform.instagram.container_expired` | The media container expired before publishing. Create the post again |
-| 504 | `platform.instagram.container_timeout` | The media was still processing after about 5 minutes |
+| 503 | `platform.instagram.container_timeout` | The media was still processing after about 5 minutes |
 | 503 | `platform.instagram.1`, `platform.instagram.2` | Instagram reported a temporary failure. Retry the request |
 | 403 | `platform.instagram.200` | Instagram says the connected account has not granted a scope the call needs. Reconnect the account to grant it |
 | 404 | `platform.instagram.100` | Instagram says the object does not exist, or does not accept the request. Check the ID |
@@ -425,7 +426,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 403 | `platform.instagram.230` | Instagram withholds the participant profile: the person has not messaged the account or tapped an icebreaker or the persistent menu |
 | 404 | `platform.facebook.100` | Facebook says the object does not exist, or the Page lacks a scope the call needs. Check the ID and the Page scopes |
 | 403 | `platform.facebook.230` | Facebook requires the user's consent to access the resource. Reconnect the account |
-| 504 | `platform.facebook.reel_timeout`, `platform.facebook.story_timeout` | Facebook did not finish processing the Reel or Story video within the time allowed |
+| 503 | `platform.facebook.reel_timeout`, `platform.facebook.story_timeout` | Facebook did not finish processing the Reel or Story video within the time allowed |
 | 422 | `platform.facebook.reel_processing_failed`, `platform.facebook.story_processing_failed` | Facebook could not process the Reel or Story video |
 | 400 | `validation.media_invalid` | A Facebook Reel does not have exactly one video, and the post was sent with `skip_validation: true`. Without it, the post returns `400 publishing.validation_failed` |
 | 400 | `validation.media_mixed` | A Facebook multi-photo post includes a video, and the post was sent with `skip_validation: true`. Without it, the post returns `400 publishing.validation_failed` |
@@ -437,7 +438,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 |---|---|---|
 | 422 | `platform.threads.THREADS_API__LINK_LIMIT_EXCEEDED` | The post holds more than 5 unique links |
 | 422 | `platform.threads.ERROR`, `platform.threads.EXPIRED` | Threads rejected the media, or the media expired before publishing |
-| 504 | `platform.threads.container_timeout` | Threads did not finish processing the media after about 4 minutes |
+| 503 | `platform.threads.container_timeout` | Threads did not finish processing the media after about 4 minutes |
 | 422 | `platform.threads.801` | `follower_demographics` was requested for an account with fewer than 100 followers |
 | 429 | `platform.threads.rate_limit` | Threads' own rate limit. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 | 403 | `platform.threads.<code>` | A call needs a Threads scope that the account lacks, such as hiding a reply without `threads_manage_replies`. `<code>` is Meta's error code |
@@ -466,9 +467,9 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 401 | `platform.tiktok.auth` | TikTok's authorization for the account ended. Later calls return `403 account.reconnection_required` until you reconnect |
 | 401 | `platform.tiktok.unauthorized` | TikTok refused the call as unauthorized without saying the authorization ended. The account stays usable. Reconnect if it repeats |
 | 429 | `platform.tiktok.rate_limit` | TikTok's own request limit of 40 requests per minute for each account and each TikTok call. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back). Wait 1 minute, then retry |
-| 502 | `platform.tiktok.api_error` | TikTok returned no usable answer, or accepted a post without returning its publish ID. Check the account in the TikTok app before retrying a post |
+| 503 | `platform.tiktok.api_error` | TikTok returned no usable answer, or accepted a post without returning its publish ID. Check the account in the TikTok app before retrying a post |
 
-A TikTok code that this table does not list returns `502` with the code after `platform.tiktok.`.
+A TikTok code that this table does not list returns `503` with the code after `platform.tiktok.`.
 
 ### X, LinkedIn, YouTube, and Zalo
 
@@ -479,11 +480,12 @@ A TikTok code that this table does not list returns `502` with the code after `p
 | 400 | `validation.media_size` | An X media file is too large to upload in the chunks X allows |
 | 402 | `platform.twitter.usage_capped` | Your own X developer app is out of API credits or reached its X usage cap. Add credits or raise the spending limit in the X Developer Console. Waiting does not clear it |
 | 422 | `platform.linkedin.processing_failed` | LinkedIn failed to process the media |
-| 504 | `platform.linkedin.upload_timeout`, `platform.linkedin.processing_timeout` | A LinkedIn image upload or video processing timed out |
+| 503 | `platform.linkedin.upload_timeout`, `platform.linkedin.processing_timeout` | A LinkedIn image upload or video processing timed out |
 | 403 | `platform.linkedin.access_denied` | LinkedIn refused the action for this account. Reconnecting does not change it. Read `message` |
 | 400 | `validation.video_url` | A YouTube video URL is not accessible |
 | 400 | `validation.video_size` | The size of the YouTube video file could not be determined |
 | 403 | `platform.youtube.insufficientPermissions` | The connection lacks a scope the call needs. Reconnect the account to grant it |
+| 403 | `platform.youtube.custom_thumbnail_forbidden` | The channel cannot set custom thumbnails, or YouTube refused a thumbnail for this video. Verify the channel in YouTube Studio, then retry |
 | 403 | `platform.youtube.account_suspended` | YouTube suspended or closed the account or its channel. Reconnecting does not restore access. Resolve the suspension with YouTube. SocialAPI stops background sync for the account |
 | 422 | `platform.youtube.processing_failure` | YouTube refused to delete the comment: only comments your channel wrote can be deleted |
 | 422 | `platform.youtube.comments_disabled` | The video has comments turned off. Retrying does not help until the channel owner turns them back on, and the error can continue for up to 24 hours after that |
@@ -513,7 +515,7 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 | 400 | `validation.image_format_unsupported` | A WhatsApp image is not JPEG or PNG |
 | 400 | `validation.voice_unsupported` | `voice` was set on an attachment that is not audio |
 | 404 | `whatsapp.no_account` | No WhatsApp account is connected |
-| 502 | `whatsapp.unknown` | WhatsApp returned an error SocialAPI does not map. Retry with backoff |
+| 503 | `whatsapp.unknown` | WhatsApp returned an error SocialAPI does not map. Retry with backoff |
 
 ### Telegram
 
@@ -532,8 +534,8 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 | 429 | `platform.zalo.rate_limit` | The per-app or per-Official Account quota is used up |
 | 400 | `validation.platform_param` | Zalo rejected a parameter. `error.message` carries Zalo's reason |
 | 404 | `resource.not_found` | The Zalo account or object does not exist |
-| 502 | `platform.zalo.e<N>` | Zalo returned an error SocialAPI does not map. `<N>` is the absolute value of Zalo's numeric code (Zalo `-105` becomes `platform.zalo.e105`) |
-| 502 | `platform.zalo.api_error` | The request failed before Zalo answered with an error |
+| 503 | `platform.zalo.e<N>` | Zalo returned an error SocialAPI does not map. `<N>` is the absolute value of Zalo's numeric code (Zalo `-105` becomes `platform.zalo.e105`) |
+| 503 | `platform.zalo.api_error` | The request failed before Zalo answered with an error |
 
 `platform.zalo.not_deliverable` is the most common: Zalo allows a customer service message within 7 days of the person's last interaction with your Official Account (free within 48 hours), and refuses later sends with `422`.
 
@@ -562,7 +564,7 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 | 403 | `platform.app_store_connect.forbidden` | App Store Connect refused the API key's role. Replies need the Customer Support, Admin, or Account Holder role |
 | 404 | `resource.not_found` | On a reviews list or a reply: the app or the review no longer exists, or the key cannot see it |
 | 429 | `platform.app_store_connect.rate_limit` | The API key's hourly request limit on App Store Connect is used up. Wait, then retry |
-| 502 | `platform.app_store_connect.<code>` | App Store Connect returned an error SocialAPI does not map. `<code>` is App Store Connect's error code, or `api_error` when it sends none. `error.message` carries App Store Connect's reason. Retry later |
+| 503 | `platform.app_store_connect.<code>` | App Store Connect returned an error SocialAPI does not map. `<code>` is App Store Connect's error code, or `api_error` when it sends none. `error.message` carries App Store Connect's reason. Retry later |
 
 ### Pinterest
 
@@ -576,7 +578,7 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 
 ## Platform errors
 
-When a platform refuses a call, the code is `platform.<name>.<reason>`, where `<name>` is the platform slug. SocialAPI forwards the platform's HTTP status when it maps one, and returns `502` otherwise.
+When a platform refuses a call, the code is `platform.<name>.<reason>`, where `<name>` is the platform slug. SocialAPI forwards the platform's HTTP status when it maps one, and returns `503` otherwise. SocialAPI does not respond with `502` or `504`: when a platform call fails or does not finish in time and no other status applies, SocialAPI returns `503` with the error body. Any `502` or `504` you receive comes from in front of SocialAPI, has no SocialAPI error body, and the request can still have run. After such a `502` or `504`, retry reads with backoff, and before you repeat a request that creates or sends something, check whether the first request succeeded: see [Create requests are not idempotent](/guides/ids#create-requests-are-not-idempotent).
 
 | HTTP | Code | When it occurs |
 |---|---|---|
@@ -585,8 +587,8 @@ When a platform refuses a call, the code is `platform.<name>.<reason>`, where `<
 | 401 | `platform.<name>.unauthorized` | The platform answered 401 without saying the token is bad. A healthy account keeps working. Reconnect if it persists |
 | 429 | `platform.<name>.rate_limit` | The platform's own limit. See [Rate limits](#rate-limits) |
 | 422 | `platform.<name>.publish_failed` | A publish failed with an error SocialAPI does not map. Appears in [Delivery failures](#delivery-failures) |
-| 502 | `platform.<name>.api_error` | A failure reaching the platform, or a response with no usable error |
-| 502 | `platform.<name>.<code>` | The platform returned its own error code. The status is `502` unless the code has its own row above, such as `404 platform.facebook.100` |
+| 503 | `platform.<name>.api_error` | A failure reaching the platform, or a response with no usable error |
+| 503 | `platform.<name>.<code>` | The platform returned its own error code. The status is `503` unless the code has its own row above, such as `404 platform.facebook.100` |
 
 Branch on the prefix and suffix: `platform.` with `.auth` means reconnect, with `.rate_limit` means back off.
 

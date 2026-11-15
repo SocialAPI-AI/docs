@@ -139,6 +139,7 @@ This target publishes with `category_id` `22` from the post level and `notify_su
 | `contains_synthetic_media` | bool | `false` | Declares that the video contains AI-generated or altered content |
 | `notify_subscribers` | bool | `true` | Whether to notify the channel's subscribers on publish |
 | `playlist_id` | string | none | A playlist to add the video to after the upload |
+| `cover_url` | string | none | Public `http` or `https` URL of a JPG or PNG image, 50 MB or smaller, set as the video's custom thumbnail. See Custom thumbnail below |
 
 SocialAPI forwards any additional keys in `platform_data.youtube` only when the table above lists them. YouTube has no other publish options that SocialAPI passes through: an unlisted key is not sent.
 
@@ -182,6 +183,28 @@ Set `first_comment` to the text of a top-level comment that SocialAPI posts on t
 ### Add to playlist
 
 Set `platform_data.youtube.playlist_id` to add the video to one of your playlists after the upload. A failure here does not change the post status either.
+
+### Custom thumbnail
+
+Set `platform_data.youtube.cover_url` to the public URL of a JPG or PNG image, 50 MB or smaller. SocialAPI sets it as the video's thumbnail right after the upload:
+
+```json
+{
+  "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+  "title": "Our spring collection walkthrough",
+  "text": "A full tour of the new lineup.",
+  "publish_now": true,
+  "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+  "platform_data": {
+    "youtube": { "cover_url": "https://cdn.example.com/media/spring-thumbnail.jpg" }
+  }
+}
+```
+
+- **Verified channels only.** YouTube allows custom thumbnails only on verified channels. YouTube recommends 3840x2160 (16:9) with a minimum width of 640 pixels for videos, and 2160x3840 (9:16) with a minimum height of 640 pixels for Shorts.
+- **A failed thumbnail never fails the post.** If the thumbnail cannot be set (the URL is unreachable, the file is not a JPG or PNG, it is larger than 50 MB, or YouTube refuses it), the video publishes with YouTube's default thumbnail and the target stays `published` with no `error`. Set the thumbnail again with the [After publishing](#after-publishing) endpoint, which reports the reason.
+- **Shorts.** YouTube applies a Short's custom thumbnail only once the Short has finished processing on YouTube. A thumbnail set earlier can be ignored with no error. For a Short, leave `cover_url` out of the publish request, and set it with the [After publishing](#after-publishing) endpoint once YouTube Studio shows the Short as processed.
+- **Invalid URL.** A `cover_url` that is not an `http` or `https` URL fails pre-publish validation with `400 publishing.validation_failed`, with the issue on the `cover_url` field.
 
 ---
 
@@ -236,11 +259,14 @@ Response (HTTP 200):
 | `description` | string | The video description |
 | `visibility` | string | `public`, `unlisted`, or `private` |
 | `tags` | string or array | The Studio tags. A JSON array or a comma-separated string, as at create time |
+| `cover_url` | string | Public URL of a JPG or PNG image, 50 MB or smaller, set as the video's custom thumbnail |
 
 - **Partial edits are safe.** A field you omit keeps its current value on YouTube. An omitted field is never erased.
 - **Tags.** `tags` sets the Studio tags, which are separate from any `#hashtags` in the description. Editing the description does not change the tags, and setting tags does not change the description. Omitting `tags`, or sending an empty array, leaves the tags as they are. The API cannot clear tags.
 - **`publish_at`.** It can be set only before the video is first published. It cannot change once the video is public.
 - **Unknown video.** A `videoId` that does not exist on the channel returns `404 resource.not_found`.
+- **Thumbnail.** `cover_url` replaces the video's thumbnail. The thumbnail is set first: if it is refused, the request fails and no other field in it is applied. A request with only `cover_url` changes only the thumbnail.
+- **Thumbnail errors.** `403 platform.youtube.custom_thumbnail_forbidden` means the channel cannot set custom thumbnails, or YouTube refused a thumbnail for this video: verify the channel in YouTube Studio, then retry. An image that cannot be downloaded, is not a JPG or PNG, or is larger than 50 MB returns `400 validation.field_invalid` with `error.meta.field` set to `cover_url`. A channel that reached YouTube's limit on thumbnail uploads returns `429 platform.youtube.rate_limit`: wait, then retry.
 
 ---
 
@@ -344,9 +370,9 @@ A post without a `title` fails its YouTube target with `validation.field_require
 
 YouTube schedules private videos only. `publish_at` with `public` or `unlisted` visibility returns `400 publishing.validation_failed` before the upload starts.
 
-### First comment and playlist add never fail the post
+### First comment, playlist add, and thumbnail never fail the post
 
-If the `first_comment` or the playlist add fails after a successful upload, the post stays `published` and the failure is not reported on the post. Check the video on YouTube, or post the comment with `POST /v1/inbox/comments/{postId}`.
+If the `first_comment`, the playlist add, or the `cover_url` thumbnail fails after a successful upload, the post stays `published` and the failure is not reported on the post. Retry a thumbnail with `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}`. Check the video on YouTube, or post the comment with `POST /v1/inbox/comments/{postId}`.
 
 ### Posting caps
 

@@ -118,6 +118,7 @@ Send these keys flat in the target's `platform_data` (`targets[].platform_data`)
 | `place` | string (numeric Page ID) | text/link posts, photo, video, multi-photo albums, reel | Tags a location on the post. |
 | `alt_text` | string | single photo | Accessibility text for the photo. |
 | `title` | string | single video, reel | Title shown with the video or Reel. |
+| `cover_url` | string (URL) | single video, reel | Public `http` or `https` URL of a JPG or PNG image, 10 MB or smaller, set as the video's cover. A value that is not an `http` or `https` URL returns a validation error. See "Custom cover" below. |
 | `share_to_feed` | boolean | reel | Default `true`: the Reel is also shared to the Page feed on Facebook, not just the Reels tab. Send `false` to keep it in the Reels tab only. Either value, the Reel is not returned by List posts. |
 | `no_story` | boolean | single photo, single video | When `true`, the photo or video is added without posting a separate update to the Page feed. |
 | `content_category` | string | single video | One of Facebook's video categories: `BEAUTY_FASHION`, `BUSINESS`, `CARS_TRUCKS`, `COMEDY`, `CUTE_ANIMALS`, `ENTERTAINMENT`, `FAMILY`, `FOOD_HEALTH`, `HOME`, `LIFESTYLE`, `MUSIC`, `NEWS`, `POLITICS`, `SCIENCE`, `SPORTS`, `TECHNOLOGY`, `VIDEO_GAMING`, or `OTHER`. |
@@ -224,7 +225,7 @@ Provide 2 to 10 cards. `child_attachments` on a post with `media` returns a vali
 
 ### Video post
 
-Provide a single video entry in `media`. It is published as a Page video. Video posts also accept `min_age`, `max_age`, `countries`, `place`, `no_story`, `content_category`, `content_tags`, `embeddable`, `secret`, and `social_actions`; see the table above.
+Provide a single video entry in `media`. It is published as a Page video. Video posts also accept `min_age`, `max_age`, `countries`, `place`, `no_story`, `content_category`, `content_tags`, `embeddable`, `secret`, `social_actions`, and `cover_url`; see the table above.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -240,7 +241,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ### Reel
 
-Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media`. Facebook processes Reels before they go live. SocialAPI waits up to about 10 minutes for that to finish. After that, the target fails with `504 platform.facebook.reel_timeout`. If Facebook cannot process the video, the target fails with `422 platform.facebook.reel_processing_failed`.
+Publish a short-form vertical video as a Page Reel by setting `content_type: "reel"` in the target's `platform_data`. Provide exactly one vertical video entry in `media`. Facebook processes Reels before they go live. SocialAPI waits up to about 10 minutes for that to finish. After that, the target fails with `503 platform.facebook.reel_timeout`. If Facebook cannot process the video, the target fails with `422 platform.facebook.reel_processing_failed`.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts \
@@ -260,13 +261,37 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-`share_to_feed` defaults to `true`, which shares the Reel to the Page feed on Facebook as well as the Reels tab. List posts does not return a Reel with either value. Reels also accept `title` and `place`; see the table above for every option.
+`share_to_feed` defaults to `true`, which shares the Reel to the Page feed on Facebook as well as the Reels tab. List posts does not return a Reel with either value. Reels also accept `title`, `place`, and `cover_url`; see the table above for every option.
 
 Requirements: exactly one video, vertical orientation (9:16), and a duration of 3 to 90 seconds. SocialAPI warns when the duration is outside that range; Facebook enforces the aspect ratio at publish time and rejects videos that do not comply.
 
+### Custom cover
+
+Set `cover_url` in `platform_data` to choose the cover image of a video post or a Reel. The image must be a JPG or PNG, 10 MB or smaller, reachable at a public URL. Facebook recommends the same aspect ratio as the video.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Behind the scenes #reels",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true,
+    "targets": [{
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform_data": {
+        "content_type": "reel",
+        "cover_url": "https://cdn.example.com/media/reel-cover.jpg"
+      }
+    }]
+  }'
+```
+
+If the cover cannot be applied (the URL is unreachable, the file is not a JPG or PNG, it is larger than 10 MB, or Facebook refuses it), the post still publishes with the cover Facebook generates, and the target reports `published` with no `error`. The cover of a video that is already published cannot be changed through SocialAPI. On a photo, album, story, or text post, `cover_url` is not sent and returns a validation warning.
+
 ### Story
 
-Publish a 24-hour Page Story by setting `content_type: "stories"` in the target's `platform_data`. Provide exactly one photo or video entry in `media`. A video Story waits up to about 10 minutes for Facebook to process it. After that, the target fails with `504 platform.facebook.story_timeout`. If Facebook cannot process the video, the target fails with `422 platform.facebook.story_processing_failed`.
+Publish a 24-hour Page Story by setting `content_type: "stories"` in the target's `platform_data`. Provide exactly one photo or video entry in `media`. A video Story waits up to about 10 minutes for Facebook to process it. After that, the target fails with `503 platform.facebook.story_timeout`. If Facebook cannot process the video, the target fails with `422 platform.facebook.story_processing_failed`.
 
 Stories carry no caption, link, call-to-action, or audience targeting. `text` is ignored, and any `platform_data` key other than `content_type` is not sent and returns a validation warning.
 
@@ -478,10 +503,10 @@ A publish that fails after the request returned puts a structured error on the t
 
 - `401 platform.facebook.auth`: the access token is invalid or revoked. Reconnect the account.
 - `429 platform.facebook.rate_limit`: Facebook's own limit. Wait, then retry.
-- `platform.facebook.<code>`: Facebook refused the request with its own error code and message. The HTTP status is `502` unless the code has its own mapping, such as `404 platform.facebook.100` or `403 platform.facebook.230`. Read `message`. Common causes are a missing Page scope, a post that no longer exists, and an invalid media URL.
-- `502 platform.facebook.api_error`: a failure reaching Facebook, or a response with no usable error.
+- `platform.facebook.<code>`: Facebook refused the request with its own error code and message. The HTTP status is `503` unless the code has its own mapping, such as `404 platform.facebook.100` or `403 platform.facebook.230`. Read `message`. Common causes are a missing Page scope, a post that no longer exists, and an invalid media URL.
+- `503 platform.facebook.api_error`: a failure reaching Facebook, or a response with no usable error.
 - `422 platform.facebook.reel_processing_failed` and `422 platform.facebook.story_processing_failed`: Facebook could not process the video.
-- `504 platform.facebook.reel_timeout` and `504 platform.facebook.story_timeout`: Facebook did not finish processing the video in about 10 minutes.
+- `503 platform.facebook.reel_timeout` and `503 platform.facebook.story_timeout`: Facebook did not finish processing the video in about 10 minutes.
 
 Every code is in [Errors](/guides/errors).
 

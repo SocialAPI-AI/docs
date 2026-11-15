@@ -270,7 +270,7 @@ curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/17895695668004550/17
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Hiding is free. A platform without it returns `501 resource.not_supported`. Threads hides replies only on an account connected on or after 2026-10-17: reconnect an older account first. See [Threads](/platforms/threads).
+Hiding is free. A platform without it returns `501 resource.not_supported`. Facebook refuses to hide or unhide some comments, for example a comment the Page's moderation filters already hid. That refusal returns `422 platform.facebook.comment_not_hideable`, and retrying does not help. Threads hides replies only on an account connected on or after 2026-10-17: reconnect an older account first. See [Threads](/platforms/threads).
 
 ## Delete a comment
 
@@ -322,6 +322,7 @@ Check these in order when a comment call fails or returns nothing:
 8. **`400 platform.instagram.private_reply_ineligible`, `400 platform.facebook.private_reply_ineligible`.** The comment already received its private reply, or is older than 7 days.
 9. **`429 validation.interaction_limit_exhausted`, `429 platform.{platform}.rate_limit`.** Your allowance, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
 10. **`422 platform.youtube.processing_failure`.** YouTube refused to delete a comment that your channel did not write. Hide it instead.
+11. **`422 platform.facebook.comment_not_hideable`.** Facebook refused to hide or unhide the comment, for example a comment the Page's moderation filters already hid. Retrying does not help.
 
 When the list is empty, check that the post has comments, that `account_id` owns the post, and, on a platform that sends events, that the comment arrived: see [Webhook events](/guides/webhook-events#comments). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
 

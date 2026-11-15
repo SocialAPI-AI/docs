@@ -5413,7 +5413,7 @@
                         }
                     },
                     "400": {
-                        "description": "Missing or invalid account_id, or account.page_inactive: the conversation's Facebook Page is no longer connected, so its thread cannot be refreshed. Reconnect the Page to sync it again.",
+                        "description": "Missing or invalid account_id",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11750,63 +11750,6 @@
                 }
             }
         },
-        "/posts/metrics": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Fetches engagement metrics for up to 20 published posts in one call. Each ID can be a SocialAPI post ID or a platform post ID. Duplicate IDs are returned once.\nEach item has the same targets as GET /v1/posts/{pid}/metrics. A post that cannot be read (not found, or a platform post ID that matches several posts) gets an `error` on its item instead of failing the request.",
-                "tags": [
-                    "Posts"
-                ],
-                "summary": "Get metrics for several posts",
-                "parameters": [
-                    {
-                        "description": "Comma-separated post IDs (SocialAPI or platform), at most 20",
-                        "name": "post_ids",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.PostsMetricsResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "post_ids missing, more than 20 IDs, or an ID longer than 100 characters",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid or missing API key",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/posts/validate": {
             "get": {
                 "security": [
@@ -17373,43 +17316,6 @@
                     },
                     "pagination": {
                         "$ref": "#/components/schemas/api_endpoints.PaginationInfo"
-                    }
-                }
-            },
-            "api_endpoints.PostsMetricsItem": {
-                "type": "object",
-                "properties": {
-                    "error": {
-                        "description": "Set when this post could not be read: not found, or a platform post ID that matches several posts.",
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/api_endpoints.PostTargetErrorResponse"
-                            }
-                        ]
-                    },
-                    "post_id": {
-                        "description": "The post ID as given in post_ids.",
-                        "type": "string",
-                        "example": "9b2f1c34-5e6a-4d7b-8c9d-0e1f2a3b4c5d"
-                    },
-                    "targets": {
-                        "description": "Same targets as GET /v1/posts/{pid}/metrics. Empty when error is set.",
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/api_endpoints.PostTargetResponse"
-                        }
-                    }
-                }
-            },
-            "api_endpoints.PostsMetricsResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "description": "One item per distinct post ID, in request order.",
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/api_endpoints.PostsMetricsItem"
-                        }
                     }
                 }
             },

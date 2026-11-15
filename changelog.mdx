@@ -18,6 +18,20 @@ rss: true
   A new `description` key in `platform_data.tiktok` sets the caption of a photo carousel, up to 4,000 UTF-16 characters, with hashtags and mentions. The post `text` stays the title and its 90-character limit is unchanged. Before, a carousel published with a title only. A longer value fails validation on the field `description`. See [Platform data fields](/platforms/tiktok/publishing#platform-data-fields).
 </Update>
 
+<Update label="2026-11-12" description="Publishing" tags={["Publishing", "Facebook", "YouTube"]}>
+  ## Custom covers for Facebook and YouTube videos
+
+  `platform_data.facebook.cover_url` sets the cover of a Facebook Page video or Reel, from a public JPG or PNG, 10 MB or smaller. `platform_data.youtube.cover_url` sets a YouTube video's custom thumbnail, from a public JPG or PNG, 50 MB or smaller, on a verified channel. The key matches Instagram's `cover_url` for Reels. A cover that cannot be applied at publish never fails the post: the video goes live with the platform's default cover. `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` also accepts `cover_url`, to change the thumbnail of a published YouTube video, and returns `403 platform.youtube.custom_thumbnail_forbidden` when the channel cannot use custom thumbnails. See [Facebook custom cover](/platforms/facebook/publishing#custom-cover) and [YouTube custom thumbnail](/platforms/youtube/publishing#custom-thumbnail).
+</Update>
+
+<Update label="2026-11-12" description="Errors" tags={["Errors", "Comments", "Facebook"]}>
+  ## Platform failures return 503, and a new Facebook hide error
+
+  A platform failure or timeout that returned `502` or `504` now returns `503`, with the same error body and `error.code`, for example `503 platform.instagram.container_timeout`. `status_code` in `GET /v1/events` shows `503` for these failures from now on. SocialAPI no longer responds with `502` or `504`: any `502` or `504` you receive comes from in front of SocialAPI, has no SocialAPI error body, and the request can still have run, so check whether a create or send succeeded before you repeat it. `GET /v1/inbox/media/{id}` now returns `503 http.503` while the file is still being fetched, instead of `504 http.504`: a response without `Retry-After` means send the request again, one with `Retry-After: 1` means wait 1 second first. See [Platform errors](/guides/errors#platform-errors).
+
+  Hiding or unhiding a Facebook comment that Facebook refuses, for example one the Page's moderation filters already hid, now returns `422 platform.facebook.comment_not_hideable` instead of `502 platform.facebook.1`. Retrying does not help. See [Hide and unhide a comment](/guides/comments#hide-and-unhide-a-comment).
+</Update>
+
 <Update label="2026-11-11" description="Direct messages" tags={["Direct messages", "Instagram", "Facebook", "WhatsApp", "MCP"]}>
   ## Typing indicators and seen receipts
 

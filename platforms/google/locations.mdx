@@ -201,7 +201,7 @@ The writable fields:
 
 Lists replace instead of merging: `regular_hours.periods`, `labels`, `additional_phones`, `additional_categories`, and `service_items` each overwrite the whole list, so include every entry you want to keep. Objects merge: inside `storefront_address` you can send only `postal_code` and the rest of the address stays.
 
-Not writable: `place_id`, `maps_uri`, `new_review_uri`, and the status flags are output only. `language_code` is fixed when the location is created. A request with none of the writable fields returns `400 validation.no_fields_to_update`. A value Google rejects returns `502 platform.google.api_error`, with Google's reason in `error.message`.
+Not writable: `place_id`, `maps_uri`, `new_review_uri`, and the status flags are output only. `language_code` is fixed when the location is created. A request with none of the writable fields returns `400 validation.no_fields_to_update`. A value Google rejects returns `503 platform.google.api_error`, with Google's reason in `error.message`.
 
 ### Validate before you write
 
@@ -375,7 +375,7 @@ Response (HTTP 200): the updated attributes, in the shape of the read. Like ever
 | `400 validation.no_fields_to_update` | `attributes` is empty |
 | `400 validation.attribute_duplicate` | The same attribute is listed twice |
 | `400 validation.attribute_value_conflict` | An attribute sets more than one value field |
-| `502 platform.google.api_error` | Google rejected the attribute or the value, with its reason in `error.message`. Check the id and values against the available list |
+| `503 platform.google.api_error` | Google rejected the attribute or the value, with its reason in `error.message`. Check the id and values against the available list |
 
 ## Food menus
 
@@ -422,7 +422,7 @@ The structure is menus, then sections, then items, then optional options (varian
 
 Item `attributes` also accept `spiciness` (`MILD`, `MEDIUM`, `HOT`), `allergen`, `dietary_restriction`, `preparation_methods`, `nutrition_facts`, `ingredients`, `serves_num_people`, `portion_size`, and `media_keys` (photos already on the location's profile). `cuisines`, `allergen`, `dietary_restriction` and `preparation_methods` take Google's enum names, for example `FRENCH`, `PEANUT`, `VEGAN` or `GRILLED`.
 
-A menu that breaks a rule returns `400` with the offending path in `error.meta.field` (for example `menus[0].sections[1].items[0].attributes.price`). A value Google rejects returns `502 platform.google.api_error` with its reason.
+A menu that breaks a rule returns `400` with the offending path in `error.meta.field` (for example `menus[0].sections[1].items[0].attributes.price`). A value Google rejects returns `503 platform.google.api_error` with its reason.
 
 ## Reservation and ordering links
 
