@@ -26,17 +26,17 @@ An unsupported call returns `501 resource.not_supported`.
 | Schedule a post | Yes | 2 ways: `scheduled_at` makes SocialAPI upload the video at that time, and `platform_data.youtube.publish_at` makes YouTube publish an uploaded private video at that time |
 | First comment on a video | Yes | Posted after the upload. A failure does not fail the post |
 | Add a video to a playlist | Yes | `platform_data.youtube.playlist_id`. A failure does not fail the post |
-| Custom thumbnail | Yes | `platform_data.youtube.cover_url`, verified channels only. A failure does not fail the post. Change it later with `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` |
-| Update a video | Yes | Before publishing: `PATCH /v1/posts/{pid}`. After publishing: `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` |
+| Custom thumbnail | Yes | `platform_data.youtube.cover_url`, verified channels only. A failure does not fail the post. Change it later with `PATCH /v1/platforms/youtube/accounts/{account_id}/videos/{video_id}` |
+| Update a video | Yes | Before publishing: `PATCH /v1/posts/{post_id}`. After publishing: `PATCH /v1/platforms/youtube/accounts/{account_id}/videos/{video_id}` |
 | Delete a video | Yes | Removes the video from YouTube |
 | List posts | Yes | Every video in the channel's uploads, including videos uploaded outside SocialAPI |
 | List comments and replies | Yes | Comments are read per video |
 | Reply to a comment | Yes | Up to 5 replies and top-level comments per channel per day (midnight to midnight Pacific Time), through the reply endpoint and the `social_api_reply_to_comment` MCP tool combined. See [YouTube comments](/platforms/youtube/comments) |
 | Post a top-level comment | Yes | Omit `comment_id` when you reply |
 | Hide, unhide a comment | Yes | Hiding sets the comment to `rejected`. Unhide works on a `held_for_review` comment. Do not use it on a `rejected` comment: YouTube does not move a `rejected` comment back to `published`. See [Hide and unhide a comment](/platforms/youtube/comments#hide-and-unhide-a-comment) |
-| Hold a comment for review, ban its author | Yes | `POST /v1/platforms/youtube/comments/{commentId}/moderate` |
+| Hold a comment for review, ban its author | Yes | `POST /v1/platforms/youtube/comments/{comment_id}/moderate` |
 | Delete a comment | Conditional | Only comments your channel wrote. Another person's comment returns `422 platform.youtube.processing_failure`: hide it instead |
-| Edit your own comment | Yes | `PATCH /v1/platforms/youtube/comments/{commentId}` |
+| Edit your own comment | Yes | `PATCH /v1/platforms/youtube/comments/{comment_id}` |
 | Like a comment | No | `501 resource.not_supported`. YouTube has no comment-like API |
 | Private reply | No | `501 resource.not_supported` |
 | DMs | No | `501 resource.not_supported` |
@@ -84,7 +84,7 @@ YouTube-specific rules:
 
 `GET /v1/posts?platform=youtube&account_ids={account_id}` lists the channel's videos with their `permalink` and engagement metrics: see [YouTube publishing](/platforms/youtube/publishing#6-retrieve-posts).
 
-`GET /v1/platforms/youtube/accounts/{id}/summary` returns the channel's aggregate stats:
+`GET /v1/platforms/youtube/accounts/{account_id}/summary` returns the channel's aggregate stats:
 
 ```bash
 curl https://api.social-api.ai/v1/platforms/youtube/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary \
@@ -104,7 +104,7 @@ Response (HTTP 200):
 }
 ```
 
-`POST /v1/platforms/youtube/accounts/{id}/sync` re-reads the channel's videos at once and returns `{"success": true}`. Use it after you upload a video outside SocialAPI.
+`POST /v1/platforms/youtube/accounts/{account_id}/sync` re-reads the channel's videos at once and returns `{"success": true}`. Use it after you upload a video outside SocialAPI.
 
 ## Comments
 

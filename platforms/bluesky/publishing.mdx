@@ -100,7 +100,7 @@ See [Scheduling](/guides/scheduling) for how scheduled posts settle.
 
 ## 4. Update post
 
-Bluesky has no way to edit a published post. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post.
+Bluesky has no way to edit a published post. `PATCH /v1/posts/{post_id}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post.
 
 To correct a post, delete it and publish a new one.
 
@@ -113,7 +113,7 @@ curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-To remove only the Bluesky target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{pid}` always removes every target.
+To remove only the Bluesky target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{post_id}` always removes every target.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/unpublish \
@@ -165,7 +165,7 @@ Each post includes a `targets` array with the per-platform status and engagement
 
 `likes` is Bluesky's like count, `comments` its reply count, and `shares` its repost count. Bluesky reports no saves, so `saves` stays `0`. `metrics_synced_at` is when SocialAPI last read the counts from Bluesky.
 
-**Posts published outside SocialAPI:** SocialAPI imports the 25 most recent posts of the account when you connect it and when you call `POST /v1/accounts/{id}/sync`.
+**Posts published outside SocialAPI:** SocialAPI imports the 25 most recent posts of the account when you connect it and when you call `POST /v1/accounts/{account_id}/sync`.
 
 ---
 
@@ -173,7 +173,7 @@ Each post includes a `targets` array with the per-platform status and engagement
 
 ### No post editing
 
-Bluesky has no way to edit a published post. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one.
+Bluesky has no way to edit a published post. `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one.
 
 ### Video
 
@@ -185,7 +185,7 @@ An `@handle` in the text is not a mention. The mentioned account is not notified
 
 ### Image download failure
 
-SocialAPI downloads each `url` image when it publishes. When the download fails, the target fails with `500 system.internal`. Check that the URL is public and returns the image, then send `POST /v1/posts/{pid}/retry`.
+SocialAPI downloads each `url` image when it publishes. When the download fails, the target fails with `500 system.internal`. Check that the URL is public and returns the image, then send `POST /v1/posts/{post_id}/retry`.
 
 ### Posting caps
 
@@ -215,7 +215,7 @@ Every code is in [Errors](/guides/errors).
 ### Recovery
 
 - **Auth error.** Connect the account again with a working app password: `POST /v1/accounts/connect` with the same `platform` and `brand_id`. See [Connect accounts](/guides/connect-accounts).
-- **Rate limit.** Wait for the `Retry-After` header, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Rate limit.** Wait for the `Retry-After` header, then send `POST /v1/posts/{post_id}/retry`. See [Delivery](/guides/delivery).
 - **Image too large.** Resize the image to 2 MB or less, upload it again, and publish a new post.
 
 ---

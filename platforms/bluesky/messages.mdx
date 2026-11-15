@@ -11,14 +11,14 @@ SocialAPI lists the direct message (DM) conversations of a connected Bluesky acc
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/conversations` | List conversations |
-| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
-| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
-| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
-| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
-| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a text message |
+| `GET` | `/v1/inbox/conversations/{conversation_id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{conversation_id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{conversation_id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages` | Send a text message |
 | `POST` | `/v1/inbox/sync` | Load new conversations, or new messages of one conversation |
 
-`{id}` is the conversation `id` that `GET /v1/inbox/conversations` returns. Reactions and typing indicators are not available on Bluesky: see [What Bluesky does not support](#what-bluesky-does-not-support).
+`{conversation_id}` is the conversation `id` that `GET /v1/inbox/conversations` returns. Reactions and typing indicators are not available on Bluesky: see [What Bluesky does not support](#what-bluesky-does-not-support).
 
 ## Direct message access
 
@@ -26,7 +26,7 @@ A Bluesky app password reaches DMs only when **Allow access to your direct messa
 
 Without that access:
 
-- `POST /v1/inbox/conversations/{id}/messages` returns `403 platform.bluesky.dm_scope_missing`, and the request still costs its interaction credit.
+- `POST /v1/inbox/conversations/{conversation_id}/messages` returns `403 platform.bluesky.dm_scope_missing`, and the request still costs its interaction credit.
 - The conversation list stays empty, and a sync started with `POST /v1/inbox/sync` ends in `state: failed` with an `error` that says the app password has no direct message access.
 - Posts, comments, and mentions keep working.
 
@@ -116,7 +116,7 @@ Bluesky sends SocialAPI no notification of new messages, so SocialAPI sends no `
 - With only `account_id`, the sync refreshes the conversation list, including the latest message of each conversation, and loads the messages of conversations never loaded before, as described in the guide.
 - With `conversation_id` as well, it loads the new messages of that conversation.
 
-The first `GET /v1/inbox/conversations/{id}/messages` returns the conversation's latest messages. After that, a new incoming message appears only after `POST /v1/inbox/sync` with that `conversation_id`. If more than 100 messages arrive between two syncs, the older ones are missing. Each target accepts 1 sync you start every 5 minutes: a second attempt after the first sync finished and inside that time returns `429 inbox.sync_rate_limited` with a `Retry-After` header. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually).
+The first `GET /v1/inbox/conversations/{conversation_id}/messages` returns the conversation's latest messages. After that, a new incoming message appears only after `POST /v1/inbox/sync` with that `conversation_id`. If more than 100 messages arrive between two syncs, the older ones are missing. Each target accepts 1 sync you start every 5 minutes: a second attempt after the first sync finished and inside that time returns `429 inbox.sync_rate_limited` with a `Retry-After` header. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/inbox/sync \
@@ -145,7 +145,7 @@ Response (HTTP 202):
 
 ## Read messages
 
-`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first, with the fields in [Read messages](/guides/direct-messages#read-messages). On Bluesky:
+`GET /v1/inbox/conversations/{conversation_id}/messages` lists the messages of a conversation, newest first, with the fields in [Read messages](/guides/direct-messages#read-messages). On Bluesky:
 
 - `platform_id` is Bluesky's message ID, and `sender_id` is the sender's DID.
 - `attachment_type`, `attachment_url`, and `reply_to` are `null` on every message read from Bluesky: SocialAPI reads only the text of a Bluesky message. A message you sent through SocialAPI with an attachment keeps its `attachment_type` and `attachment_url` in the list, although Bluesky received an empty message.
@@ -154,7 +154,7 @@ Response (HTTP 202):
 
 ## Send a message
 
-`POST /v1/inbox/conversations/{id}/messages` sends the `text` of the request as a Bluesky message. The request fields are in [Send a message](/guides/direct-messages#send-a-message). On Bluesky:
+`POST /v1/inbox/conversations/{conversation_id}/messages` sends the `text` of the request as a Bluesky message. The request fields are in [Send a message](/guides/direct-messages#send-a-message). On Bluesky:
 
 | Field | On Bluesky |
 |---|---|
@@ -171,8 +171,8 @@ When the conversation is locked on Bluesky, the call returns `503 platform.blues
 
 ## What Bluesky does not support
 
-- **Reactions.** `POST` and `DELETE /v1/inbox/conversations/{id}/messages/{messageId}/reaction` return `501 resource.not_supported`.
-- **Typing indicators and seen receipts.** `POST /v1/inbox/conversations/{id}/sender-action` returns `501 resource.not_supported`. `POST /v1/inbox/conversations/{id}/read` returns `{ "success": true }`, and the person sees nothing.
+- **Reactions.** `POST` and `DELETE /v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` return `501 resource.not_supported`.
+- **Typing indicators and seen receipts.** `POST /v1/inbox/conversations/{conversation_id}/sender-action` returns `501 resource.not_supported`. `POST /v1/inbox/conversations/{conversation_id}/read` returns `{ "success": true }`, and the person sees nothing.
 - **Attachments and interactive content.** Text only. Each attachment is sent as an extra empty message.
 - **Starting a conversation.** SocialAPI sends only into a conversation that exists on Bluesky and appears in `GET /v1/inbox/conversations`.
 - **A private reply to a comment.** Bluesky has no comment-to-DM path: see [Bluesky comments](/platforms/bluesky/comments#what-bluesky-does-not-support).

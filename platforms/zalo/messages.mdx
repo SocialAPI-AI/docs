@@ -11,15 +11,15 @@ SocialAPI's direct message (DM) API lists the conversations of a connected Zalo 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/conversations` | List conversations |
-| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
-| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
-| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
-| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
-| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message |
+| `GET` | `/v1/inbox/conversations/{conversation_id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{conversation_id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{conversation_id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages` | Send a message |
 | `POST` | `/v1/inbox/sync` | Refresh the conversation list or one conversation's messages |
 | `GET` | `/v1/inbox/sync` | Read the sync state of the conversation list or of one conversation |
 
-`{id}` is the conversation `id` that `GET /v1/inbox/conversations` returns. Reactions and typing indicators return `501 resource.not_supported` on Zalo: see [What Zalo does not support](#what-zalo-does-not-support).
+`{conversation_id}` is the conversation `id` that `GET /v1/inbox/conversations` returns. Reactions and typing indicators return `501 resource.not_supported` on Zalo: see [What Zalo does not support](#what-zalo-does-not-support).
 
 ## Your first reply
 
@@ -99,7 +99,7 @@ SocialAPI has no endpoint that starts a new Zalo conversation. You reply into a 
 
 ## Read messages
 
-`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first.
+`GET /v1/inbox/conversations/{conversation_id}/messages` lists the messages of a conversation, newest first.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages?limit=25" \
@@ -156,13 +156,13 @@ The fields are described in [Read messages](/guides/direct-messages#read-message
 | `reply_to` | Always `null` |
 | `status` | A message you sent through SocialAPI keeps `status: "pending"`: SocialAPI does not report delivery or read status on Zalo. A message the OA sent from Zalo's own apps has no `status` |
 
-`GET /v1/inbox/conversations/{id}/messages` returns up to the 10 most recent messages of the conversation (sent and received) as of the first time SocialAPI loads them, plus the messages you send through SocialAPI. That first load happens on your first read, or earlier when a `POST /v1/inbox/sync` with only `account_id` loads the conversation: see [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually). A message the person sends later appears only after you send `POST /v1/inbox/sync` with `account_id` and `conversation_id` (1 per conversation every 5 minutes), even when its `dm.received` event already arrived. When more than 10 messages, sent or received, pass between two loads, the older ones that you did not send through SocialAPI never appear.
+`GET /v1/inbox/conversations/{conversation_id}/messages` returns up to the 10 most recent messages of the conversation (sent and received) as of the first time SocialAPI loads them, plus the messages you send through SocialAPI. That first load happens on your first read, or earlier when a `POST /v1/inbox/sync` with only `account_id` loads the conversation: see [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually). A message the person sends later appears only after you send `POST /v1/inbox/sync` with `account_id` and `conversation_id` (1 per conversation every 5 minutes), even when its `dm.received` event already arrived. When more than 10 messages, sent or received, pass between two loads, the older ones that you did not send through SocialAPI never appear.
 
 `limit` and `cursor` work as on every platform: see [Pagination](/guides/pagination).
 
 ## Send a message
 
-`POST /v1/inbox/conversations/{id}/messages` sends a message to the person. Every message goes out as a Zalo consultation message, the message type Zalo reserves for answering a person who contacted the OA. SocialAPI sends `text` first, then each attachment in order, as separate messages. The request costs 1 interaction credit however many messages it sends.
+`POST /v1/inbox/conversations/{conversation_id}/messages` sends a message to the person. Every message goes out as a Zalo consultation message, the message type Zalo reserves for answering a person who contacted the OA. SocialAPI sends `text` first, then each attachment in order, as separate messages. The request costs 1 interaction credit however many messages it sends.
 
 The fields are described in [Send a message](/guides/direct-messages#send-a-message). On Zalo:
 
@@ -289,8 +289,8 @@ The refused send still costs 1 interaction credit. To avoid it, compare the time
 
 ## What Zalo does not support
 
-- **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` and `DELETE` on the same path return `501 resource.not_supported`.
-- **Typing indicators and seen receipts.** `POST /v1/inbox/conversations/{id}/sender-action` returns `501 resource.not_supported`.
+- **Reactions.** `POST /v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` and `DELETE` on the same path return `501 resource.not_supported`.
+- **Typing indicators and seen receipts.** `POST /v1/inbox/conversations/{conversation_id}/sender-action` returns `501 resource.not_supported`.
 - **Promotion, transaction, and broadcast messages.** SocialAPI sends consultation messages only, so you cannot message a person outside the 7-day window.
 - **Message tags.** `message_tag` returns `422 messaging.tag_not_supported`.
 - **Quick replies and list menus.** `quick_replies` and `list_sections` are ignored.

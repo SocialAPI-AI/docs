@@ -10,29 +10,29 @@ A Google Business Profile location is one business listing on Google Search and 
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/platforms/google/logins/{loginId}/locations` | List every location a Google login manages, with its details and assignment |
-| `POST` | `/v1/platforms/google/logins/{loginId}/locations/{locationId}/assign` | Connect a location from the login to a brand |
-| `PUT` | `/v1/platforms/google/accounts/{id}` | Update a location's public profile |
-| `GET` | `/v1/platforms/google/accounts/{id}/media` | List the photos and videos on a location's profile |
-| `GET` | `/v1/platforms/google/accounts/{id}/media/{mediaId}` | Read one photo or video |
-| `POST` | `/v1/platforms/google/accounts/{id}/media` | Add one photo or video to the profile |
-| `DELETE` | `/v1/platforms/google/accounts/{id}/media/{mediaId}` | Remove a photo or video you added |
-| `GET` | `/v1/platforms/google/accounts/{id}/attributes` | List the attributes set on a location |
-| `PUT` | `/v1/platforms/google/accounts/{id}/attributes` | Set or remove attributes |
-| `GET` | `/v1/platforms/google/accounts/{id}/attributes/available` | List the attributes the location accepts |
-| `GET` | `/v1/platforms/google/accounts/{id}/food-menus` | Read the location's food menus |
-| `PUT` | `/v1/platforms/google/accounts/{id}/food-menus` | Replace every food menu |
-| `GET` | `/v1/platforms/google/accounts/{id}/place-action-links` | List the reservation, ordering and booking links |
-| `POST` | `/v1/platforms/google/accounts/{id}/place-action-links` | Add a link |
-| `PATCH` | `/v1/platforms/google/accounts/{id}/place-action-links/{linkId}` | Change a link |
-| `DELETE` | `/v1/platforms/google/accounts/{id}/place-action-links/{linkId}` | Remove a link |
-| `GET` | `/v1/platforms/google/accounts/{id}/place-action-types` | List the link types the location can offer |
+| `GET` | `/v1/platforms/google/logins/{login_id}/locations` | List every location a Google login manages, with its details and assignment |
+| `POST` | `/v1/platforms/google/logins/{login_id}/locations/{location_id}/assign` | Connect a location from the login to a brand |
+| `PUT` | `/v1/platforms/google/accounts/{account_id}` | Update a location's public profile |
+| `GET` | `/v1/platforms/google/accounts/{account_id}/media` | List the photos and videos on a location's profile |
+| `GET` | `/v1/platforms/google/accounts/{account_id}/media/{media_id}` | Read one photo or video |
+| `POST` | `/v1/platforms/google/accounts/{account_id}/media` | Add one photo or video to the profile |
+| `DELETE` | `/v1/platforms/google/accounts/{account_id}/media/{media_id}` | Remove a photo or video you added |
+| `GET` | `/v1/platforms/google/accounts/{account_id}/attributes` | List the attributes set on a location |
+| `PUT` | `/v1/platforms/google/accounts/{account_id}/attributes` | Set or remove attributes |
+| `GET` | `/v1/platforms/google/accounts/{account_id}/attributes/available` | List the attributes the location accepts |
+| `GET` | `/v1/platforms/google/accounts/{account_id}/food-menus` | Read the location's food menus |
+| `PUT` | `/v1/platforms/google/accounts/{account_id}/food-menus` | Replace every food menu |
+| `GET` | `/v1/platforms/google/accounts/{account_id}/place-action-links` | List the reservation, ordering and booking links |
+| `POST` | `/v1/platforms/google/accounts/{account_id}/place-action-links` | Add a link |
+| `PATCH` | `/v1/platforms/google/accounts/{account_id}/place-action-links/{link_id}` | Change a link |
+| `DELETE` | `/v1/platforms/google/accounts/{account_id}/place-action-links/{link_id}` | Remove a link |
+| `GET` | `/v1/platforms/google/accounts/{account_id}/place-action-types` | List the link types the location can offer |
 
-`{loginId}` is the `login_id` returned when you connect Google and on every Google account: see [Choose a Google Business Profile](/guides/connect-accounts#choose-a-google-business-profile). `{id}` is the connected account ID (`acc_...`). The full schemas are in the [API reference](/api-reference/google/list-a-google-logins-business-profile-locations).
+`{login_id}` is the `login_id` returned when you connect Google and on every Google account: see [Choose a Google Business Profile](/guides/connect-accounts#choose-a-google-business-profile). `{account_id}` is the connected account ID (`acc_...`). The full schemas are in the [API reference](/api-reference/google/list-a-google-logins-business-profile-locations).
 
 ## Read a location's details
 
-`GET /v1/platforms/google/logins/{loginId}/locations` returns the locations the Google login can manage, read from Google at request time. A location added in Google Business Profile after the login was authorized appears at once, with no new consent screen.
+`GET /v1/platforms/google/logins/{login_id}/locations` returns the locations the Google login can manage, read from Google at request time. A location added in Google Business Profile after the login was authorized appears at once, with no new consent screen.
 
 ```bash
 curl https://api.social-api.ai/v1/platforms/google/logins/cred_01J8X3Q4R5M6N7P8V2K0W1JA/locations \
@@ -116,7 +116,7 @@ A boolean flag that is absent means Google told SocialAPI nothing. It does not m
 
 ## Connect another location to a brand
 
-`POST /v1/platforms/google/logins/{loginId}/locations/{locationId}/assign` connects one location from the login to a brand, without a second consent screen. `{locationId}` is the `platform_account_id`, with the slashes either sent as they are or URL-encoded as `%2F`.
+`POST /v1/platforms/google/logins/{login_id}/locations/{location_id}/assign` connects one location from the login to a brand, without a second consent screen. `{location_id}` is the `platform_account_id`, with the slashes either sent as they are or URL-encoded as `%2F`.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/platforms/google/logins/cred_01J8X3Q4R5M6N7P8V2K0W1JA/locations/accounts%2F123%2Flocations%2F789/assign" \
@@ -147,7 +147,7 @@ When the Google login manages more than 1 location, the connect flow pauses so y
 
 ## Update a location
 
-`PUT /v1/platforms/google/accounts/{id}` writes the location's public profile. Send only the fields you want to change:
+`PUT /v1/platforms/google/accounts/{account_id}` writes the location's public profile. Send only the fields you want to change:
 
 ```bash
 curl -X PUT https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J \
@@ -228,7 +228,7 @@ A `200` means Google accepted the change for review. It does not mean the change
 
 A location's profile carries its own photos and videos: the logo, the cover image, interior and exterior shots. They are separate from the media attached to a post, and they are what customers see on the listing.
 
-`GET /v1/platforms/google/accounts/{id}/media` lists them:
+`GET /v1/platforms/google/accounts/{account_id}/media` lists them:
 
 ```bash
 curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/media" \
@@ -266,11 +266,11 @@ Response (HTTP 200):
 | `total_count` | The items on the location across all pages. 0 for an empty gallery |
 | `next_cursor` | Pass it as `cursor` for the next page. Absent on the last page. `limit` sets the page size |
 
-`GET /v1/platforms/google/accounts/{id}/media/{mediaId}` returns one item. `mediaId` accepts the bare ID or the full resource name from the list.
+`GET /v1/platforms/google/accounts/{account_id}/media/{media_id}` returns one item. `media_id` accepts the bare ID or the full resource name from the list.
 
 ### Add a photo or video
 
-`POST /v1/platforms/google/accounts/{id}/media` adds one item. `media` takes exactly 1 entry, in the same `{source_type, source}` form the publishing endpoints accept:
+`POST /v1/platforms/google/accounts/{account_id}/media` adds one item. `media` takes exactly 1 entry, in the same `{source_type, source}` form the publishing endpoints accept:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/media \
@@ -297,7 +297,7 @@ A request with other than 1 media entry returns `422 google.media.single_item_re
 
 ### Remove a photo or video
 
-`DELETE /v1/platforms/google/accounts/{id}/media/{mediaId}` removes an item you added and returns `204` with no body. `mediaId` accepts the bare ID or the full resource name.
+`DELETE /v1/platforms/google/accounts/{account_id}/media/{media_id}` removes an item you added and returns `204` with no body. `media_id` accepts the bare ID or the full resource name.
 
 ### Photos your customers posted
 
@@ -314,7 +314,7 @@ Each item carries an `attribution` block with `profile_name`, `profile_photo_url
 
 Attributes are the facts shown on a listing: outdoor seating, Wi-Fi, accepted payment methods, a wheelchair accessible entrance. Which attributes a location accepts depends on its category and country.
 
-`GET /v1/platforms/google/accounts/{id}/attributes/available` lists them:
+`GET /v1/platforms/google/accounts/{account_id}/attributes/available` lists them:
 
 ```bash
 curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/attributes/available" \
@@ -344,7 +344,7 @@ curl "https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7
 
 An attribute marked `deprecated: true` still reads but should no longer be set.
 
-`GET /v1/platforms/google/accounts/{id}/attributes` returns the attributes set on the location. `value_type` says which value field is filled:
+`GET /v1/platforms/google/accounts/{account_id}/attributes` returns the attributes set on the location. `value_type` says which value field is filled:
 
 | `value_type` | Value field |
 |---|---|
@@ -353,7 +353,7 @@ An attribute marked `deprecated: true` still reads but should no longer be set.
 | `URL` | `uri_values`: array of URLs |
 | `REPEATED_ENUM` | `repeated_enum_value`: `set_values` (the values that apply) and `unset_values` (the values that explicitly do not) |
 
-`PUT /v1/platforms/google/accounts/{id}/attributes` sets the attributes you list and leaves every other attribute alone. Send the one value field that matches the attribute's `value_type`. An attribute sent with no value field is removed:
+`PUT /v1/platforms/google/accounts/{account_id}/attributes` sets the attributes you list and leaves every other attribute alone. Send the one value field that matches the attribute's `value_type`. An attribute sent with no value field is removed:
 
 ```bash
 curl -X PUT https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/attributes \
@@ -381,9 +381,9 @@ Response (HTTP 200): the updated attributes, in the shape of the read. Like ever
 
 Restaurants and cafés can show their menus on the listing. Only locations whose [details](#read-a-locations-details) report `can_have_food_menus: true` support them. Check it before you write: Google refuses menus on any other location.
 
-`GET /v1/platforms/google/accounts/{id}/food-menus` returns every menu. A location without menus returns `"menus": []`.
+`GET /v1/platforms/google/accounts/{account_id}/food-menus` returns every menu. A location without menus returns `"menus": []`.
 
-`PUT /v1/platforms/google/accounts/{id}/food-menus` replaces every menu with the ones you send, so always send the full set. `"menus": []` removes them all:
+`PUT /v1/platforms/google/accounts/{account_id}/food-menus` replaces every menu with the ones you send, so always send the full set. `"menus": []` removes them all:
 
 ```bash
 curl -X PUT https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/food-menus \
@@ -428,7 +428,7 @@ A menu that breaks a rule returns `400` with the offending path in `error.meta.f
 
 Place action links are the "Reserve a table", "Order online" and "Book" buttons on a listing. Each points at a URL.
 
-`GET /v1/platforms/google/accounts/{id}/place-action-types` lists the types the location can offer:
+`GET /v1/platforms/google/accounts/{account_id}/place-action-types` lists the types the location can offer:
 
 ```json
 { "data": [{ "type": "DINING_RESERVATION", "display_name": "Reserve a table" }, { "type": "FOOD_ORDERING", "display_name": "Order online" }] }
@@ -436,7 +436,7 @@ Place action links are the "Reserve a table", "Order online" and "Book" buttons 
 
 `place_action_type` is one of `APPOINTMENT`, `ONLINE_APPOINTMENT`, `DINING_RESERVATION`, `FOOD_ORDERING`, `FOOD_DELIVERY`, `FOOD_TAKEOUT`, or `SHOP_ONLINE`.
 
-`GET /v1/platforms/google/accounts/{id}/place-action-links` lists the links:
+`GET /v1/platforms/google/accounts/{account_id}/place-action-links` lists the links:
 
 ```json
 {
@@ -457,7 +457,7 @@ Place action links are the "Reserve a table", "Order online" and "Book" buttons 
 
 A link with `is_editable: false` was added by a booking or ordering provider (`provider_type: AGGREGATOR_3P`). It cannot be changed or deleted here.
 
-`POST /v1/platforms/google/accounts/{id}/place-action-links` adds a link. `uri` and `place_action_type` are required:
+`POST /v1/platforms/google/accounts/{account_id}/place-action-links` adds a link. `uri` and `place_action_type` are required:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/place-action-links \
@@ -468,7 +468,7 @@ curl -X POST https://api.social-api.ai/v1/platforms/google/accounts/acc_01HZ9X3Q
 
 Response (HTTP 201): the new link. Only one link per type can be preferred; `is_preferred: true` picks the one Google shows first.
 
-`PATCH /v1/platforms/google/accounts/{id}/place-action-links/{linkId}` changes `uri`, `place_action_type` or `is_preferred`; only the fields you send change. `DELETE` on the same path removes the link and returns `204`.
+`PATCH /v1/platforms/google/accounts/{account_id}/place-action-links/{link_id}` changes `uri`, `place_action_type` or `is_preferred`; only the fields you send change. `DELETE` on the same path removes the link and returns `204`.
 
 | Error | Meaning |
 |---|---|
@@ -477,7 +477,7 @@ Response (HTTP 201): the new link. Only one link per type can be preferred; `is_
 | `400 validation.place_action_type_invalid` | The type is not one of the values above |
 | `400 validation.no_fields_to_update` | A `PATCH` with none of the three fields |
 | Google refuses the change | The link belongs to a provider (`is_editable: false`). It cannot be changed or deleted here |
-| `404 resource.not_found` | No link with that `linkId` on this location |
+| `404 resource.not_found` | No link with that `link_id` on this location |
 | `409 platform.google.already_exists` | The location already has a link with this `uri` and type |
 
 ## Limits

@@ -16,11 +16,11 @@ The same flow serves every platform. Telegram, Bluesky, and App Store Connect sk
 | `GET` | `/v1/accounts` | List your connected accounts and their status. Filter to one brand with `brand_id` |
 | `GET` | `/v1/accounts/pending/{connection_id}` | Read a connection that waits for you to choose a location, a LinkedIn profile or Page, or Facebook Pages |
 | `POST` | `/v1/accounts/pending/{connection_id}/select` | Make the choice and finish the connection |
-| `PATCH` | `/v1/accounts/{id}` | Change the account's permissions: see [Account permissions](/guides/permissions) |
-| `DELETE` | `/v1/accounts/{id}` | Disconnect an account |
+| `PATCH` | `/v1/accounts/{account_id}` | Change the account's permissions: see [Account permissions](/guides/permissions) |
+| `DELETE` | `/v1/accounts/{account_id}` | Disconnect an account |
 | `POST` | `/v1/invites` | Create a single-use link that lets someone else connect an account to a brand |
 | `GET` | `/v1/invites` | List a brand's invite links. Requires `brand_id` |
-| `DELETE` | `/v1/invites/{id}` | Revoke an invite link |
+| `DELETE` | `/v1/invites/{invite_id}` | Revoke an invite link |
 
 ## Your first connection
 
@@ -385,7 +385,7 @@ Response (HTTP 201):
 }
 ```
 
-`username` and `display_name` are the name on the Facebook login, not a Page name. The selected Pages are on the account: list them with `GET /v1/accounts/{id}/pages`.
+`username` and `display_name` are the name on the Facebook login, not a Page name. The selected Pages are on the account: list them with `GET /v1/accounts/{account_id}/pages`.
 
 The [selection rules](#selection-rules) on expiry, single use, and `400` apply. Also:
 
@@ -496,8 +496,8 @@ Always pass `brand_id` when you reconnect. Without it, SocialAPI creates a new b
 Connecting a platform account that another of your brands already holds moves it to the brand you name. These cases do not move it:
 
 - **Facebook, and Instagram connected through Facebook Login.** A Page or Instagram account that another of your brands holds is not taken. With a selection step, it comes back with `assignable: false`. Without a selection step, a login whose every Page or Instagram account belongs to another brand ends with `error=platform.facebook.no_assignable_pages` or `error=platform.instagram.no_assignable_pages`. You assign Pages to brands as described in [Facebook](/platforms/facebook).
-- **Google Business Profile locations assigned with the assign call.** `POST /v1/platforms/google/logins/{loginId}/locations/{locationId}/assign` returns `400 validation.location_already_assigned` for a location that another brand holds. See [Google locations](/platforms/google/locations).
-- **LinkedIn member profiles and company Pages assigned with the assign call.** `POST /v1/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign` returns `400 validation.profile_already_assigned` for an account that another brand holds. See [LinkedIn](/platforms/linkedin#connect-more-profiles-and-pages-from-a-login).
+- **Google Business Profile locations assigned with the assign call.** `POST /v1/platforms/google/logins/{login_id}/locations/{location_id}/assign` returns `400 validation.location_already_assigned` for a location that another brand holds. See [Google locations](/platforms/google/locations).
+- **LinkedIn member profiles and company Pages assigned with the assign call.** `POST /v1/platforms/linkedin/logins/{login_id}/profiles/{profile_id}/assign` returns `400 validation.profile_already_assigned` for an account that another brand holds. See [LinkedIn](/platforms/linkedin#connect-more-profiles-and-pages-from-a-login).
 - **`lock_accounts_to_brand` set to `true` on your SocialAPI account** (`PATCH /v1/users/me`). A connect that would move an account to a different brand ends with `error=account.already_linked`, or returns `409 account.already_linked`. The default is `false`. The lock does not apply to Facebook.
 
 Each of those errors leaves the account in its current brand.
@@ -549,13 +549,13 @@ Send `url` to the person. They approve on the platform's consent screen, SocialA
 - A Facebook invite connects every Page of the person's login that none of your other brands holds. The person cannot choose Pages. When `facebook_page_selection` is `true`, more Pages than [your plan allows per brand](/guides/plans#facebook-pages-per-brand) end the invite with `platform.facebook.page_cap`.
 - An expired, used, or revoked link shows the person a SocialAPI error page.
 - `GET /v1/invites?brand_id={brand_id}` lists the brand's invites, newest first, each with `id`, `platform`, `token`, `url`, `is_active`, `expires_at`, `created_at`, and `permissions`. A missing `brand_id` returns `400 validation.field_required`.
-- `DELETE /v1/invites/{id}` revokes an invite and returns HTTP 204 with no body. An unknown or already used invite returns `404 resource.not_found`.
+- `DELETE /v1/invites/{invite_id}` revokes an invite and returns HTTP 204 with no body. An unknown or already used invite returns `404 resource.not_found`.
 
 Creating, listing, and revoking invites needs a full-access key or the dashboard, and costs no credits.
 
 ## Disconnect an account
 
-`DELETE /v1/accounts/{id}` disconnects an account:
+`DELETE /v1/accounts/{account_id}` disconnects an account:
 
 ```bash
 curl -X DELETE https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J \
@@ -576,7 +576,7 @@ Disconnecting an account:
 - **Asks the platform to end SocialAPI's access** on Instagram, Facebook, Threads, Google Business Profile, YouTube, TikTok, X, and WhatsApp. The account is disconnected even when the platform does not answer. SocialAPI keeps the authorization while another connected account still uses the same platform login, so disconnecting one brand's Facebook or Google account never cuts off another brand.
 - **Leaves the authorization in place on LinkedIn, Pinterest, Zalo, Bluesky, and App Store Connect**, which offer SocialAPI no way to end it. The person removes SocialAPI from their platform settings (on Bluesky, deletes the app password; on App Store Connect, revokes the API key). For Telegram, SocialAPI stops receiving the bot's messages, and the bot token stays valid until you revoke it in [@BotFather](https://t.me/BotFather).
 
-`DELETE /v1/accounts/{id}` does not send a webhook event.
+`DELETE /v1/accounts/{account_id}` does not send a webhook event.
 
 ## Errors
 
@@ -609,7 +609,7 @@ A brand-restricted key must pass a `brand_id` from its own list. A connection st
 
 - `account.connected` is sent each time an account connects or reconnects.
 - `account.updated` with `change: "permissions_reduced"` is sent when an account loses a permission you did not remove yourself: see [Account permissions](/guides/permissions#what-an-account-can-do-right-now).
-- `account.disconnected` is sent in two cases. When the person removes SocialAPI's app from Instagram, Facebook, or Threads, SocialAPI disconnects and deletes the account as `DELETE /v1/accounts/{id}` does, and the event carries `account_id`, `platform`, and `platform_user_id`. When an account needs reconnecting, the account stays connected and the event carries `reconnect_required: true` and a `reason`.
+- `account.disconnected` is sent in two cases. When the person removes SocialAPI's app from Instagram, Facebook, or Threads, SocialAPI disconnects and deletes the account as `DELETE /v1/accounts/{account_id}` does, and the event carries `account_id`, `platform`, and `platform_user_id`. When an account needs reconnecting, the account stays connected and the event carries `reconnect_required: true` and a `reason`.
 
 The `reason` of a reconnect event names the cause. It equals `reconnect_reason` on `GET /v1/accounts`, with these exceptions:
 

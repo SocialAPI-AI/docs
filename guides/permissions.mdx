@@ -15,7 +15,7 @@ Permissions are not [API key scopes](/guides/scoped-keys). A permission limits w
 | `POST` | `/v1/invites` | Create an invite link. Send `permissions` to limit the account it connects |
 | `GET` | `/v1/invites` | List a brand's invite links, each with its `permissions` |
 | `GET` | `/v1/accounts` | List accounts, each with its `permissions` and `effective_permissions` |
-| `PATCH` | `/v1/accounts/{id}` | Replace an account's permissions |
+| `PATCH` | `/v1/accounts/{account_id}` | Replace an account's permissions |
 
 ## Connect with permissions
 
@@ -57,7 +57,7 @@ Response (HTTP 202): the usual connect response, described in [Connect accounts]
 
 | Permission | Covers |
 |---|---|
-| `posts.read` | Reading the account's posts from the platform, including posts published outside SocialAPI: `POST /v1/accounts/{id}/sync`, stories, collaborators, and exports |
+| `posts.read` | Reading the account's posts from the platform, including posts published outside SocialAPI: `POST /v1/accounts/{account_id}/sync`, stories, collaborators, and exports |
 | `posts.write` | Publishing, editing, and deleting posts, the platform's posting options, such as TikTok creator info, and accepting or declining collaborator invites |
 | `comments.read` | Reading comments and mentions, and the `comment.received` and `mention.received` webhooks |
 | `comments.write` | Replying to, hiding, deleting, and liking comments, and replying to mentions |
@@ -107,10 +107,10 @@ Every account has two lists:
 
 A call that needs a permission outside `effective_permissions` fails with `403 account.permission_missing`, and `error.meta.permission` names it. The refusal comes before the call reaches the platform. A platform's unsupported operation keeps its usual answer, `501 resource.not_supported`, whatever the permissions. These calls answer differently:
 
-- **Publishing** (`POST /v1/posts`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`, and a scheduled post when it is delivered) reports `account.permission_missing` on the target and returns no `403`.
-- **Removing a published post from a platform.** `DELETE /v1/posts/{pid}` reports the target in `results` with `outcome: "failed"` and leaves it `published`. `POST /v1/posts/{pid}/unpublish` returns `500 system.internal`, and the target stays `published`.
-- **Live post metrics** (`GET /v1/posts/{pid}/metrics`) report `resource.not_found` on the target.
-- **Lists.** `GET /v1/inbox/comments`, `GET /v1/inbox/conversations`, and `GET /v1/inbox/conversations/{id}/messages` never return `account.permission_missing`. Without the matching read permission, items that did not come from SocialAPI are not added to them. Removing the permission deletes what they already held: see [Removing a permission deletes data](#removing-a-permission-deletes-data).
+- **Publishing** (`POST /v1/posts`, `POST /v1/posts/{post_id}/publish`, `POST /v1/posts/{post_id}/retry`, and a scheduled post when it is delivered) reports `account.permission_missing` on the target and returns no `403`.
+- **Removing a published post from a platform.** `DELETE /v1/posts/{post_id}` reports the target in `results` with `outcome: "failed"` and leaves it `published`. `POST /v1/posts/{post_id}/unpublish` returns `500 system.internal`, and the target stays `published`.
+- **Live post metrics** (`GET /v1/posts/{post_id}/metrics`) report `resource.not_found` on the target.
+- **Lists.** `GET /v1/inbox/comments`, `GET /v1/inbox/conversations`, and `GET /v1/inbox/conversations/{conversation_id}/messages` never return `account.permission_missing`. Without the matching read permission, items that did not come from SocialAPI are not added to them. Removing the permission deletes what they already held: see [Removing a permission deletes data](#removing-a-permission-deletes-data).
 - **Review accounts.** `GET /v1/inbox/reviews` does not check `reviews.read`.
 
 A refused call costs what its path charges:
@@ -162,7 +162,7 @@ The response and every item of `GET /v1/invites` return `permissions` as you set
 
 ## Change an account's permissions
 
-`PATCH /v1/accounts/{id}` replaces an account's permissions. `permissions` is required: send a list, or `null` to give the account every permission, including ones added later.
+`PATCH /v1/accounts/{account_id}` replaces an account's permissions. `permissions` is required: send a list, or `null` to give the account every permission, including ones added later.
 
 ```bash
 curl -X PATCH https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J \
@@ -226,7 +226,7 @@ An update is checked only when it changes `steps` or sets `status` to `active`. 
 
 ## Errors
 
-- `403 account.permission_missing`: the account does not have the permission the call needs. `error.meta.permission` names it. Add it with `PATCH /v1/accounts/{id}`, or reconnect the account when the platform has not granted it.
+- `403 account.permission_missing`: the account does not have the permission the call needs. `error.meta.permission` names it. Add it with `PATCH /v1/accounts/{account_id}`, or reconnect the account when the platform has not granted it.
 - `400 validation.permission_unknown`: a value in `permissions` is not a permission. `error.meta.permission` names it.
 - `400 validation.permissions_empty`: `permissions` is an empty list.
 - `400 validation.permission_missing`: an Automation needs a permission the account does not have. `error.meta.permission` names it.
@@ -239,13 +239,13 @@ Every code is described in [Errors](/guides/errors).
 | Scope | Grants |
 |---|---|
 | `accounts:read` | `GET /v1/accounts` |
-| `accounts:manage` | `PATCH /v1/accounts/{id}` and `POST /v1/accounts/connect` |
+| `accounts:manage` | `PATCH /v1/accounts/{account_id}` and `POST /v1/accounts/connect` |
 
 Invite endpoints need a full-access key. See [Scoped API keys](/guides/scoped-keys).
 
 ## Events
 
-`account.updated` with `change: "permissions_reduced"` fires when an account loses a permission you did not remove yourself. It does not fire when you remove a permission with `PATCH /v1/accounts/{id}`. The payload is in [Webhook events](/guides/webhook-events#account-updated).
+`account.updated` with `change: "permissions_reduced"` fires when an account loses a permission you did not remove yourself. It does not fire when you remove a permission with `PATCH /v1/accounts/{account_id}`. The payload is in [Webhook events](/guides/webhook-events#account-updated).
 
 ## Use from an AI agent
 

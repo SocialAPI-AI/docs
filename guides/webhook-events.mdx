@@ -62,11 +62,11 @@ Webhook events carry `brand_id`, the [brand](/guides/concepts#brand) of the conn
 | `data.targets[].brand_id` | `post.scheduled` |
 | `data.results[].brand_id` | `post.published`, `post.partial`, `post.failed` |
 
-A post can target accounts of different brands, so `post.scheduled`, `post.published`, `post.partial`, and `post.failed` carry one `brand_id` per target. `post.updated`, `post.deleted`, and `post.retried` name no account and carry no `brand_id`. To route `post.updated` and `post.retried`, read `targets[].account_id` from `GET /v1/posts/{pid}`, then each account's `brand_id` from `GET /v1/accounts`. `post.deleted` fires after the post is deleted, so read `targets[].account_id` from `GET /v1/posts/{pid}` before you delete the post, or record each post's brands when you create it.
+A post can target accounts of different brands, so `post.scheduled`, `post.published`, `post.partial`, and `post.failed` carry one `brand_id` per target. `post.updated`, `post.deleted`, and `post.retried` name no account and carry no `brand_id`. To route `post.updated` and `post.retried`, read `targets[].account_id` from `GET /v1/posts/{post_id}`, then each account's `brand_id` from `GET /v1/accounts`. `post.deleted` fires after the post is deleted, so read `targets[].account_id` from `GET /v1/posts/{post_id}` before you delete the post, or record each post's brands when you create it.
 
 Treat `brand_id` as optional: an event can arrive without it. For example, these cases always arrive without it:
 
-- `post.unpublished` with `account_id` set to `null`. Route it like `post.updated`, with `GET /v1/posts/{pid}`.
+- `post.unpublished` with `account_id` set to `null`. Route it like `post.updated`, with `GET /v1/posts/{post_id}`.
 - `comment.received` and `mention.received` from Threads, when the same Threads account is connected to more than one of your brands. Their `account_id` is the Threads user ID, which is the `platform_user_id` of each of those accounts in its `account.connected` event, so you choose which of those brands handles the event.
 
 ## Platform coverage
@@ -156,7 +156,7 @@ Fires when you create a post with a future `scheduled_at` and it enters the `sch
 | `results[].status` | `published` or `failed` |
 | `results[].platform_post_id` | The platform's ID of the published post. Omitted when the target failed |
 | `results[].permalink` | The public URL. Omitted when the platform returns none |
-| `results[].error` | On a failed target: `code` and `message` only. The same failure on `GET /v1/posts/{pid}` is in `targets[].error`, which also holds `category` and `caused_by`. Codes are described on [Track post delivery](/guides/delivery#target-errors) |
+| `results[].error` | On a failed target: `code` and `message` only. The same failure on `GET /v1/posts/{post_id}` is in `targets[].error`, which also holds `category` and `caused_by`. Codes are described on [Track post delivery](/guides/delivery#target-errors) |
 
 ### `post.updated`
 
@@ -196,7 +196,7 @@ Fires when you delete a post.
 
 ### `post.unpublished`
 
-Fires when `POST /v1/posts/{pid}/unpublish` removes at least one target of a published post from its platform.
+Fires when `POST /v1/posts/{post_id}/unpublish` removes at least one target of a published post from its platform.
 
 ```json
 {
@@ -214,7 +214,7 @@ Fires when `POST /v1/posts/{pid}/unpublish` removes at least one target of a pub
 
 ### `post.retried`
 
-Fires when a failed or partial post is retried with `POST /v1/posts/{pid}/retry`. A `post.published`, `post.partial`, or `post.failed` event follows when the retry settles.
+Fires when a failed or partial post is retried with `POST /v1/posts/{post_id}/retry`. A `post.published`, `post.partial`, or `post.failed` event follows when the retry settles.
 
 ```json
 {
@@ -236,7 +236,7 @@ Fires when a person comments on a post of a connected account. Facebook sends th
 
 **Emitted for:** Instagram, Facebook, Threads (replies to the account's posts), and TikTok.
 
-The example is the Instagram comment shown in the [envelope](#event-envelope). The `data` object is the shared shape in [Interaction payload](#interaction-payload): nested `author` and `content` objects. It is not the flat shape (`author_id`, `text`) that `GET /v1/inbox/comments/{postId}` returns. Per platform:
+The example is the Instagram comment shown in the [envelope](#event-envelope). The `data` object is the shared shape in [Interaction payload](#interaction-payload): nested `author` and `content` objects. It is not the flat shape (`author_id`, `text`) that `GET /v1/inbox/comments/{post_id}` returns. Per platform:
 
 | Platform | What is in `data` |
 |---|---|
@@ -249,7 +249,7 @@ The example is the Instagram comment shown in the [envelope](#event-envelope). T
 
 ## Direct messages
 
-Direct message events share the [interaction payload](#interaction-payload). A DM event carries the SocialAPI `conversation_id` and the `platform_id` of the message, except on Zalo, which carries neither, and except `dm.referral`, which has no `platform_id`. Join `platform_id` to the `platform_id` of a row from `GET /v1/inbox/conversations/{id}/messages`. Do not join on `id`: the message endpoint returns its own record ID, which differs from the event's interaction ID.
+Direct message events share the [interaction payload](#interaction-payload). A DM event carries the SocialAPI `conversation_id` and the `platform_id` of the message, except on Zalo, which carries neither, and except `dm.referral`, which has no `platform_id`. Join `platform_id` to the `platform_id` of a row from `GET /v1/inbox/conversations/{conversation_id}/messages`. Do not join on `id`: the message endpoint returns its own record ID, which differs from the event's interaction ID.
 
 ### `dm.received`
 
@@ -303,7 +303,7 @@ Fires when a connected account sent a message. The sender is `author` and the pe
 
 On Instagram and Facebook the event fires for every message the platform reports as sent from the account: messages sent through the API, replies typed in the platform's own app or inbox, and DMs your [Automations](/guides/automations) send. The event carries nothing that separates an Automation's DM from one you sent. On Facebook, `raw_payload` carries `app_id`, the ID of the app that sent the message, which tells API sends from replies typed in the Page inbox.
 
-On WhatsApp there is no message echo. The event fires at most once per message, when WhatsApp reports it as `sent`, for messages sent with `POST /v1/inbox/conversations/{id}/messages` or the `send-template` endpoint. It also fires for each message sent from the phone on a number that stays on the WhatsApp Business app (see [WhatsApp](/platforms/whatsapp)). A redelivered receipt does not raise it again, and neither do the later `delivered` and `read` receipts. `received_at` is WhatsApp's send time, `author.id` is the sending phone number ID, and `recipient.id` is the contact's WhatsApp ID.
+On WhatsApp there is no message echo. The event fires at most once per message, when WhatsApp reports it as `sent`, for messages sent with `POST /v1/inbox/conversations/{conversation_id}/messages` or the `send-template` endpoint. It also fires for each message sent from the phone on a number that stays on the WhatsApp Business app (see [WhatsApp](/platforms/whatsapp)). A redelivered receipt does not raise it again, and neither do the later `delivered` and `read` receipts. `received_at` is WhatsApp's send time, `author.id` is the sending phone number ID, and `recipient.id` is the contact's WhatsApp ID.
 
 ```json
 {
@@ -490,7 +490,7 @@ On WhatsApp:
 
 ### `mention.received`
 
-Fires in two cases: the platform tells SocialAPI that a connected account was @mentioned in a comment or in a post caption, or you list mentions with `GET /v1/accounts/{id}/mentions` (see [Mentions you list](#mentions-you-list)).
+Fires in two cases: the platform tells SocialAPI that a connected account was @mentioned in a comment or in a post caption, or you list mentions with `GET /v1/accounts/{account_id}/mentions` (see [Mentions you list](#mentions-you-list)).
 
 **Emitted for:** Instagram, Facebook, and Threads when the platform reports a mention, and every platform that lists mentions when you list them. Instagram story mentions are not `mention.received`: they arrive as `dm.received` (see above).
 
@@ -527,11 +527,11 @@ SocialAPI reads the mention's text and author from the platform before sending. 
 | Facebook | `metadata.mention_type` is `comment` or `post`. Adds `page_id` |
 | Threads | `author.username` only. `platform_post_id` is the mentioning post's ID, `permalink` is its URL, and there is no `mention_type`. `account_id` is the Threads user ID, not an `acc_` ID |
 
-On Threads, `GET /v1/accounts/{id}/mentions` returns the same mention with the same `id`, so the event and the list can be matched. Mentions are described on [Mentions](/guides/mentions).
+On Threads, `GET /v1/accounts/{account_id}/mentions` returns the same mention with the same `id`, so the event and the list can be matched. Mentions are described on [Mentions](/guides/mentions).
 
 #### Mentions you list
 
-Every `GET /v1/accounts/{id}/mentions` call that returns at least one item also sends one `mention.received` event, on every platform that lists mentions. A call that returns no items sends none. SocialAPI sends the event on every such call, including a repeated call that returns the same items.
+Every `GET /v1/accounts/{account_id}/mentions` call that returns at least one item also sends one `mention.received` event, on every platform that lists mentions. A call that returns no items sends none. SocialAPI sends the event on every such call, including a repeated call that returns the same items.
 
 For this event, `data` is an array: the items of that response's `data`, in the same order, each with the fields of the item in the list plus `brand_id`. The event has no `raw_payload`. The event a platform notification triggers has an object in `data`, so a handler for `mention.received` must accept both an object and an array.
 
@@ -755,7 +755,7 @@ Fires when something changes on the account. Branch on `change`.
 }
 ```
 
-`permissions_reduced` fires when X refused a media upload because the account's access lacks `media.write`, or when a reconnect granted less than the account had. It does not fire when you remove a permission with `PATCH /v1/accounts/{id}`. Reconnect the account to ask for the permissions again.
+`permissions_reduced` fires when X refused a media upload because the account's access lacks `media.write`, or when a reconnect granted less than the account had. It does not fire when you remove a permission with `PATCH /v1/accounts/{account_id}`. Reconnect the account to ask for the permissions again.
 
 ```json
 {

@@ -13,17 +13,17 @@ A public reply costs 1 interaction credit. Reading, private replies, hiding, del
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/comments?platform=instagram` | List Instagram posts that received comments |
-| `GET` | `/v1/inbox/comments/{postId}` | List the comments on one post |
-| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to one comment |
-| `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or comment on the post |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/private-reply` | Send a private reply to the person who commented |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a comment |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide a comment |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a comment |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/like` | Like a comment. Facebook Login only |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/like` | Remove that like. Facebook Login only |
+| `GET` | `/v1/inbox/comments/{post_id}` | List the comments on one post |
+| `GET` | `/v1/inbox/comments/{post_id}/{comment_id}/replies` | List the replies to one comment |
+| `POST` | `/v1/inbox/comments/{post_id}` | Reply to a comment, or comment on the post |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/private-reply` | Send a private reply to the person who commented |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Hide a comment |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Unhide a comment |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}` | Delete a comment |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/like` | Like a comment. Facebook Login only |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/like` | Remove that like. Facebook Login only |
 
-`{postId}` is the Instagram media ID: `targets[].platform_post_id` on a post you published through SocialAPI, or `id` from `GET /v1/inbox/comments`. `{commentId}` accepts the comment's `sapi_cmt_` ID or Instagram's comment ID. See [IDs](/guides/ids#what-each-endpoint-accepts).
+`{post_id}` is the Instagram media ID: `targets[].platform_post_id` on a post you published through SocialAPI, or `id` from `GET /v1/inbox/comments`. `{comment_id}` accepts the comment's `sapi_cmt_` ID or Instagram's comment ID. See [IDs](/guides/ids#what-each-endpoint-accepts).
 
 ## Your first reply
 
@@ -162,11 +162,11 @@ Response (HTTP 200):
 { "success": true }
 ```
 
-Unhide with `DELETE` on the same path, and delete with `DELETE /v1/inbox/comments/{postId}/{commentId}`. Both take `account_id` as a query parameter and return `{ "success": true }`.
+Unhide with `DELETE` on the same path, and delete with `DELETE /v1/inbox/comments/{post_id}/{comment_id}`. Both take `account_id` as a query parameter and return `{ "success": true }`.
 
 ## Like a comment
 
-Liking a comment works only on accounts connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login). `POST /v1/inbox/comments/{postId}/{commentId}/like` likes the comment as the connected account, and `DELETE` on the same path removes the like. `POST` takes `account_id` in the body, and `DELETE` as a query parameter. Both return `{ "success": true }`.
+Liking a comment works only on accounts connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login). `POST /v1/inbox/comments/{post_id}/{comment_id}/like` likes the comment as the connected account, and `DELETE` on the same path removes the like. `POST` takes `account_id` in the body, and `DELETE` as a query parameter. Both return `{ "success": true }`.
 
 On an account connected through Instagram Login, both calls return `501 resource.not_supported`, because Instagram Login has no comment likes. Read `can_like` on the comment instead of assuming.
 

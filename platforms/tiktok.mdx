@@ -27,10 +27,10 @@ Each row that is not Yes states what the call returns. This table is for the def
 | Send a post to the account's TikTok drafts | Yes | `post_mode: "inbox"`. Video or photo carousel. The creator finishes the post in the TikTok app |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | No | `first_comment` is ignored. Comment on the post with [TikTok comments](/platforms/tiktok/comments) after it is published |
-| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post, and TikTok gives apps no edit call |
-| Delete a published post | No | `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the TikTok target, and the post stays live. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported`. Delete the post in the TikTok app |
+| Update a published post | No | `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a published post, and TikTok gives apps no edit call |
+| Delete a published post | No | `DELETE /v1/posts/{post_id}` returns HTTP 200 with `results[].outcome: "not_supported"` for the TikTok target, and the post stays live. `POST /v1/posts/{post_id}/unpublish` returns `501 resource.not_supported`. Delete the post in the TikTok app |
 | List posts | Yes | Public videos and photo posts with likes, comments, shares, and views. See [Sync videos](#sync-videos) |
-| Live post metrics | Yes | `GET /v1/posts/{pid}/metrics`, for the account's 20 most recent posts. See [Sync videos](#sync-videos) |
+| Live post metrics | Yes | `GET /v1/posts/{post_id}/metrics`, for the account's 20 most recent posts. See [Sync videos](#sync-videos) |
 | Creator info | Yes | Whether the account can post, its longest video, and its interaction locks. See [Creator info](#creator-info) |
 | Account summary | Yes | Profile and counts. See [Account summary](#account-summary) |
 | Comments, replies, and comments on a post | Yes | See [TikTok comments](/platforms/tiktok/comments) |
@@ -134,7 +134,7 @@ When the person removes SocialAPI's app in TikTok's settings, SocialAPI removes 
 
 ## Creator info
 
-`GET /v1/accounts/{id}/creator-info` returns the settings TikTok applies to the account's next post. Read it before you publish. It needs the `accounts:read` scope.
+`GET /v1/accounts/{account_id}/creator-info` returns the settings TikTok applies to the account's next post. Read it before you publish. It needs the `accounts:read` scope.
 
 ```bash
 curl https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/creator-info \
@@ -171,7 +171,7 @@ Other platforms return `501 resource.not_supported` from this endpoint.
 
 ## Account summary
 
-`GET /v1/platforms/tiktok/accounts/{id}/summary` returns the account's current profile and counts. It needs the `accounts:read` scope, and the account needs the `analytics.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
+`GET /v1/platforms/tiktok/accounts/{account_id}/summary` returns the account's current profile and counts. It needs the `accounts:read` scope, and the account needs the `analytics.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
 
 ```bash
 curl https://api.social-api.ai/v1/platforms/tiktok/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary \
@@ -199,9 +199,9 @@ When the account's authorization lacks a scope for these fields, TikTok refuses 
 
 ## Sync videos
 
-`GET /v1/posts?platform=tiktok&account_ids={id}` lists the account's TikTok posts: public videos and photo posts, including posts published outside SocialAPI. Each target carries `permalink`, `media_type` (`VIDEO` or `PHOTO`), and `metrics`.
+`GET /v1/posts?platform=tiktok&account_ids={account_id}` lists the account's TikTok posts: public videos and photo posts, including posts published outside SocialAPI. Each target carries `permalink`, `media_type` (`VIDEO` or `PHOTO`), and `metrics`.
 
-SocialAPI refreshes the account's posts on its own. The account needs the `posts.read` [permission](/guides/permissions). Without it, both sync endpoints return `403 account.permission_missing` and SocialAPI refreshes nothing on its own. `POST /v1/platforms/tiktok/accounts/{id}/sync` refreshes them at once from the 20 most recent posts on TikTok. It needs the `accounts:manage` scope and has no cooldown. `POST /v1/accounts/{id}/sync` reads the same 20 posts and allows 1 sync per account every 15 minutes: see [Analytics](/guides/analytics#refresh-an-accounts-posts).
+SocialAPI refreshes the account's posts on its own. The account needs the `posts.read` [permission](/guides/permissions). Without it, both sync endpoints return `403 account.permission_missing` and SocialAPI refreshes nothing on its own. `POST /v1/platforms/tiktok/accounts/{account_id}/sync` refreshes them at once from the 20 most recent posts on TikTok. It needs the `accounts:manage` scope and has no cooldown. `POST /v1/accounts/{account_id}/sync` reads the same 20 posts and allows 1 sync per account every 15 minutes: see [Analytics](/guides/analytics#refresh-an-accounts-posts).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/platforms/tiktok/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/sync \
@@ -220,10 +220,10 @@ The two endpoints that return counts use different keys for the view count:
 
 | Endpoint | Likes, comments, shares | Views |
 |---|---|---|
-| `GET /v1/posts` and `GET /v1/posts/{pid}` | `metrics.likes`, `metrics.comments`, `metrics.shares`. `metrics.saves` is always `0` | `metrics.extra.view_count`. Absent while the count is `0` |
-| `GET /v1/posts/{pid}/metrics` | The same three keys, with `metrics.saves` always `0` | `metrics.views` and `metrics.extra.views`, with the same value. Absent while the count is `0` |
+| `GET /v1/posts` and `GET /v1/posts/{post_id}` | `metrics.likes`, `metrics.comments`, `metrics.shares`. `metrics.saves` is always `0` | `metrics.extra.view_count`. Absent while the count is `0` |
+| `GET /v1/posts/{post_id}/metrics` | The same three keys, with `metrics.saves` always `0` | `metrics.views` and `metrics.extra.views`, with the same value. Absent while the count is `0` |
 
-TikTok updates likes, comments, shares, and views with a delay of 24 to 48 hours. The counts are TikTok's latest published figures, so a new post shows `0` until TikTok publishes them. Reach, saves, and watch time are not available. `GET /v1/posts/{pid}/metrics` covers the account's 20 most recent posts. For an older post, the target returns `404 resource.not_found`. Examples are in [TikTok publishing](/platforms/tiktok/publishing#6-retrieve-posts).
+TikTok updates likes, comments, shares, and views with a delay of 24 to 48 hours. The counts are TikTok's latest published figures, so a new post shows `0` until TikTok publishes them. Reach, saves, and watch time are not available. `GET /v1/posts/{post_id}/metrics` covers the account's 20 most recent posts. For an older post, the target returns `404 resource.not_found`. Examples are in [TikTok publishing](/platforms/tiktok/publishing#6-retrieve-posts).
 
 ## Comments
 
@@ -231,12 +231,12 @@ SocialAPI lists, replies to, hides, likes, and deletes the comments on the accou
 
 ## Mentions
 
-`GET /v1/accounts/{id}/mentions` lists the public posts that mention the account in the caption and the comments that mention it. TikTok serves mentions for TikTok Business Accounts only. For another account, TikTok refuses the call and SocialAPI returns the TikTok code as `platform.tiktok.<code>`. The shared endpoints are in [Mentions](/guides/mentions).
+`GET /v1/accounts/{account_id}/mentions` lists the public posts that mention the account in the caption and the comments that mention it. TikTok serves mentions for TikTok Business Accounts only. For another account, TikTok refuses the call and SocialAPI returns the TikTok code as `platform.tiktok.<code>`. The shared endpoints are in [Mentions](/guides/mentions).
 
 - **Delay.** TikTok makes a mention available 24 to 48 hours after it is made, and 24 hours after the account is connected. TikTok asks apps to read each mention list at most once per account per day, after 07:00 UTC.
 - **Page size.** A page holds up to 20 mentions, split between caption mentions and comment mentions. Newest first within a page. Follow `next_cursor` for the rest.
 - **Item fields.** `author.username` is the handle of the person, `content.text` is the caption or comment text, `platform_post_id` is the TikTok video ID, and `permalink` is the video link. `metadata` is `null`. A comment mention's `id` carries both the video and the comment.
-- **Reply.** `POST /v1/accounts/{id}/mentions/reply` works for a mention made in a comment. Send the mention's `sapi_mnt_` ID as `media_id`, or send the video ID as `media_id` with the comment's `platform_id` as `comment_id`. For a mention in a caption, TikTok has no reply: the call returns `400 validation.mention_reply_unsupported`. A reply costs 1 interaction credit.
+- **Reply.** `POST /v1/accounts/{account_id}/mentions/reply` works for a mention made in a comment. Send the mention's `sapi_mnt_` ID as `media_id`, or send the video ID as `media_id` with the comment's `platform_id` as `comment_id`. For a mention in a caption, TikTok has no reply: the call returns `400 validation.mention_reply_unsupported`. A reply costs 1 interaction credit.
 - **Events.** TikTok sends SocialAPI no mention notifications. Each call that returns at least one mention sends a `mention.received` event: see [Mentions you list](/guides/webhook-events#mentions-you-list).
 
 ## Webhook events

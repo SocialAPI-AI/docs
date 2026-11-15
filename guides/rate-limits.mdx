@@ -37,8 +37,8 @@ A 429 from SocialAPI's own limits on `/v1` uses the standard error envelope. `er
 | `messaging.recipient_limit` | How many different people are messaged per calendar day (UTC). See [Errors](/guides/errors#inbox-comments-messages-and-reviews) | Yes |
 | `whatsapp.frequency_cap`, `whatsapp.pair_rate_limit`, `whatsapp.throughput_exceeded` | WhatsApp's own limits on one person or one number. See [WhatsApp messages](/platforms/whatsapp/messages#errors-and-debugging) | No |
 | `inbox.sync_rate_limited` | Repeated `POST /v1/inbox/sync` for the same target. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually) | Yes |
-| `accounts.sync_rate_limited` | Repeated `POST /v1/accounts/{id}/sync` for the same connected account. See [Analytics](/guides/analytics#refresh-an-accounts-posts) | Yes |
-| `accounts.sync_daily_limit` | Your plan's daily number of `POST /v1/accounts/{id}/sync` calls. See [Analytics](/guides/analytics#refresh-an-accounts-posts) | Yes |
+| `accounts.sync_rate_limited` | Repeated `POST /v1/accounts/{account_id}/sync` for the same connected account. See [Analytics](/guides/analytics#refresh-an-accounts-posts) | Yes |
+| `accounts.sync_daily_limit` | Your plan's daily number of `POST /v1/accounts/{account_id}/sync` calls. See [Analytics](/guides/analytics#refresh-an-accounts-posts) | Yes |
 | `validation.post_limit_exhausted`, `validation.interaction_limit_exhausted`, `billing.post_limit`, `billing.export_limit`, `billing.export_cooldown`, `billing.export_concurrent` | Plan allowances. See [Plans and usage](/guides/plans) | No |
 
 A request refused by `ratelimit.exceeded`, `publishing.velocity_limit`, `platform.{platform}.throttled`, or any `messaging.*` code sends nothing and spends no credit.
@@ -85,7 +85,7 @@ TikTok also limits publishing to 6 posts per minute per account. SocialAPI does 
 
 ### What happens at a cap
 
-- **Immediate publish** (`POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`): the request returns `429 publishing.velocity_limit` and creates nothing. `meta.window` is `hour` or `day`, `meta.limit` is the cap reached, and `meta.account_id` is the connected account. A refused request spends no post credit.
+- **Immediate publish** (`POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{post_id}/publish`, `POST /v1/posts/{post_id}/retry`): the request returns `429 publishing.velocity_limit` and creates nothing. `meta.window` is `hour` or `day`, `meta.limit` is the cap reached, and `meta.account_id` is the connected account. A refused request spends no post credit.
 - **More than one target in one request:** the request is all or nothing. If one target is at a cap, the whole request is refused and no target's counter moves.
 - **Scheduled post:** a scheduled post is never failed by a velocity cap. SocialAPI holds the target and publishes it once the window clears, so it goes out late. The wait does not count as a failed delivery.
 
@@ -108,7 +108,7 @@ Each platform limits what an app can do for an account. When the platform refuse
 
 ### Read a platform's remaining quota
 
-`GET /v1/accounts/{id}/limits` returns the quota the platform reports for one connected account, as an object of numbers. It needs the `accounts:read` scope and costs no credits.
+`GET /v1/accounts/{account_id}/limits` returns the quota the platform reports for one connected account, as an object of numbers. It needs the `accounts:read` scope and costs no credits.
 
 ```bash
 curl https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/limits \
@@ -178,7 +178,7 @@ async function callWithRetry(url, options, maxAttempts = 4) {
 
 | Tool | What it does |
 |---|---|
-| `social_api_get_account_limits` | Returns the same keys as `GET /v1/accounts/{id}/limits` |
+| `social_api_get_account_limits` | Returns the same keys as `GET /v1/accounts/{account_id}/limits` |
 
 ## Related
 

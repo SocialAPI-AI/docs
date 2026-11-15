@@ -40,7 +40,7 @@ What each limit returns when you reach it:
 
 Two features depend on the plan rather than on an allowance:
 
-- **WhatsApp template messages** need a paid plan. On the Free plan, `POST /v1/platforms/whatsapp/accounts/{id}/send-template` returns `403 whatsapp.paid_plan_required`. Replies to people who messaged you first work on every plan. See [Send a template](/platforms/whatsapp/messages#send-a-template).
+- **WhatsApp template messages** need a paid plan. On the Free plan, `POST /v1/platforms/whatsapp/accounts/{account_id}/send-template` returns `403 whatsapp.paid_plan_required`. Replies to people who messaged you first work on every plan. See [Send a template](/platforms/whatsapp/messages#send-a-template).
 - **Visual analysis in exports** (`include_vision`) needs a paid plan. On the Free plan, SocialAPI ignores `include_vision: true` and runs the export without it.
 
 ### Profile packs
@@ -49,7 +49,7 @@ On the Pro (Full Send) and Business (Empire) plans, your brand allowance grows i
 
 ## Facebook Pages per brand
 
-When `facebook_page_selection` is `true` on your SocialAPI account (`GET /v1/users/me`), each brand holds at most 2 active Facebook Pages on Free, 5 on Starter, 10 on Pro, 20 on Business, and any number on Enterprise. A Page is active when `is_active` is `true` in `GET /v1/accounts/{id}/pages`. Choosing or assigning more returns `403 platform.facebook.page_cap`, with the allowance in `error.meta.limit`. Pages cost no credits. When `facebook_page_selection` is `false`, no Page cap applies.
+When `facebook_page_selection` is `true` on your SocialAPI account (`GET /v1/users/me`), each brand holds at most 2 active Facebook Pages on Free, 5 on Starter, 10 on Pro, 20 on Business, and any number on Enterprise. A Page is active when `is_active` is `true` in `GET /v1/accounts/{account_id}/pages`. Choosing or assigning more returns `403 platform.facebook.page_cap`, with the allowance in `error.meta.limit`. Pages cost no credits. When `facebook_page_selection` is `false`, no Page cap applies.
 
 When `facebook_page_selection` is `true` and you change to a plan with a lower allowance, or a cancellation moves your SocialAPI account to the Free plan, SocialAPI sets `is_active` to `false` on the Pages of each brand above the new allowance, starting from the last Page added, and keeps the Pages added first. A Page with `is_active: false` cannot be published to.
 
@@ -151,18 +151,18 @@ Post and interaction credits are counted on plans with a post or interaction all
 **1 post credit** for each of these requests:
 
 - `POST /v1/posts` with `publish_now: true` or a `scheduled_at`. Saving a draft costs nothing.
-- `POST /v1/posts/{pid}/publish`, which publishes a draft or a scheduled post. It costs 1 credit even when the post was scheduled with `POST /v1/posts`, which already cost 1 credit.
-- `POST /v1/posts/{pid}/retry`.
+- `POST /v1/posts/{post_id}/publish`, which publishes a draft or a scheduled post. It costs 1 credit even when the post was scheduled with `POST /v1/posts`, which already cost 1 credit.
+- `POST /v1/posts/{post_id}/retry`.
 
 A post costs 1 credit whatever the number of targets.
 
 **1 interaction credit** for each of these requests:
 
-- A public reply to a comment: `POST /v1/inbox/comments/{postId}`.
-- A reply to a review: `POST /v1/inbox/reviews/{id}/reply`.
-- A reply to a mention: `POST /v1/accounts/{id}/mentions/reply`.
-- A DM: `POST /v1/inbox/conversations/{id}/messages`. One request costs 1 credit, even when it sends more than one message.
-- A WhatsApp template: `POST /v1/platforms/whatsapp/accounts/{id}/send-template`.
+- A public reply to a comment: `POST /v1/inbox/comments/{post_id}`.
+- A reply to a review: `POST /v1/inbox/reviews/{review_id}/reply`.
+- A reply to a mention: `POST /v1/accounts/{account_id}/mentions/reply`.
+- A DM: `POST /v1/inbox/conversations/{conversation_id}/messages`. One request costs 1 credit, even when it sends more than one message.
+- A WhatsApp template: `POST /v1/platforms/whatsapp/accounts/{account_id}/send-template`.
 
 **No credit** for everything else, including private replies, hiding, liking, or deleting a comment, reactions to messages, typing indicators and seen receipts, every read, and every account, brand, key, webhook, and Automation operation.
 
@@ -174,8 +174,8 @@ SocialAPI gives the credit back when:
 
 - Any request that costs a credit fails with a `validation.*` error, except a DM request that already delivered at least one of its messages.
 - `POST /v1/posts` fails with `publishing.validation_failed`.
-- `POST /v1/posts`, `POST /v1/posts/{pid}/publish`, or `POST /v1/posts/{pid}/retry` fails with `429 publishing.velocity_limit`.
-- Every target of `POST /v1/posts` with `publish_now: true`, or of `POST /v1/posts/{pid}/publish`, fails.
+- `POST /v1/posts`, `POST /v1/posts/{post_id}/publish`, or `POST /v1/posts/{post_id}/retry` fails with `429 publishing.velocity_limit`.
+- Every target of `POST /v1/posts` with `publish_now: true`, or of `POST /v1/posts/{post_id}/publish`, fails.
 - SocialAPI refuses a reply or DM before sending it because the conversation's messaging window is closed (see [Direct messages](/guides/direct-messages)).
 - The request fails with `429 platform.{platform}.throttled`.
 
@@ -245,7 +245,7 @@ Responses also report usage in headers, so you can track it without calling `GET
 | `X-Posts-Remaining` | Same as `X-Posts-Limit` | Post credits left in the current billing period |
 | `X-Interactions-Limit` | Requests that spend an interaction credit, on a plan with an interaction allowance | Interaction credits per billing period |
 | `X-Interactions-Remaining` | Same as `X-Interactions-Limit` | Interaction credits left in the current billing period |
-| `X-Storage-Used` | `GET /v1/media/storage`, `GET /v1/media/upload-url`, `POST /v1/media/upload`, and `POST /v1/media/{id}/verify`, on every plan | Bytes of media stored |
+| `X-Storage-Used` | `GET /v1/media/storage`, `GET /v1/media/upload-url`, `POST /v1/media/upload`, and `POST /v1/media/{media_id}/verify`, on every plan | Bytes of media stored |
 | `X-Storage-Limit` | Same as `X-Storage-Used` | Media storage allowance in bytes. `-1` means unlimited |
 
 ## When you reach an allowance

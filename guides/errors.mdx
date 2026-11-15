@@ -68,7 +68,7 @@ Every `/v1` request needs `Authorization: Bearer <API key>`. See [Authentication
 | 403 | `auth.insufficient_scope` | A [scoped API key](/guides/scoped-keys) lacks the scope the request needs, or a scoped key called an admin operation (managing keys, brands, invites, or `PATCH /v1/users/me`). `meta.required_scope` names the scope when one applies |
 | 402 | `billing.past_due` | Your subscription payment failed twice. Every endpoint returns it except every method of `/v1/users/me` and every `/v1/billing/*` endpoint. See [Past-due accounts](/guides/plans#past-due-accounts) for how access returns |
 | 403 | `auth.state_mismatch` | The `state` you passed to a connect step belongs to a different API key |
-| 403 | `account.permission_missing` | The connected account does not have the [permission](/guides/permissions) the call needs. `meta.permission` names it. Add it with `PATCH /v1/accounts/{id}`, or reconnect the account when the platform has not granted it. Publishing, post removal, live post metrics, and the stored inbox lists answer differently: see [Account permissions](/guides/permissions#what-an-account-can-do-right-now) |
+| 403 | `account.permission_missing` | The connected account does not have the [permission](/guides/permissions) the call needs. `meta.permission` names it. Add it with `PATCH /v1/accounts/{account_id}`, or reconnect the account when the platform has not granted it. Publishing, post removal, live post metrics, and the stored inbox lists answer differently: see [Account permissions](/guides/permissions#what-an-account-can-do-right-now) |
 | 400 | `auth.oauth.invalid_client` | The MCP client's `client_id` is unknown. See [OAuth for MCP clients](/integrations/oauth) |
 | 400 | `auth.oauth.invalid_redirect` | The MCP client's `redirect_uri` is not registered for its `client_id` |
 | 503 | `system.internal` | Your credentials could not be verified at that moment. They are not invalid: keep them and retry the request |
@@ -100,7 +100,7 @@ These codes apply to any endpoint. `error.meta.field` names the offending input 
 | 409 | `ambiguous_post_id` | The platform post ID you passed matches more than one post. Use the SocialAPI post ID |
 | 501 | `resource.not_supported` | The operation does not exist on this account's platform. `meta.platform` names it. See the [capability matrix](/platforms/overview). On X, also returned when X refuses the action for that resource or person, for example a DM to a person who does not accept DMs from the account: see [X comments](/platforms/twitter/comments) and [X direct messages](/platforms/twitter/messages) |
 | 422 | `account.platform_unsupported` | The account's platform has no reviews, and the request was for reviews |
-| 4xx, 5xx | `http.<status>` | A routing or transport error. `http.404` is an unknown path. `GET /v1/inbox/media/{id}` also returns `http.404` (unknown media), `http.410` (media expired), and `http.503` (the media is not ready yet, or too many requests are waiting: send the request again, after the `Retry-After` delay when the response carries one, until you get 200 or 410) |
+| 4xx, 5xx | `http.<status>` | A routing or transport error. `http.404` is an unknown path. `GET /v1/inbox/media/{media_id}` also returns `http.404` (unknown media), `http.410` (media expired), and `http.503` (the media is not ready yet, or too many requests are waiting: send the request again, after the `Retry-After` delay when the response carries one, until you get 200 or 410) |
 
 ## Rate limits
 
@@ -113,8 +113,8 @@ Rate-limit codes are `429` and are covered in [Rate limits](/guides/rate-limits)
 | 429 | `platform.<name>.rate_limit` | The platform's own limit. Wait, then retry with backoff. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 | 429 | `platform.<name>.throttled` | The platform refused this account or Page with its own rate limit, and SocialAPI refuses its calls until the wait ends. `meta.scope` is `account` or `page`. Wait for the `Retry-After` header, then retry. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 | 429 | `inbox.sync_rate_limited` | `POST /v1/inbox/sync` ran again before the wait for the same target ended. `meta.retry_after_seconds` is set |
-| 429 | `accounts.sync_rate_limited` | `POST /v1/accounts/{id}/sync` ran again before the wait for the same account ended. `meta.retry_after_seconds` is set |
-| 429 | `accounts.sync_daily_limit` | `POST /v1/accounts/{id}/sync` reached your plan's daily limit. `meta.retry_after_seconds` (until midnight UTC) and `meta.limit` are set |
+| 429 | `accounts.sync_rate_limited` | `POST /v1/accounts/{account_id}/sync` ran again before the wait for the same account ended. `meta.retry_after_seconds` is set |
+| 429 | `accounts.sync_daily_limit` | `POST /v1/accounts/{account_id}/sync` reached your plan's daily limit. `meta.retry_after_seconds` (until midnight UTC) and `meta.limit` are set |
 
 ## Billing and plan allowances
 
@@ -145,8 +145,8 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | 400 | `validation.connection_type_invalid` | `metadata.connection_type` is present but is not one of the platform's values: `business` or `creator` on TikTok, `profile` or `organization` on LinkedIn. `meta.field` is `connection_type` |
 | 400 | `validation.platform_invalid` | `platform` is `linkedin_page` on `POST /v1/accounts/connect` or `POST /v1/invites`. Connect LinkedIn member profiles and company Pages with `linkedin`. `meta.field` is `platform` |
 | 400 | `validation.customer_state_too_long` | `state` is longer than 512 characters |
-| 400 | `validation.permission_unknown` | A value in `permissions` is not a [permission](/guides/permissions#the-permissions). `meta.permission` names it. `POST /v1/accounts/connect`, `POST /v1/invites`, and `PATCH /v1/accounts/{id}` return it |
-| 400 | `validation.permissions_empty` | `permissions` is an empty list. Send at least one permission, or omit the field. `PATCH /v1/accounts/{id}` also returns it, where `null` gives the account every permission |
+| 400 | `validation.permission_unknown` | A value in `permissions` is not a [permission](/guides/permissions#the-permissions). `meta.permission` names it. `POST /v1/accounts/connect`, `POST /v1/invites`, and `PATCH /v1/accounts/{account_id}` return it |
+| 400 | `validation.permissions_empty` | `permissions` is an empty list. Send at least one permission, or omit the field. `PATCH /v1/accounts/{account_id}` also returns it, where `null` gives the account every permission |
 | 400 | `validation.redirect_uri_invalid_format` | `redirect_uri` is malformed |
 | 400 | `validation.redirect_uri_not_whitelisted` | `redirect_uri` is not registered. Register it in the dashboard first |
 | 400 | `validation.state_invalid` | A connection `state` is unknown or expired |
@@ -162,7 +162,7 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | 400 | `validation.invalid_location_id` | The Google location ID is not valid |
 | 400 | `validation.profile_not_granted` | The LinkedIn member profile or company Page is not accessible with this login. `meta.platform_account_id` names it |
 | 400 | `validation.profile_already_assigned` | The LinkedIn member profile or company Page already belongs to another brand. `meta.brand_id` names that brand |
-| 400 | `validation.invalid_profile_id` | The LinkedIn `{profileId}` in the path is not a valid URL-encoded value |
+| 400 | `validation.invalid_profile_id` | The LinkedIn `{profile_id}` in the path is not a valid URL-encoded value |
 | 400 | `validation.auth_code_expired` | The TikTok authorization code expired or was already used. Start the connection again |
 | 409 | `account.already_linked` | The brand already holds a different account on this platform (never on LinkedIn, where a brand holds any number of accounts), or `lock_accounts_to_brand` is `true` and the account belongs to another of your brands (see [Reconnect an account](/guides/connect-accounts#reconnect-an-account)). In the 409 response, `meta.brand_id` is the brand you named, or with the lock, the brand that holds the account. Telegram, Bluesky, App Store Connect, and choosing a Google location or a LinkedIn member profile or company Page with `POST /v1/accounts/pending/{connection_id}/select` return the 409. On a platform with a consent screen it reaches your `redirect_uri` as `error=account.already_linked` |
 | 409 | `account.different_login` | The brand's Facebook, or its Instagram connected through Facebook Login, is connected through a different login. Disconnect it first. During a connection it reaches your `redirect_uri` as `error=account.different_login`; assigning a Page returns the 409 |
@@ -183,7 +183,7 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | 400 | `account.no_active_page` | The account has no active default Page |
 | 400 | `account.page_inactive` | The Page is deactivated |
 | 400 | `account.pages_not_supported` | The platform has no Pages |
-| 400 | `account.use_boards_endpoint` | A Pinterest account has boards, not Pages. Use `/v1/accounts/{id}/boards` |
+| 400 | `account.use_boards_endpoint` | A Pinterest account has boards, not Pages. Use `/v1/accounts/{account_id}/boards` |
 | 400 | `account.boards_not_supported` | The account is not Pinterest, which is the only platform with boards |
 | 403 | `whatsapp.number_banned` | Meta banned the WhatsApp number, so it cannot be connected |
 | 400 | `whatsapp.ambiguous_phone_number` | The WhatsApp Business Account has more than one phone number and none was chosen. Start the connection again with `POST /v1/accounts/connect` and choose the number when the redirect carries `status=selection_required` |
@@ -232,8 +232,8 @@ These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post life
 | 409 | `resource.conflict` | The same account has a post with the same title and text that was created in the last 24 hours and is now `published`. Send `skip_duplicate_check: true` to publish the content again |
 | 409 | `post.state_invalid` | The post's status does not allow the call. Edit works on `draft`, `scheduled`, or `failed`. Publish works on `draft` or `scheduled`. Retry works on `failed` or `partial`. Delete does not work on a `publishing` post. `meta.state` is the current status |
 | 400 | `post.no_retryable_deliveries` | The post has no failed targets to retry |
-| 422 | `account.platform_unsupported` | `POST /v1/posts` or `PATCH /v1/posts/{pid}` names a target account on Telegram or App Store Connect, which do not publish posts. `error.meta.account_id` names it. Remove that target |
-| 403 | `account.reconnection_required` | A publish that would go out now names a target account that must be reconnected: `POST /v1/posts` without `scheduled_at` or `queue_id`, `POST /v1/posts/{pid}/publish`, or `POST /v1/posts/{pid}/retry`. `error.meta.id` names the account. Nothing is published and the post keeps its status. [Reconnect the account](/guides/connect-accounts#reconnect-an-account), then send the request again |
+| 422 | `account.platform_unsupported` | `POST /v1/posts` or `PATCH /v1/posts/{post_id}` names a target account on Telegram or App Store Connect, which do not publish posts. `error.meta.account_id` names it. Remove that target |
+| 403 | `account.reconnection_required` | A publish that would go out now names a target account that must be reconnected: `POST /v1/posts` without `scheduled_at` or `queue_id`, `POST /v1/posts/{post_id}/publish`, or `POST /v1/posts/{post_id}/retry`. `error.meta.id` names the account. Nothing is published and the post keeps its status. [Reconnect the account](/guides/connect-accounts#reconnect-an-account), then send the request again |
 | 422 | `publishing.media.missing_source` | A media item has no source |
 | 422 | `publishing.media.invalid_source_type` | `source_type` is not `url`, `media_id`, or `platform_attachment_id` |
 | 422 | `publishing.media.missing_type` | A `platform_attachment_id` item has no `type` (`image`, `video`, `audio`, or `file`) |
@@ -248,7 +248,7 @@ These codes come from `POST /v1/posts`, `POST /v1/posts/validate`, the post life
 
 ## Delivery failures
 
-A target that fails after `POST /v1/posts` returned is a failed delivery. It does not return an HTTP error. Its code is in `targets[].error.code` on the post (`GET /v1/posts/{pid}`) and in `results[].error.code` of the `post.failed` and `post.partial` webhooks. `GET /v1/events` has no error code. See [Delivery](/guides/delivery#target-errors).
+A target that fails after `POST /v1/posts` returned is a failed delivery. It does not return an HTTP error. Its code is in `targets[].error.code` on the post (`GET /v1/posts/{post_id}`) and in `results[].error.code` of the `post.failed` and `post.partial` webhooks. `GET /v1/events` has no error code. See [Delivery](/guides/delivery#target-errors).
 
 | Code | When it occurs |
 |---|---|
@@ -315,7 +315,7 @@ WhatsApp messaging errors are in [WhatsApp](#whatsapp). Telegram's are in [Teleg
 
 ## Automations
 
-Returned by `POST /v1/automations` and `PATCH /v1/automations/{id}`. The rules behind each code are in [Automations](/guides/automations).
+Returned by `POST /v1/automations` and `PATCH /v1/automations/{automation_id}`. The rules behind each code are in [Automations](/guides/automations).
 
 | HTTP | Code | When it occurs |
 |---|---|---|
@@ -361,7 +361,7 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 400 | `validation.field_required` | `url` is missing |
 | 400 | `validation.field_invalid` | `url` is not a valid `https` URL, or an event type in `events` is unknown |
 | 400 | `validation.body_invalid` | A `PATCH` set no fields |
-| 400 | `validation.webhook_verification_failed` | `POST /v1/webhooks/{id}/test` could not build a request to the endpoint URL |
+| 400 | `validation.webhook_verification_failed` | `POST /v1/webhooks/{webhook_id}/test` could not build a request to the endpoint URL |
 
 ## Media library and exports
 
@@ -525,7 +525,7 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 | 404 | `whatsapp.template_not_found` | The template does not exist for this WhatsApp Business account |
 | 400 | `whatsapp.template_paused` | The template is paused because of quality issues |
 | 400 | `validation.template_invalid` | A template failed validation. `meta.errors` lists the issues |
-| 400 | `validation.body_empty` | `PUT /v1/platforms/whatsapp/phone-numbers/{id}/business-profile` set no field to change |
+| 400 | `validation.body_empty` | `PUT /v1/platforms/whatsapp/phone-numbers/{phone_number_id}/business-profile` set no field to change |
 | 400 | `whatsapp.not_registered` | The number is not registered for the WhatsApp Cloud API. Register it before sending |
 | 400 | `whatsapp.pin_mismatch` | The number has a two-step verification PIN SocialAPI does not hold. Turn two-step verification off for the number, then retry |
 | 400 | `whatsapp.media_download_failed` | WhatsApp could not download the media from the URL. Check that it is publicly reachable |

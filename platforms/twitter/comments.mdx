@@ -13,14 +13,14 @@ A public reply costs 1 interaction credit. Reading, hiding, unhiding, and deleti
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/comments?account_id={account_id}` | List the account's posts with their reply counts |
-| `GET` | `/v1/inbox/comments/{postId}` | List the replies to a post, at every depth of its conversation |
-| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the direct replies to one reply |
-| `POST` | `/v1/inbox/comments/{postId}` | Reply to a reply, or reply to the post itself |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a reply in a conversation that the account's own post started |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide that reply |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a reply the account wrote |
+| `GET` | `/v1/inbox/comments/{post_id}` | List the replies to a post, at every depth of its conversation |
+| `GET` | `/v1/inbox/comments/{post_id}/{comment_id}/replies` | List the direct replies to one reply |
+| `POST` | `/v1/inbox/comments/{post_id}` | Reply to a reply, or reply to the post itself |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Hide a reply in a conversation that the account's own post started |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Unhide that reply |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}` | Delete a reply the account wrote |
 
-`{postId}` is the X post ID, for example `1846123456789012345`: the `id` of a post in `GET /v1/inbox/comments`, or `targets[].platform_post_id` on a post you published through SocialAPI. `{commentId}` and `comment_id` accept the reply's `sapi_cmt_` ID or its X post ID (`platform_id`). See [IDs](/guides/ids#what-each-endpoint-accepts).
+`{post_id}` is the X post ID, for example `1846123456789012345`: the `id` of a post in `GET /v1/inbox/comments`, or `targets[].platform_post_id` on a post you published through SocialAPI. `{comment_id}` and `comment_id` accept the reply's `sapi_cmt_` ID or its X post ID (`platform_id`). See [IDs](/guides/ids#what-each-endpoint-accepts).
 
 ## Your first request
 
@@ -70,7 +70,7 @@ The fields are described in [List comments and replies](/guides/comments#list-co
 
 ## List the replies to a post
 
-`GET /v1/inbox/comments/{postId}` returns the replies in the post's conversation, newest first. The list holds direct replies to the post and replies to those replies, at every depth, in one flat list. Reposts are left out.
+`GET /v1/inbox/comments/{post_id}` returns the replies in the post's conversation, newest first. The list holds direct replies to the post and replies to those replies, at every depth, in one flat list. Reposts are left out.
 
 | Parameter | Description |
 |---|---|
@@ -82,7 +82,7 @@ The fields are described in [List comments and replies](/guides/comments#list-co
 - **Paging.** Follow `next_cursor` until `has_more` is `false`. With a `limit` below 10, each page holds at most `limit` replies, and `next_cursor` skips the rest of that page's 10. Use a `limit` of 10 or more when you page.
 - **Filters.** `moderation_status`, `order`, and `q` do not filter or sort X replies. An invalid value still returns `400 validation.field_invalid`.
 
-`GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the direct replies to one reply, in the same shape, newest first. Its default `limit` is 10, the same 7-day window applies, and a `limit` above 100 is treated as 100. The paging rule above applies. A `limit` of 0 or less, or one that is not an integer, returns `400 validation.field_invalid`.
+`GET /v1/inbox/comments/{post_id}/{comment_id}/replies` lists the direct replies to one reply, in the same shape, newest first. Its default `limit` is 10, the same 7-day window applies, and a `limit` above 100 is treated as 100. The paging rule above applies. A `limit` of 0 or less, or one that is not an integer, returns `400 validation.field_invalid`.
 
 `GET /v1/inbox/comments?account_id={account_id}&platform=twitter` lists the account's posts with their `comment_count`, which is X's reply count. The list includes the replies the account published, because X treats each reply as a post. Reposts are left out. The parameters are in [List posts with comments](/guides/comments#list-posts-with-comments).
 
@@ -103,7 +103,7 @@ The fields are described in [List comments and replies](/guides/comments#list-co
 
 ## Reply to a post or a reply
 
-`POST /v1/inbox/comments/{postId}` publishes a reply as the connected account. With `comment_id`, the reply answers that reply. Without it, the reply answers the post itself.
+`POST /v1/inbox/comments/{post_id}` publishes a reply as the connected account. With `comment_id`, the reply answers that reply. Without it, the reply answers the post itself.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/comments/1846123456789012345" \
@@ -139,7 +139,7 @@ Response (HTTP 200):
 
 ## Hide and unhide a reply
 
-`POST /v1/inbox/comments/{postId}/{commentId}/hide` hides a reply. X keeps a hidden reply reachable by its link and de-emphasizes it in the conversation view. `DELETE` on the same path, with `account_id` as a query parameter, unhides it.
+`POST /v1/inbox/comments/{post_id}/{comment_id}/hide` hides a reply. X keeps a hidden reply reachable by its link and de-emphasizes it in the conversation view. `DELETE` on the same path, with `account_id` as a query parameter, unhides it.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/comments/1846123456789012345/1846198765432109876/hide" \
@@ -158,7 +158,7 @@ X lets the connected account hide only a reply in a conversation that the accoun
 
 ## Delete a reply
 
-`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes a reply the connected account wrote. It returns `{ "success": true }`, costs no credit, and cannot be undone.
+`DELETE /v1/inbox/comments/{post_id}/{comment_id}?account_id={account_id}` deletes a reply the connected account wrote. It returns `{ "success": true }`, costs no credit, and cannot be undone.
 
 X lets an account delete only its own posts. Deleting another person's reply fails with `501 resource.not_supported` or `403 platform.twitter.forbidden`: hide it instead. `can_delete` is `false` on every X reply, so decide from `author_username`, not from `can_delete`.
 
@@ -216,7 +216,7 @@ The X connection needs `tweet.read` and `users.read` to read replies, `tweet.wri
 
 ## Events
 
-X sends no comment events, so SocialAPI emits no `comment.received` for X. Read new replies with `GET /v1/inbox/comments/{postId}`. The events an X account does emit are in the Webhook events row of [X capabilities](/platforms/twitter#capabilities).
+X sends no comment events, so SocialAPI emits no `comment.received` for X. Read new replies with `GET /v1/inbox/comments/{post_id}`. The events an X account does emit are in the Webhook events row of [X capabilities](/platforms/twitter#capabilities).
 
 ## Use from an AI agent
 

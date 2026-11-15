@@ -14,13 +14,13 @@ Each event, its platforms, and its payload are on [Webhook events](/guides/webho
 | `GET` | `/v1/webhooks/events` | List the event names you can subscribe to |
 | `POST` | `/v1/webhooks` | Register an endpoint |
 | `GET` | `/v1/webhooks` | List your endpoints |
-| `GET` | `/v1/webhooks/{id}` | Get an endpoint with its delivery counts |
-| `PATCH` | `/v1/webhooks/{id}` | Change the URL, the events, or the active state |
-| `DELETE` | `/v1/webhooks/{id}` | Delete an endpoint |
-| `GET` | `/v1/webhooks/{id}/deliveries` | List an endpoint's deliveries |
-| `GET` | `/v1/webhooks/{id}/deliveries/{did}` | Get one delivery with its payload and attempts |
-| `POST` | `/v1/webhooks/{id}/deliveries/{did}/retry` | Send a delivery again |
-| `POST` | `/v1/webhooks/{id}/test` | Send a test payload to an endpoint |
+| `GET` | `/v1/webhooks/{webhook_id}` | Get an endpoint with its delivery counts |
+| `PATCH` | `/v1/webhooks/{webhook_id}` | Change the URL, the events, or the active state |
+| `DELETE` | `/v1/webhooks/{webhook_id}` | Delete an endpoint |
+| `GET` | `/v1/webhooks/{webhook_id}/deliveries` | List an endpoint's deliveries |
+| `GET` | `/v1/webhooks/{webhook_id}/deliveries/{delivery_id}` | Get one delivery with its payload and attempts |
+| `POST` | `/v1/webhooks/{webhook_id}/deliveries/{delivery_id}/retry` | Send a delivery again |
+| `POST` | `/v1/webhooks/{webhook_id}/test` | Send a test payload to an endpoint |
 
 You can also manage endpoints in the dashboard under **Webhooks**.
 
@@ -55,7 +55,7 @@ Response (HTTP 201):
 | `url` | Yes | The URL that receives events. It must use `https` |
 | `events` | Yes | A non-empty array of event names from [Webhook events](/guides/webhook-events) |
 
-The `secret` is a 64-character string. It is returned once, in this response. `GET /v1/webhooks/{id}` returns only a hint made of `whsec_...` and the last 4 characters. To replace a lost secret, register a new endpoint and delete the old one.
+The `secret` is a 64-character string. It is returned once, in this response. `GET /v1/webhooks/{webhook_id}` returns only a hint made of `whsec_...` and the last 4 characters. To replace a lost secret, register a new endpoint and delete the old one.
 
 SocialAPI does not call your URL when you register it, so registration succeeds even when the server is not running. Send a test delivery to check the endpoint.
 
@@ -265,7 +265,7 @@ A failed attempt is retried until the delivery has used 10 attempts. The wait be
 | 9 | 4 hours after attempt 8 fails | about 8 hours |
 | 10 | 6 hours after attempt 9 fails | about 14 hours |
 
-Each wait varies by up to 10 percent either way. After the tenth failed attempt, about 14 hours after the first, the delivery's `status` becomes `failed` and SocialAPI makes no further attempts. Send a failed delivery again yourself with `POST /v1/webhooks/{id}/deliveries/{did}/retry`.
+Each wait varies by up to 10 percent either way. After the tenth failed attempt, about 14 hours after the first, the delivery's `status` becomes `failed` and SocialAPI makes no further attempts. Send a failed delivery again yourself with `POST /v1/webhooks/{webhook_id}/deliveries/{delivery_id}/retry`.
 
 A retried event can arrive hours after events that happened later. Order events by their own timestamps, not by arrival.
 
@@ -297,7 +297,7 @@ Response (HTTP 200):
 }
 ```
 
-`GET /v1/webhooks/{id}` returns the same fields plus `secret_hint` and delivery counts:
+`GET /v1/webhooks/{webhook_id}` returns the same fields plus `secret_hint` and delivery counts:
 
 ```json
 {
@@ -379,7 +379,7 @@ Response (HTTP 200):
 
 `count` is the number of deliveries that match the filters across all pages. `next_cursor` is absent on the last page. Deliveries are sorted newest first.
 
-`GET /v1/webhooks/{id}/deliveries/{did}` returns the delivery with the exact `payload` that was sent and every attempt:
+`GET /v1/webhooks/{webhook_id}/deliveries/{delivery_id}` returns the delivery with the exact `payload` that was sent and every attempt:
 
 ```json
 {
@@ -407,13 +407,13 @@ Response (HTTP 200):
 
 Each attempt holds the first 10,240 bytes of your response body. An attempt that ended in a connection error has an `error_message` in place of a response. The example `payload` is shortened. The real one is the full body that was sent.
 
-`POST /v1/webhooks/{id}/deliveries/{did}/retry` creates a new delivery with the same event and payload and the description `Retry of {did}`. It returns the new delivery with `status` `pending`. The new delivery gets 10 attempts of its own. The original delivery is unchanged.
+`POST /v1/webhooks/{webhook_id}/deliveries/{delivery_id}/retry` creates a new delivery with the same event and payload and the description `Retry of {delivery_id}`. It returns the new delivery with `status` `pending`. The new delivery gets 10 attempts of its own. The original delivery is unchanged.
 
 SocialAPI keeps deliveries for the number of days your plan allows (see [History and export allowances](/guides/plans#history-and-export-allowances)).
 
 ## Test an endpoint
 
-`POST /v1/webhooks/{id}/test` sends one request to the endpoint and returns the result. You choose the event name and the body:
+`POST /v1/webhooks/{webhook_id}/test` sends one request to the endpoint and returns the result. You choose the event name and the body:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/webhooks/3f6b0c1e-5a47-4d2b-9a0e-8c1d7b2e4f90/test \
@@ -467,12 +467,12 @@ Which platforms emit each event is listed under the event on [Webhook events](/g
 
 When an event does not arrive, check in this order:
 
-1. **Endpoint state.** `GET /v1/webhooks/{id}` must show `is_active: true` and the event name in `events`. An event is delivered only to endpoints subscribed to it when it occurs.
+1. **Endpoint state.** `GET /v1/webhooks/{webhook_id}` must show `is_active: true` and the event name in `events`. An event is delivered only to endpoints subscribed to it when it occurs.
 2. **Past due.** While your SocialAPI account is past due, SocialAPI sends no events and records no deliveries. Calls to the API return `402 billing.past_due`.
 3. **Platform support.** Check **Emitted for** under the event on [Webhook events](/guides/webhook-events). A platform that does not emit the event never sends it.
-4. **Deliveries.** `GET /v1/webhooks/{id}/deliveries?status=failed` lists failures. Read the attempts of one delivery: `status_code` is your endpoint's response, and `error_message` explains a connection error or timeout.
+4. **Deliveries.** `GET /v1/webhooks/{webhook_id}/deliveries?status=failed` lists failures. Read the attempts of one delivery: `status_code` is your endpoint's response, and `error_message` explains a connection error or timeout.
 5. **Signature.** When your handler returns `401` on every request, check that you hash the raw body, key the HMAC with the secret string as returned, and compare against `X-SocialAPI-Signature-V2`.
-6. **Test.** Send `POST /v1/webhooks/{id}/test` to separate your endpoint's behavior from SocialAPI's event delivery.
+6. **Test.** Send `POST /v1/webhooks/{webhook_id}/test` to separate your endpoint's behavior from SocialAPI's event delivery.
 
 Other codes on these endpoints: `401 auth.invalid_key` and its siblings for a missing or invalid key, `403 auth.insufficient_scope` when the key lacks `webhooks:manage`, and `404 resource.not_found` for an unknown endpoint or delivery. Every code is in [Errors](/guides/errors).
 

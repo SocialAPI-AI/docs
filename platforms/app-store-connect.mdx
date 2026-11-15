@@ -25,11 +25,11 @@ SocialAPI connects an app in App Store Connect with your own App Store Connect A
 | Reply to a review | Yes | A review has 1 developer response. A new reply replaces it |
 | Edit or delete a reply | No | Send a new reply to change it. Delete a response in App Store Connect |
 | Review summary | Partial | `total_count` and `last_review_at`. `average_rating` is always `0`: App Store Connect reports no average rating |
-| Publishing | No | `POST /v1/posts` and `PATCH /v1/posts/{pid}` with an App Store Connect target return `422 account.platform_unsupported` |
+| Publishing | No | `POST /v1/posts` and `PATCH /v1/posts/{post_id}` with an App Store Connect target return `422 account.platform_unsupported` |
 | Comments, DMs, mentions | No | `501 resource.not_supported` |
 | Analytics | No | No post metrics, account summary, or stored history |
 | Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
-| Platform quota | No | `GET /v1/accounts/{id}/limits` returns `501 resource.not_supported` |
+| Platform quota | No | `GET /v1/accounts/{account_id}/limits` returns `501 resource.not_supported` |
 | Webhook events | Partial | Account events. No `review.received` or `review.updated`: read reviews with the list endpoint |
 
 The capability matrix for every platform is on [Supported platforms](/platforms/overview).
@@ -129,7 +129,7 @@ Disconnecting the account (`DELETE /v1/accounts/{account_id}`) deletes the API k
 
 ## Reviews
 
-You list an app's reviews with `GET /v1/inbox/reviews/{account_id}` and reply with `POST /v1/inbox/reviews/{id}/reply`. The parameters, response fields, and cost are on [Reviews](/guides/reviews). These rules are specific to App Store Connect:
+You list an app's reviews with `GET /v1/inbox/reviews/{account_id}` and reply with `POST /v1/inbox/reviews/{review_id}/reply`. The parameters, response fields, and cost are on [Reviews](/guides/reviews). These rules are specific to App Store Connect:
 
 - **Reviews carry a title.** Each review has `title`, the reviewer's headline, next to `text`, the review body.
 - **The author is a nickname.** `author.name` is the reviewer's App Store nickname. `author.avatar_url` is absent.
@@ -174,7 +174,7 @@ A reply that fails with a `validation.*` code gets its interaction credit back. 
 |---|---|
 | Requests per API key (App Store Connect) | An hourly limit set by Apple, shared by every app the key can see and by every other tool that uses the key. Apple's example is 3,500 requests per rolling hour, and Apple states the actual limit can vary |
 | Reviews per page | 1 to 50, the same as every platform: see [Reviews](/guides/reviews) |
-| Reply text | SocialAPI sets no length limit on `POST /v1/inbox/reviews/{id}/reply`. A reply App Store Connect refuses returns `400 validation.app_store_connect_rejected`. The MCP tool `social_api_reply_to_review` accepts up to 2,200 bytes |
+| Reply text | SocialAPI sets no length limit on `POST /v1/inbox/reviews/{review_id}/reply`. A reply App Store Connect refuses returns `400 validation.app_store_connect_rejected`. The MCP tool `social_api_reply_to_review` accepts up to 2,200 bytes |
 
 ## Scopes
 

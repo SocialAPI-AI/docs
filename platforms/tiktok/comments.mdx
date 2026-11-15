@@ -13,16 +13,16 @@ A public reply costs 1 interaction credit. Reading, hiding, deleting, and liking
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/comments` | List the account's posts with their comment counts |
-| `GET` | `/v1/inbox/comments/{postId}` | List the comments on one post |
-| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to one comment |
-| `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or comment on the post |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a comment another person wrote |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide that comment |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a comment the connected account wrote |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/like` | Like a comment as the connected account |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/like` | Remove that like |
+| `GET` | `/v1/inbox/comments/{post_id}` | List the comments on one post |
+| `GET` | `/v1/inbox/comments/{post_id}/{comment_id}/replies` | List the replies to one comment |
+| `POST` | `/v1/inbox/comments/{post_id}` | Reply to a comment, or comment on the post |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Hide a comment another person wrote |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Unhide that comment |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}` | Delete a comment the connected account wrote |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/like` | Like a comment as the connected account |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/like` | Remove that like |
 
-SocialAPI does not send private replies on TikTok: `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` returns `501 resource.not_supported`.
+SocialAPI does not send private replies on TikTok: `POST /v1/inbox/comments/{post_id}/{comment_id}/private-reply` returns `501 resource.not_supported`.
 
 ## Which accounts have comments
 
@@ -32,9 +32,9 @@ SocialAPI does not send private replies on TikTok: `POST /v1/inbox/comments/{pos
 
 ## Post and comment IDs
 
-- **`{postId}`** is the TikTok video ID. It is `targets[].platform_post_id` on a post you published through SocialAPI, and `id` in `GET /v1/inbox/comments`.
+- **`{post_id}`** is the TikTok video ID. It is `targets[].platform_post_id` on a post you published through SocialAPI, and `id` in `GET /v1/inbox/comments`.
 - **`platform_id`** of a comment is `{video_id}_{comment_id}`, for example `7431982715038469413_7432015593081422625`.
-- **`id`** of a comment is its `sapi_cmt_` ID. Use `id` or `platform_id` as `{commentId}` and as `comment_id`.
+- **`id`** of a comment is its `sapi_cmt_` ID. Use `id` or `platform_id` as `{comment_id}` and as `comment_id`.
 - **Bare TikTok comment IDs.** Hide, unhide, reply, and list replies need `id` or the full `platform_id`. A bare TikTok comment ID such as `7432015593081422625` returns `400 validation.comment_id_invalid`, with the value in `error.meta.comment_id`. Delete, like, and unlike accept a bare comment ID too.
 
 ## List posts with comments
@@ -70,14 +70,14 @@ Response (HTTP 200):
 }
 ```
 
-- **Which posts.** The list holds the account's 20 most recent TikTok posts, plus older posts that were among its 20 most recent posts earlier or whose comments (without `q`, `order`, or `moderation_status`) or replies you listed. To read the comments on any other post of the account, call `GET /v1/inbox/comments/{postId}` with its video ID.
-- **`comment_count`** is TikTok's count for a post among the account's 20 most recent posts, and it can trail TikTok. After a post leaves those 20, its `comment_count` keeps its last value and goes up by 1 only for each comment or reply you send on it through SocialAPI. A post that is in the list only because you listed its comments or replies starts at `0`, and its `comment_count` goes up by 1 only for each comment or reply you send on it through SocialAPI. `GET /v1/inbox/comments/{postId}` returns the post's current comments.
+- **Which posts.** The list holds the account's 20 most recent TikTok posts, plus older posts that were among its 20 most recent posts earlier or whose comments (without `q`, `order`, or `moderation_status`) or replies you listed. To read the comments on any other post of the account, call `GET /v1/inbox/comments/{post_id}` with its video ID.
+- **`comment_count`** is TikTok's count for a post among the account's 20 most recent posts, and it can trail TikTok. After a post leaves those 20, its `comment_count` keeps its last value and goes up by 1 only for each comment or reply you send on it through SocialAPI. A post that is in the list only because you listed its comments or replies starts at `0`, and its `comment_count` goes up by 1 only for each comment or reply you send on it through SocialAPI. `GET /v1/inbox/comments/{post_id}` returns the post's current comments.
 - **`like_count`** is `0`. Read a post's likes from [Sync videos](/platforms/tiktok#sync-videos).
 - **`thumbnail`** is a temporary link from TikTok. Download the image if you need it later.
 
 ## List the comments on a post
 
-`GET /v1/inbox/comments/{postId}` lists the comments on one post, in TikTok's order. `account_id` is required.
+`GET /v1/inbox/comments/{post_id}` lists the comments on one post, in TikTok's order. `account_id` is required.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/comments/7431982715038469413?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=30" \
@@ -156,8 +156,8 @@ The fields on TikTok:
 
 TikTok leaves hidden comments out of its comment list. SocialAPI adds a hidden comment back at the end of the first page of results, with `is_hidden: true`, when all of these hold:
 
-1. The comment is a top-level comment that appeared in a `GET /v1/inbox/comments/{postId}` response sent without `q`, `order`, or `moderation_status` (or with their defaults) before it was hidden.
-2. You hid it with `POST /v1/inbox/comments/{postId}/{commentId}/hide`, or with the MCP tool `social_api_hide_comment` and its `post_id`.
+1. The comment is a top-level comment that appeared in a `GET /v1/inbox/comments/{post_id}` response sent without `q`, `order`, or `moderation_status` (or with their defaults) before it was hidden.
+2. You hid it with `POST /v1/inbox/comments/{post_id}/{comment_id}/hide`, or with the MCP tool `social_api_hide_comment` and its `post_id`.
 3. The first page of results has `pagination.has_more: false`.
 4. The request sends no `q`, and `order` and `moderation_status` are absent or set to `recent` and `published`.
 
@@ -167,7 +167,7 @@ A comment hidden in the TikTok app, a reply you hid, and a comment hidden with `
 
 ## List the replies to a comment
 
-`GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the replies to one comment, in the same shape as comments. `{commentId}` is the comment's `id` or full `platform_id`.
+`GET /v1/inbox/comments/{post_id}/{comment_id}/replies` lists the replies to one comment, in the same shape as comments. `{comment_id}` is the comment's `id` or full `platform_id`.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sapi_cmt_K7QW3NRT8HXZ5MBV2YDLC9FJPAE4SG6U/replies?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
@@ -213,7 +213,7 @@ Response (HTTP 200):
 
 ## Reply to a comment or comment on a post
 
-`POST /v1/inbox/comments/{postId}` with `comment_id` replies to that comment as the connected account. Without `comment_id`, it adds a top-level comment to the post.
+`POST /v1/inbox/comments/{post_id}` with `comment_id` replies to that comment as the connected account. Without `comment_id`, it adds a top-level comment to the post.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/inbox/comments/7431982715038469413 \
@@ -249,7 +249,7 @@ Response (HTTP 200):
 
 ## Hide and unhide a comment
 
-`POST /v1/inbox/comments/{postId}/{commentId}/hide` hides a comment another person wrote. `DELETE` on the same path, with `account_id` as a query parameter, unhides it. Both return `{ "success": true }` and cost no credit.
+`POST /v1/inbox/comments/{post_id}/{comment_id}/hide` hides a comment another person wrote. `DELETE` on the same path, with `account_id` as a query parameter, unhides it. Both return `{ "success": true }` and cost no credit.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sapi_cmt_K7QW3NRT8HXZ5MBV2YDLC9FJPAE4SG6U/hide \
@@ -269,7 +269,7 @@ curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/7431982715038469413/
 
 ## Delete a comment
 
-`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes a comment the connected account wrote. It returns `{ "success": true }`, costs no credit, and cannot be undone.
+`DELETE /v1/inbox/comments/{post_id}/{comment_id}?account_id={account_id}` deletes a comment the connected account wrote. It returns `{ "success": true }`, costs no credit, and cannot be undone.
 
 ```bash
 curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sapi_cmt_P4LM8XWQ2TRC6HZN9BVKD3YFJGAE7SU5?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
@@ -280,7 +280,7 @@ TikTok deletes only the connected account's own comments. `can_delete` is `false
 
 ## Like and unlike a comment
 
-`POST /v1/inbox/comments/{postId}/{commentId}/like` likes a comment as the connected account, with `account_id` in the body. `DELETE` on the same path, with `account_id` as a query parameter, removes the like. Both return `{ "success": true }` and cost no credit. `can_like` is `true` on every TikTok comment.
+`POST /v1/inbox/comments/{post_id}/{comment_id}/like` likes a comment as the connected account, with `account_id` in the body. `DELETE` on the same path, with `account_id` as a query parameter, removes the like. Both return `{ "success": true }` and cost no credit. `can_like` is `true` on every TikTok comment.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sapi_cmt_K7QW3NRT8HXZ5MBV2YDLC9FJPAE4SG6U/like \
@@ -303,12 +303,12 @@ curl -X POST https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sap
 
 SocialAPI sends `comment.received` when another person comments on, or replies under, a post of the connected TikTok account. The payload is the shared [Interaction](/guides/webhook-events#interaction-payload) shape. On TikTok:
 
-- **IDs.** `id` is the comment's `sapi_cmt_` ID, the same `id` that `GET /v1/inbox/comments/{postId}` returns. `platform_post_id` is the TikTok video ID. `post_id` and `permalink` are not set, and `metadata` is `null`.
+- **IDs.** `id` is the comment's `sapi_cmt_` ID, the same `id` that `GET /v1/inbox/comments/{post_id}` returns. `platform_post_id` is the TikTok video ID. `post_id` and `permalink` are not set, and `metadata` is `null`.
 - **Author.** `author.id` is TikTok's unique identifier for the person. `author.name`, `author.username`, and `author.avatar_url` come from the comment.
 - **Content.** `content.text` is the comment text.
 - **Raw payload.** `raw_payload` holds TikTok's notification.
 - **Timing.** `comment.received` can arrive up to 5 minutes after the comment is posted, because TikTok reports new comments to apps with that delay.
-- **Not sent.** Comments written by the connected account, deletions, and changes to a comment's visibility. A comment deleted within 5 minutes of being posted can produce no event. Read `GET /v1/inbox/comments/{postId}` to catch comments the events missed.
+- **Not sent.** Comments written by the connected account, deletions, and changes to a comment's visibility. A comment deleted within 5 minutes of being posted can produce no event. Read `GET /v1/inbox/comments/{post_id}` to catch comments the events missed.
 - **The same TikTok account connected more than once.** When more than one connected account holds the same TikTok account, each one with the `comments.read` permission receives its own event. An account without `comments.read` receives none.
 
 The payload and the other platforms are in [`comment.received`](/guides/webhook-events#comment-received).

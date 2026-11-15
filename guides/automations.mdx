@@ -15,10 +15,10 @@ Each Automation action costs what the same API call costs, and the same platform
 |--------|------|-------------|
 | `POST` | `/v1/automations` | Create an Automation |
 | `GET` | `/v1/automations` | List your Automations, newest first. Filter to one account with `account_id` |
-| `GET` | `/v1/automations/{id}` | Get one Automation with its counters |
-| `PATCH` | `/v1/automations/{id}` | Update the fields you send, or pause and resume |
-| `DELETE` | `/v1/automations/{id}` | Delete an Automation and its run history |
-| `GET` | `/v1/automations/{id}/firings` | List the Automation's runs from the last 30 days |
+| `GET` | `/v1/automations/{automation_id}` | Get one Automation with its counters |
+| `PATCH` | `/v1/automations/{automation_id}` | Update the fields you send, or pause and resume |
+| `DELETE` | `/v1/automations/{automation_id}` | Delete an Automation and its run history |
+| `GET` | `/v1/automations/{automation_id}/firings` | List the Automation's runs from the last 30 days |
 
 Configuring Automations is free. Only the actions they carry out can cost credits.
 
@@ -390,7 +390,7 @@ The Automation itself carries running totals: `fired_count` (runs, taps included
 
 ### Debug a failed action
 
-1. `GET /v1/automations/{id}` and check `failed_count`.
+1. `GET /v1/automations/{automation_id}` and check `failed_count`.
 2. List the Firings and find an outcome with `"status": "failed"`.
 3. Look up its `error_code` in [Errors](/guides/errors). It is the code the same API call would have returned, so it means the same thing. For example, `platform.instagram.private_reply_ineligible` means the comment is older than 7 days or already had a private reply, perhaps from another Automation or from your own API call. `platform.instagram.window_closed` means a `send_dm` went outside the messaging window.
 4. Fix the cause, for example by removing an overlapping Automation. The failed action is not retried.

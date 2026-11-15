@@ -13,15 +13,15 @@ A send costs 1 interaction credit. Reading costs no credits. X also bills every 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/conversations?account_id={account_id}` | List the account's conversations |
-| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
-| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
-| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
-| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
-| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a text message |
+| `GET` | `/v1/inbox/conversations/{conversation_id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{conversation_id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{conversation_id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages` | Send a text message |
 | `POST` | `/v1/inbox/sync` | Refresh the account's conversations, or one conversation's messages |
 | `GET` | `/v1/inbox/sync` | Read a sync's state |
 
-`{id}` is the conversation `id` from `GET /v1/inbox/conversations`. Reactions and sender actions (typing indicators, seen receipts) return `501 resource.not_supported` on X.
+`{conversation_id}` is the conversation `id` from `GET /v1/inbox/conversations`. Reactions and sender actions (typing indicators, seen receipts) return `501 resource.not_supported` on X.
 
 ## Your first message
 
@@ -90,13 +90,13 @@ Response (HTTP 200):
 
 - **`platform_id`** is X's conversation ID. A conversation between 2 people has the form `{smaller_user_id}-{larger_user_id}`. A group conversation has a numeric ID.
 - **`participant_id`** is the X user ID of the member who sent the most recent message by anyone other than the connected account, as of when the conversation first appeared, and `participant_name` and `participant_picture` are that person's X name and profile picture. In a 1:1 conversation where only the connected account has written, `participant_id` is the other person's ID, and `participant_name` and `participant_picture` are empty. In a group conversation where no other member had written when it first appeared, `participant_id` is empty. It stays empty, and a send to that conversation returns `400 validation.participant_required`.
-- **`unread_count`** is always `0` on X, and `POST /v1/inbox/conversations/{id}/read` has no visible effect.
+- **`unread_count`** is always `0` on X, and `POST /v1/inbox/conversations/{conversation_id}/read` has no visible effect.
 - **30-day history.** X returns only the last 30 days of DMs. A conversation or message that is already more than 30 days old when SocialAPI first reads the account never appears.
 - **First list after connecting.** The list starts with the conversations in the account's 100 most recent DMs. An older conversation appears when someone sends a new message in it.
 
 ## Read messages
 
-`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first. `limit` is 25 by default, and a value above 200 is treated as 200.
+`GET /v1/inbox/conversations/{conversation_id}/messages` lists the messages of a conversation, newest first. `limit` is 25 by default, and a value above 200 is treated as 200.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages?limit=25" \
@@ -150,15 +150,15 @@ curl -X POST https://api.social-api.ai/v1/inbox/sync \
 ```
 
 - **With `account_id` only**, the sync refreshes the conversation list: new conversations, and each conversation's `last_message` and `last_message_at`.
-- **With `conversation_id` too**, the sync refreshes that conversation's messages. After you read a conversation's messages once, new messages in it appear in `GET /v1/inbox/conversations/{id}/messages` after a sync of that conversation.
+- **With `conversation_id` too**, the sync refreshes that conversation's messages. After you read a conversation's messages once, new messages in it appear in `GET /v1/inbox/conversations/{conversation_id}/messages` after a sync of that conversation.
 
-The first `GET /v1/inbox/conversations` after you connect the account waits for X and returns the account's conversations. The first `GET /v1/inbox/conversations/{id}/messages` on a conversation waits for X and returns up to `limit` of its most recent messages. Its older messages appear in later calls.
+The first `GET /v1/inbox/conversations` after you connect the account waits for X and returns the account's conversations. The first `GET /v1/inbox/conversations/{conversation_id}/messages` on a conversation waits for X and returns up to `limit` of its most recent messages. Its older messages appear in later calls.
 
 Poll `GET /v1/inbox/sync` until `state` leaves `syncing`, then list again. A start while a sync of the same target is still running returns `202` with that sync, `state` `syncing`, and starts nothing new. Each target accepts 1 new sync you start every 5 minutes: another start within that time, once the running one has finished, returns `429 inbox.sync_rate_limited` with a `Retry-After` header. X bills your X app for the DMs each refresh reads.
 
 ## Send a message
 
-`POST /v1/inbox/conversations/{id}/messages` sends a text DM to the person in the conversation's `participant_id`.
+`POST /v1/inbox/conversations/{conversation_id}/messages` sends a text DM to the person in the conversation's `participant_id`.
 
 | Field | On X |
 |---|---|
@@ -190,7 +190,7 @@ To share a file, send its URL in `text`.
 | Send an image, video, GIF, or file | `400 validation.attachment_unsupported`. Send a link in `text` |
 | Quick replies, buttons, cards, or list menus | Ignored. The text is sent alone |
 | React to a message | `501 resource.not_supported` |
-| Typing indicator or seen receipt | `POST /v1/inbox/conversations/{id}/sender-action` returns `501 resource.not_supported`. `POST /v1/inbox/conversations/{id}/read` has no visible effect on X |
+| Typing indicator or seen receipt | `POST /v1/inbox/conversations/{conversation_id}/sender-action` returns `501 resource.not_supported`. `POST /v1/inbox/conversations/{conversation_id}/read` has no visible effect on X |
 | Send with `message_tag` | `422 messaging.tag_not_supported` |
 | Message the whole group | A send goes to 1 member, as described in [Send a message](#send-a-message) |
 | Start a conversation with a new person | No endpoint |

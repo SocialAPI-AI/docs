@@ -91,7 +91,7 @@ Response (HTTP 201):
 }
 ```
 
-SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
+SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{post_id}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
 
 ### Platform data fields
 
@@ -134,11 +134,11 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
 
 ## 4. Update post
 
-A published Threads post cannot be edited through SocialAPI. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a post that is live on this platform. Only `draft`, `scheduled`, and `failed` posts can be edited here; a published post can be edited only when it is live on Google Business Profile alone.
+A published Threads post cannot be edited through SocialAPI. `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a post that is live on this platform. Only `draft`, `scheduled`, and `failed` posts can be edited here; a published post can be edited only when it is live on Google Business Profile alone.
 
-A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{pid}` before it publishes.
+A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{post_id}` before it publishes.
 
-To correct a published post, delete it with `DELETE /v1/posts/{pid}` and publish a new post.
+To correct a published post, delete it with `DELETE /v1/posts/{post_id}` and publish a new post.
 
 ---
 
@@ -149,7 +149,7 @@ curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-To remove only the Threads target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{pid}` always removes every target.
+To remove only the Threads target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{post_id}` always removes every target.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/unpublish \
@@ -211,7 +211,7 @@ A post with media waits for Threads to process the file. If Threads has not fini
 
 ### No post editing
 
-A published Threads post cannot be edited. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid`. Delete the post and publish a new one: see [4. Update post](#4-update-post).
+A published Threads post cannot be edited. `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid`. Delete the post and publish a new one: see [4. Update post](#4-update-post).
 
 ### Text-only posts
 
@@ -260,7 +260,7 @@ Every code is in [Errors](/guides/errors).
 
 - **Auth error.** Reconnect the Threads account through the OAuth flow to get a fresh token.
 - **Media timeout.** A large video or a slow media URL causes it. Upload the media again and retry.
-- **API error.** Read `message`, fix the cause, and send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **API error.** Read `message`, fix the cause, and send `POST /v1/posts/{post_id}/retry`. See [Delivery](/guides/delivery).
 
 ---
 

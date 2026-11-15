@@ -169,13 +169,13 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) instead of `publish_now`. Soci
 
 ## 4. Update post
 
-LinkedIn posts cannot be edited through SocialAPI once they are published. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post. To correct a published post, delete it and publish a new one.
+LinkedIn posts cannot be edited through SocialAPI once they are published. `PATCH /v1/posts/{post_id}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post. To correct a published post, delete it and publish a new one.
 
 ---
 
 ## 5. Delete post
 
-`DELETE /v1/posts/{pid}` deletes the post from LinkedIn when its LinkedIn target is `published`. A target that is not published is removed from SocialAPI only. See [Delete a post](/guides/delivery#delete-a-post).
+`DELETE /v1/posts/{post_id}` deletes the post from LinkedIn when its LinkedIn target is `published`. A target that is not published is removed from SocialAPI only. See [Delete a post](/guides/delivery#delete-a-post).
 
 ```bash
 curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
@@ -186,7 +186,7 @@ curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1
 
 ## 6. Retrieve posts
 
-`GET /v1/posts?platform=linkedin&account_ids={id}` lists the posts of a member profile or a company Page.
+`GET /v1/posts?platform=linkedin&account_ids={account_id}` lists the posts of a member profile or a company Page.
 
 For a member profile, the list holds the posts you published through SocialAPI. LinkedIn gives apps no read of a member's own posts, so a post published on LinkedIn directly never appears, and `GET /v1/posts` returns no metrics for these posts. Read counts for the 5 most recent ones from [LinkedIn insights](/platforms/linkedin#insights). For a company Page, the list also holds the Page's posts made outside SocialAPI.
 
@@ -217,7 +217,7 @@ A publish that fails after the request returned puts a structured error on the t
 
 ### Recovery
 
-- **Rate limit.** Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Rate limit.** Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then send `POST /v1/posts/{post_id}/retry`. See [Delivery](/guides/delivery).
 - **Auth error.** Reconnect the LinkedIn account through the OAuth flow.
 - **Media failure.** Replace the file, create the post again, or edit the failed post and retry it.
 

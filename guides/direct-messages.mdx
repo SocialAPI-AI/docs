@@ -12,16 +12,16 @@ A DM request costs 1 interaction credit, however many messages it sends. Reads, 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/conversations` | List conversations |
-| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
-| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
-| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
-| `POST` | `/v1/inbox/conversations/{id}/sender-action` | Show the person a typing indicator, or mark their messages seen |
-| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
-| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message |
-| `POST` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | React to a message |
-| `DELETE` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | Remove your reaction |
+| `GET` | `/v1/inbox/conversations/{conversation_id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{conversation_id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/read` | Mark a conversation as read in SocialAPI |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/sender-action` | Show the person a typing indicator, or mark their messages seen |
+| `GET` | `/v1/inbox/conversations/{conversation_id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages` | Send a message |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` | React to a message |
+| `DELETE` | `/v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` | Remove your reaction |
 
-`{id}` is the conversation `id` that `GET /v1/inbox/conversations` returns. It is a UUID, not a `sapi_dm_` ID. `{messageId}` is a message's `platform_id`. See [IDs](/guides/ids#what-each-endpoint-accepts).
+`{conversation_id}` is the conversation `id` that `GET /v1/inbox/conversations` returns. It is a UUID, not a `sapi_dm_` ID. `{message_id}` is a message's `platform_id`. See [IDs](/guides/ids#what-each-endpoint-accepts).
 
 ## Your first message
 
@@ -113,11 +113,11 @@ Response (HTTP 200):
 | `created_at`, `updated_at` | When SocialAPI created and last updated the conversation, in ISO 8601 UTC |
 | `sync_state`, `last_synced_at` | `idle`, `syncing`, or `failed`, and when the list last completed a refresh. `sync_state` is set only when you pass `account_id`: see [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually) |
 
-`PATCH /v1/inbox/conversations/{id}` with `{ "status": "archived" }` or `{ "status": "active" }` changes the status and returns `{ "success": true }`. Any other value returns `400 validation.field_invalid`. `POST /v1/inbox/conversations/{id}/read` sets `unread_count` to 0 and returns `{ "success": true }`. It does not send a read receipt to the person.
+`PATCH /v1/inbox/conversations/{conversation_id}` with `{ "status": "archived" }` or `{ "status": "active" }` changes the status and returns `{ "success": true }`. Any other value returns `400 validation.field_invalid`. `POST /v1/inbox/conversations/{conversation_id}/read` sets `unread_count` to 0 and returns `{ "success": true }`. It does not send a read receipt to the person.
 
 ## Read messages
 
-`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first.
+`GET /v1/inbox/conversations/{conversation_id}/messages` lists the messages of a conversation, newest first.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages?limit=25" \
@@ -154,7 +154,7 @@ Response (HTTP 200):
 | Field | Description |
 |---|---|
 | `id` | The message ID in SocialAPI |
-| `platform_id` | The platform's message ID. It is the `{messageId}` of the reaction endpoints |
+| `platform_id` | The platform's message ID. It is the `{message_id}` of the reaction endpoints |
 | `direction` | `incoming` (the person wrote it) or `outgoing` (a connected account sent it) |
 | `text` | The message text. An attachment-only outgoing message holds `[Attachment]` |
 | `sender_id`, `sender_name` | Who sent it |
@@ -168,7 +168,7 @@ Response (HTTP 200):
 
 ## Send a message
 
-`POST /v1/inbox/conversations/{id}/messages` sends a message into a conversation. A request must hold `text`, an attachment, or interactive content, and can hold all three. A request with none returns `400 validation.field_required`.
+`POST /v1/inbox/conversations/{conversation_id}/messages` sends a message into a conversation. A request must hold `text`, an attachment, or interactive content, and can hold all three. A request with none returns `400 validation.field_required`.
 
 | Field | Description |
 |---|---|
@@ -272,7 +272,7 @@ WhatsApp has buttons with its own rules and list menus, and Zalo takes buttons a
 
 ## React to a message
 
-`POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` adds your emoji reaction to a message, and replaces your earlier one. It works on Instagram and Facebook. Other platforms return `501 resource.not_supported`.
+`POST /v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` adds your emoji reaction to a message, and replaces your earlier one. It works on Instagram and Facebook. Other platforms return `501 resource.not_supported`.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages/m_AbCdEf123/reaction" \
@@ -291,7 +291,7 @@ Response (HTTP 200):
 
 ## Typing indicators and seen receipts
 
-`POST /v1/inbox/conversations/{id}/sender-action` shows the person a typing indicator, or marks their messages as seen, without sending a message. It works on Instagram, Facebook, and WhatsApp. Other platforms return `501 resource.not_supported`. It costs no credit.
+`POST /v1/inbox/conversations/{conversation_id}/sender-action` shows the person a typing indicator, or marks their messages as seen, without sending a message. It works on Instagram, Facebook, and WhatsApp. Other platforms return `501 resource.not_supported`. It costs no credit.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/sender-action" \
@@ -316,7 +316,7 @@ Both fields are required. `action` is one of:
 
 Any other `action` returns `400 validation.invalid_action`. On WhatsApp, `typing_on` and `mark_seen` need at least one message from the person in the conversation, or the call returns `400 validation.no_inbound_message`. On Instagram and Facebook, when the platform refuses the action because the messaging window is closed, the call returns `400 platform.instagram.window_closed` or `400 platform.facebook.window_closed`.
 
-`POST /v1/inbox/conversations/{id}/read` is different: it sets the conversation's `unread_count` to 0 in SocialAPI, and the person sees nothing. To let the person see that you read their messages, send `mark_seen`.
+`POST /v1/inbox/conversations/{conversation_id}/read` is different: it sets the conversation's `unread_count` to 0 in SocialAPI, and the person sees nothing. To let the person see that you read their messages, send `mark_seen`.
 
 The reverse direction works through webhooks: `dm.status.read` tells you the person read a message you sent, on Instagram, Facebook, and WhatsApp. Instagram, Facebook, and WhatsApp do not report when the person is typing, so SocialAPI has no event for it.
 
