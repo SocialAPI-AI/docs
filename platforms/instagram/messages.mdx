@@ -109,15 +109,12 @@ curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a
   }'
 ```
 
-The response is the same as an untagged send. The rules:
+The response is the same as an untagged send. How it works:
 
-- **Human replies only.** Send the tag only on a reply a member of your team types. Never send it from a workflow, an automation, a bot, an AI agent acting on its own, a broadcast, a promotion, or a re-engagement message. You are responsible for following Meta's messaging policy.
-- **Enabled per SocialAPI account.** Ask support to enable HUMAN_AGENT for your SocialAPI account. Until it is enabled, a send with the tag returns `403 messaging.tag_not_enabled`.
+- **For replies your team types.** Send HUMAN_AGENT only on a reply a member of your team types to a person who is waiting for help. Workflows, Automations, bots, and AI agents acting on their own send without the tag, so they reply within 24 hours of the person's last message. Broadcasts and promotions also send without the tag. Meta's messaging policy applies to every tagged message.
+- **Turn it on.** Ask support to enable HUMAN_AGENT for your SocialAPI account. Until then, a send with the tag returns `403 messaging.tag_not_enabled`.
 - **Window.** Within 24 hours of the person's last message, the message is sent without the tag, as an ordinary reply. More than 7 days after it, the send returns `400 messaging.human_agent_window_closed`, and the person must message the account first.
 - **Allowed values.** `HUMAN_AGENT` is the only value. Any other value, or the tag on an account connected through Facebook Login, returns `422 messaging.tag_not_supported`. Send without `message_tag` instead.
-- **Pause.** While HUMAN_AGENT is paused on the connected account, a send that needs the tag returns `429 messaging.tag_rate_limited`. When the error carries `error.meta.retry_after_seconds`, the pause ends at 00:00 UTC: wait that long, also given in the `Retry-After` header, then send again. Without it, the pause has no set end: reply without `message_tag` inside the 24-hour window, and contact support to learn when tagging resumes. Replies within 24 hours of the person's last message still work during a pause.
-- **Revoked.** Revoking is permanent until support enables HUMAN_AGENT again. After a revoke, every send with the tag returns `403 messaging.tag_not_enabled`, as before it was enabled. Send without `message_tag` inside the 24-hour window, or contact support.
-- **Misuse.** Misuse can pause HUMAN_AGENT on the connected account, revoke it for your SocialAPI account, and get the Instagram account restricted by Meta.
 
 ## Message types and sizes
 
@@ -250,7 +247,7 @@ Check these in order when an Instagram DM call fails:
 1. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `messages.read` to read a participant profile, and `messages.write` to send a message, a reaction, or a sender action.
 2. **`404 conversation.not_found`, `401 platform.instagram.auth`, `403 account.reconnection_required`.** `404 conversation.not_found`: no conversation has that id, or, on a send, the conversation belongs to another connected account than `account_id`. The other two mean the token is no longer valid and the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
 3. **`400 platform.instagram.window_closed`.** The messaging window is closed. Wait for the person to message the account, or, on Instagram Login with HUMAN_AGENT enabled, send a typed reply with `message_tag`.
-4. **`403 messaging.tag_not_enabled`, `422 messaging.tag_not_supported`, `400 messaging.human_agent_window_closed`, `429 messaging.tag_rate_limited`.** A HUMAN_AGENT send is not enabled, not allowed on this account, too late, or paused: see [Reply after 24 hours with HUMAN_AGENT](#reply-after-24-hours-with-human_agent).
+4. **`403 messaging.tag_not_enabled`, `422 messaging.tag_not_supported`, `400 messaging.human_agent_window_closed`.** A HUMAN_AGENT send is not enabled, not allowed on this account, or too late: see [Reply after 24 hours with HUMAN_AGENT](#reply-after-24-hours-with-human_agent).
 5. **`400 validation.*`.** The body is wrong. `error.meta.field` names the field. The codes are in [Send a message](/guides/direct-messages#send-a-message).
 6. **`422 platform.instagram.attachment_failed`.** Instagram could not fetch or accept an attachment. Check that the URL is public and the file matches [Message types and sizes](#message-types-and-sizes).
 7. **`422 platform.instagram.invalid_parameter`.** Instagram rejected a parameter, for example `reply_to_message_id` on Instagram Login. Retrying unchanged does not help.
