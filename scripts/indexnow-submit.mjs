@@ -1,10 +1,10 @@
 // Submits the docs pages changed by a push to IndexNow, once Mintlify has
 // deployed them. Port of landing-page/scripts/indexnow-submit.mjs.
 //
-// Mintlify stamps every sitemap <lastmod> with the deploy time, so a sitemap
-// diff would resubmit all pages on every deploy. The changed pages come from
-// git instead; the sitemap only tells us the deploy is live and which pages
-// Mintlify actually publishes.
+// Mintlify's sitemap <lastmod> values are build stamps, not page edit dates,
+// so a sitemap diff cannot find changed pages. They come from git instead; the
+// "Mintlify Deployment" check run on the commit says when they are live, and
+// the live sitemap says which files Mintlify actually publishes.
 //
 // Usage: node scripts/indexnow-submit.mjs <base-ref> <head-ref> [--dry-run]
 
@@ -95,29 +95,33 @@ async function get(url) {
 }
 
 /**
- * Polls the live sitemap until Mintlify has deployed `head`: every lastmod is
- * a deploy timestamp, so the newest one passing the commit time means live.
- * @param {string} commitIso commit time of head
- * @returns {Promise<Map<string, string> | null>}
+ * Polls the commit's "Mintlify Deployment" check run until it completes.
+ * Needs GITHUB_REPOSITORY and GITHUB_TOKEN (with checks: read).
+ * @param {string} sha
+ * @returns {Promise<boolean>} true once Mintlify reports a successful deploy
  */
-async function waitForDeploy(commitIso) {
-  const commitMs = Date.parse(commitIso);
+async function waitForDeploy(sha) {
+  const url = `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/commits/${sha}/check-runs?check_name=Mintlify%20Deployment`;
   const deadline = Date.now() + DEPLOY_WAIT_MS;
   while (Date.now() < deadline) {
     try {
-      const { ok, text } = await get(`${ORIGIN}/sitemap.xml`);
-      if (ok) {
-        const sitemap = parseSitemap(text);
-        const newest = Math.max(...[...sitemap.values()].map(Date.parse));
-        if (newest >= commitMs) return sitemap;
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      const run = response.ok ? (await response.json()).check_runs?.[0] : undefined;
+      if (run?.status === "completed") {
+        if (run.conclusion === "success") return true;
+        warn(`Mintlify deployment of ${sha} ended "${run.conclusion}"; nothing submitted`);
+        return false;
       }
     } catch {
       // Transient; poll again.
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }
-  warn(`deploy of ${commitIso} not seen in sitemap after ${DEPLOY_WAIT_MS / 60_000} min; nothing submitted`);
-  return null;
+  warn(`Mintlify deployment of ${sha} not done after ${DEPLOY_WAIT_MS / 60_000} min; nothing submitted`);
+  return false;
 }
 
 /** @param {string[]} urls */
@@ -167,11 +171,14 @@ async function main(argv) {
     return;
   }
 
-  // Dry runs check the current live sitemap instead of waiting for a deploy.
-  const sitemap = dryRun
-    ? parseSitemap((await get(`${ORIGIN}/sitemap.xml`)).text)
-    : await waitForDeploy(git("show", "-s", "--format=%cI", head).trim());
-  if (sitemap === null) return;
+  // Dry runs and manual runs (no GITHUB_TOKEN) skip the deploy wait.
+  if (!dryRun && process.env.GITHUB_TOKEN && !(await waitForDeploy(git("rev-parse", head).trim()))) return;
+  const live = await get(`${ORIGIN}/sitemap.xml`).catch(() => null);
+  if (!live?.ok) {
+    warn(`could not fetch ${ORIGIN}/sitemap.xml; nothing submitted`);
+    return;
+  }
+  const sitemap = parseSitemap(live.text);
 
   const urls = changedUrls(nameStatus, sitemap);
   if (urls.length === 0) {
