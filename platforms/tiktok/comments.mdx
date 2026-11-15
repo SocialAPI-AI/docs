@@ -1,0 +1,373 @@
+---
+title: TikTok comments
+sidebarTitle: "Comments"
+description: "List, reply to, hide, like, and delete the comments on a TikTok account's posts through SocialAPI, and receive comment.received webhook events."
+---
+
+SocialAPI reads the comments on a connected TikTok account's own posts and acts on them: reply to a comment, comment on a post, hide and unhide comments other people wrote, delete comments the connected account wrote, and like comments. A new comment from another person sends a `comment.received` webhook event. Comments work on the default TikTok connection: on a [creator connection](/platforms/tiktok#creator-connection), only the list of posts with their comment counts works, and the same holds for an account connected before 2026-10-13 until you reconnect it. The endpoints are the shared [Comments](/guides/comments) endpoints, and this page holds what is specific to TikTok.
+
+A public reply costs 1 interaction credit. Reading, hiding, deleting, and liking cost none.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/comments` | List the account's posts with their comment counts |
+| `GET` | `/v1/inbox/comments/{postId}` | List the comments on one post |
+| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to one comment |
+| `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or comment on the post |
+| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a comment another person wrote |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide that comment |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a comment the connected account wrote |
+| `POST` | `/v1/inbox/comments/{postId}/{commentId}/like` | Like a comment as the connected account |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/like` | Remove that like |
+
+SocialAPI does not send private replies on TikTok: `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` returns `501 resource.not_supported`.
+
+## Which accounts have comments
+
+- **Default connection only.** An account connected on or after 2026-10-13 with `connection_type: "business"`, or with no `connection_type`, has comments. On a [creator connection](/platforms/tiktok#creator-connection), `GET /v1/inbox/comments` lists the account's posts with their comment counts. Every other comment call returns `501 resource.not_supported`, and no `comment.received` event is sent.
+- **Accounts connected before 2026-10-13.** `GET /v1/inbox/comments` lists the account's posts with their comment counts. Every other comment call returns `501 resource.not_supported`, and no `comment.received` event is sent, until you reconnect the account: see [Connect an account](/platforms/tiktok#connect-an-account).
+- **Account permissions.** Listing comments and replies needs the `comments.read` [permission](/guides/permissions). Replying, commenting on a post, hiding, unhiding, deleting, liking, and unliking need `comments.write`. TikTok comments need no other permission. Without the one a call needs, the call returns `403 account.permission_missing`, and `error.meta.permission` names it. `GET /v1/inbox/comments` never returns this error: without `comments.read`, no new posts are added to its list, and removing `comments.read` empties the list.
+
+## Post and comment IDs
+
+- **`{postId}`** is the TikTok video ID. It is `targets[].platform_post_id` on a post you published through SocialAPI, and `id` in `GET /v1/inbox/comments`.
+- **`platform_id`** of a comment is `{video_id}_{comment_id}`, for example `7431982715038469413_7432015593081422625`.
+- **`id`** of a comment is its `sapi_cmt_` ID. Use `id` or `platform_id` as `{commentId}` and as `comment_id`.
+- **Bare TikTok comment IDs.** Hide, unhide, reply, and list replies need `id` or the full `platform_id`. A bare TikTok comment ID such as `7432015593081422625` returns `400 validation.comment_id_invalid`, with the value in `error.meta.comment_id`. Delete, like, and unlike accept a bare comment ID too.
+
+## List posts with comments
+
+`GET /v1/inbox/comments` lists the account's TikTok posts with their comment counts. Add `min_comments=1` to keep only posts that have comments. The other parameters are in [List posts with comments](/guides/comments#list-posts-with-comments).
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&min_comments=1" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "tiktok",
+      "id": "7431982715038469413",
+      "content": "Spring collection is live",
+      "thumbnail": "https://p16-sign-va.tiktokcdn.com/obj/cover.jpeg?x-expires=1792483200",
+      "permalink": "https://www.tiktok.com/@acmecorp/video/7431982715038469413",
+      "comment_count": 4,
+      "like_count": 0,
+      "published_at": "2026-10-12T09:00:00Z",
+      "created_at": "2026-10-12T09:15:00Z",
+      "updated_at": "2026-10-13T14:30:00Z"
+    }
+  ],
+  "pagination": { "has_more": false }
+}
+```
+
+- **Which posts.** The list holds the account's 20 most recent TikTok posts, plus older posts that were among its 20 most recent posts earlier or whose comments (without `q`, `order`, or `moderation_status`) or replies you listed. To read the comments on any other post of the account, call `GET /v1/inbox/comments/{postId}` with its video ID.
+- **`comment_count`** is TikTok's count for a post among the account's 20 most recent posts, and it can trail TikTok. After a post leaves those 20, its `comment_count` keeps its last value and goes up by 1 only for each comment or reply you send on it through SocialAPI. A post that is in the list only because you listed its comments or replies starts at `0`, and its `comment_count` goes up by 1 only for each comment or reply you send on it through SocialAPI. `GET /v1/inbox/comments/{postId}` returns the post's current comments.
+- **`like_count`** is `0`. Read a post's likes from [Sync videos](/platforms/tiktok#sync-videos).
+- **`thumbnail`** is a temporary link from TikTok. Download the image if you need it later.
+
+## List the comments on a post
+
+`GET /v1/inbox/comments/{postId}` lists the comments on one post, in TikTok's order. `account_id` is required.
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/7431982715038469413?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=30" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_K7QW3NRT8HXZ5MBV2YDLC9FJPAE4SG6U",
+      "platform_id": "7431982715038469413_7432015593081422625",
+      "platform": "tiktok",
+      "text": "Which colors does the jacket come in?",
+      "author_id": "MS4wLjABAAAAv7iSuuXDJGDvJkmH-vz1qkDZYo1apxgzaxdBSeIuPiM",
+      "author_name": "Jane Smith",
+      "author_username": "janesmith",
+      "author_picture": "https://p16-sign-va.tiktokcdn.com/avatar.jpeg?x-expires=1792483200",
+      "is_owner": false,
+      "like_count": 3,
+      "reply_count": 1,
+      "has_replies": true,
+      "liked_by_viewer": false,
+      "is_hidden": false,
+      "parent_id": null,
+      "created_at": "2026-10-13T14:30:00Z",
+      "capabilities": {
+        "can_reply": true,
+        "can_delete": false,
+        "can_hide": true,
+        "can_like": true,
+        "can_private_reply": false
+      }
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" }
+}
+```
+
+| Parameter | Description |
+|---|---|
+| `account_id` | Required. The connected account that owns the post |
+| `limit` | Comments per page. The default is 25. TikTok returns at most 30, so a value above 30 returns up to 30. A value of 0 or less, or one that is not an integer, returns `400 validation.field_invalid` |
+| `cursor` | The `next_cursor` of the previous page. Treat it as an opaque string |
+| `q`, `order`, `moderation_status` | Accepted with these values: `q` up to 256 bytes, `order` set to `recent` or `relevance`, `moderation_status` set to `published`, `held_for_review`, or `likely_spam`. Other values return `400 validation.field_invalid`. TikTok neither filters nor sorts by them. A `q`, an `order` other than `recent`, or a `moderation_status` other than `published` stops hidden comments from being added to the list: see [Hidden comments](#hidden-comments) |
+
+A page can hold fewer comments than `limit` while `pagination.has_more` is `true`, because TikTok leaves some comments out of a page. Follow `next_cursor` until `has_more` is `false`.
+
+The fields on TikTok:
+
+| Field | On TikTok |
+|---|---|
+| `author_id` | TikTok's unique identifier for the person, the same value as `author.id` in `comment.received` |
+| `author_name` | The person's display name, or the handle when TikTok gives no display name |
+| `author_username` | The person's TikTok handle |
+| `author_picture` | A temporary link from TikTok to the person's avatar |
+| `is_owner` | `true` when the connected account wrote the comment |
+| `liked_by_viewer` | `true` when the connected account liked the comment, in the TikTok app or through SocialAPI |
+| `is_hidden` | `true` on a hidden comment added as described in [Hidden comments](#hidden-comments). TikTok's list leaves other hidden comments out |
+| `parent_id` | `null` on a top-level comment. On a reply, the `platform_id` of the comment it answers |
+| `text` | The comment text. An image attached to a comment is not returned |
+
+`capabilities` on TikTok:
+
+| Key | Value |
+|---|---|
+| `can_reply` | Always `true` |
+| `can_delete` | `true` only on a comment the connected account wrote (`is_owner: true`) |
+| `can_hide` | `true` only on a comment another person wrote (`is_owner: false`) |
+| `can_like` | Always `true` |
+| `can_private_reply` | Always `false` |
+
+### Hidden comments
+
+TikTok leaves hidden comments out of its comment list. SocialAPI adds a hidden comment back at the end of the first page of results, with `is_hidden: true`, when all of these hold:
+
+1. The comment is a top-level comment that appeared in a `GET /v1/inbox/comments/{postId}` response sent without `q`, `order`, or `moderation_status` (or with their defaults) before it was hidden.
+2. You hid it with `POST /v1/inbox/comments/{postId}/{commentId}/hide`, or with the MCP tool `social_api_hide_comment` and its `post_id`.
+3. The first page of results has `pagination.has_more: false`.
+4. The request sends no `q`, and `order` and `moderation_status` are absent or set to `recent` and `published`.
+
+The added comments come on top of TikTok's items, so that page can hold more items than `limit`. Send `limit=30`, the largest page TikTok returns: if the first page still has `pagination.has_more: true`, no hidden comment is listed on any page.
+
+A comment hidden in the TikTok app, a reply you hid, and a comment hidden with `social_api_moderate_comment` or with `social_api_hide_comment` without `post_id` are not added back. A comment unhidden in the TikTok app or deleted stops being added. Keep a comment's `id` or `platform_id` when you hide it: where it is not listed, that ID is how you unhide it.
+
+## List the replies to a comment
+
+`GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the replies to one comment, in the same shape as comments. `{commentId}` is the comment's `id` or full `platform_id`.
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sapi_cmt_K7QW3NRT8HXZ5MBV2YDLC9FJPAE4SG6U/replies?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_P4LM8XWQ2TRC6HZN9BVKD3YFJGAE7SU5",
+      "platform_id": "7431982715038469413_7432019048813650720",
+      "platform": "tiktok",
+      "text": "Black, olive, and sand. All three are in the shop now.",
+      "author_id": "MS4wLjABAAAAq2Xb8nLw-Rk5cT1yVfJm3DzP0sUe9HgAiOt4KbNxWcE",
+      "author_name": "Acme Corp",
+      "author_username": "acmecorp",
+      "author_picture": "https://p16-sign-va.tiktokcdn.com/acme.jpeg?x-expires=1792483200",
+      "is_owner": true,
+      "like_count": 0,
+      "reply_count": 0,
+      "has_replies": false,
+      "liked_by_viewer": false,
+      "is_hidden": false,
+      "parent_id": "7431982715038469413_7432015593081422625",
+      "created_at": "2026-10-13T15:02:00Z",
+      "capabilities": {
+        "can_reply": true,
+        "can_delete": true,
+        "can_hide": false,
+        "can_like": true,
+        "can_private_reply": false
+      }
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" }
+}
+```
+
+`limit` defaults to 10, and TikTok returns at most 30 replies per page. TikTok does not list the replies to a hidden comment.
+
+## Reply to a comment or comment on a post
+
+`POST /v1/inbox/comments/{postId}` with `comment_id` replies to that comment as the connected account. Without `comment_id`, it adds a top-level comment to the post.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/comments/7431982715038469413 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "comment_id": "sapi_cmt_K7QW3NRT8HXZ5MBV2YDLC9FJPAE4SG6U",
+    "text": "Black, olive, and sand. All three are in the shop now."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "comment_id": "sapi_cmt_P4LM8XWQ2TRC6HZN9BVKD3YFJGAE7SU5"
+}
+```
+
+`comment_id` in the response is the new comment's `sapi_cmt_` ID.
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected account that replies |
+| `text` | Required. The reply text, up to 1,200 characters (TikTok's limit). Text only: a reply cannot carry an image |
+| `comment_id` | The comment to reply to, as its `id` or full `platform_id`. Omit it to comment on the post |
+
+- **Credit.** A reply or a comment on the post costs 1 interaction credit. When the plan's interaction allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. A `validation.*` error, such as `400 validation.comment_id_invalid`, gives the credit back: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
+- **Text over 1,200 characters.** TikTok refuses the reply, and the credit stays spent. `error.message` carries TikTok's reason: see [Errors](/guides/errors#tiktok).
+- **Repeated text.** TikTok can hide comments it flags as spam, such as many near-identical replies posted in a short time. Vary the text of automated replies.
+
+## Hide and unhide a comment
+
+`POST /v1/inbox/comments/{postId}/{commentId}/hide` hides a comment another person wrote. `DELETE` on the same path, with `account_id` as a query parameter, unhides it. Both return `{ "success": true }` and cost no credit.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sapi_cmt_K7QW3NRT8HXZ5MBV2YDLC9FJPAE4SG6U/hide \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```
+
+```bash
+curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sapi_cmt_K7QW3NRT8HXZ5MBV2YDLC9FJPAE4SG6U/hide?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+- **Who can be hidden.** Comments other people wrote. `can_hide` is `false` on the connected account's own comments, and TikTok refuses to hide them. `error.message` carries TikTok's reason: see [Errors](/guides/errors#tiktok). Delete them instead.
+- **Unhide can stay hidden.** TikTok can keep a comment hidden after a successful unhide when its own moderation, the person's privacy settings, or another TikTok filter hides it. List the post's comments to check.
+- **Finding a hidden comment again.** See [Hidden comments](#hidden-comments).
+
+## Delete a comment
+
+`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes a comment the connected account wrote. It returns `{ "success": true }`, costs no credit, and cannot be undone.
+
+```bash
+curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sapi_cmt_P4LM8XWQ2TRC6HZN9BVKD3YFJGAE7SU5?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+TikTok deletes only the connected account's own comments. `can_delete` is `false` on other people's comments, and TikTok refuses to delete them. `error.message` carries TikTok's reason: see [Errors](/guides/errors#tiktok). Hide those comments instead.
+
+## Like and unlike a comment
+
+`POST /v1/inbox/comments/{postId}/{commentId}/like` likes a comment as the connected account, with `account_id` in the body. `DELETE` on the same path, with `account_id` as a query parameter, removes the like. Both return `{ "success": true }` and cost no credit. `can_like` is `true` on every TikTok comment.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/comments/7431982715038469413/sapi_cmt_K7QW3NRT8HXZ5MBV2YDLC9FJPAE4SG6U/like \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```
+
+## What you cannot do on TikTok
+
+- **Private replies.** SocialAPI does not send private replies on TikTok: the call returns `501 resource.not_supported`. Reply publicly instead.
+- **Images.** SocialAPI sends replies as text only, and listed comments carry only their text, not an attached image.
+- **Editing a comment.** SocialAPI has no endpoint for it. Delete the comment and post a new one.
+- **Deleting another person's comment.** TikTok refuses the call. Hide the comment instead.
+- **Hiding the connected account's own comment.** TikTok refuses the call. Delete the comment instead.
+- **Replies to a hidden comment.** TikTok does not list them. Unhide the comment first.
+- **Comment actions on a creator connection.** Every comment call except `GET /v1/inbox/comments` returns `501 resource.not_supported`. Connect the account with the default connection: see [Creator connection](/platforms/tiktok#creator-connection).
+
+## Comment events
+
+SocialAPI sends `comment.received` when another person comments on, or replies under, a post of the connected TikTok account. The payload is the shared [Interaction](/guides/webhook-events#interaction-payload) shape. On TikTok:
+
+- **IDs.** `id` is the comment's `sapi_cmt_` ID, the same `id` that `GET /v1/inbox/comments/{postId}` returns. `platform_post_id` is the TikTok video ID. `post_id` and `permalink` are not set, and `metadata` is `null`.
+- **Author.** `author.id` is TikTok's unique identifier for the person. `author.name`, `author.username`, and `author.avatar_url` come from the comment.
+- **Content.** `content.text` is the comment text.
+- **Raw payload.** `raw_payload` holds TikTok's notification.
+- **Timing.** `comment.received` can arrive up to 5 minutes after the comment is posted, because TikTok reports new comments to apps with that delay.
+- **Not sent.** Comments written by the connected account, deletions, and changes to a comment's visibility. A comment deleted within 5 minutes of being posted can produce no event. Read `GET /v1/inbox/comments/{postId}` to catch comments the events missed.
+- **The same TikTok account connected more than once.** When more than one connected account holds the same TikTok account, each one with the `comments.read` permission receives its own event. An account without `comments.read` receives none.
+
+The payload and the other platforms are in [`comment.received`](/guides/webhook-events#comment-received).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Reply or comment text | 1,200 characters, TikTok's limit |
+| Comments per page | 30, plus any [hidden comments](#hidden-comments) added to the first page of results |
+| Replies per page | 30 |
+| Posts in `GET /v1/inbox/comments` | The 20 most recent posts, plus older posts that were among the 20 most recent earlier or whose comments (without `q`, `order`, or `moderation_status`) or replies you listed |
+| TikTok's request limit | TikTok's own request limit: 40 requests per minute for each account and each TikTok call, plus a limit on all calls made through SocialAPI's app, so this error can arrive below 40 per minute. `429 platform.tiktok.rate_limit`. Wait 5 minutes, then retry. If the error repeats after that, TikTok's daily limit is reached: retry after 00:00 UTC. See [TikTok limits](/platforms/tiktok#limits) |
+
+## Errors and debugging
+
+Check these in order when a TikTok comment call fails:
+
+1. **`501 resource.not_supported`.** The call is a private reply, or the account is a creator connection or was connected before 2026-10-13 (on those, only `GET /v1/inbox/comments` works).
+2. **`403 account.permission_missing`.** The account lacks `comments.read` or `comments.write`. `error.meta.permission` names it.
+3. **`400 validation.comment_id_invalid`.** A bare TikTok comment ID on hide, unhide, reply, or list replies. Send the comment's `id` or full `platform_id`.
+4. **`401 platform.tiktok.auth`, `403 account.reconnection_required`, `401 platform.tiktok.unauthorized`.** TikTok's authorization for the account ended or was refused: see [When TikTok authorization ends](/platforms/tiktok#when-tiktok-authorization-ends).
+5. **`403 platform.tiktok.40001`, `403 platform.tiktok.40118`, `403 platform.tiktok.40125`.** The account's authorization lacks a scope the call needs. Reconnect the account.
+6. **`404 resource.not_found`.** The post or the comment does not exist on TikTok, for example because it was deleted.
+7. **`400 platform.tiktok.40000`, `400 platform.tiktok.40002`.** TikTok refused a parameter. `error.message` carries TikTok's reason.
+8. **`429 platform.tiktok.rate_limit`, `429 validation.interaction_limit_exhausted`.** TikTok's request limit, or your plan's interaction allowance.
+9. **`503 platform.tiktok.api_error`, or a `platform.tiktok.*` code not listed above.** TikTok returned no usable answer, or refused the call for another reason. `error.message` describes the failure, with TikTok's reason when TikTok gave one. See [Errors](/guides/errors#tiktok).
+
+Every code is in [Errors](/guides/errors#tiktok), with the shared comment codes in [Inbox errors](/guides/errors#inbox-comments-messages-and-reviews).
+
+## Scopes
+
+| API key scope | Operations |
+|---|---|
+| `inbox:read` | List posts with comments, list comments, list replies |
+| `inbox:write` | Reply, comment on a post, hide, unhide, delete, like, unlike |
+
+On TikTok's consent screen, the connected account grants `comment.list` for reading comments and `comment.list.manage` for replying, hiding, liking, and deleting: see [TikTok scopes](/platforms/tiktok#scopes).
+
+## Use from an AI agent
+
+| Tool | What it does on TikTok |
+|---|---|
+| `social_api_list_inbox_posts` | Lists the account's posts with their comment counts |
+| `social_api_list_post_comments` | Lists the comments on one post, up to 30 per page plus any added hidden comments |
+| `social_api_get_comment_replies` | Lists the replies to one comment, up to 30 per page |
+| `social_api_reply_to_comment` | Replies to a comment, or comments on the post. The tool accepts up to 2,200 bytes of text, and TikTok accepts up to 1,200 characters |
+| `social_api_hide_comment`, `social_api_unhide_comment` | Hide or unhide a comment another person wrote. Pass `post_id` so a hidden comment is added back to the list |
+| `social_api_delete_comment` | Deletes a comment the connected account wrote |
+| `social_api_like_comment`, `social_api_unlike_comment` | Like or unlike a comment |
+| `social_api_moderate_comment` | Hides, unhides, or deletes a comment by its `sapi_cmt_` ID. A comment it hides is not added back to the list |
+
+`social_api_private_reply_to_comment` returns `resource.not_supported` on TikTok. The full list is in [MCP tools](/integrations/tools#comments).
+
+## Related
+
+- [TikTok API](/platforms/tiktok): capabilities, connection types, mentions, and scopes for TikTok
+- [TikTok publishing](/platforms/tiktok/publishing): publish the videos and photo posts that receive these comments
+- [Comments](/guides/comments): the shared comment endpoints and fields on every platform
+- [Webhook events](/guides/webhook-events#comment-received): the `comment.received` payload
+- [Account permissions](/guides/permissions): `comments.read` and `comments.write`
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit

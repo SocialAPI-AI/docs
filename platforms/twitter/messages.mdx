@@ -1,0 +1,265 @@
+---
+title: X / Twitter direct messages
+sidebarTitle: "Messages"
+description: List X direct message conversations, read their messages, and send text DMs through one API, with X's 30-day history, recipient rules, and rate limits.
+---
+
+SocialAPI lists the direct message (DM) conversations of a connected X account, reads their messages, and sends text replies. X DMs use the same endpoints as every other platform with DMs, and a send is text only. The cross-platform rules are in [Direct messages](/guides/direct-messages).
+
+A send costs 1 interaction credit. Reading costs no credits. X also bills every read and write to your own X developer app, because X connects through [your own X app](/platforms/twitter/own-app). X has no messaging window, but it delivers a DM only to a person who accepts DMs from the connected account. X sends no DM events, so new messages appear after a refresh: see [New messages](#new-messages).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/conversations?account_id={account_id}` | List the account's conversations |
+| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a text message |
+| `POST` | `/v1/inbox/sync` | Refresh the account's conversations, or one conversation's messages |
+| `GET` | `/v1/inbox/sync` | Read a sync's state |
+
+`{id}` is the conversation `id` from `GET /v1/inbox/conversations`. Reactions and sender actions (typing indicators, seen receipts) return `501 resource.not_supported` on X.
+
+## Your first message
+
+List the conversations of the X account:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "twitter",
+      "platform_id": "1402789345612345678-1580123456789012345",
+      "participant_id": "1402789345612345678",
+      "participant_name": "Jane Smith",
+      "participant_picture": "https://pbs.twimg.com/profile_images/1402789345612345678/jane_normal.jpg",
+      "last_message": "Is the blue one in stock?",
+      "last_message_at": "2026-10-13T14:30:00Z",
+      "status": "active",
+      "unread_count": 0,
+      "created_at": "2026-10-13T14:31:00Z",
+      "updated_at": "2026-10-13T14:31:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": "2026-10-13T14:31:00Z"
+}
+```
+
+Send a reply into that conversation:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Yes, the blue one ships today."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+  "message_ids": ["sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I"]
+}
+```
+
+`message_ids` holds the SocialAPI ID of the message sent. X delivers the DM to the person in `participant_id`. The fields of both responses are described in [Direct messages](/guides/direct-messages#conversations).
+
+## Conversations
+
+`GET /v1/inbox/conversations` lists conversations, most recent activity first. Add `platform=twitter` to list only X conversations. The parameters and fields are in [Conversations](/guides/direct-messages#conversations). On X:
+
+- **`platform_id`** is X's conversation ID. A conversation between 2 people has the form `{smaller_user_id}-{larger_user_id}`. A group conversation has a numeric ID.
+- **`participant_id`** is the X user ID of the member who sent the most recent message by anyone other than the connected account, as of when the conversation first appeared, and `participant_name` and `participant_picture` are that person's X name and profile picture. In a 1:1 conversation where only the connected account has written, `participant_id` is the other person's ID, and `participant_name` and `participant_picture` are empty. In a group conversation where no other member had written when it first appeared, `participant_id` is empty. It stays empty, and a send to that conversation returns `400 validation.participant_required`.
+- **`unread_count`** is always `0` on X, and `POST /v1/inbox/conversations/{id}/read` has no visible effect.
+- **30-day history.** X returns only the last 30 days of DMs. A conversation or message that is already more than 30 days old when SocialAPI first reads the account never appears.
+- **First list after connecting.** The list starts with the conversations in the account's 100 most recent DMs. An older conversation appears when someone sends a new message in it.
+
+## Read messages
+
+`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first. `limit` is 25 by default, and a value above 200 is treated as 200.
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages?limit=25" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "0e4d2f6a-5b1c-4c7e-9a3d-8f2b6c1d4e7a",
+      "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "platform_id": "1846204455667788990",
+      "direction": "incoming",
+      "text": "Is the blue one in stock?",
+      "sender_id": "1402789345612345678",
+      "sender_name": "Jane Smith",
+      "attachment_type": null,
+      "attachment_url": null,
+      "reply_to": null,
+      "created_at": "2026-10-13T14:30:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": "2026-10-13T14:31:00Z"
+}
+```
+
+The fields are described in [Read messages](/guides/direct-messages#read-messages). On X:
+
+- **Text only.** `attachment_type` and `attachment_url` are `null`, including on a message that carried an image or a video in X. `reply_to` is `null`.
+- **`sender_name`** is the sender's X name, not the `@` username.
+- **No delivery status.** X reports no delivery or read receipts, so `status` on a message sent through SocialAPI stays `pending`. A message the account sent in X has no `status`.
+- **History.** When SocialAPI first reads a conversation, its history starts with its 100 most recent messages from the last 30 days.
+
+## New messages
+
+X sends no DM events to SocialAPI, so a new conversation or message appears only after SocialAPI refreshes the inbox from X. Listing conversations can start a refresh, and `sync_state` shows it. To read new X messages right away, call [`POST /v1/inbox/sync`](/guides/inbox#refresh-the-inbox-manually):
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/sync \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067"
+  }'
+```
+
+- **With `account_id` only**, the sync refreshes the conversation list: new conversations, and each conversation's `last_message` and `last_message_at`.
+- **With `conversation_id` too**, the sync refreshes that conversation's messages. After you read a conversation's messages once, new messages in it appear in `GET /v1/inbox/conversations/{id}/messages` after a sync of that conversation.
+
+The first `GET /v1/inbox/conversations` after you connect the account waits for X and returns the account's conversations. The first `GET /v1/inbox/conversations/{id}/messages` on a conversation waits for X and returns up to `limit` of its most recent messages. Its older messages appear in later calls.
+
+Poll `GET /v1/inbox/sync` until `state` leaves `syncing`, then list again. A start while a sync of the same target is still running returns `202` with that sync, `state` `syncing`, and starts nothing new. Each target accepts 1 new sync you start every 5 minutes: another start within that time, once the running one has finished, returns `429 inbox.sync_rate_limited` with a `Retry-After` header. X bills your X app for the DMs each refresh reads.
+
+## Send a message
+
+`POST /v1/inbox/conversations/{id}/messages` sends a text DM to the person in the conversation's `participant_id`.
+
+| Field | On X |
+|---|---|
+| `account_id` | Required. The connected account that sends the message |
+| `text` | Required. The message text. A request with no `text`, no attachments, and no interactive content returns `400 validation.field_required`. Text made only of spaces returns `400 validation.text_required` |
+| `attachments`, `attachment_url` | Not supported: see [Attachments are refused](#attachments-are-refused) |
+| `quick_replies`, `buttons`, `cards`, `list_sections` | Ignored. X sends the `text` alone. Without `text`, the call returns `400 validation.text_required` |
+| `message_tag` | Not supported. Any value returns `422 messaging.tag_not_supported`, and nothing is sent |
+| `reply_to_message_id` | Ignored. The message is sent as an ordinary message |
+
+- **Cost.** A send costs 1 interaction credit. When the plan's allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. The credit comes back when the request fails with `429 platform.twitter.throttled`, or with a `validation.*` error before any message is sent: see [When a credit comes back](/guides/plans#when-a-credit-comes-back). Text X refuses as malformed returns `400 validation.field_required` with `error.meta.field` set to `request_body`, and the credit comes back. Every other `platform.twitter.*` code, `501 resource.not_supported`, and `404 resource.not_found` keep the credit. `422 messaging.tag_not_supported` is refused before any credit is charged.
+- **Who receives it.** X delivers a DM only to a person whose X message settings accept DMs from the connected account. When the person does not accept DMs from the account, X refuses the send and the call returns `501 resource.not_supported`. When the person's X account no longer exists, the call returns `404 resource.not_found`.
+- **Group conversations.** A send on a group conversation goes as a 1-to-1 DM to the member in `participant_id`, not to the group. When `participant_id` is empty, the call returns `400 validation.participant_required` and the credit comes back.
+- **No new conversations.** You send only into a conversation that `GET /v1/inbox/conversations` lists. SocialAPI has no endpoint to start an X conversation.
+
+### Attachments are refused
+
+X DMs sent through SocialAPI carry text only. SocialAPI sends the text first, then each attachment, and the first attachment fails the call with `400 validation.attachment_unsupported`. The result depends on what the request holds:
+
+- **Attachments only.** Nothing is sent, and the credit comes back.
+- **Text and attachments.** The text is delivered. The call then fails with `error.meta.sent_count` set to `1` and `error.meta.failed_index` set to `1`, and the credit is spent.
+
+To share a file, send its URL in `text`.
+
+## What X does not allow
+
+| Action | Result |
+|---|---|
+| Send an image, video, GIF, or file | `400 validation.attachment_unsupported`. Send a link in `text` |
+| Quick replies, buttons, cards, or list menus | Ignored. The text is sent alone |
+| React to a message | `501 resource.not_supported` |
+| Typing indicator or seen receipt | `POST /v1/inbox/conversations/{id}/sender-action` returns `501 resource.not_supported`. `POST /v1/inbox/conversations/{id}/read` has no visible effect on X |
+| Send with `message_tag` | `422 messaging.tag_not_supported` |
+| Message the whole group | A send goes to 1 member, as described in [Send a message](#send-a-message) |
+| Start a conversation with a new person | No endpoint |
+| Read DMs that are more than 30 days old when SocialAPI first reads the account | Never returned |
+| Answer DMs automatically | [Automations](/guides/automations) do not run on X: creating one returns `422 automation.platform_unsupported` |
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Conversations per page | Default 25, up to 100 |
+| Messages per page | Default 25, up to 200 |
+| DM history | DMs already more than 30 days old when SocialAPI first reads the account never appear |
+| Messages per conversation | History starts with the 100 most recent, from the last 30 days |
+| Text through the MCP tool `social_api_send_dm` | 1,000 bytes |
+| X's DM read limit | 15 requests per 15 minutes for each connected account |
+| X's DM send limits | 15 per 15 minutes and 1,440 per 24 hours for each connected account. X also lists a per-app limit of 1,440 per 24 hours |
+| X credits and spending cap | Your X app out of credits, or at its spending limit, returns `402 platform.twitter.usage_capped`. Add credits in the X Developer Console |
+
+Past one of X's rate limits, the call returns `429 platform.twitter.rate_limit`, with a `Retry-After` header when X reports when the limit resets. The same code is returned when X is temporarily unavailable. See [Rate limits](/guides/rate-limits).
+
+## Errors and debugging
+
+Check these in order when an X DM call fails:
+
+1. **`401`, `403 auth.insufficient_scope`.** The API key is invalid, or a scoped key lacks `dms:send`.
+2. **`404 conversation.not_found`, `404 account.not_found`, `403 account.reconnection_required`, `401 platform.twitter.auth`, `401 platform.twitter.unauthorized`.** The conversation is not yours or belongs to another connected account than `account_id`, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account). `401 platform.twitter.unauthorized` leaves the account working: if it persists, reconnect.
+3. **`412 byok.app_access_denied`, `401 byok.credentials_invalid`.** X refused your X app access to its API, or rejected the app credentials saved in SocialAPI. Fix the app as in [Use your own X app](/platforms/twitter/own-app#troubleshooting), then reconnect the account.
+4. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `messages.write` to send, `messages.read` to start or read a sync. `error.meta.permission` names it.
+5. **`403 platform.twitter.insufficient_scope`.** The X connection lacks `dm.read` or `dm.write`. Check the app permissions in [Use your own X app](/platforms/twitter/own-app), then reconnect the account.
+6. **`400 validation.field_required`, `400 validation.text_required`, `400 validation.attachment_unsupported`, `400 validation.participant_required`, `422 messaging.tag_not_supported`.** The request holds something X DMs cannot send: see [Send a message](#send-a-message).
+7. **`501 resource.not_supported`.** The person does not accept DMs from the account, or the call is a reaction or a sender action.
+8. **`404 resource.not_found`.** The person's X account no longer exists.
+9. **`402 platform.twitter.usage_capped`.** Your X app is out of credits or at its spending limit.
+10. **`429 validation.interaction_limit_exhausted`, `429 platform.twitter.rate_limit`, `429 platform.twitter.throttled`.** `validation.interaction_limit_exhausted`: your plan's interaction allowance is used up until the next billing period. Upgrade the plan to send now. `platform.twitter.rate_limit`: X's own limit. Wait for the `Retry-After` header when it is present. `platform.twitter.throttled`: X refused this account with its own rate limit, and SocialAPI refuses its calls until the wait ends. Wait for the `Retry-After` header.
+
+When a conversation or a message is missing, check that it was less than 30 days old when SocialAPI first read the account, then start a sync as in [New messages](#new-messages). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `dms:read` | List and get conversations, list messages, start or read an inbox sync |
+| `dms:send` | Send a message |
+
+The X connection needs `dm.read` to read DMs and `dm.write` to send them, on top of `tweet.read` and `users.read`. Your X app needs the **Direct message** app permission for X to grant them. The full list is in [X scopes](/platforms/twitter#scopes).
+
+## Events
+
+X sends no DM events, so SocialAPI emits no `dm.received`, `dm.sent`, or `dm.status.*` events for X. Read new messages as described in [New messages](#new-messages).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_conversations` | List conversations, most recent activity first |
+| `social_api_get_conversation` | Get one conversation |
+| `social_api_list_messages` | List the messages of a conversation, newest first |
+| `social_api_send_dm` | Send a text message. The text is 1,000 bytes at most. Quick replies and buttons are ignored on X |
+| `social_api_update_conversation` | Archive a conversation, or set it back to `active` |
+| `social_api_mark_conversation_read` | Mark a conversation as read in SocialAPI |
+
+No MCP tool starts an inbox sync. The tool list is in [MCP tools](/integrations/tools#direct-messages).
+
+## Related
+
+- [X / Twitter API](/platforms/twitter): capabilities, connect rules, limits, and scopes for X
+- [X / Twitter comments](/platforms/twitter/comments): list and answer the replies to your X posts
+- [Direct messages](/guides/direct-messages): the cross-platform DM endpoints and fields
+- [Unified inbox](/guides/inbox#refresh-the-inbox-manually): start and poll an inbox sync
+- [Use your own X app](/platforms/twitter/own-app): the X app and its Direct message permission
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit

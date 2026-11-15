@@ -29,15 +29,16 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 | Delete a published post | Partial | Instagram Login: `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the Instagram target, and the post stays live. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported`. Delete the post in the Instagram app. [Facebook Login](#connect-through-facebook-login): `DELETE /v1/posts/{pid}` deletes the post from Instagram, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI |
 | List posts | Yes | Posts, Reels, and carousels |
 | List active stories | Yes | Only stories that are live now |
-| List comments and replies | Yes | Comments are read per post |
-| Reply to a comment | Yes | |
+| List comments and replies | Yes | Comments are read per post. See [Instagram comments](/platforms/instagram/comments) |
+| Reply to a comment | Yes | Replies nest one level deep |
 | Hide, unhide, delete a comment | Yes | |
 | Like a comment | Partial | Instagram Login: `501 resource.not_supported`, and `can_like` is `false` on every comment. [Facebook Login](#connect-through-facebook-login): yes, and `can_like` is `true` |
-| Private reply to a comment | Yes | One per comment, within 7 days of the comment |
-| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text, attachments, quick replies, buttons, cards |
+| Private reply to a comment | Yes | One per comment, within 7 days of the comment. See [Send a private reply](/platforms/instagram/comments#send-a-private-reply) |
+| DMs: list, read, send | Yes | Inside the 24-hour messaging window. Text, attachments, quick replies, buttons, cards. See [Instagram direct messages](/platforms/instagram/messages) |
+| Reply to a DM after 24 hours (`HUMAN_AGENT`) | Conditional | Instagram Login only, once enabled for your SocialAPI account. Facebook Login returns `422 messaging.tag_not_supported`. See [Reply after 24 hours with HUMAN_AGENT](/platforms/instagram/messages#reply-after-24-hours-with-human_agent) |
 | React to a DM | Yes | |
 | Unsend or delete a DM | No | Only the Instagram app can |
-| Messaging participant profile | Yes | Only for a person who messaged the account or tapped an icebreaker or the persistent menu |
+| Messaging participant profile | Yes | Only for a person who messaged the account or tapped an icebreaker or the persistent menu. See [Participant profile](/platforms/instagram/messages#participant-profile) |
 | Mentions | Partial | `GET /v1/accounts/{id}/mentions` returns media the account is tagged in. Caption and comment @mentions arrive as `mention.received` events only |
 | Reply to a mention | Yes | |
 | Reviews | No | Instagram has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
@@ -137,7 +138,7 @@ Hold each Instagram account through one path. Connecting through Facebook Login 
 | Instagram accounts per connection | One | Every account the login administers, each as a Page of the brand's Instagram account |
 | Delete a published post | No | Yes: `DELETE /v1/posts/{pid}` deletes it, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI |
 | Like a comment | No | Yes |
-| `message_tag: "HUMAN_AGENT"` on a DM | Extends the window to 7 days | Not sent: the DM goes out untagged and the 24-hour window applies |
+| `message_tag: "HUMAN_AGENT"` on a DM | Replies up to 7 days after the person's last message, once enabled for your SocialAPI account | `422 messaging.tag_not_supported`. The 24-hour window applies |
 | `content_type` on a post | Required | Optional. `stories` and `carousel` apply as given. Otherwise, including `feed` and `reel`, the media decides: one video publishes as a Reel, one image as a feed post, 2 or more items as a carousel |
 | Paid-partnership label | Either key fails validation | `platform_data.is_paid_partnership` (`true` or `false`) and `platform_data.branded_content_sponsor_ids` (1 or 2 numeric Instagram account IDs) |
 | Scope names | `instagram_business_*` | `instagram_*` and `pages_*` |
@@ -168,61 +169,15 @@ The account stays limited to the permissions you selected: an account connected 
 
 ## Comments
 
-List comments on a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID (`targets[].platform_post_id`). Reply, hide, unhide, and delete work as described in [Comments](/guides/comments). Instagram-specific rules:
+SocialAPI lists the comments on an Instagram post, replies in public, sends a private reply to the person who commented, and hides, unhides, and deletes comments. Liking a comment needs [Facebook Login](#connect-through-facebook-login). The endpoints, private-reply rules, limits, and errors are in [Instagram comments](/platforms/instagram/comments).
 
-- On Instagram Login, a comment's `capabilities.can_like` is always `false`, because Instagram has no like endpoint for comments on that path. On [Facebook Login](#connect-through-facebook-login) it is `true`.
+## Direct messages
 
-## Private replies
-
-A private reply sends a DM to the person who commented. Send it with `POST /v1/inbox/comments/{postId}/{commentId}/private-reply`.
-
-- Instagram allows one private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.instagram.private_reply_ineligible`.
-- A private reply does not open the 24-hour messaging window: the person's answer does.
-- The request accepts up to 3 `buttons`, sent as a button template.
-- An [Automation](/guides/automations) can send the private reply whenever a comment matches its keywords.
-
-## Direct messages and the messaging window
-
-An Instagram account can message a person only inside the 24-hour messaging window that the person's last message opened. Outside it, the send returns `400 platform.instagram.window_closed`. On Instagram Login, send `message_tag: "HUMAN_AGENT"` to reply up to 7 days after the person's last message. Instagram Login accepts no other tag: any other value returns `400 validation.invalid_message_tag`. On [Facebook Login](#connect-through-facebook-login), `message_tag` is not sent: the DM goes out untagged and the 24-hour window applies.
-
-- **Message types.** Text, attachments, quick replies, buttons, and cards. Each attachment in `attachments[]` has a `source_type` (`url`, `media_id`, or `platform_attachment_id`) and a `type`. `type` is required for `platform_attachment_id`, or the request returns `400 validation.attachment_type_required`. Field rules are in [Direct messages](/guides/direct-messages).
-- **Size limits.** Instagram sets them and refuses a larger message: text up to 1,000 bytes of UTF-8; images in PNG or JPEG up to 8 MB; video in MP4, OGG, AVI, MOV, or WebM up to 25 MB; audio in AAC, M4A, WAV, or MP4 up to 25 MB; files in PDF up to 25 MB.
-- **Unsending.** Instagram does not let apps unsend or delete a sent DM. When the other person unsends a message, you receive a `dm.deleted` event and the message disappears from the conversation.
-- **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` reacts to a message with any emoji, and `DELETE` on the same path removes the reaction.
-- **Typing and seen.** `POST /v1/inbox/conversations/{id}/sender-action` shows a typing indicator (`typing_on`, `typing_off`) or marks the person's messages seen (`mark_seen`). See [Typing indicators and seen receipts](/guides/direct-messages#typing-indicators-and-seen-receipts).
-- **Story mentions.** A story that mentions your account arrives as `dm.received` with an attachment of type `story_mention`, not as `mention.received`.
-
-### Participant profile
-
-`GET /v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile` returns the profile of a person in a conversation, including whether they follow the account (`is_user_follow_business`) and whether the account follows them (`is_business_follow_user`). `participantId` is the `participant_id` of the conversation.
-
-```bash
-curl "https://api.social-api.ai/v1/platforms/instagram/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/participants/2287522528728101/profile" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-Response (HTTP 200):
-
-```json
-{
-  "id": "2287522528728101",
-  "username": "janedoe",
-  "name": "Jane Doe",
-  "profile_pic": "https://scontent.cdninstagram.com/v/.../profile.jpg",
-  "follower_count": 310,
-  "is_user_follow_business": true
-}
-```
-
-- Read the follow fields at each call, because they change when a person unfollows.
-- `profile_pic` links expire: do not store them.
-- Instagram discloses a profile only for a person who messaged the account or tapped an icebreaker or the persistent menu. For anyone else the call returns `403 platform.instagram.230`, which means Instagram withholds the data. It does not mean the person does not follow the account.
-- A field that Instagram has no value for, such as `name`, is absent.
-- `is_verified_user`, `is_user_follow_business`, and `is_business_follow_user` are absent when `false`, and `follower_count` is absent when it is `0`. An absent follow flag means the person does not follow in that direction, or Instagram did not report it: the response does not tell the two apart. When Instagram withholds the relationship because the person has not given consent, the call returns `403 platform.instagram.230` instead.
+SocialAPI lists the DM conversations of an Instagram account, reads their messages, and sends text, attachments, and interactive messages inside the 24-hour messaging window. It also reacts to messages, sends typing indicators and seen receipts, and reads the profile of a person in a conversation. The messaging window, `HUMAN_AGENT`, message sizes, and errors are in [Instagram direct messages](/platforms/instagram/messages).
 
 ## Mentions
 
-`GET /v1/accounts/{id}/mentions` returns media in which another account tagged yours. An @mention written in a caption or a comment is not in that list: it arrives as a `mention.received` event, with `metadata.mention_type` set to `comment` or `caption`. Reply to a mention with `POST /v1/accounts/{id}/mentions/reply`. A story mention arrives as a DM: see [Direct messages](#direct-messages-and-the-messaging-window). Details are in [Mentions](/guides/mentions).
+`GET /v1/accounts/{id}/mentions` returns media in which another account tagged yours. An @mention written in a caption or a comment is not in that list: it arrives as a `mention.received` event, with `metadata.mention_type` set to `comment` or `caption`. Reply to a mention with `POST /v1/accounts/{id}/mentions/reply`. A story mention arrives as a DM: see [Incoming messages](/platforms/instagram/messages#incoming-messages). Details are in [Mentions](/guides/mentions).
 
 ## Stories
 
@@ -331,7 +286,7 @@ Instagram accounts emit these events to your webhook endpoints. Payloads are in 
 | `dm.sent` | A message left the account, including one sent from the Instagram app |
 | `dm.deleted` | A person unsent a message |
 | `dm.referral` | A person opened a conversation from an ad or referral link without sending a message |
-| `dm.postback` | A person tapped a quick reply or a button |
+| `dm.postback` | A person tapped a quick reply or a `postback` button |
 | `dm.status.sent` | Instagram accepted a DM you sent |
 | `dm.status.read` | A person read a DM you sent. Instagram sends no delivery receipts, so there is no `dm.status.delivered` |
 | `account.connected` | You finished connecting or reconnecting the account |
@@ -347,8 +302,7 @@ Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitte
 |---|---|
 | Caption | 2,200 characters, 30 hashtags, 20 mentions |
 | Carousel | 2 to 10 items |
-| Posts | 45 per 24 hours and 25 per hour for each account. Instagram's own cap is 50 per rolling 24 hours: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
-| Private reply | 1 per comment, within 7 days |
+| Posts | 45 per 24 hours and 25 per hour for each Instagram account, including each Instagram account under a Facebook Login connection. Instagram's own cap is 50 per rolling 24 hours: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 | Instagram's own rate limit | `429 platform.instagram.rate_limit`. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 
 `GET /v1/accounts/{id}/limits` returns `posts_remaining`, the posts left in Instagram's rolling 24 hours.
@@ -370,7 +324,8 @@ Instagram asks for comments and for messages as 1 scope each, covering both read
 ## Related
 
 - [Instagram publishing](/platforms/instagram/publishing): fields, media rules, and quirks for publishing
+- [Instagram comments](/platforms/instagram/comments): replies, private replies, and moderation
+- [Instagram direct messages](/platforms/instagram/messages): the messaging window, HUMAN_AGENT, and participant profiles
 - [Connect accounts](/guides/connect-accounts): the shared connect flow
 - [Automations](/guides/automations): comment-to-DM and the Follow gate
 - [Platforms](/platforms/overview): the capability matrix
-- [Errors](/guides/errors): every error code

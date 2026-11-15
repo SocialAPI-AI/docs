@@ -1,0 +1,243 @@
+---
+title: LinkedIn comments
+sidebarTitle: "Comments"
+description: List, reply to, like, and delete LinkedIn comments on company Page posts, and reply to, like, and delete comments as a LinkedIn member profile.
+---
+
+SocialAPI reads and answers the comments on LinkedIn posts through the same [comments endpoints](/guides/comments) as every other platform. What you can do depends on the connected account's `connection_type`:
+
+| Action | Company Page (`organization`) | Member profile (`profile`) |
+|---|---|---|
+| List posts with comments | Yes | Partial: only posts published through SocialAPI |
+| List comments and replies | Yes | No: `501 resource.not_supported` |
+| Reply, or comment on a post | Yes | Yes |
+| Like and unlike a comment | Yes | Yes |
+| Delete a comment | Yes | Yes |
+| Hide and unhide a comment | No: `501 resource.not_supported` | No: `501 resource.not_supported` |
+| Private reply | No: `501 resource.not_supported` | No: `501 resource.not_supported` |
+
+A member profile cannot list comments: LinkedIn grants read access to a member's comments only to apps it selects, and SocialAPI's app does not have that access. A company Page account replies, likes, and deletes as the Page, and a member profile as the member. A reply, or a top-level comment on a post, costs 1 interaction credit. Listing, liking, and deleting cost no credits.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/comments` | List the account's posts with their comment counts: see [Posts with comments](#posts-with-comments) |
+| `GET` | `/v1/inbox/comments/{postId}` | List the comments on one post. Company Page only |
+| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to one comment. Company Page only |
+| `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or comment on the post |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a comment |
+| `POST` | `/v1/inbox/comments/{postId}/{commentId}/like` | Like a comment as the connected account |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/like` | Remove that like |
+
+`{postId}` is the LinkedIn post URN, for example `urn:li:share:7251234567890123456`. It is `targets[].platform_post_id` on a post you published through SocialAPI, or `id` in `GET /v1/inbox/comments`. Put the URN in the path as it is, not URL-encoded, and put a comment URN in the path the same way. `{commentId}` and `comment_id` accept the comment's `sapi_cmt_` ID or its LinkedIn comment URN: see [Comment IDs](#comment-ids).
+
+## List the comments on a company Page post
+
+`GET /v1/inbox/comments/{postId}` lists the top-level comments on a post of a company Page. `account_id` is required.
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/urn:li:share:7251234567890123456?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "platform_id": "urn:li:comment:(urn:li:activity:7251234567891000000,7252345678901234567)",
+      "platform": "linkedin",
+      "text": "Congratulations to the whole team!",
+      "author_id": "urn:li:person:8fA3kLm2Qx",
+      "author_name": "Jane Doe",
+      "author_username": "",
+      "author_picture": "",
+      "author_headline": "Head of Marketing at Example Inc",
+      "author_profile_url": "https://www.linkedin.com/in/janedoe",
+      "is_owner": false,
+      "like_count": 3,
+      "reply_count": 0,
+      "has_replies": true,
+      "liked_by_viewer": false,
+      "is_hidden": false,
+      "parent_id": null,
+      "created_at": "2026-10-13T14:30:00Z",
+      "capabilities": {
+        "can_reply": true,
+        "can_delete": true,
+        "can_hide": false,
+        "can_like": true,
+        "can_private_reply": false
+      }
+    }
+  ],
+  "pagination": { "has_more": true, "next_cursor": "25" }
+}
+```
+
+The fields are described in [List comments and replies](/guides/comments#list-comments-and-replies). On LinkedIn they read as follows:
+
+| Field | On LinkedIn |
+|---|---|
+| `platform_id` | The comment URN, `urn:li:comment:(urn:li:activity:...,...)` |
+| `author_id` | The commenter's URN: `urn:li:person:...` for a member, `urn:li:organization:...` for a company Page |
+| `author_name` | The member's name or the company Page's name. Empty for a member who limits the visibility of their profile outside LinkedIn, unless that member connected the account. Can be empty for a company Page the connected account does not administer |
+| `author_username` | Always empty |
+| `author_picture` | The commenting company Page's logo. Can be empty for a company Page the connected account does not administer. Always empty for a member |
+| `author_headline` | The member's LinkedIn headline. Absent when there is none |
+| `author_profile_url` | `https://www.linkedin.com/in/{vanity name}` for a member, `https://www.linkedin.com/company/{vanity name}` for a company Page. Absent when there is none. Can be absent for a company Page the connected account does not administer |
+| `is_owner` | `false` on every top-level comment, including the account's own. In a replies list, `true` on a reply the account posted through SocialAPI. To find the account's own comments, compare `author_id` with the account's URN (`urn:li:organization:...` for a company Page), which is `platform_account_id` in [the login's profile list](/platforms/linkedin#connect-more-profiles-and-pages-from-a-login) |
+| `reply_count` | Always 0. Read `has_replies` |
+| `has_replies` | `true` when the comment has replies |
+| `liked_by_viewer` | `true` when the company Page liked the comment, through SocialAPI or on LinkedIn, or when the member who connected the Page liked it as themselves. LinkedIn lists only a sample of a comment's likers, so a like the Page made on LinkedIn is not always reflected. A like made through SocialAPI and later removed on LinkedIn can still read `true` |
+| `is_hidden` | Always `false`: LinkedIn has no hidden comments |
+| `parent_id` | Always `null`, on replies too. A reply belongs to the comment whose replies you listed |
+| `capabilities` | `can_reply`, `can_delete`, and `can_like` are `true`. `can_hide` and `can_private_reply` are `false` |
+
+The 3 filter parameters `moderation_status`, `order`, and `q` have no effect on LinkedIn. A post with no comments, and a post ID LinkedIn does not know, both return an empty `data` array, not `404`. The comment and reply lists can show a change up to 5 minutes late, whether the change was made on LinkedIn or through SocialAPI: a new comment or reply, a deletion, or a like.
+
+### Pagination
+
+Pass `next_cursor` back as `cursor` until `has_more` is `false`. Treat the cursor as an opaque string. `limit` is 25 comments or 10 replies by default, up to 100. A value above 100 is treated as 100: see [Pagination](/guides/pagination#fetch-every-page).
+
+### Replies
+
+`GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the replies to one comment, in the same shape. LinkedIn nests comments 1 level deep: a top-level comment has replies, and a reply has no replies of its own.
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/urn:li:share:7251234567890123456/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I/replies?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+## Posts with comments
+
+`GET /v1/inbox/comments?account_id={id}` returns the account's posts with `comment_count`. On a company Page, the list holds the Page's posts, including posts made outside SocialAPI. On a member profile, the list holds only the posts published through SocialAPI, and `comment_count` counts the replies and top-level comments posted through SocialAPI, and does not go down when one is deleted. On LinkedIn posts, `thumbnail` is `null` and `like_count` is 0. `permalink` is the post's LinkedIn URL for a post published through SocialAPI, and `null` for a post made on LinkedIn. The parameters are in [List posts with comments](/guides/comments#list-posts-with-comments).
+
+## Reply to a comment
+
+`POST /v1/inbox/comments/{postId}` posts a public reply as the company Page or as the member. Both connection types can reply.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/urn:li:share:7251234567890123456" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "comment_id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "text": "Thank you, Jane! We are proud of the team."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "comment_id": "sapi_cmt_7Q2KDWZ9SFN4RAHB6GXEM3YLTPV1C5UJ"
+}
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected LinkedIn account that replies |
+| `text` | Required. The reply, as plain text. A missing value returns `400 validation.field_required` |
+| `comment_id` | The comment to reply to. Omit it to add a top-level comment to the post |
+
+`comment_id` in the response is the new reply's `sapi_cmt_` ID. Use it to like or delete the reply later.
+
+- **Reply to the top-level comment.** LinkedIn nests comments 1 level deep. To answer a reply, set `comment_id` to the top-level comment that holds it.
+- **Text only.** A reply carries no image, and SocialAPI has no endpoint to edit a reply once posted.
+- **No mentions.** The `@[Name](urn:li:person:...)` mention syntax of [LinkedIn publishing](/platforms/linkedin/publishing) does not apply to replies: SocialAPI sends the reply text to LinkedIn exactly as you wrote it.
+- **Cost.** A reply, or a top-level comment on a post, costs 1 interaction credit. When the plan's interaction allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. A reply that fails with a `validation.*` error gives the credit back: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
+- **LinkedIn's rate limit.** LinkedIn limits how many comments one member creates per minute. Past it, the call returns `429 platform.linkedin.rate_limit`.
+
+## Like and delete a comment
+
+`POST /v1/inbox/comments/{postId}/{commentId}/like` likes a comment as the connected account, and `DELETE` on the same path removes the like. `DELETE /v1/inbox/comments/{postId}/{commentId}` deletes the comment on LinkedIn and cannot be undone. Each returns `{ "success": true }`. `account_id` goes in the body for the `POST`, and in the query for both `DELETE` calls.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/urn:li:share:7251234567890123456/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I/like" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```
+
+```bash
+curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/urn:li:share:7251234567890123456/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+`can_delete` is `true` on every LinkedIn comment, and LinkedIn decides which comments the account can delete. When LinkedIn refuses, the call returns `403 platform.linkedin.access_denied`, and retrying does not help. A comment ID that does not start with `sapi_` and is not a LinkedIn comment URN returns `400 validation.comment_urn` on delete. Liking, unliking, and deleting cost no credits.
+
+## Comment IDs
+
+A LinkedIn comment has 2 IDs, and every endpoint above accepts both:
+
+- **`id`**, the `sapi_cmt_` ID SocialAPI returns in lists and in the reply response.
+- **`platform_id`**, LinkedIn's comment URN: `urn:li:comment:(urn:li:activity:{activity ID},{comment ID})`.
+
+A member profile cannot list comments, so it acts on the comments whose IDs it already holds: the `comment_id` of each reply it posted, and comment URNs taken from LinkedIn. A URN you build yourself must use the `urn:li:activity:` form. On a reply or a like, LinkedIn refuses a comment URN built on a `urn:li:share:` ID, and the call returns `400 validation.field_required` with `meta.field` set to `request_body`. ID rules for every platform are in [IDs](/guides/ids#what-each-endpoint-accepts).
+
+## What LinkedIn does not allow
+
+- **Hide and unhide.** LinkedIn has no hidden comments. `POST` and `DELETE` on `/v1/inbox/comments/{postId}/{commentId}/hide` return `501 resource.not_supported`. Delete the comment instead.
+- **Private replies.** LinkedIn has no private reply to a commenter. `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` returns `501 resource.not_supported`, or `400 validation.field_not_supported` when the request carries `attachment`. LinkedIn direct messages are not available either.
+- **Reading comments as a member profile.** On a member profile, listing comments or replies returns `501 resource.not_supported`. Connect the company Page to read the comments on its posts.
+- **Comment events.** SocialAPI sends no `comment.received` event for LinkedIn. List the comments on a company Page post to find new ones. Comments that mention the company Page come through [Mentions](/guides/mentions) and the `mention.received` event: see the Mentions row in [LinkedIn capabilities](/platforms/linkedin#capabilities).
+
+## Errors and debugging
+
+Check these in order when a LinkedIn comment call fails. The shared checks are in [Comments](/guides/comments#errors-and-debugging), and every code is in [Errors](/guides/errors).
+
+1. **`501 resource.not_supported`.** The call lists comments or replies on a member profile, hides, unhides, or sends a private reply. Connect the company Page to list its comments, and delete a comment instead of hiding it. Hiding or unhiding on an account without `comments.write` returns `403 account.permission_missing` instead.
+2. **`401 platform.linkedin.auth`.** LinkedIn rejected the token, and the account is now `token_expired`. Reconnect it: see [LinkedIn](/platforms/linkedin#connect-an-account). `401 platform.linkedin.unauthorized` leaves the account usable: retry, and reconnect if it persists.
+3. **`403 platform.linkedin.access_denied`.** LinkedIn refused the action for this account, for example a delete it does not allow. Reconnecting does not change it. Read `message`.
+4. **`404 account.not_found` on an account you hold.** LinkedIn refused the action without naming a reason. On a company Page, check that the member who connected it still administers it. Then reconnect the account.
+5. **`400 validation.comment_urn`, `400 validation.id_invalid`.** On a delete, a comment ID that does not start with `sapi_` and is not a LinkedIn comment URN returns `validation.comment_urn`. On any call, a malformed `sapi_` ID returns `validation.id_invalid`. Send the `sapi_cmt_` ID or the `platform_id` from a list.
+6. **`400 validation.field_required` with `meta.field` set to `request_body`.** LinkedIn rejected the request as malformed, for example a reply or a like on a comment URN built on a `urn:li:share:` ID. Use the `urn:li:activity:` form: see [Comment IDs](#comment-ids).
+7. **`404 resource.not_found`.** LinkedIn does not know the comment or the post on a reply, like, or delete, for example because it was deleted on LinkedIn.
+8. **`429 platform.linkedin.rate_limit`.** LinkedIn's rate limit, or LinkedIn being temporarily unavailable. Back off and retry.
+9. **`platform.linkedin.api_error`.** LinkedIn returned an error that has no specific code. When LinkedIn gives a reason, `error.message` carries it. Retry later, and stop if it repeats.
+
+## Permissions and scopes
+
+Each operation needs an account [permission](/guides/permissions) on the connected account. The LinkedIn scopes behind each permission are in [LinkedIn scopes](/platforms/linkedin#scopes).
+
+| Operation | Account permission | API key scope |
+|---|---|---|
+| List posts with comments | None. On a company Page without `comments.read`, the list holds only the posts published through SocialAPI while the account lacks `comments.read`. Removing `comments.read` deletes the posts already in the list, including posts published through SocialAPI: see [Removing a permission deletes data](/guides/permissions#removing-a-permission-deletes-data) | `inbox:read` |
+| List comments, list replies | `comments.read` (company Page only) | `inbox:read` |
+| Reply, like, unlike, delete, and hide or unhide (which then returns `501`) | `comments.write` | `inbox:write` |
+
+On a company Page, listing comments or replies without `comments.read` returns `403 account.permission_missing`. On either connection type, replying, liking, unliking, deleting, hiding, or unhiding without `comments.write` returns `403 account.permission_missing`. `error.meta.permission` names the permission. On a member profile, listing returns `501 resource.not_supported` whatever its permissions. `GET /v1/inbox/comments` never returns `account.permission_missing`. A key without the scope returns `403 auth.insufficient_scope`: see [Scoped API keys](/guides/scoped-keys).
+
+## Use from an AI agent
+
+| Tool | What it does on LinkedIn |
+|---|---|
+| `social_api_list_inbox_posts` | Lists the account's posts with their comment counts. On a member profile, only posts published through SocialAPI |
+| `social_api_list_post_comments` | Lists the comments on a company Page post |
+| `social_api_get_comment_replies` | Lists the replies to a comment on a company Page post |
+| `social_api_reply_to_comment` | Replies to a comment, or comments on a post. The text is 2,200 bytes at most |
+| `social_api_like_comment`, `social_api_unlike_comment` | Likes or unlikes a comment |
+| `social_api_delete_comment` | Deletes a comment |
+| `social_api_moderate_comment` | Deletes a comment with `action: "delete"`. Takes the `sapi_cmt_` ID only. `hide` and `unhide` return `resource.not_supported` |
+
+The tool list is in [MCP tools](/integrations/tools#comments).
+
+## Related
+
+- [LinkedIn API](/platforms/linkedin): capabilities, connect rules, mentions, insights, and scopes for LinkedIn
+- [LinkedIn publishing](/platforms/linkedin/publishing): publish the posts these comments arrive on
+- [Comments](/guides/comments): the endpoints, fields, and rules shared by every platform
+- [IDs](/guides/ids): the `sapi_cmt_` ID and the platform IDs these endpoints accept
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit

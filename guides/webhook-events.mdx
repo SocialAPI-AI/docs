@@ -75,7 +75,7 @@ Which platforms emit an event is stated under each event as **Emitted for**. The
 
 - **Instagram, Facebook, Threads, WhatsApp, Telegram, Zalo, and Google Business Profile** send comments, direct messages, mentions, or reviews to SocialAPI as they happen, so those events arrive as webhook events. Each platform's page has a Capabilities table, and [Supported platforms](/platforms/overview) compares them.
 - **X / Twitter, YouTube, Bluesky, Pinterest, LinkedIn, and App Store Connect** push nothing to SocialAPI. They emit no comment, DM, or review events, and no mention event from the platform: read those with the inbox endpoints. Listing mentions on X, Bluesky, and a LinkedIn company Page sends `mention.received` (see [Mentions you list](#mentions-you-list)).
-- **TikTok** sends new comments to SocialAPI, so it emits `comment.received`. It has no DM events or review events. Listing TikTok mentions sends `mention.received` (see [Mentions you list](#mentions-you-list)). TikTok accounts also emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect an account, and `account.disconnected` when SocialAPI flags the account for reconnection. A TikTok [creator connection](/platforms/tiktok#creator-connection) emits no comment or mention events, and also emits `account.disconnected` when the person removes SocialAPI's app.
+- **TikTok** sends new comments to SocialAPI, so it emits `comment.received`. It has no DM events or review events. Listing TikTok mentions sends `mention.received` (see [Mentions you list](#mentions-you-list)). TikTok accounts also emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect an account, and `account.disconnected` when SocialAPI flags the account for reconnection. A TikTok [creator connection](/platforms/tiktok#creator-connection) emits no comment or mention events, and neither does a TikTok account connected before 2026-10-13 until it is reconnected. A creator connection also emits `account.disconnected` when the person removes SocialAPI's app.
 - **Trustpilot** is not available, so it emits no events.
 
 ## Posts
@@ -243,13 +243,13 @@ The example is the Instagram comment shown in the [envelope](#event-envelope). T
 | Instagram | `author.id` and `author.name` (the person's username), and `author.avatar_url` when SocialAPI can read it. `platform_post_id` is the media ID. `metadata` is `null` |
 | Facebook | `author.id`, `author.name`, and `page_id` (the SocialAPI page that received the comment). `platform_post_id` is the Facebook post ID |
 | Threads | `author.username` only. `platform_post_id` is the root post's ID, `permalink` is the reply's URL, and `metadata` holds `parent_id` (the post or reply being answered) and `is_verified`. `account_id` is the Threads user ID, not an `acc_` ID. `raw_payload` is the `values` object of the Threads event |
-| TikTok | `author.id` (TikTok's unique identifier for the person), `author.name`, `author.username`, and `author.avatar_url`. `platform_post_id` is the TikTok video ID. A reply under a comment is also `comment.received`. `post_id` and `permalink` are not set, and `metadata` is `null`. Comments written by the connected account are not sent. `raw_payload` is TikTok's notification: see [TikTok](/platforms/tiktok#webhook-events) |
+| TikTok | `author.id` (TikTok's unique identifier for the person), `author.name`, `author.username`, and `author.avatar_url`. `platform_post_id` is the TikTok video ID. A reply under a comment is also `comment.received`. `post_id` and `permalink` are not set, and `metadata` is `null`. Comments written by the connected account are not sent. `raw_payload` is TikTok's notification: see [TikTok](/platforms/tiktok/comments#comment-events) |
 
 `post_id` is set on Instagram and Facebook when the post was published through SocialAPI.
 
 ## Direct messages
 
-Direct message events share the [interaction payload](#interaction-payload). A DM event carries the SocialAPI `conversation_id` and, except on Zalo, the `platform_id` of the message. Join `platform_id` to the `platform_id` of a row from `GET /v1/inbox/conversations/{id}/messages`. Do not join on `id`: the message endpoint returns its own record ID, which differs from the event's interaction ID.
+Direct message events share the [interaction payload](#interaction-payload). A DM event carries the SocialAPI `conversation_id` and the `platform_id` of the message, except on Zalo, which carries neither, and except `dm.referral`, which has no `platform_id`. Join `platform_id` to the `platform_id` of a row from `GET /v1/inbox/conversations/{id}/messages`. Do not join on `id`: the message endpoint returns its own record ID, which differs from the event's interaction ID.
 
 ### `dm.received`
 
@@ -303,7 +303,7 @@ Fires when a connected account sent a message. The sender is `author` and the pe
 
 On Instagram and Facebook the event fires for every message the platform reports as sent from the account: messages sent through the API, replies typed in the platform's own app or inbox, and DMs your [Automations](/guides/automations) send. The event carries nothing that separates an Automation's DM from one you sent. On Facebook, `raw_payload` carries `app_id`, the ID of the app that sent the message, which tells API sends from replies typed in the Page inbox.
 
-On WhatsApp there is no message echo. The event fires once per message, when WhatsApp reports it as `sent`, for messages sent with `POST /v1/inbox/conversations/{id}/messages` or the `send-template` endpoint. It also fires for each message sent from the phone on a number that stays on the WhatsApp Business app (see [WhatsApp](/platforms/whatsapp)). A redelivered receipt does not raise it again, and neither do the later `delivered` and `read` receipts. `received_at` is WhatsApp's send time, `author.id` is the sending phone number ID, and `recipient.id` is the contact's WhatsApp ID.
+On WhatsApp there is no message echo. The event fires at most once per message, when WhatsApp reports it as `sent`, for messages sent with `POST /v1/inbox/conversations/{id}/messages` or the `send-template` endpoint. It also fires for each message sent from the phone on a number that stays on the WhatsApp Business app (see [WhatsApp](/platforms/whatsapp)). A redelivered receipt does not raise it again, and neither do the later `delivered` and `read` receipts. `received_at` is WhatsApp's send time, `author.id` is the sending phone number ID, and `recipient.id` is the contact's WhatsApp ID.
 
 ```json
 {
@@ -733,7 +733,7 @@ The event's `reason` can differ from the account's `reconnect_reason`. When a to
 
 Fires when something changes on the account. Branch on `change`.
 
-**Emitted for:** every platform for `permissions_reduced`. Google Business Profile for every other `change`.
+**Emitted for:** every platform except App Store Connect, Bluesky, Telegram, WhatsApp and Zalo for `permissions_reduced`. Google Business Profile for every other `change`.
 
 | `change` | Meaning | Extra fields |
 |---|---|---|

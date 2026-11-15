@@ -1,0 +1,280 @@
+---
+title: Facebook direct messages
+sidebarTitle: "Messages"
+description: Read and send Facebook Messenger DMs for your Pages, with the 24-hour messaging window, attachments, buttons, reactions, typing indicators, and seen receipts.
+---
+
+SocialAPI reads and sends the Messenger direct messages (DMs) of a connected Facebook Page. A conversation is one person talking to one Page. The Page can message a person only within 24 hours of the person's last message, and SocialAPI offers no way to reach the person after that. A DM request costs 1 interaction credit, and reads, reactions, typing indicators, and seen receipts cost none. For the rules shared by every platform, see [Direct messages](/guides/direct-messages).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/conversations?platform=facebook` | List Facebook conversations |
+| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message as the Page |
+| `POST` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | React to a message |
+| `DELETE` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | Remove the Page's reaction |
+| `POST` | `/v1/inbox/conversations/{id}/sender-action` | Show a typing indicator, or mark the person's messages seen |
+
+`{id}` is the conversation `id` from `GET /v1/inbox/conversations`. `{messageId}` is a message's `platform_id`. A conversation starts when the person messages the Page, or when the person answers a [private reply](/platforms/facebook/comments#private-replies). SocialAPI has no endpoint to start a conversation with someone who never messaged the Page.
+
+## Your first message
+
+List the Facebook conversations of one account:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&platform=facebook" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "page_id": "sapi_page_01HZ9X5V7C9D3E6G8H1J4K2M",
+      "platform": "facebook",
+      "platform_id": "t_869531119037776",
+      "participant_id": "6512398740011223",
+      "participant_name": "Jane Smith",
+      "participant_picture": "",
+      "last_message": "Do you deliver on Sundays?",
+      "last_message_at": "2026-10-13T14:30:00Z",
+      "status": "active",
+      "unread_count": 1,
+      "created_at": "2026-10-13T14:30:00Z",
+      "updated_at": "2026-10-13T14:30:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": "2026-10-13T14:31:00Z"
+}
+```
+
+Reply into that conversation with two quick replies:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Yes, we deliver on Sundays until 2 pm. Shall I book a slot?",
+    "quick_replies": [
+      { "title": "Book a slot", "payload": "BOOK_SUNDAY" },
+      { "title": "Not now", "payload": "NOT_NOW" }
+    ]
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+  "message_ids": ["sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I"]
+}
+```
+
+`message_ids` lists the SocialAPI ID of every message the request sent, in send order. When the person taps a quick reply, SocialAPI sends a `dm.postback` event with its `payload`.
+
+## Conversations on Facebook
+
+Facebook conversations have the fields described in [Conversations](/guides/direct-messages#conversations), with these Facebook values:
+
+| Field | On Facebook |
+|---|---|
+| `page_id` | The SocialAPI ID of the Page in the conversation |
+| `platform_id` | Facebook's thread ID, which starts with `t_` |
+| `participant_id` | The person's Page-scoped ID (PSID). The same person has a different ID on each Page |
+| `participant_name` | The person's name on Facebook, or empty when Facebook gives none |
+| `participant_picture` | Empty for most people: Facebook shares a profile picture only in rare cases. Treat it as optional |
+
+SocialAPI has no participant profile endpoint for Facebook, and a Facebook conversation never reports whether the person follows the Page.
+
+### Accounts with more than one Page
+
+A connected Facebook account can hold more than 1 Page, and each conversation belongs to one of them. Pass `page_id` (the `sapi_page_` ID from `GET /v1/accounts/{id}/pages`) to `GET /v1/inbox/conversations` to list the conversations of one Page. Sends, reactions, and sender actions take no Page parameter: SocialAPI acts as the Page that owns the conversation. See [Pages of an account](/platforms/facebook#pages-of-an-account).
+
+## Read messages
+
+`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first, in the shape described in [Read messages](/guides/direct-messages#read-messages).
+
+- **Messages sent outside SocialAPI.** A message typed in Facebook's own apps, such as Meta Business Suite, appears as an `outgoing` message.
+- **Attachments.** `attachment_type` and `attachment_url` hold the first attachment of a message. The `dm.received` event carries every attachment.
+- **Replies.** A message that replies to an earlier one carries `reply_to` with the earlier message's `platform_id`.
+- **Status.** An outgoing message moves from `pending` to `sent`, `delivered`, and `read` as Facebook reports it.
+
+When a conversation or a message is missing from a list, force a refresh with [`POST /v1/inbox/sync`](/guides/inbox#refresh-the-inbox-manually).
+
+## Send a message
+
+`POST /v1/inbox/conversations/{id}/messages` sends a message as the Page. The fields are in [Send a message](/guides/direct-messages#send-a-message). On Facebook:
+
+| Field | On Facebook |
+|---|---|
+| `text` | Facebook accepts up to 2,000 characters per message |
+| `attachments` | Images, videos, audio, and files. Facebook accepts files up to 25 MB. Facebook fetches a `url` attachment, so it must be reachable without a login. A `platform_attachment_id` needs `type`, or the call returns `400 validation.attachment_type_required` |
+| `reply_to_message_id` | Makes the first message of the request a reply to the message with this `platform_id` |
+| `quick_replies`, `buttons`, `cards` | Supported. See [Interactive messages](#interactive-messages) |
+| `message_tag` | Not available. Any value returns `422 messaging.tag_not_supported`, and nothing is sent |
+| `caption`, `voice`, `list_sections`, `list_button` | Ignored on Facebook |
+
+SocialAPI sends the text first, then each attachment in order, as separate messages, and the request costs 1 interaction credit. If a send fails part way, the earlier messages stay delivered, and the error carries `error.meta.sent_count` and `error.meta.failed_index`.
+
+A failed request returns its credit only when the error is a `validation.*` error and no message was delivered. A request that delivered at least 1 message keeps its credit, and so does a Facebook refusal such as `platform.facebook.window_closed`. A request refused before any send costs nothing: a missing scope, a `404`, a missing permission, `messaging.tag_not_supported`, `messaging.velocity_limit`, `messaging.recipient_limit`, `platform.facebook.throttled`, and a `platform.facebook.window_closed` with `error.meta.blocked_locally: true`. See [When a credit comes back](/guides/plans#when-a-credit-comes-back). An attachment Facebook cannot fetch or accept returns `422 platform.facebook.attachment_failed`.
+
+### Interactive messages
+
+A Facebook DM can carry tappable content. Set at most 1 of `quick_replies`, `buttons`, or `cards`: more than 1 returns `400 validation.interactive_conflict`.
+
+| Content | Limits |
+|---|---|
+| `quick_replies` | Up to 13 chips, each title 20 characters at most. Needs `text` |
+| `buttons` | 1 to 3 buttons, `url` or `postback`, each title 20 characters at most. `text` is the body, 640 characters at most |
+| `cards` | Up to 10 cards. Title and subtitle 80 characters at most each, up to 3 buttons per card |
+
+A tap on a quick reply or a `postback` button sends a `dm.postback` event with your `payload`, and the tapped title appears in the conversation as the person's message. Field rules and every error code are in [Interactive messages](/guides/direct-messages#interactive-messages).
+
+## The messaging window
+
+The Page can message a person only within 24 hours of the person's last message. Outside the window, a send returns `400 platform.facebook.window_closed` and sends nothing. The person reopens the window by messaging the Page again.
+
+- **Later sends return the same error.** After Facebook refuses a send for a closed window, later sends to that conversation return `400 platform.facebook.window_closed` with `error.meta.blocked_locally: true`, until the person messages the Page again or 24 hours after the refusal, whichever comes first. These later refusals cost no credit. Facebook's own refusal costs the request's 1 credit.
+- **No message tags.** SocialAPI sends no message tag on Facebook, including `HUMAN_AGENT`, so nothing extends the window. A send with `message_tag` returns `422 messaging.tag_not_supported`.
+- **Private replies.** A private reply does not open the window and does not end these refusals. The person's next message does both.
+
+## React to a message
+
+`POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` adds the Page's emoji reaction to a message, and replaces its earlier one. `DELETE` on the same path, with `account_id` as a query parameter, removes it.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages/m_AbCdEf123/reaction" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "reaction": "❤️" }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+`reaction` is one emoji, sent as the character, not a name such as `love`. A name or plain text returns `400 validation.invalid_reaction`, and a `POST` without `reaction` returns `400 validation.field_required`. A reaction costs no credit. SocialAPI sends no event when the person reacts to a message.
+
+## Typing indicators and seen receipts
+
+`POST /v1/inbox/conversations/{id}/sender-action` shows the person a typing indicator, or marks their messages seen, without sending a message. It costs no credit.
+
+| `action` | What the person sees |
+|---|---|
+| `typing_on` | A typing indicator. Send `typing_off` to clear it |
+| `typing_off` | The typing indicator disappears |
+| `mark_seen` | The Page has seen their messages |
+
+Any other `action` returns `400 validation.invalid_action`. If Facebook refuses a sender action because the messaging window is closed, the call returns `400 platform.facebook.window_closed`. Facebook does not report when the person is typing. An example request is in [Typing indicators and seen receipts](/guides/direct-messages#typing-indicators-and-seen-receipts).
+
+## Delivery and read status
+
+Facebook reports what happens to each message the Page sends, and SocialAPI turns each report into an event:
+
+| Event | When it fires |
+|---|---|
+| `dm.status.sent` | Facebook accepted the message |
+| `dm.status.delivered` | The message reached the person |
+| `dm.status.read` | The person read the conversation. `mids` lists every message the read covers |
+
+Each event carries `page_id`. The payloads are in [Webhook events](/guides/webhook-events#direct-messages).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Messaging window | 24 hours from the person's last message |
+| Text per message | 2,000 characters |
+| Attachment size | 25 MB, Facebook's limit |
+| Quick replies | 13 per message, 20 characters per title |
+| Buttons | 3 per message or card, 20 characters per title, 640 characters of body text |
+| Cards | 10 per message, 80 characters per title and subtitle |
+| Text through the MCP tool | 1,000 bytes |
+| Conversations per page of results | Default 25, up to 100 |
+| Messages per page of results | Default 25, up to 200 |
+
+Each DM request costs 1 interaction credit. When the allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. Facebook's own rate limit returns `429 platform.facebook.rate_limit`.
+
+## Errors and debugging
+
+Check these in order when a Facebook DM call fails:
+
+1. **`401`, `403 auth.insufficient_scope`.** The API key is invalid, or a scoped key lacks `dms:send` or `dms:read`.
+2. **`404 conversation.not_found`, `404 account.not_found`, `403 account.reconnection_required`, `401 platform.facebook.auth`.** The conversation is not yours or belongs to another connected account than `account_id`, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `messages.write` to send, react, or send a sender action, and `messages.read` to start or read an inbox sync. `error.meta.permission` names it.
+4. **`400 validation.*`, `422 messaging.tag_not_supported`.** The body is wrong, or it carries a `message_tag`. For a `validation.*` error, `error.meta.field` names the field.
+5. **`400 platform.facebook.window_closed`.** The messaging window is closed: see [The messaging window](#the-messaging-window).
+6. **`422 platform.facebook.thread_unavailable`.** Facebook refused to deliver to this conversation, which can be restricted or unavailable. Retrying does not help.
+7. **`422 platform.facebook.attachment_failed`.** Facebook could not fetch or accept the file. Fix the URL or the file and send again.
+8. **`403 platform.facebook.permission_denied`.** The Facebook scopes granted at connect do not cover the action. Reconnect the account and approve every scope.
+9. **`429 validation.interaction_limit_exhausted`.** The plan allowance is used up until the next billing period: see [Plans](/guides/plans).
+10. **`429 platform.facebook.rate_limit`.** Wait for the `Retry-After` header when present.
+11. **`429 platform.facebook.throttled`.** Facebook refused the connected account, or one of its Pages, with its own rate limit, and SocialAPI refuses calls for that account or Page until the wait ends. `error.meta.scope` is `account` or `page`. Nothing was sent. Wait for the `Retry-After` header, then retry.
+12. **`429 messaging.velocity_limit`.** The Page is sending messages faster than SocialAPI allows. Wait for the `Retry-After` header. Nothing was sent and no credit was used.
+13. **`429 messaging.recipient_limit`.** Too many different people were messaged this calendar day (UTC). Wait for the `Retry-After` header. Nothing was sent and no credit was used.
+14. **`403`, `404`, or `503 platform.facebook.<code>`, `503 platform.facebook.api_error`, or `501 resource.not_supported`.** Facebook returned an error that has no row above, where `<code>` is Meta's error code: see [Platform errors](/guides/errors#platform-errors).
+
+The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
+
+## Scopes
+
+| API key scope | Operations |
+|---|---|
+| `dms:read` | List and get conversations, list messages, start or read an inbox sync |
+| `dms:send` | Send a message, add or remove a reaction, show a typing indicator, mark messages seen |
+
+The Facebook scope for Messenger (`pages_messaging`) and the account permissions it belongs to are in [Facebook scopes](/platforms/facebook#scopes).
+
+## Events
+
+Facebook sends these DM events to your [webhook endpoints](/guides/webhooks), each with `page_id`:
+
+| Event | When it fires |
+|---|---|
+| `dm.received` | A person sends the Page a message |
+| `dm.sent` | A message left the Page, including one typed in Facebook's own apps, such as Meta Business Suite |
+| `dm.postback` | A person tapped a quick reply or a `postback` button |
+| `dm.referral` | A person opened a conversation from an ad or a referral link without sending a message |
+| `dm.status.sent`, `dm.status.delivered`, `dm.status.read` | See [Delivery and read status](#delivery-and-read-status) |
+
+`dm.deleted` and `dm.status.failed` are not emitted for Facebook. Which events an account receives without the `messages.read` permission is in [Events](/guides/direct-messages#events). The payloads are in [Webhook events](/guides/webhook-events#direct-messages).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_conversations` | List conversations, most recent activity first. `page_id` filters to one Page |
+| `social_api_get_conversation` | Get one conversation |
+| `social_api_list_messages` | List the messages of a conversation, newest first |
+| `social_api_send_dm` | Send a text message with optional quick replies or buttons. The text is 1,000 bytes at most. The tool sends no attachments and no cards: use the REST endpoint for them |
+| `social_api_update_conversation` | Archive a conversation, or set it back to `active` |
+| `social_api_mark_conversation_read` | Mark a conversation as read in SocialAPI |
+| `social_api_send_sender_action` | Show a typing indicator, or mark the person's messages seen |
+
+There is no tool for reactions. See [MCP tools](/integrations/tools#direct-messages).
+
+## Related
+
+- [Facebook API](/platforms/facebook): capabilities, Pages, scopes, and webhook events for Facebook
+- [Facebook comments](/platforms/facebook/comments): private replies that start a Messenger conversation from a comment
+- [Direct messages](/guides/direct-messages): the DM endpoints and fields shared by every platform
+- [Automations](/guides/automations): send DMs and answer button taps without your own handler
+- [Webhook events](/guides/webhook-events#direct-messages): the DM event payloads

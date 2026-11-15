@@ -31,9 +31,9 @@ An unsupported call returns `501 resource.not_supported`.
 | Delete a video | Yes | Removes the video from YouTube |
 | List posts | Yes | Every video in the channel's uploads, including videos uploaded outside SocialAPI |
 | List comments and replies | Yes | Comments are read per video |
-| Reply to a comment | Yes | |
+| Reply to a comment | Yes | Up to 5 replies and top-level comments per channel per day (midnight to midnight Pacific Time), through the reply endpoint and the `social_api_reply_to_comment` MCP tool combined. See [YouTube comments](/platforms/youtube/comments) |
 | Post a top-level comment | Yes | Omit `comment_id` when you reply |
-| Hide, unhide a comment | Yes | Hiding sets the comment to `rejected` |
+| Hide, unhide a comment | Yes | Hiding sets the comment to `rejected`. Unhide works on a `held_for_review` comment. Do not use it on a `rejected` comment: YouTube does not move a `rejected` comment back to `published`. See [Hide and unhide a comment](/platforms/youtube/comments#hide-and-unhide-a-comment) |
 | Hold a comment for review, ban its author | Yes | `POST /v1/platforms/youtube/comments/{commentId}/moderate` |
 | Delete a comment | Conditional | Only comments your channel wrote. Another person's comment returns `422 platform.youtube.processing_failure`: hide it instead |
 | Edit your own comment | Yes | `PATCH /v1/platforms/youtube/comments/{commentId}` |
@@ -44,7 +44,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Reviews | No | `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | A YouTube account returns `422 automation.platform_unsupported` |
 | Channel summary | Yes | Subscribers, views, and video count |
-| Analytics | Yes | Live post metrics (`likes`, `comments`, `views`, `extra.views`), stored post history, and a live channel summary. SocialAPI stores no channel history. See [Analytics](/guides/analytics) |
+| Analytics | Yes | Live post metrics (`likes`, `comments`, `views`, `extra.views`), post metrics history, and a live channel summary. Channel metrics history is not available. See [Analytics](/guides/analytics) |
 | Webhook events | Partial | Post and account events only. YouTube sends no comment events |
 
 The cross-platform matrix is on [Platforms](/platforms/overview).
@@ -108,120 +108,11 @@ Response (HTTP 200):
 
 ## Comments
 
-YouTube comments are read per video. A video is identified by its YouTube video ID, which is the `{postId}` in the comment paths. For the cross-platform endpoints, see [Comments](/guides/comments). This section lists what is specific to YouTube.
-
-```bash
-curl "https://api.social-api.ai/v1/inbox/comments/dQw4w9WgXcQ?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&order=relevance" \
-  -H "Authorization: Bearer $SOCAPI_KEY"
-```
-
-Response (HTTP 200):
-
-```json
-{
-  "data": [
-    {
-      "id": "sapi_cmt_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL",
-      "platform_id": "UgxK3m9pQ2",
-      "platform": "youtube",
-      "text": "Great video!",
-      "author_id": "UCxyz123",
-      "author_name": "Jane Smith",
-      "author_username": "Jane Smith",
-      "author_picture": "https://yt3.ggpht.com/abc",
-      "is_owner": false,
-      "like_count": 5,
-      "reply_count": 2,
-      "has_replies": true,
-      "liked_by_viewer": false,
-      "is_hidden": false,
-      "moderation_status": "published",
-      "parent_id": null,
-      "created_at": "2026-03-15T10:30:00Z",
-      "capabilities": {
-        "can_reply": true,
-        "can_delete": true,
-        "can_hide": true,
-        "can_like": false,
-        "can_private_reply": false
-      }
-    }
-  ],
-  "pagination": { "has_more": false, "next_cursor": "" }
-}
-```
-
-These query parameters apply to YouTube only:
-
-| Parameter | Description |
-|---|---|
-| `moderation_status` | `published` (default), `held_for_review`, or `likely_spam`. The last two list comments waiting for your review. Another value returns `400 validation.field_invalid` |
-| `order` | `recent` (default) or `relevance`. Another value returns `400 validation.field_invalid` |
-| `q` | Keyword search across comment text, up to 256 characters |
-
-YouTube-specific behavior:
-
-- **Videos with comments.** `GET /v1/inbox/comments` lists commented videos only when you pass `account_id`. The list is 1 page with no cursor.
-- **Comments turned off.** Listing the comments of a video with comments turned off returns `422 platform.youtube.comments_disabled`. Retrying does not help: stop polling the video until the channel owner turns comments back on in YouTube Studio. After that, the error can continue for up to 24 hours.
-- **Reply or top-level comment.** `POST /v1/inbox/comments/{postId}` with `comment_id` replies to that comment. Without `comment_id`, it posts a new top-level comment on the video. Each costs 1 interaction credit.
-- **Hide.** `POST /v1/inbox/comments/{postId}/{commentId}/hide` sets the comment to `rejected`, which removes it from public view. `DELETE` on the same path sets it back to `published`.
-- **Moderate.** `POST /v1/platforms/youtube/comments/{commentId}/moderate` sets the status explicitly.
-- **Delete.** `DELETE /v1/inbox/comments/{postId}/{commentId}` removes a comment your channel wrote. `capabilities.can_delete` is `true` on every YouTube comment, including other people's. Deleting another person's comment returns `422 platform.youtube.processing_failure`. Hide it instead.
-- **Like and private reply.** Not available. `can_like` and `can_private_reply` are `false`.
-
-### Moderate a comment
-
-```bash
-curl -X POST https://api.social-api.ai/v1/platforms/youtube/comments/UgxK3m9pQ2/moderate \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "post_id": "dQw4w9WgXcQ",
-    "status": "rejected",
-    "ban_author": true
-  }'
-```
-
-Response (HTTP 200):
-
-```json
-{ "success": true }
-```
-
-| Field | Description |
-|---|---|
-| `account_id` | Required. The connected YouTube account |
-| `post_id` | Required. The YouTube video ID the comment is on |
-| `status` | Required. `published`, `held_for_review`, or `rejected`. Another value returns `400 validation.field_invalid` |
-| `ban_author` | Optional. `true` also bans the author from commenting on your channel. Valid only with `status` `rejected`, otherwise `400 validation.field_invalid` |
-
-A missing `account_id` or `post_id` returns `400 validation.field_required`.
-
-### Edit your own comment
-
-```bash
-curl -X PATCH https://api.social-api.ai/v1/platforms/youtube/comments/UgxK3m9pQ2 \
-  -H "Authorization: Bearer $SOCAPI_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
-    "post_id": "dQw4w9WgXcQ",
-    "text": "Updated comment text"
-  }'
-```
-
-Response (HTTP 200):
-
-```json
-{ "success": true }
-```
-
-`account_id`, `post_id`, and `text` are all required. A missing one returns `400 validation.field_required`. YouTube accepts the edit only on a comment your channel wrote.
+SocialAPI lists comments and replies on the channel's videos, replies to comments, posts top-level comments, hides, moderates, edits, and deletes comments, with YouTube's own filters for comments held for review or likely spam. Endpoints, fields, limits, and errors are in [YouTube comments](/platforms/youtube/comments).
 
 ## Webhook events
 
-YouTube sends nothing to SocialAPI, so it emits no comment events: read comments with the endpoints above. Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for videos you publish through SocialAPI. You also receive `account.connected` when you connect a channel, `account.disconnected` when SocialAPI flags the channel, and `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself. See [Webhook events](/guides/webhook-events).
+YouTube sends nothing to SocialAPI, so it emits no comment events: read comments with the endpoints in [YouTube comments](/platforms/youtube/comments). Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitted for videos you publish through SocialAPI. You also receive `account.connected` when you connect a channel, `account.disconnected` when SocialAPI flags the channel, and `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself. See [Webhook events](/guides/webhook-events).
 
 ## Suspended or closed channels
 
@@ -253,6 +144,7 @@ A call the granted scope does not permit returns `403 platform.youtube.insuffici
 ## Related
 
 - [YouTube publishing](/platforms/youtube/publishing): fields, scheduling, and quirks for publishing videos
+- [YouTube comments](/platforms/youtube/comments): list, reply to, moderate, edit, and delete video comments
 - [Comments](/guides/comments): the cross-platform comment endpoints
 - [Connect accounts](/guides/connect-accounts): the shared connect flow
 - [Webhook events](/guides/webhook-events): the post and account events

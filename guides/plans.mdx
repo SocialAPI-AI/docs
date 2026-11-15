@@ -40,7 +40,7 @@ What each limit returns when you reach it:
 
 Two features depend on the plan rather than on an allowance:
 
-- **WhatsApp template messages** need a paid plan. On the Free plan, `POST /v1/platforms/whatsapp/accounts/{id}/send-template` returns `403 whatsapp.paid_plan_required`. Replies to people who messaged you first work on every plan. See [WhatsApp](/platforms/whatsapp).
+- **WhatsApp template messages** need a paid plan. On the Free plan, `POST /v1/platforms/whatsapp/accounts/{id}/send-template` returns `403 whatsapp.paid_plan_required`. Replies to people who messaged you first work on every plan. See [Send a template](/platforms/whatsapp/messages#send-a-template).
 - **Visual analysis in exports** (`include_vision`) needs a paid plan. On the Free plan, SocialAPI ignores `include_vision: true` and runs the export without it.
 
 ### Profile packs
@@ -172,13 +172,14 @@ The same rules apply to [MCP tools](/integrations/tools) and to the actions an [
 
 SocialAPI gives the credit back when:
 
-- Any request that costs a credit fails with a `validation.*` error.
+- Any request that costs a credit fails with a `validation.*` error, except a DM request that already delivered at least one of its messages.
 - `POST /v1/posts` fails with `publishing.validation_failed`.
 - `POST /v1/posts`, `POST /v1/posts/{pid}/publish`, or `POST /v1/posts/{pid}/retry` fails with `429 publishing.velocity_limit`.
 - Every target of `POST /v1/posts` with `publish_now: true`, or of `POST /v1/posts/{pid}/publish`, fails.
 - SocialAPI refuses a reply or DM before sending it because the conversation's messaging window is closed (see [Direct messages](/guides/direct-messages)).
+- The request fails with `429 platform.{platform}.throttled`.
 
-A comment reply, DM, review reply, or mention reply refused with `403 account.permission_missing` is never charged: see [Permissions](/guides/permissions). Any other failure keeps the credit spent. That includes a request the platform refuses (for example `429 platform.{platform}.rate_limit` on a reply or DM), a `409 resource.conflict` for duplicate content, a post that fails on only some of its targets, and a retry that fails again.
+A comment reply, DM, review reply, or mention reply refused with `403 account.permission_missing` is never charged: see [Permissions](/guides/permissions). A DM, WhatsApp template send, or reply refused with a `429 messaging.*` code is never charged. Any other failure keeps the credit spent. That includes a request the platform refuses (for example `429 platform.{platform}.rate_limit` on a reply or DM), a `409 resource.conflict` for duplicate content, a post that fails on only some of its targets, and a retry that fails again.
 
 ## Billing periods
 

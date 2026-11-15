@@ -18,7 +18,7 @@ SocialAPI connects a Bluesky account with an app password. It publishes posts wi
 
 ## Capabilities
 
-An unsupported call returns `501 resource.not_supported`. Read the `capabilities` object on each comment instead of assuming (`can_reply`, `can_delete`, `can_hide`).
+An unsupported call returns `501 resource.not_supported`. The `capabilities` object on a Bluesky comment does not show which replies you can hide or delete: [Bluesky comments](/platforms/bluesky/comments) states the rules.
 
 | Feature | Status | Condition |
 |---|---|---|
@@ -30,19 +30,19 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
 | Delete a published post | Yes | |
 | List posts | Yes | |
-| List comments and replies | Yes | Replies up to 6 levels below the post, as one flat list with no cursor |
+| List comments and replies | Yes | Replies up to 6 levels below the post, as one flat list with no cursor. See [Bluesky comments](/platforms/bluesky/comments) |
 | Reply to a comment | Yes | |
-| Hide, unhide a comment | Yes | Only replies on a thread you started. At most 300 hidden replies per thread |
+| Hide, unhide a comment | Conditional | Only replies on a thread you started. At most 300 hidden replies per thread |
 | Delete a comment | Conditional | Only your own replies. A reply from another account cannot be deleted: hide it |
 | Like a comment | No | `501 resource.not_supported`. `can_like` is `false` on every comment |
 | Private reply to a comment | No | `501 resource.not_supported`. Bluesky has no comment-to-DM path |
 | Mentions | Yes | Posts that mention the account |
 | Reply to a mention | Yes | |
-| DMs: list, read, send | Partial | Text only. Needs an app password with direct message access: see [Direct messages](#direct-messages) |
+| DMs: list, read, send | Partial | Text only. Needs an app password with direct message access: see [Bluesky direct messages](/platforms/bluesky/messages) |
 | React to a DM | No | `501 resource.not_supported` |
 | Reviews | No | Bluesky has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
-| Platform quota | Yes | `GET /v1/accounts/{id}/limits` returns `write_points_per_hour` and `write_points_per_day`: see [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
+| Platform quota | Yes | `GET /v1/accounts/{id}/limits` returns Bluesky's fixed write budgets, `write_points_per_hour` and `write_points_per_day`, not the points left: see [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
 | Webhook events | Partial | No comment or DM events. `mention.received` only when you list mentions. See [Webhook events](#webhook-events) |
 
 The capability matrix for every platform is on [Supported platforms](/platforms/overview).
@@ -103,25 +103,13 @@ When the account has email two-factor authentication on, the first connect reque
 
 Disconnecting the account (`DELETE /v1/accounts/{account_id}`) deletes the app password from SocialAPI. Bluesky offers no way to revoke an app password from outside, so the password stays valid on Bluesky. To cut off access completely, delete the app password in **Settings** on Bluesky.
 
+## Comments
+
+SocialAPI lists the replies to your Bluesky posts, answers them, hides replies in threads you started, and deletes your own replies. Endpoints, fields, limits, and errors are on [Bluesky comments](/platforms/bluesky/comments).
+
 ## Direct messages
 
-DMs work only with an app password that has direct message access. SocialAPI checks this when you connect. Without it, every DM call returns `403 platform.bluesky.dm_scope_missing`, and posts, comments, and mentions keep working. The fix is a new app password with **Allow access to your direct messages** on, then a new connect request. Reconnecting with the old password does not help.
-
-You list conversations with `GET /v1/inbox/conversations`, read a conversation with `GET /v1/inbox/conversations/{conversation_id}/messages`, and reply with `POST /v1/inbox/conversations/{conversation_id}/messages`. The request fields are on [Direct messages](/guides/direct-messages).
-
-These rules are specific to Bluesky:
-
-- **Text only.** A Bluesky message carries text. SocialAPI sends only the `text` of a send request. It does not send attachments, `buttons`, `quick_replies`, `cards`, or `list_sections`.
-- **No `message_tag`.** Bluesky has no message tags: `message_tag` is ignored.
-
-## Comments and replies
-
-You read the replies to a post with `GET /v1/inbox/comments/{postId}` and answer with the reply endpoints on [Comments](/guides/comments).
-
-- **One flat list.** Bluesky returns a thread as a tree with no cursor. SocialAPI flattens it, the pagination object is always empty, and replies deeper than 6 levels below the post are not returned. A very large thread can be cut off.
-- **Hide, not delete.** Only the author of the original post can hide a reply to it: another account gets `403 platform.bluesky.not_thread_owner`. A thread holds at most 300 hidden replies: the 301st returns `422 platform.bluesky.hidden_replies_full`. A hidden reply is not removed: Bluesky no longer shows it by default.
-- **Delete only your own replies.** `platform.bluesky.not_own_record` is returned when you try to delete a reply from another account.
-- **No likes and no private replies.** `can_like` and `can_private_reply` are `false` on every comment.
+SocialAPI lists, reads, and sends Bluesky direct messages (DMs), text only, when the app password was created with direct message access. Endpoints, the access requirement, and errors are on [Bluesky direct messages](/platforms/bluesky/messages).
 
 ## Mentions
 
@@ -138,9 +126,7 @@ Bluesky sends SocialAPI no notification of its own, so there is no `comment.rece
 | Post text | 300 characters |
 | Images per post | 4 |
 | Image size | 2 MB |
-| Replies read per post | 6 levels deep |
-| Hidden replies per thread | 300 |
-| Writes per account (Bluesky) | 5,000 points per hour and 35,000 per day. A new post or reply costs 3 points, an update 2, a delete 1 |
+| Writes per account (Bluesky) | 5,000 points per hour and 35,000 per day. A new post or reply costs 3 points, a hide or unhide 2, a delete 1 |
 | Sign-ins per account (Bluesky) | 30 per 5 minutes |
 | Posts (SocialAPI) | 25 per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 
@@ -153,8 +139,8 @@ Bluesky has no OAuth scopes. An app password gives SocialAPI the access of the a
 ## Related
 
 - [Bluesky publishing](/platforms/bluesky/publishing): text, images, scheduling, and deleting posts
-- [Direct messages](/guides/direct-messages): the request fields for sending DMs
-- [Comments](/guides/comments): reading, replying to, and hiding comments
+- [Bluesky comments](/platforms/bluesky/comments): reading, replying to, hiding, and deleting replies
+- [Bluesky direct messages](/platforms/bluesky/messages): reading and sending DMs
 - [Platform apps](/guides/platform-credentials): which app connects each platform
 - [Errors](/guides/errors): every Bluesky error code
 - [Supported platforms](/platforms/overview): what each platform supports

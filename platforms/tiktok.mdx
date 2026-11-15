@@ -5,7 +5,7 @@ description: Connect TikTok accounts to publish videos and photo carousels, read
 icon: "tiktok"
 ---
 
-The TikTok API in SocialAPI connects a TikTok account through TikTok's authorization screen, using TikTok API for Business. It publishes videos and photo carousels, lists the account's posts with their counts, reads, replies to, and moderates comments, lists mentions, sends `comment.received` events, and returns profile counts. A [creator connection](#creator-connection) uses TikTok's Content Posting API instead, and has no comments or mentions. SocialAPI's own TikTok app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
+The TikTok API in SocialAPI connects a TikTok account through TikTok's authorization screen, using TikTok API for Business. It publishes videos and photo carousels, lists the account's posts with their counts, reads, replies to, and moderates [comments](/platforms/tiktok/comments), lists mentions, sends `comment.received` events, and returns profile counts. A [creator connection](#creator-connection) uses TikTok's Content Posting API instead, cannot read or answer comments, and has no mentions. SocialAPI's own TikTok app connects the account, so you register nothing: see [Platform apps](/guides/platform-credentials).
 
 ## At a glance
 
@@ -18,7 +18,7 @@ The TikTok API in SocialAPI connects a TikTok account through TikTok's authoriza
 
 ## Capabilities
 
-An unsupported call returns `501 resource.not_supported`. This table is for the default connection. A [creator connection](#creator-connection) has its own table.
+Each row that is not Yes states what the call returns. This table is for the default connection. A [creator connection](#creator-connection) has its own table.
 
 | Feature | Status | Condition |
 |---|---|---|
@@ -26,21 +26,21 @@ An unsupported call returns `501 resource.not_supported`. This table is for the 
 | Publish a photo post | Yes | 1 to 35 images |
 | Send a post to the account's TikTok drafts | Yes | `post_mode: "inbox"`. Video or photo carousel. The creator finishes the post in the TikTok app |
 | Schedule a post | Yes | `scheduled_at` on the post |
-| First comment on a post | No | `first_comment` is ignored. Comment on the post with [Comments](#comments) after it is published |
+| First comment on a post | No | `first_comment` is ignored. Comment on the post with [TikTok comments](/platforms/tiktok/comments) after it is published |
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post, and TikTok gives apps no edit call |
 | Delete a published post | No | `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the TikTok target, and the post stays live. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported`. Delete the post in the TikTok app |
 | List posts | Yes | Public videos and photo posts with likes, comments, shares, and views. See [Sync videos](#sync-videos) |
 | Live post metrics | Yes | `GET /v1/posts/{pid}/metrics`, for the account's 20 most recent posts. See [Sync videos](#sync-videos) |
 | Creator info | Yes | Whether the account can post, its longest video, and its interaction locks. See [Creator info](#creator-info) |
 | Account summary | Yes | Profile and counts. See [Account summary](#account-summary) |
-| Comments, replies, and comments on a post | Yes | See [Comments](#comments) |
-| Hide and unhide a comment | Conditional | Comments written by other people only |
-| Delete a comment | Conditional | Comments written by the connected account only |
+| Comments, replies, and comments on a post | Yes | See [TikTok comments](/platforms/tiktok/comments) |
+| Hide and unhide a comment | Conditional | Comments written by other people only. TikTok refuses to hide the connected account's own comment, with a `platform.tiktok.*` error |
+| Delete a comment | Conditional | Comments written by the connected account only. TikTok refuses to delete another person's comment, with a `platform.tiktok.*` error |
 | Like a comment | Yes | |
 | Private reply to a commenter | No | `501 resource.not_supported` |
 | DMs | No | `501 resource.not_supported` |
-| Mentions | Conditional | TikTok Business Accounts only. See [Mentions](#mentions) |
-| Reply to a mention | Conditional | Mentions made in a comment only |
+| Mentions | Conditional | TikTok Business Accounts only. For another account, TikTok's code returns as `platform.tiktok.<code>`. See [Mentions](#mentions) |
+| Reply to a mention | Conditional | Mentions made in a comment only. A caption mention returns `400 validation.mention_reply_unsupported` |
 | Reviews | No | TikTok has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
 | Analytics export | Partial | Captions and metrics. On the default connection, `include_transcript` or `include_vision` returns `400 account.export_enrichment_not_supported`. A [creator connection](#creator-connection) accepts both |
@@ -80,18 +80,19 @@ TikTok-specific rules:
 - **Account type.** Listing mentions needs a TikTok Business Account: see [Mentions](#mentions).
 - **Connection type.** `metadata.connection_type` is `"business"` (the default) or `"creator"`: see [Creator connection](#creator-connection). Without `connection_type` the connect uses `"business"`. Any other value, including an empty string or a non-string, returns `400 validation.connection_type_invalid`.
 - **Reconnect.** Reconnect with the same flow: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
-- **Accounts connected before 2026-10-13.** [Comment](#comments) and [mention](#mentions) calls on them return `501 resource.not_supported` until you reconnect them.
+- **Accounts connected before 2026-10-13.** [Comment](/platforms/tiktok/comments) calls other than `GET /v1/inbox/comments`, and [mention](#mentions) calls, return `501 resource.not_supported` on them until you reconnect them, and no `comment.received` or `mention.received` event is sent.
 
 ### When TikTok authorization ends
 
 This section covers the default connection. A [creator connection](#creator-connection) is removed when the person removes SocialAPI's app.
 
-The authorization ends when the person removes SocialAPI's app in TikTok's settings, or when TikTok refuses to renew it. TikTok sends SocialAPI no notice of a removal, so SocialAPI learns it from the next call that reaches TikTok.
+The authorization ends when the person removes SocialAPI's app in TikTok's settings, or when TikTok refuses to renew it. TikTok gives apps no notice of a removal. After one, calls for the account fail as follows:
 
 - **First call.** It returns `401 platform.tiktok.auth`.
 - **Later calls.** They return `403 account.reconnection_required` until you reconnect the account.
-- **`401 platform.tiktok.unauthorized`.** TikTok refused one call as unauthorized without saying the authorization is invalid. The account stays usable. Reconnect it if the error repeats.
-- **`account.disconnected` event.** When SocialAPI's own refresh of the account's videos meets the ended authorization before one of your calls does, it sends `account.disconnected` with `reconnect_required: true` and `reason: "posts_sync_auth_failed"`. A removal in TikTok's settings does not delete the account from SocialAPI.
+- **`account.disconnected` event.** When SocialAPI detects the ended authorization before your next call does, it sends `account.disconnected` with `reconnect_required: true` and `reason: "posts_sync_auth_failed"`. A removal in TikTok's settings does not delete the account from SocialAPI.
+
+Separately, `401 platform.tiktok.unauthorized` means TikTok refused one call as unauthorized without saying the authorization is invalid. The account stays usable. Reconnect it if the error repeats.
 
 ## Creator connection
 
@@ -117,7 +118,7 @@ The response has the same shape as in [Connect an account](#connect-an-account),
 | Creator info | Yes. `privacy_level_options` lists every level TikTok allows for the account |
 | Account summary | Yes |
 | Analytics export | Yes, including `include_transcript` and `include_vision` |
-| Comments, `comment.received`, and mentions | No. `501 resource.not_supported` |
+| Comments, `comment.received`, and mentions | No. `GET /v1/inbox/comments` lists the posts with their comment counts. Every other comment call and every mention call returns `501 resource.not_supported`, and no `comment.received` event is sent |
 
 A creator connection asks on TikTok's consent screen for `user.info.basic` and `user.info.profile`, plus the scopes of the [permissions](/guides/permissions) you select:
 
@@ -170,7 +171,7 @@ Other platforms return `501 resource.not_supported` from this endpoint.
 
 ## Account summary
 
-`GET /v1/platforms/tiktok/accounts/{id}/summary` reads the account's profile and counts from TikTok at the time of the call. It needs the `accounts:read` scope, and the account needs the `analytics.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
+`GET /v1/platforms/tiktok/accounts/{id}/summary` returns the account's current profile and counts. It needs the `accounts:read` scope, and the account needs the `analytics.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
 
 ```bash
 curl https://api.social-api.ai/v1/platforms/tiktok/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary \
@@ -198,9 +199,9 @@ When the account's authorization lacks a scope for these fields, TikTok refuses 
 
 ## Sync videos
 
-`GET /v1/posts?platform=tiktok&account_ids={id}` lists the TikTok posts SocialAPI has stored for the account: public videos and photo posts, including posts published outside SocialAPI. Each target carries `permalink`, `media_type` (`VIDEO` or `PHOTO`), and `metrics`.
+`GET /v1/posts?platform=tiktok&account_ids={id}` lists the account's TikTok posts: public videos and photo posts, including posts published outside SocialAPI. Each target carries `permalink`, `media_type` (`VIDEO` or `PHOTO`), and `metrics`.
 
-SocialAPI refreshes an account's stored posts on its own, no more than once every 15 minutes. The account needs the `posts.read` [permission](/guides/permissions). Without it, both sync endpoints return `403 account.permission_missing` and SocialAPI refreshes nothing on its own. `POST /v1/platforms/tiktok/accounts/{id}/sync` refreshes them at once from the 20 most recent posts on TikTok. It needs the `accounts:manage` scope and has no cooldown. `POST /v1/accounts/{id}/sync` reads the same 20 posts and allows 1 sync per account every 5 minutes: see [Analytics](/guides/analytics#refresh-an-accounts-posts).
+SocialAPI refreshes the account's posts on its own. The account needs the `posts.read` [permission](/guides/permissions). Without it, both sync endpoints return `403 account.permission_missing` and SocialAPI refreshes nothing on its own. `POST /v1/platforms/tiktok/accounts/{id}/sync` refreshes them at once from the 20 most recent posts on TikTok. It needs the `accounts:manage` scope and has no cooldown. `POST /v1/accounts/{id}/sync` reads the same 20 posts and allows 1 sync per account every 15 minutes: see [Analytics](/guides/analytics#refresh-an-accounts-posts).
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/platforms/tiktok/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/sync \
@@ -222,24 +223,11 @@ The two endpoints that return counts use different keys for the view count:
 | `GET /v1/posts` and `GET /v1/posts/{pid}` | `metrics.likes`, `metrics.comments`, `metrics.shares`. `metrics.saves` is always `0` | `metrics.extra.view_count`. Absent while the count is `0` |
 | `GET /v1/posts/{pid}/metrics` | The same three keys, with `metrics.saves` always `0` | `metrics.views` and `metrics.extra.views`, with the same value. Absent while the count is `0` |
 
-TikTok updates likes, comments, shares, and views with a delay of 24 to 48 hours. A call reads TikTok's latest figures, so a new post shows `0` until TikTok publishes them. Reach, saves, and watch time are not available. `GET /v1/posts/{pid}/metrics` reads the account's 20 most recent posts and reuses that read for 10 minutes. For an older post, the target returns `404 resource.not_found`. Examples are in [TikTok publishing](/platforms/tiktok/publishing#6-retrieve-posts).
+TikTok updates likes, comments, shares, and views with a delay of 24 to 48 hours. The counts are TikTok's latest published figures, so a new post shows `0` until TikTok publishes them. Reach, saves, and watch time are not available. `GET /v1/posts/{pid}/metrics` covers the account's 20 most recent posts. For an older post, the target returns `404 resource.not_found`. Examples are in [TikTok publishing](/platforms/tiktok/publishing#6-retrieve-posts).
 
 ## Comments
 
-SocialAPI reads, writes, and moderates comments on the account's own TikTok posts through the shared [Comments](/guides/comments) endpoints. This section holds only what differs on TikTok.
-
-- **IDs.** `{postId}` is the TikTok video ID, which is the target's `platform_post_id`. A comment's `platform_id` is `{video_id}_{comment_id}`, and its `id` is the `sapi_cmt_` ID. Use `id` or `platform_id` as `{commentId}`. Hide, unhide, reply, and list replies need that full form: a bare TikTok comment ID returns `400 validation.comment_id_invalid`. Delete and like accept either form.
-- **List.** `GET /v1/inbox/comments/{postId}` returns up to 30 comments from TikTok per page of results, and the replies endpoint returns up to 30 replies per page of results. TikTok leaves hidden comments out of its list. Hidden comments added as described below are in addition to TikTok's items, so the first page of results can hold more than 30. A top-level comment that appeared in this list and that you then hid with `POST /v1/inbox/comments/{postId}/{commentId}/hide` is added at the end of the first page of results, with `is_hidden: true`, when all three hold: that page has `pagination.has_more: false`, the request sends no `q`, and `order` and `moderation_status` are absent or set to their defaults (`order=recent`, `moderation_status=published`). That page can then hold more items than `limit`. Send `limit=30`, the largest page TikTok returns: if the first page still has `pagination.has_more: true`, hidden comments are not listed on any page. A comment hidden in the TikTok app is not added back. Keep a comment's `id` or `platform_id` when you hide it: where hidden comments are not listed, that ID is how you unhide it through [Hide and unhide a comment](/guides/comments#hide-and-unhide-a-comment). A reply to a hidden comment cannot be listed. Comment text only: images in comments are not returned.
-- **`GET /v1/inbox/comments`.** It lists the account's posts that have comments, with their comment counts. A read refreshes that list when it is older than 1 hour.
-- **Reply.** `POST /v1/inbox/comments/{postId}` with `comment_id` replies to that comment. Without `comment_id` it comments on the post as the connected account. The text holds up to 1,200 characters, and a reply costs 1 interaction credit.
-- **Hide and unhide.** For comments written by other people. `capabilities.can_hide` is `false` on the connected account's own comments.
-- **Delete.** For comments the connected account wrote. `capabilities.can_delete` is `false` on other people's comments. Hide those instead.
-- **Like.** `POST` and `DELETE` on `/v1/inbox/comments/{postId}/{commentId}/like` like and unlike as the connected account. `liked_by_viewer` is `true` when the connected account liked the comment.
-- **Private replies.** TikTok has none: `501 resource.not_supported`, and `can_private_reply` is `false`.
-- **Author fields.** `author_id` is TikTok's unique identifier for the person, `author_name` is the display name (the handle when TikTok gives none), and `author_username` is the handle.
-- **Replies.** A reply has `parent_id` set to the `platform_id` of the comment it answers.
-
-TikTok limits each account to 40 requests per minute for each TikTok call. Beyond that, calls return `429 platform.tiktok.rate_limit`.
+SocialAPI lists, replies to, hides, likes, and deletes the comments on the account's own TikTok posts, and sends `comment.received` when another person comments. IDs, hidden comments, page sizes, the rules for who can hide or delete what, and the comment errors are on [TikTok comments](/platforms/tiktok/comments).
 
 ## Mentions
 
@@ -255,19 +243,11 @@ TikTok limits each account to 40 requests per minute for each TikTok call. Beyon
 
 | Event | When it fires |
 |---|---|
-| `comment.received` | Another person comments on, or replies under, a TikTok post of the account. See [`comment.received`](/guides/webhook-events#comment-received) |
+| `comment.received` | Another person comments on, or replies under, a TikTok post of the account. The TikTok fields are in [TikTok comments](/platforms/tiktok/comments#comment-events) |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery). A TikTok post can finish after the request that created it returned |
 | `account.connected` | You connected a TikTok account |
 | `account.disconnected` | SocialAPI flagged the account for reconnection: see [When TikTok authorization ends](#when-tiktok-authorization-ends). On a [creator connection](#creator-connection), the person removed SocialAPI's app and SocialAPI removed the account |
 | `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
-
-`comment.received` details on TikTok:
-
-- **Author.** `author.id` is TikTok's unique identifier for the person. `author.name`, `author.username`, and `author.avatar_url` come from the comment.
-- **Post.** `platform_post_id` is the TikTok video ID. `post_id` and `permalink` are not set.
-- **Not sent.** Comments written by the connected account, and TikTok's deletions and visibility changes. A comment that TikTok no longer lists when SocialAPI reads it, for example one deleted within seconds, produces no event.
-- **Timing.** TikTok reports a new comment to SocialAPI within 5 minutes of the comment.
-- **Raw payload.** `raw_payload` holds the TikTok notification.
 
 TikTok has no DM or review events. Listing mentions sends `mention.received`: see [Mentions you list](/guides/webhook-events#mentions-you-list). Every event is described in [Webhook events](/guides/webhook-events).
 
@@ -281,11 +261,9 @@ TikTok has no DM or review events. Listing mentions sends `mention.received`: se
 | Photo post | 1 to 35 images, JPEG or WebP, up to 20 MB each |
 | Posts, SocialAPI's cap | 13 per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 | Posts, TikTok's own limit | 6 per minute and 15 per day for each account, for the video call and for the photo call. SocialAPI does not enforce the 6 per minute: TikTok refuses a 7th post within a minute |
-| Comment or reply text | 1,200 characters |
 | Posts per sync | 20 |
-| Comments or replies per page | 30 |
 | Mentions per page | 20 |
-| TikTok's request limit | 40 requests per minute for each account and each TikTok call. `429 platform.tiktok.rate_limit`. Wait 1 minute, then retry. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
+| TikTok's request limit | TikTok's own request limit: 40 requests per minute for each account and each TikTok call, plus a limit on all calls made through SocialAPI's app, so this error can arrive below 40 per minute. `429 platform.tiktok.rate_limit`. Wait 5 minutes, then retry. If the error repeats after that, TikTok's daily limit is reached: retry after 00:00 UTC. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 
 ## Scopes
 
@@ -310,6 +288,7 @@ SocialAPI's TikTok app asks the person for these scopes on TikTok's consent scre
 ## Related
 
 - [TikTok publishing](/platforms/tiktok/publishing): fields, media rules, and quirks for publishing
+- [TikTok comments](/platforms/tiktok/comments): list, reply to, hide, like, and delete comments
 - [Comments](/guides/comments): the shared comment endpoints
 - [Mentions](/guides/mentions): the shared mention endpoints
 - [Connect accounts](/guides/connect-accounts): the shared connect flow

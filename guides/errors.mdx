@@ -95,12 +95,12 @@ These codes apply to any endpoint. `error.meta.field` names the offending input 
 | 404 | `account.not_found` | The `acc_` ID is not a connected account of your SocialAPI account |
 | 404 | `brand.not_found` | The brand is outside the brands your [brand-restricted key](/guides/scoped-keys) can reach. The Facebook, Google, and LinkedIn assign calls also return it for a brand that does not exist or is not yours |
 | 404 | `conversation.not_found` | The conversation does not exist or is not yours |
-| 404 | `media.not_found` | The media item does not exist or is not yours |
+| 404 | `media.not_found` | The media item does not exist or is not yours. A `media_id` attachment on a post or DM also returns it when the upload has not finished |
 | 409 | `resource.conflict` | The request conflicts with current state. Duplicate post content and invite creation use it: see below |
 | 409 | `ambiguous_post_id` | The platform post ID you passed matches more than one post. Use the SocialAPI post ID |
-| 501 | `resource.not_supported` | The operation does not exist on this account's platform. `meta.platform` names it. See the [capability matrix](/platforms/overview) |
+| 501 | `resource.not_supported` | The operation does not exist on this account's platform. `meta.platform` names it. See the [capability matrix](/platforms/overview). On X, also returned when X refuses the action for that resource or person, for example a DM to a person who does not accept DMs from the account: see [X comments](/platforms/twitter/comments) and [X direct messages](/platforms/twitter/messages) |
 | 422 | `account.platform_unsupported` | The account's platform has no reviews, and the request was for reviews |
-| 4xx, 5xx | `http.<status>` | A routing or transport error. `http.404` is an unknown path. `GET /v1/inbox/media/{id}` also returns `http.404` (unknown media), `http.410` (media expired), and `http.503` (the media is still being fetched, or too many requests are waiting: send the request again, after the `Retry-After` delay when the response carries one, until you get 200 or 410) |
+| 4xx, 5xx | `http.<status>` | A routing or transport error. `http.404` is an unknown path. `GET /v1/inbox/media/{id}` also returns `http.404` (unknown media), `http.410` (media expired), and `http.503` (the media is not ready yet, or too many requests are waiting: send the request again, after the `Retry-After` delay when the response carries one, until you get 200 or 410) |
 
 ## Rate limits
 
@@ -111,6 +111,7 @@ Rate-limit codes are `429` and are covered in [Rate limits](/guides/rate-limits)
 | 429 | `ratelimit.exceeded` | Your SocialAPI account used its request budget for the current minute. `meta.limit` is the budget and `meta.retry_after_seconds` the wait. See [Request rate limit](/guides/rate-limits#request-rate-limit) |
 | 429 | `publishing.velocity_limit` | A publish target reached its post cap per hour or per 24 hours. `meta.window` is `hour` or `day` |
 | 429 | `platform.<name>.rate_limit` | The platform's own limit. Wait, then retry with backoff. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
+| 429 | `platform.<name>.throttled` | The platform refused this account or Page with its own rate limit, and SocialAPI refuses its calls until the wait ends. `meta.scope` is `account` or `page`. Wait for the `Retry-After` header, then retry. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 | 429 | `inbox.sync_rate_limited` | `POST /v1/inbox/sync` ran again before the wait for the same target ended. `meta.retry_after_seconds` is set |
 | 429 | `accounts.sync_rate_limited` | `POST /v1/accounts/{id}/sync` ran again before the wait for the same account ended. `meta.retry_after_seconds` is set |
 | 429 | `accounts.sync_daily_limit` | `POST /v1/accounts/{id}/sync` reached your plan's daily limit. `meta.retry_after_seconds` (until midnight UTC) and `meta.limit` are set |
@@ -185,7 +186,8 @@ A code marked **Redirect** has no HTTP status: it reaches your `redirect_uri` as
 | 400 | `account.use_boards_endpoint` | A Pinterest account has boards, not Pages. Use `/v1/accounts/{id}/boards` |
 | 400 | `account.boards_not_supported` | The account is not Pinterest, which is the only platform with boards |
 | 403 | `whatsapp.number_banned` | Meta banned the WhatsApp number, so it cannot be connected |
-| 400 | `whatsapp.ambiguous_phone_number` | The WhatsApp Business account has more than one phone number. Pass `phone_number_id` |
+| 400 | `whatsapp.ambiguous_phone_number` | The WhatsApp Business Account has more than one phone number and none was chosen. Start the connection again with `POST /v1/accounts/connect` and choose the number when the redirect carries `status=selection_required` |
+| Redirect | `whatsapp.no_waba` | No WhatsApp Business Account was shared during signup. Start a new connection |
 | 400 | `whatsapp.no_phone_number` | The WhatsApp Business account has no phone number. Add one, then connect again |
 | 409 | `whatsapp.business_app_number` | The number is still in the WhatsApp Business app and is already registered. Do not call register for it |
 | 400 | `platform.bluesky.auth_factor_required` | The Bluesky account has email two-factor authentication on. Retry with the emailed code as `metadata.auth_factor_token` |
@@ -266,7 +268,7 @@ See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [R
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 400 | `platform.instagram.window_closed`, `platform.facebook.window_closed` | The 24-hour messaging window is closed. The person must message you first |
-| 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: it is older than 7 days, or already received one |
+| 400 | `platform.instagram.private_reply_ineligible`, `platform.facebook.private_reply_ineligible` | The comment cannot receive a private reply: it is older than 7 days, or already received one. A reply that carried `buttons` or an attachment can also be refused for that content: unless `meta.blocked_locally` is `true`, send it once more as text only |
 | 422 | `platform.instagram.attachment_failed`, `platform.facebook.attachment_failed` | The platform could not fetch or accept an attachment on a DM or a private reply. Check that the URL is publicly reachable and the file type and size are supported, then send again. A private reply refused this way leaves the comment eligible |
 | 422 | `platform.instagram.thread_unavailable`, `platform.facebook.thread_unavailable` | The platform refused to deliver to this conversation. It can be restricted or unavailable |
 | 422 | `platform.facebook.comment_not_hideable` | Facebook refused to hide or unhide the comment, for example a comment the Page's moderation filters already hid. Retrying does not help |
@@ -278,22 +280,30 @@ See [Comments](/guides/comments), [Direct messages](/guides/direct-messages), [R
 | 400 | `validation.field_invalid` | `status` is not `active` or `archived`, `moderation_status` is not an allowed value, or `order` is not `newest`, `rating_asc`, or `rating_desc` |
 | 400 | `validation.attachment_invalid` | An attachment has no `source_type` |
 | 400 | `validation.attachment_type_required` | An attachment of source `platform_attachment_id` has no `type` |
+| 400 | `validation.field_not_supported` | A private reply carries `attachment` on a platform whose private replies take none. `meta.field` is `attachment` |
+| 400 | `validation.comment_urn` | LinkedIn: the comment ID on a delete does not start with `sapi_` and is not a LinkedIn comment URN |
 | 400 | `validation.media_unresolved` | A `media_id` attachment could not be resolved |
-| 400 | `validation.invalid_message_tag` | The `message_tag` is not supported. Instagram Login accepts only `HUMAN_AGENT` |
+| 400 | `validation.attachment_conflict` | A private reply sent `attachment` together with text or buttons. A private reply carries text or 1 attachment |
+| 429 | `messaging.recipient_limit` | Too many different people were messaged this calendar day (UTC). Wait for the `Retry-After` header. Nothing was sent and no credit was used |
+| 429 | `messaging.velocity_limit` | The sending Instagram account, Facebook Page, or WhatsApp number is sending messages or replies faster than SocialAPI allows. Wait for the `Retry-After` header. Nothing was sent and no credit was used |
+| 422 | `messaging.tag_not_supported` | The request sent `message_tag` where no tag is accepted: any value on a platform or connection other than Instagram Login, or a value other than `HUMAN_AGENT` on Instagram Login. Nothing is sent and no credit is used. Send without `message_tag` |
+| 403 | `messaging.tag_not_enabled` | The request sent `message_tag: "HUMAN_AGENT"`, and HUMAN_AGENT tagging is not enabled for your SocialAPI account |
+| 400 | `messaging.human_agent_window_closed` | The person's last message is more than 7 days old, so even `HUMAN_AGENT` cannot reach them. The person must message you first |
+| 429 | `messaging.tag_rate_limited` | HUMAN_AGENT tagging is paused on the connected account. Retry after the `Retry-After` header when it is present |
 | 400 | `validation.message_required` | `message_id` is missing when reacting to a message |
 | 400 | `validation.participant_required` | `participant_id` is missing when reacting to a message, the conversation has no participant for a sender action, or the conversation's X participant is unknown |
 | 400 | `validation.invalid_reaction` | The reaction is not a single emoji character |
 | 400 | `validation.invalid_action` | `action` on a sender action is not `typing_on`, `typing_off`, or `mark_seen` |
 | 400 | `validation.action_unsupported` | The platform does not offer this sender action: WhatsApp has no `typing_off` |
 | 400 | `validation.no_inbound_message` | A WhatsApp sender action was sent on a conversation where the person has sent no message |
-| 400 | `validation.interactive_conflict` | More than one of `quick_replies`, `buttons`, and `cards` (Instagram), or of `buttons` and `list_sections` (WhatsApp), was sent |
-| 400 | `validation.too_many_quick_replies`, `validation.too_many_buttons`, `validation.too_many_cards`, `validation.too_many_sections`, `validation.too_many_rows` | An interactive message exceeds a count limit. Instagram: 13 quick replies, 3 buttons per card, 10 cards. WhatsApp: 3 buttons, 10 sections, 10 rows across all sections |
-| 400 | `validation.invalid_button_count` | A button template has more than 3 buttons: on an Instagram DM, or on an Instagram or Facebook private reply |
-| 400 | `validation.invalid_button_title`, `validation.title_too_long`, `validation.quick_reply_title_too_long`, `validation.card_text_too_long`, `validation.description_too_long`, `validation.text_too_long` | A title or text is empty or too long. Limits: button title 20 characters, quick reply title 20, card title 80, card subtitle 80, button template text 640 (Instagram DMs, and private replies on Instagram and Facebook), WhatsApp interactive text 1,024, WhatsApp `list_button` 20, WhatsApp section title 24, WhatsApp row title 24, WhatsApp row description 72 |
+| 400 | `validation.interactive_conflict` | More than one of `quick_replies`, `buttons`, and `cards` (Instagram, Facebook), or of `buttons` and `list_sections` (WhatsApp), was sent |
+| 400 | `validation.too_many_quick_replies`, `validation.too_many_buttons`, `validation.too_many_cards`, `validation.too_many_sections`, `validation.too_many_rows` | An interactive message exceeds a count limit. Instagram and Facebook: 13 quick replies, 3 buttons per card, 10 cards. WhatsApp: 3 buttons, 10 sections, 10 rows across all sections |
+| 400 | `validation.invalid_button_count` | A button template has more than 3 buttons: on an Instagram or Facebook DM, or private reply |
+| 400 | `validation.invalid_button_title`, `validation.title_too_long`, `validation.quick_reply_title_too_long`, `validation.card_text_too_long`, `validation.description_too_long`, `validation.text_too_long` | A title or text is empty or too long. Limits: button title 20 characters, quick reply title 20, card title 80, card subtitle 80, button template text 640 (Instagram and Facebook DMs and private replies), WhatsApp interactive text 1,024, WhatsApp `list_button` 20, WhatsApp section title 24, WhatsApp row title 24, WhatsApp row description 72 |
 | 400 | `validation.invalid_button_type` | A button `type` is not `url` or `postback` |
 | 400 | `validation.button_type_unsupported` | A WhatsApp button is neither `postback` nor `url`, or a `url` button is sent beside other buttons. Send up to 3 `postback` buttons, or 1 `url` button alone |
-| 400 | `validation.cards_unsupported`, `validation.quick_replies_unsupported` | WhatsApp has no carousel or quick replies. Use buttons or `list_sections` |
-| 400 | `validation.duplicate_payload` | WhatsApp button payloads are not unique |
+| 400 | `validation.cards_unsupported`, `validation.quick_replies_unsupported` | WhatsApp has no carousel or quick replies, and `cards` or `quick_replies` was sent together with `buttons` or `list_sections`. Use buttons or `list_sections` |
+| 400 | `validation.duplicate_payload` | WhatsApp button payloads or list row IDs are not unique |
 | 400 | `validation.attachment_unsupported` | X direct messages cannot carry attachments through the API. Send text only |
 | 400 | `validation.text_required` | X requires message text |
 | 403 | `platform.bluesky.not_own_record` | Bluesky lets you delete only your own replies. Hide the reply instead |
@@ -439,10 +449,14 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 422 | `platform.threads.THREADS_API__LINK_LIMIT_EXCEEDED` | The post holds more than 5 unique links |
 | 422 | `platform.threads.ERROR`, `platform.threads.EXPIRED` | Threads rejected the media, or the media expired before publishing |
 | 503 | `platform.threads.container_timeout` | Threads did not finish processing the media after about 4 minutes |
+| 422 | `platform.threads.1` | Threads reported an unknown error. `error.message` carries Meta's reason, and `meta.fbtrace_id` its trace ID when Meta sends one. Retry the request with backoff |
 | 422 | `platform.threads.801` | `follower_demographics` was requested for an account with fewer than 100 followers |
 | 429 | `platform.threads.rate_limit` | Threads' own rate limit. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
-| 403 | `platform.threads.<code>` | A call needs a Threads scope that the account lacks, such as hiding a reply without `threads_manage_replies`. `<code>` is Meta's error code |
-| 404 | `resource.not_found` | The post, reply, or profile does not exist, or a profile is not discoverable |
+| 403 | `platform.threads.<code>`, where `<code>` is from 200 to 299 | The account lacks a Threads scope the call needs. Reconnect the account |
+| 422 | `platform.threads.10` | Threads refused the call as not permitted. `error.message` carries Meta's reason. When it names a missing permission, reconnect the account |
+| 403 | `platform.threads.10.<subcode>` | Threads refused this action on this specific post or reply. `error.message` says why |
+| 403 | `platform.threads.10.4279017` | You tried to hide a reply your own account wrote. Delete it instead |
+| 404 | `resource.not_found` | The post, reply, or profile does not exist, a profile is not discoverable, or Threads refused a value in the request as invalid, for example an ID or the reply text |
 
 ### TikTok
 
@@ -466,15 +480,19 @@ An action that fails when an Automation runs is not returned as an error. It is 
 | 422 | `platform.tiktok.publish_failed` | TikTok rejected the post while processing it, or could not report its outcome. `error.message` carries TikTok's reason. Check the account in the TikTok app before retrying |
 | 401 | `platform.tiktok.auth` | TikTok's authorization for the account ended. Later calls return `403 account.reconnection_required` until you reconnect |
 | 401 | `platform.tiktok.unauthorized` | TikTok refused the call as unauthorized without saying the authorization ended. The account stays usable. Reconnect if it repeats |
-| 429 | `platform.tiktok.rate_limit` | TikTok's own request limit of 40 requests per minute for each account and each TikTok call. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back). Wait 1 minute, then retry |
+| 429 | `platform.tiktok.rate_limit` | TikTok's own request limit: 40 requests per minute for each account and each TikTok call, plus a limit on all calls made through SocialAPI's app, so this error can arrive below 40 per minute. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back). Wait 5 minutes, then retry. If the error repeats after that, TikTok's daily limit is reached: retry after 00:00 UTC |
 | 503 | `platform.tiktok.api_error` | TikTok returned no usable answer, or accepted a post without returning its publish ID. Check the account in the TikTok app before retrying a post |
 
 A TikTok code that this table does not list returns `503` with the code after `platform.tiktok.`.
 
-### X, LinkedIn, YouTube, and Zalo
+### X, LinkedIn, and YouTube
 
 | HTTP | Code | When it occurs |
 |---|---|---|
+| 403 | `platform.twitter.forbidden` | X refused the action, for example a reply to a post whose author did not mention or quote the connected account, or a delete of another person's reply. `error.message` carries X's reason |
+| 403 | `platform.twitter.duplicate_content` | X refused a post or reply whose text repeats a recent post of the account. Change the text |
+| 404 | `account.not_found` | LinkedIn: LinkedIn refused the action without a reason. On a company Page, check that the member who connected it still administers it. Then reconnect the account |
+| 400 | `validation.field_required` with `meta.field` `request_body` | LinkedIn or X rejected the request as malformed, for example a LinkedIn comment URN built on a `urn:li:share:` ID |
 | 400 | `validation.media_count` | An X post has more media items than X accepts |
 | 400 | `validation.media_type` | X does not accept the media type, or a LinkedIn multi-image post includes a video |
 | 400 | `validation.media_size` | An X media file is too large to upload in the chunks X allows |
@@ -486,26 +504,29 @@ A TikTok code that this table does not list returns `503` with the code after `p
 | 400 | `validation.video_size` | The size of the YouTube video file could not be determined |
 | 403 | `platform.youtube.insufficientPermissions` | The connection lacks a scope the call needs. Reconnect the account to grant it |
 | 403 | `platform.youtube.custom_thumbnail_forbidden` | The channel cannot set custom thumbnails, or YouTube refused a thumbnail for this video. Verify the channel in YouTube Studio, then retry |
-| 403 | `platform.youtube.account_suspended` | YouTube suspended or closed the account or its channel. Reconnecting does not restore access. Resolve the suspension with YouTube. SocialAPI stops background sync for the account |
-| 422 | `platform.youtube.processing_failure` | YouTube refused to delete the comment: only comments your channel wrote can be deleted |
+| 403 | `platform.youtube.account_suspended` | YouTube suspended or closed the account or its channel. Reconnecting does not restore access. Resolve the suspension with YouTube |
+| 422 | `platform.youtube.processing_failure` | YouTube refused the request: on a delete, the comment was not written by your channel (hide it instead); on a hide or a moderation, the commenter already deleted the comment, or YouTube could not process the request (retry once, and stop if it repeats) |
+| 4xx | `platform.youtube.api_error` | YouTube refused the request with a reason SocialAPI does not map, for example comment text over YouTube's length limit. The status is YouTube's own 4xx |
+| 403 | `platform.youtube.forbidden` | YouTube refused the action for lack of permission, or the comment was deleted, or the comment ID is invalid. Check that the comment still exists and is on a video of the connected channel. Retrying does not help |
+| 429 | `validation.youtube_daily_reply_limit` | The channel posted its 5 replies and top-level comments for the day (midnight to midnight Pacific Time). The call costs no credit. Retry after midnight Pacific Time |
 | 422 | `platform.youtube.comments_disabled` | The video has comments turned off. Retrying does not help until the channel owner turns them back on, and the error can continue for up to 24 hours after that |
 
 ### WhatsApp
 
-WhatsApp has the most codes because of its messaging window, frequency caps, and template states. See [WhatsApp](/platforms/whatsapp).
+WhatsApp has the most codes because of its messaging window, frequency caps, and template states. See [WhatsApp messages](/platforms/whatsapp/messages).
 
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 400 | `whatsapp.window_closed` | The 24-hour customer service window is closed. Send an approved template |
 | 429 | `whatsapp.frequency_cap` | The recipient reached the daily marketing message limit |
 | 429 | `whatsapp.pair_rate_limit` | Too many messages to the same recipient |
-| 429 | `whatsapp.throughput_exceeded` | The account's messaging throughput limit is exceeded |
+| 429 | `whatsapp.throughput_exceeded` | The sending number exceeded WhatsApp's messaging throughput |
 | 403 | `whatsapp.user_opted_out` | The recipient opted out of messages |
 | 400 | `whatsapp.undeliverable` | The recipient is not on WhatsApp |
 | 404 | `whatsapp.template_not_found` | The template does not exist for this WhatsApp Business account |
 | 400 | `whatsapp.template_paused` | The template is paused because of quality issues |
 | 400 | `validation.template_invalid` | A template failed validation. `meta.errors` lists the issues |
-| 400 | `validation.body_empty` | A template update set no fields |
+| 400 | `validation.body_empty` | `PUT /v1/platforms/whatsapp/phone-numbers/{id}/business-profile` set no field to change |
 | 400 | `whatsapp.not_registered` | The number is not registered for the WhatsApp Cloud API. Register it before sending |
 | 400 | `whatsapp.pin_mismatch` | The number has a two-step verification PIN SocialAPI does not hold. Turn two-step verification off for the number, then retry |
 | 400 | `whatsapp.media_download_failed` | WhatsApp could not download the media from the URL. Check that it is publicly reachable |
@@ -515,29 +536,30 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 | 400 | `validation.image_format_unsupported` | A WhatsApp image is not JPEG or PNG |
 | 400 | `validation.voice_unsupported` | `voice` was set on an attachment that is not audio |
 | 404 | `whatsapp.no_account` | No WhatsApp account is connected |
-| 503 | `whatsapp.unknown` | WhatsApp returned an error SocialAPI does not map. Retry with backoff |
+| 503 | `whatsapp.unknown` | WhatsApp reported an unknown error (its code 131000). Retry with backoff |
+| 503 | `platform.whatsapp.api_error` | WhatsApp refused the request with a code SocialAPI does not map, or SocialAPI got no usable answer from WhatsApp. When WhatsApp refused it, `meta.platform_code` holds Meta's numeric code, and `meta.platform_subcode` its subcode when Meta sent one: fix the request when the code names a parameter problem (for example `132000`), otherwise retry with backoff. Without `platform_code`, the request can still have run: see [Create requests are not idempotent](/guides/ids#create-requests-are-not-idempotent) before you repeat a send |
 
 ### Telegram
 
 | HTTP | Code | When it occurs |
 |---|---|---|
 | 403 | `telegram.cannot_message` | The bot cannot message this chat. The person must start the bot first, or the bot was blocked or removed. There is no 24-hour window once the bot is started |
-| 400 | `validation.telegram_bad_request` | Telegram rejected the request. Common causes are text over 4,096 characters and an attachment URL Telegram could not fetch. `error.message` carries Telegram's description |
+| 400 | `validation.telegram_bad_request` | Telegram rejected the request: text over 4,096 characters, a caption over 1,024 characters, a file over Telegram's size limit, a URL Telegram could not fetch, a `platform_attachment_id` attachment, or a request with interactive content and no `text`. `error.message` carries Telegram's description |
 
 ### Zalo
 
 | HTTP | Code | When it occurs |
 |---|---|---|
-| 422 | `platform.zalo.not_deliverable` | The message is outside the customer service messaging window, or the recipient is not eligible |
+| 422 | `platform.zalo.not_deliverable` | The person has not interacted with the Official Account in the last 7 days, or Zalo does not let the Official Account reach them. `error.meta.zalo_code` holds Zalo's reason |
 | 401 | `platform.zalo.auth` | The access token expired or was revoked, or the Official Account is no longer authorized |
 | 202 | `platform.zalo.article_processing` | Zalo is still processing the article when the request stopped waiting. The article can still publish: check before retrying |
-| 429 | `platform.zalo.rate_limit` | The per-app or per-Official Account quota is used up |
+| 429 | `platform.zalo.rate_limit` | The per-app or per-Official Account quota is used up, or the person reached how many messages they can receive from the Official Account |
 | 400 | `validation.platform_param` | Zalo rejected a parameter. `error.message` carries Zalo's reason |
-| 404 | `resource.not_found` | The Zalo account or object does not exist |
+| 404 | `resource.not_found` | Zalo reports that the Official Account was deleted or does not exist |
 | 503 | `platform.zalo.e<N>` | Zalo returned an error SocialAPI does not map. `<N>` is the absolute value of Zalo's numeric code (Zalo `-105` becomes `platform.zalo.e105`) |
 | 503 | `platform.zalo.api_error` | The request failed before Zalo answered with an error |
 
-`platform.zalo.not_deliverable` is the most common: Zalo allows a customer service message within 7 days of the person's last interaction with your Official Account (free within 48 hours), and refuses later sends with `422`.
+`platform.zalo.not_deliverable` is the most common: Zalo allows a consultation message inside the 7-day messaging window that the person's last interaction with your Official Account opens, and refuses later sends with `422`. See [Zalo direct messages](/platforms/zalo/messages#the-7-day-messaging-window).
 
 ### Bluesky
 
@@ -545,9 +567,10 @@ WhatsApp has the most codes because of its messaging window, frequency caps, and
 |---|---|---|
 | 400 | `platform.bluesky.auth_factor_required` | See [Connect an account](#connect-an-account) |
 | 403 | `platform.bluesky.dm_scope_missing` | The app password has no direct message access. Create a new app password with the option on, then reconnect. Posts, comments, and mentions keep working |
+| 503 | `platform.bluesky.ConvoLocked` | The Bluesky DM conversation is locked and accepts no new messages. Retrying does not help |
 | 403 | `platform.bluesky.account_takedown` | Bluesky suspended the account. Reconnecting does not restore access |
 | 429 | `platform.bluesky.rate_limit` | Bluesky's quota is used up. Sign-in is limited to 30 requests per 5 minutes per account |
-| 400 | `validation.field_invalid` | Bluesky could not resolve the handle, or an image is larger than 2 MB. `meta.field` names the field |
+| 400 | `validation.field_invalid` | Bluesky could not resolve the handle, rejected the app password, or an image is larger than 2 MB. `meta.field` names the field. With `app_password` on connect, Bluesky rejected the password you sent: use an app password, not the account password. On a later call, the saved app password no longer works: create a new app password and connect the account again |
 | 400 | `validation.platform_param` | Bluesky rejected a parameter. `error.message` carries Bluesky's reason |
 
 `platform.bluesky.dm_scope_missing` affects only the DM endpoints. Treat it as a failure of one capability, not a dead connection.
@@ -588,7 +611,7 @@ When a platform refuses a call, the code is `platform.<name>.<reason>`, where `<
 | 429 | `platform.<name>.rate_limit` | The platform's own limit. See [Rate limits](#rate-limits) |
 | 422 | `platform.<name>.publish_failed` | A publish failed with an error SocialAPI does not map. Appears in [Delivery failures](#delivery-failures) |
 | 503 | `platform.<name>.api_error` | A failure reaching the platform, or a response with no usable error |
-| 503 | `platform.<name>.<code>` | The platform returned its own error code. The status is `503` unless the code has its own row above, such as `404 platform.facebook.100` |
+| 503 | `platform.<name>.<code>` | The platform returned its own error code. The status is `503` unless the code has its own row above, such as `404 platform.facebook.100` or `403 platform.twitter.forbidden` |
 
 Branch on the prefix and suffix: `platform.` with `.auth` means reconnect, with `.rate_limit` means back off.
 

@@ -3,7 +3,7 @@ title: "Rate limits"
 description: "Stay within SocialAPI's request rate limit, posting velocity caps, and each platform's own limits, and handle HTTP 429 with Retry-After."
 ---
 
-SocialAPI applies two rate limits of its own: a [request rate limit](#request-rate-limit) per SocialAPI account, and a [posting velocity cap](#posting-velocity-caps) per publish target. Each platform also applies its own limits. All of them answer HTTP 429. Read the `Retry-After` header when it is present and wait that many seconds before you send the request again.
+SocialAPI applies its own rate limits: a [request rate limit](#request-rate-limit) per SocialAPI account, a [posting velocity cap](#posting-velocity-caps) per publish target, and messaging limits per sending account, listed in [Every 429 code](#every-429-code). Each platform also applies its own limits. All of them answer HTTP 429. Read the `Retry-After` header when it is present and wait that many seconds before you send the request again.
 
 These limits do not depend on your plan, and upgrading does not raise them. The request rate limit grows with your connected accounts. Post and interaction allowances per billing period are on [Plans and usage](/guides/plans).
 
@@ -32,12 +32,17 @@ A 429 from SocialAPI's own limits on `/v1` uses the standard error envelope. `er
 | `ratelimit.exceeded` | [Requests per minute](#request-rate-limit) for your SocialAPI account | Yes |
 | `publishing.velocity_limit` | [Posts per hour and per 24 hours](#posting-velocity-caps) for one publish target | Yes |
 | `platform.{platform}.rate_limit` | The [platform's own limit](#platform-limits) | When the platform reports a wait |
+| `platform.{platform}.throttled` | Calls for an account or Page paused after the platform refused it with its own limit | Yes |
+| `messaging.velocity_limit` | How fast one sending Instagram account, Facebook Page, or WhatsApp number sends DMs, WhatsApp template messages, comment and mention replies, and private replies | Yes |
+| `messaging.tag_rate_limited` | HUMAN_AGENT tagging is paused on the connected account. See [Instagram direct messages](/platforms/instagram/messages#reply-after-24-hours-with-human_agent) | When the pause has an end time |
+| `messaging.recipient_limit` | How many different people are messaged per calendar day (UTC). See [Errors](/guides/errors#inbox-comments-messages-and-reviews) | Yes |
+| `whatsapp.frequency_cap`, `whatsapp.pair_rate_limit`, `whatsapp.throughput_exceeded` | WhatsApp's own limits on one person or one number. See [WhatsApp messages](/platforms/whatsapp/messages#errors-and-debugging) | No |
 | `inbox.sync_rate_limited` | Repeated `POST /v1/inbox/sync` for the same target. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually) | Yes |
 | `accounts.sync_rate_limited` | Repeated `POST /v1/accounts/{id}/sync` for the same connected account. See [Analytics](/guides/analytics#refresh-an-accounts-posts) | Yes |
 | `accounts.sync_daily_limit` | Your plan's daily number of `POST /v1/accounts/{id}/sync` calls. See [Analytics](/guides/analytics#refresh-an-accounts-posts) | Yes |
 | `validation.post_limit_exhausted`, `validation.interaction_limit_exhausted`, `billing.post_limit`, `billing.export_limit`, `billing.export_cooldown`, `billing.export_concurrent` | Plan allowances. See [Plans and usage](/guides/plans) | No |
 
-A request refused by `ratelimit.exceeded` or `publishing.velocity_limit` never reaches the platform and spends no credit.
+A request refused by `ratelimit.exceeded`, `publishing.velocity_limit`, `platform.{platform}.throttled`, or any `messaging.*` code sends nothing and spends no credit.
 
 ## Request rate limit
 
@@ -92,12 +97,15 @@ Each platform limits what an app can do for an account. When the platform refuse
 | Platform | Limit |
 |---|---|
 | Instagram | 50 posts per rolling 24 hours per account |
-| Threads | 250 posts and 1,000 replies per rolling 24 hours per account |
-| TikTok | 15 posts per day and 6 per minute per account |
-| YouTube | A daily quota per Google Cloud project: 100 video uploads and 10,000 units for other calls, reset at midnight Pacific Time |
+| Threads | 250 posts, 1,000 replies, and 100 deletions (posts and replies combined) per rolling 24 hours per account |
+| TikTok | 15 posts per day and 6 per minute per account. 40 requests per minute per account and per TikTok call, plus a limit on all calls through SocialAPI's app. TikTok sends no wait time: wait 5 minutes, then retry. If the error repeats after that, TikTok's daily limit is reached: retry after 00:00 UTC. |
+| YouTube | A daily quota on SocialAPI's Google app: 100 video uploads and 10,000 units for other calls, reset at midnight Pacific Time |
 | Google Business Profile | 10 location updates per minute per Business Profile |
+| LinkedIn | A short-term limit on the comments each member creates per minute (see [LinkedIn comments](/platforms/linkedin/comments#reply-to-a-comment)), plus daily limits per app and per member that reset at midnight UTC |
 | App Store Connect | An hourly request limit per App Store Connect API key, set by Apple: see [App Store Connect](/platforms/app-store-connect#limits) |
-| Facebook, X / Twitter | No single fixed number: the platform limits each app and each account, and reports usage in its response headers |
+| Telegram | Telegram's guideline for bots: at most 1 message per second in one chat and 30 messages per second across all chats. See [Telegram direct messages](/platforms/telegram/messages#limits) |
+| Zalo | Per-minute request limits for each app and each Official Account, usage quotas per feature, and a limit on how many messages one person can receive from the OA. Zalo sends no wait time: see [Zalo direct messages](/platforms/zalo/messages#limits) |
+| Facebook, X / Twitter | No single fixed number: the platform limits each app and each account. X's per-account limits for replies and DMs: see [X comments](/platforms/twitter/comments#limits) and [X direct messages](/platforms/twitter/messages#limits) |
 
 ### Read a platform's remaining quota
 
@@ -120,12 +128,12 @@ Response (HTTP 200) for an Instagram account:
 |---|---|
 | Instagram | `posts_remaining`: posts left in Instagram's rolling 24 hours |
 | Threads | `posts_remaining`, `posts_total`, `replies_remaining`, `replies_total` |
-| YouTube | `daily_quota_units`, `daily_upload_quota_calls`, and the unit cost of each operation (keys ending in `_cost` or `_cost_per_page`) |
-| WhatsApp | `quality_rating`: `3` high, `2` medium, `1` low, `0` unknown. `messaging_tier_cap`: unique recipients allowed per 24 hours, `-1` for unlimited |
-| Bluesky | `write_points_per_hour` (5,000) and `write_points_per_day` (35,000) |
+| YouTube | `daily_quota_units`, `daily_upload_quota_calls`, `daily_replies_limit` and `daily_replies_remaining` (the channel's replies and top-level comments for the current Pacific Time day), and the unit cost of each operation (keys ending in `_cost` or `_cost_per_page`) |
+| WhatsApp | `quality_rating`: `3` high, `2` medium, `1` low, `0` unknown. `messaging_tier_cap`: unique recipients allowed per rolling 24 hours, `-1` for unlimited, `0` when Meta reports no known tier |
+| Bluesky | `write_points_per_hour` and `write_points_per_day`: Bluesky's fixed write budgets, always 5,000 and 35,000. They do not show the points left |
 | X / Twitter | An empty object |
 
-Zalo no longer reports its message quota: do not rely on `remain` and `total`. Every platform that is neither in the table nor Zalo returns `501 resource.not_supported`.
+This endpoint returns no usable quota for a Zalo account: do not call it for one. Every platform that is neither in the table nor Zalo returns `501 resource.not_supported`.
 
 ### Reads and platform limits
 

@@ -11,7 +11,7 @@ The X / Twitter API in SocialAPI connects an X account through an X developer ap
 
 | Field | Value |
 |---|---|
-| Platform slug | `twitter`. `x` is accepted as the same slug |
+| Platform slug | `twitter`. `POST /v1/accounts/connect` also accepts `x`. Every response and every `platform` filter uses `twitter` |
 | Auth | OAuth 2.0 with PKCE, through your own X app |
 | Platform API | X API v2 |
 | Status | Available |
@@ -30,13 +30,13 @@ An unsupported call returns `501 resource.not_supported`.
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post |
 | Delete a published post | Yes | |
 | List posts | Yes | The account's posts and replies, without reposts, with like and reply counts |
-| List comments and replies | Yes | Replies to a post from the last 7 days. Older replies are not returned |
+| List comments and replies | Yes | Replies to a post from the last 7 days. Older replies are not returned. See [X comments](/platforms/twitter/comments) |
 | Reply to a comment | Yes | |
-| Hide or unhide a comment | Yes | A reply to the account's own post |
-| Delete a comment | Conditional | Only a reply the account wrote. X refuses to delete anyone else's post |
-| Like a comment | No | X refuses like writes for apps on self-serve access. `can_like` is `false` |
+| Hide or unhide a comment | Conditional | Only a reply in a conversation that the account's own post started. Elsewhere X refuses the action for that reply, and the call returns `501 resource.not_supported` |
+| Delete a comment | Conditional | Only a reply the account wrote. Deleting another person's reply returns `403 platform.twitter.forbidden` or `501 resource.not_supported`. `can_delete` is `false` on every reply, including the account's own |
+| Like a comment | No | X refuses like writes for apps on pay-per-use access. `can_like` is `false` |
 | Private reply to a comment | No | `501 resource.not_supported` |
-| DMs: list, read, send | Yes | Text only. See [Direct messages](#direct-messages) |
+| DMs: list, read, send | Yes | Text only. X returns only the last 30 days of DMs. See [X direct messages](/platforms/twitter/messages) |
 | Mentions | Yes | Posts that mention the account. See [Mentions](/guides/mentions) |
 | Reply to a mention | No | `501 resource.not_supported` |
 | Reviews | No | X has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
@@ -80,20 +80,11 @@ X-specific rules:
 
 ## Comments
 
-List replies to a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID (`targets[].platform_post_id`). Reply, hide, unhide, and delete work as described in [Comments](/guides/comments). X-specific rules:
-
-- **7-day window.** X returns replies posted in the last 7 days. A reply to a post older than that does not appear.
-- **Hide.** Hide and unhide work on replies to the connected account's own posts.
-- **Delete.** Deleting works only on a reply the connected account wrote.
-- **Like.** X removed like writes for self-serve apps. Read `can_like` on each comment rather than assuming.
+SocialAPI lists the replies to an X account's posts from the last 7 days, replies to them, hides and unhides replies in conversations that the account's own posts started, and deletes the replies the account wrote. Endpoints, fields, limits, and errors are in [X / Twitter comments](/platforms/twitter/comments).
 
 ## Direct messages
 
-List conversations with `GET /v1/inbox/conversations`, read one with its messages, and send with the DM endpoints in [Direct messages](/guides/direct-messages). X-specific rules:
-
-- **Text only.** A DM sends text. An attachment is rejected before anything is sent.
-- **Recipient.** A send goes to the other person in the conversation. A group conversation has no single recipient, so a send to it is refused.
-- **X's own limit.** X allows 15 DM read requests per 15 minutes for each connected account. Past it, calls return `429 platform.twitter.rate_limit`.
+SocialAPI lists an X account's DM conversations, reads their messages, and sends text DMs. X returns only the last 30 days of DMs. Endpoints, send rules, limits, and errors are in [X / Twitter direct messages](/platforms/twitter/messages).
 
 ## Limits
 
@@ -105,7 +96,7 @@ List conversations with `GET /v1/inbox/conversations`, read one with its message
 | Video | 512 MB and 140 seconds. MP4 |
 | Thread | Up to 25 continuation posts, each up to 280 characters |
 | Posts | 25 per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
-| X's own rate limit | `429 platform.twitter.rate_limit`. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
+| X's own rate limit | `429 platform.twitter.rate_limit`. The same code is returned when X is temporarily unavailable. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 | X credits and spending cap | `402 platform.twitter.usage_capped` when your X app is out of credits or reached its spending limit. Add credits in the X Developer Console |
 
 ## Scopes
@@ -120,13 +111,15 @@ You choose the app permissions (Read and write, and Direct message) on your own 
 | `users.read` | Read profiles | Every account |
 | `dm.read` | Read DM conversations and messages | `messages.read` |
 | `dm.write` | Send DMs | `messages.write` |
-| `like.write` | Like and unlike posts. X refuses these calls for self-serve apps | `comments.write` |
+| `like.write` | Like and unlike posts. X refuses these calls for apps on pay-per-use access | `comments.write` |
 | `media.write` | Upload images, video, and GIFs for a post | `posts.write` |
 | `offline.access` | Keep the connection without asking the person again | Every account |
 
 ## Related
 
 - [X publishing](/platforms/twitter/publishing): fields, media rules, threads, and quirks for publishing
+- [X comments](/platforms/twitter/comments): list, reply to, hide, and delete the replies to your posts
+- [X direct messages](/platforms/twitter/messages): list conversations and send text DMs
 - [Use your own X app](/platforms/twitter/own-app): create the X app and save its credentials
 - [Platform apps](/guides/platform-credentials): which platforms use SocialAPI's app and which use yours
 - [Platforms](/platforms/overview): the capability matrix

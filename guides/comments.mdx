@@ -11,7 +11,7 @@ A public reply costs 1 interaction credit. Reading, private replies, hiding, del
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/inbox/comments` | List posts that received comments |
+| `GET` | `/v1/inbox/comments` | List posts with their comment counts |
 | `GET` | `/v1/inbox/comments/{postId}` | List the comments on one post |
 | `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to one comment |
 | `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or comment on the post |
@@ -125,7 +125,7 @@ The reply is public when the platform accepts it. `comment_id` in the response i
 
 ## List posts with comments
 
-`GET /v1/inbox/comments` returns the posts that received comments, newest published first.
+`GET /v1/inbox/comments` returns the connected accounts' posts with their comment counts, newest published first. Add `min_comments=1` to keep only posts that have comments.
 
 | Parameter | Description |
 |---|---|
@@ -142,8 +142,6 @@ The reply is public when the platform accepts it. `comment_id` in the response i
 
 Each post has `id` (the platform's post ID, the value for `{postId}`), `user_id` (the ID of your SocialAPI account), `account_id`, `page_id` (Facebook only), `platform`, `content`, `thumbnail`, `permalink`, `comment_count`, `like_count`, `published_at`, `created_at`, and `updated_at`. `pagination` holds `has_more`, and `next_cursor` when `has_more` is `true`. Paging is in [Pagination](/guides/pagination#paginated-endpoints).
 
-YouTube videos with comments appear only when you pass `account_id`, and that list is 1 page with no cursor.
-
 ## List comments and replies
 
 `GET /v1/inbox/comments/{postId}` lists the comments on a post. `GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the replies to one comment in the same shape. Both need `account_id`, the connected account that owns the post. A missing `account_id` returns `400 validation.field_required`.
@@ -159,11 +157,11 @@ A page can hold fewer comments than `limit`, because the platform sets its own p
 | Field | Description |
 |---|---|
 | `id` | The comment's `sapi_cmt_` ID. Use it as `{commentId}` |
-| `platform_id` | The platform's own comment ID |
+| `platform_id` | The platform's comment ID. On TikTok it is `{video_id}_{comment_id}`: see [TikTok comments](/platforms/tiktok/comments#post-and-comment-ids) |
 | `platform` | The platform slug |
 | `text` | The comment text |
 | `author_id`, `author_name`, `author_username`, `author_picture` | Who wrote it. Each is empty when the platform gives none |
-| `is_owner` | `true` when the connected account wrote the comment |
+| `is_owner` | `true` when the connected account wrote the comment. On Threads, X, LinkedIn, and YouTube, `false` can appear on the account's own comments: see each platform's comments page |
 | `like_count` | Likes on the comment |
 | `reply_count` | Deprecated: not every platform reports an exact count. Read `has_replies` instead |
 | `has_replies` | `true` when the comment has replies |
@@ -179,8 +177,8 @@ Comments in webhook events use the nested [Interaction](/guides/webhook-events#i
 | `capabilities` key | `true` when |
 |---|---|
 | `can_reply` | You can reply publicly |
-| `can_delete` | You can delete the comment. On YouTube and Threads it is `true` for every comment, but deleting another account's comment fails: see [YouTube comments](/platforms/youtube#comments) and [Threads](/platforms/threads) |
-| `can_hide` | You can hide and unhide the comment |
+| `can_delete` | You can delete the comment. On YouTube and Threads it is `true` for every comment, but deleting another account's comment fails: see [YouTube comments](/platforms/youtube/comments#delete-a-comment) and [Threads comments](/platforms/threads/comments#delete-a-reply). On X it is `false` for every reply, but deleting a reply the account wrote works: see [X comments](/platforms/twitter/comments) |
+| `can_hide` | You can hide and unhide the comment. On Threads it is `true` for every reply, but hiding a reply your account wrote fails: see [Threads comments](/platforms/threads/comments#hide-and-unhide-a-reply). On X it is `true` for every reply, but hiding works only in a conversation the account's own post started: see [X comments](/platforms/twitter/comments) |
 | `can_like` | You can like the comment |
 | `can_private_reply` | You can send a private reply to its author |
 
@@ -240,7 +238,7 @@ curl -X POST "https://api.social-api.ai/v1/inbox/comments/17895695668004550/1785
   }'
 ```
 
-Private replies exist on Instagram and Facebook. The platform allows 1 private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.instagram.private_reply_ineligible` or `400 platform.facebook.private_reply_ineligible`. `error.meta.reason` says why: `already_replied`, `platform_refused`, or `window_expired`. This 400 is final, so retrying never succeeds. Every other platform returns `501 resource.not_supported`.
+Private replies exist on Instagram and Facebook. The platform allows 1 private reply per comment, within 7 days of the comment. A second reply, or a comment older than 7 days, returns `400 platform.instagram.private_reply_ineligible` or `400 platform.facebook.private_reply_ineligible`. When the platform refuses the reply, `error.meta.fbtrace_id` holds Meta's trace ID for Meta support when Meta sends one. When the comment is already known to be ineligible, the error instead carries `error.meta.blocked_locally: true` and `error.meta.reason`: `already_replied`, `platform_refused`, or `window_expired`. When `error.meta.blocked_locally` is `true`, or the reply was text only, this 400 is final. When the platform refuses a reply that carried `buttons` or an attachment, the refusal can come from that content: send it once more as text only. Every other platform returns `501 resource.not_supported`.
 
 A private reply does not open the [messaging window](/guides/direct-messages#the-messaging-window). You cannot message the person again until they answer, and their answer opens the window.
 
@@ -270,7 +268,7 @@ curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/17895695668004550/17
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-Hiding is free. A platform without it returns `501 resource.not_supported`. Facebook refuses to hide or unhide some comments, for example a comment the Page's moderation filters already hid. That refusal returns `422 platform.facebook.comment_not_hideable`, and retrying does not help. Threads hides replies only on an account connected on or after 2026-10-17: reconnect an older account first. See [Threads](/platforms/threads).
+Hiding is free. A platform without it returns `501 resource.not_supported`. Facebook refuses to hide or unhide some comments, for example a comment the Page's moderation filters already hid. That refusal returns `422 platform.facebook.comment_not_hideable`, and retrying does not help. Threads hides replies only on an account connected on or after 2026-10-17: reconnect an older account first. See [Threads comments](/platforms/threads/comments#hide-and-unhide-a-reply).
 
 ## Delete a comment
 
@@ -282,19 +280,19 @@ Hiding is free. A platform without it returns `501 resource.not_supported`. Face
 
 ## Filter YouTube comments
 
-`GET /v1/inbox/comments/{postId}` accepts 3 more parameters. Only YouTube uses them to filter or sort. On TikTok, a `q` or a non-default `order` or `moderation_status` stops hidden comments from being added to the list: see [TikTok comments](/platforms/tiktok#comments).
+`GET /v1/inbox/comments/{postId}` accepts 3 more parameters. Only YouTube uses them to filter or sort. On TikTok, a `q` or a non-default `order` or `moderation_status` stops hidden comments from being added to the list: see [TikTok comments](/platforms/tiktok/comments#hidden-comments).
 
 | Parameter | Description |
 |---|---|
-| `moderation_status` | `published` (default), `held_for_review`, or `likely_spam`. The last two list comments waiting for your review |
+| `moderation_status` | `published` (default), `held_for_review`, or `likely_spam`. The last 2 list the comments waiting for your review |
 | `order` | `recent` (default) or `relevance` |
-| `q` | A keyword searched in the comment text, up to 256 characters |
+| `q` | A keyword searched in the comment text, up to 256 bytes |
 
-A value outside these lists, or a longer `q`, returns `400 validation.field_invalid`. See [YouTube comments](/platforms/youtube#comments).
+A value outside these lists, or a longer `q`, returns `400 validation.field_invalid`. See [YouTube comments](/platforms/youtube/comments#list-comments-on-a-video).
 
 ## Platform support
 
-Every platform has its own comment rules: whether replies nest, who can hide or delete what, and which account permissions and platform scopes the connection needs. The [capability matrix](/platforms/overview) compares platforms, and each platform page has the details: [Instagram](/platforms/instagram#comments), [Facebook](/platforms/facebook), [Threads](/platforms/threads#replies), [TikTok](/platforms/tiktok#comments), [YouTube](/platforms/youtube#comments), [X](/platforms/twitter), and [Bluesky](/platforms/bluesky#comments-and-replies). Google Business Profile has no comments or Q&A: its calls return `501 resource.not_supported`. Read reviews on [Reviews](/guides/reviews).
+Every platform has its own comment rules: whether replies nest, who can hide or delete what, and which account permissions and platform scopes the connection needs. The [capability matrix](/platforms/overview) compares platforms, and each platform has a comments page with the details: [Instagram](/platforms/instagram/comments), [Facebook](/platforms/facebook/comments), [Threads](/platforms/threads/comments), [TikTok](/platforms/tiktok/comments), [LinkedIn](/platforms/linkedin/comments), [YouTube](/platforms/youtube/comments), [X](/platforms/twitter/comments), and [Bluesky](/platforms/bluesky/comments). Google Business Profile has no comments or Q&A: its calls return `501 resource.not_supported`. Read reviews on [Reviews](/guides/reviews).
 
 ## Limits
 
@@ -303,10 +301,10 @@ Every platform has its own comment rules: whether replies nest, who can hide or 
 | Private replies per comment | 1, within 7 days of the comment |
 | Buttons on a private reply | 1 to 3, with a body of 640 characters at most |
 | Private reply text on Instagram | 1,000 bytes of UTF-8 |
-| `q` filter length | 256 characters |
+| `q` filter length | 256 bytes |
 | Posts per page | Default 25, up to 100 |
-| Comments per page | Default 25, up to 100. On TikTok, up to 30 comments and 30 replies, plus any hidden comments added to the first page of results (see [TikTok comments](/platforms/tiktok#comments)) |
-| Replies per page | Default 10, up to 100 |
+| Comments per page | Default 25, up to 100. On TikTok, up to 30, plus any hidden comments added to the first page of results (see [TikTok comments](/platforms/tiktok/comments#hidden-comments)) |
+| Replies per page | Default 10, up to 100. On TikTok, up to 30 |
 
 ## Errors and debugging
 
@@ -314,14 +312,14 @@ Check these in order when a comment call fails or returns nothing:
 
 1. **`401`, `403 auth.insufficient_scope`.** The key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
 2. **`404 account.not_found`, `403 account.reconnection_required`.** The `acc_` ID is not yours, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
-3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list the comments on a post and the replies to a comment, `comments.write` to reply, hide, unhide, delete, or like, and `messages.write` for a private reply. `error.meta.permission` names it. `GET /v1/inbox/comments` lists the posts SocialAPI stored and never returns this error: an account without `comments.read` stores no new posts.
+3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list the comments on a post and the replies to a comment, `comments.write` to reply, hide, unhide, delete, or like, and `messages.write` for a private reply. `error.meta.permission` names it. `GET /v1/inbox/comments` never returns this error. Without `comments.read`, posts the account makes outside SocialAPI are not added to the list, and removing `comments.read` deletes the posts already in it, including posts published through SocialAPI: see [Removing a permission deletes data](/guides/permissions#removing-a-permission-deletes-data).
 4. **`400 validation.field_required`, `400 validation.field_invalid`.** A required field is missing, or a parameter has a wrong value. `error.meta.field` names it.
 5. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The comment ID is the wrong type or belongs to another platform: see [IDs](/guides/ids#what-each-endpoint-accepts).
 6. **`501 resource.not_supported`.** The platform lacks the action. Read `capabilities` on the comment.
 7. **`404 resource.not_found`.** The post was deleted on the platform. The same post returns the same 404 afterwards.
-8. **`400 platform.instagram.private_reply_ineligible`, `400 platform.facebook.private_reply_ineligible`.** The comment already received its private reply, or is older than 7 days.
-9. **`429 validation.interaction_limit_exhausted`, `429 platform.{platform}.rate_limit`.** Your allowance, or the platform's own limit. Read `Retry-After`: see [Rate limits](/guides/rate-limits).
-10. **`422 platform.youtube.processing_failure`.** YouTube refused to delete a comment that your channel did not write. Hide it instead.
+8. **`400 platform.instagram.private_reply_ineligible`, `400 platform.facebook.private_reply_ineligible`.** The comment already received its private reply, or is older than 7 days. When `error.meta.blocked_locally` is `true`, or the reply was text only, this 400 is final. When the platform refuses a reply that carried `buttons` or an attachment, the refusal can come from that content: send it once more as text only.
+9. **`429 validation.interaction_limit_exhausted`, `429 platform.{platform}.rate_limit`.** `interaction_limit_exhausted` means the plan's interaction allowance is used up until `period_end`: upgrade the plan to continue sooner, see [Plans and usage](/guides/plans). `rate_limit` is the platform's own limit: wait for the `Retry-After` header when it is present, see [Rate limits](/guides/rate-limits). `429 messaging.velocity_limit` and `429 platform.{platform}.throttled`: wait for the `Retry-After` header, then retry.
+10. **`422 platform.youtube.processing_failure`.** On a delete, YouTube refused because your channel did not write the comment: hide it instead. On a hide or a moderation, the commenter already deleted the comment, or YouTube could not process the request: retry once, and stop if it repeats.
 11. **`422 platform.facebook.comment_not_hideable`.** Facebook refused to hide or unhide the comment, for example a comment the Page's moderation filters already hid. Retrying does not help.
 
 When the list is empty, check that the post has comments, that `account_id` owns the post, and, on a platform that sends events, that the comment arrived: see [Webhook events](/guides/webhook-events#comments). The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).

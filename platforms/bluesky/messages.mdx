@@ -1,0 +1,244 @@
+---
+title: Bluesky direct messages
+sidebarTitle: "Messages"
+description: Read and send Bluesky direct messages through SocialAPI with an app password that has DM access, with text-only sending, inbox sync, and errors.
+---
+
+SocialAPI lists the direct message (DM) conversations of a connected Bluesky account, reads their messages, and sends text replies. DMs work only when the account's app password was created with direct message access. Bluesky has no messaging window: you can reply in a conversation at any time. Each send request costs 1 interaction credit, and reads cost none. The cross-platform rules are on [Direct messages](/guides/direct-messages).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/conversations` | List conversations |
+| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a text message |
+| `POST` | `/v1/inbox/sync` | Load new conversations, or new messages of one conversation |
+
+`{id}` is the conversation `id` that `GET /v1/inbox/conversations` returns. Reactions and typing indicators are not available on Bluesky: see [What Bluesky does not support](#what-bluesky-does-not-support).
+
+## Direct message access
+
+A Bluesky app password reaches DMs only when **Allow access to your direct messages** was ticked when the password was created. Bluesky offers no way to add the option to an existing app password. See [Connect an account](/platforms/bluesky#connect-an-account) for the steps.
+
+Without that access:
+
+- `POST /v1/inbox/conversations/{id}/messages` returns `403 platform.bluesky.dm_scope_missing`, and the request still costs its interaction credit.
+- The conversation list stays empty, and a sync started with `POST /v1/inbox/sync` ends in `state: failed` with an `error` that says the app password has no direct message access.
+- Posts, comments, and mentions keep working.
+
+To turn DMs on, create a new app password with the option ticked, then send `POST /v1/accounts/connect` again with the same handle, the new password, and the account's `brand_id`. Connecting again with the old password does not help.
+
+## Your first message
+
+List the conversations of the account:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "bluesky",
+      "platform_id": "3l5k2yxmzsa2c",
+      "participant_id": "did:plc:jane456def",
+      "participant_name": "Jane Smith",
+      "participant_picture": "https://cdn.bsky.app/img/avatar/plain/did:plc:jane456def/bafkreiexample@jpeg",
+      "last_message": "Is the export in the spring release?",
+      "last_message_at": "2026-10-17T10:30:00Z",
+      "status": "active",
+      "unread_count": 0,
+      "created_at": "2026-10-17T10:31:00Z",
+      "updated_at": "2026-10-17T10:31:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": "2026-10-17T10:31:00Z"
+}
+```
+
+Send a reply into that conversation:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Yes, the export ships in the spring release."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+  "message_ids": ["sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I"]
+}
+```
+
+`message_ids` holds the SocialAPI ID of the sent message. The message appears in the conversation on Bluesky once the call returns.
+
+## Conversations on Bluesky
+
+The conversation fields are in [Conversations](/guides/direct-messages#conversations). On Bluesky:
+
+| Field | On Bluesky |
+|---|---|
+| `platform_id` | Bluesky's conversation ID |
+| `participant_id` | The other person's DID |
+| `participant_name` | The person's display name, or their handle when they set no display name |
+| `participant_picture` | The person's avatar URL. Empty when they have none |
+| `unread_count` | Always `0` on Bluesky. Compare `last_message_at` with the time you last read the conversation instead |
+
+A group conversation appears as one conversation with one participant: the first member Bluesky lists that is not the connected account. The other members are not returned.
+
+Each sync loads the 100 most recently active conversations. A conversation outside them appears once a new message moves it into them. A conversation already listed stays listed.
+
+## New conversations and messages
+
+Bluesky sends SocialAPI no notification of new messages, so SocialAPI sends no `dm.received` event for a Bluesky account. To pick up what arrived, start a sync with [`POST /v1/inbox/sync`](/guides/inbox#refresh-the-inbox-manually):
+
+- With only `account_id`, the sync refreshes the conversation list, including the latest message of each conversation, and loads the messages of conversations never loaded before, as described in the guide.
+- With `conversation_id` as well, it loads the new messages of that conversation.
+
+The first `GET /v1/inbox/conversations/{id}/messages` returns the conversation's latest messages. After that, a new incoming message appears only after `POST /v1/inbox/sync` with that `conversation_id`. If more than 100 messages arrive between two syncs, the older ones are missing. Each target accepts 1 sync you start every 5 minutes: a second attempt after the first sync finished and inside that time returns `429 inbox.sync_rate_limited` with a `Retry-After` header. See [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually).
+
+```bash
+curl -X POST https://api.social-api.ai/v1/inbox/sync \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067"
+  }'
+```
+
+Response (HTTP 202):
+
+```json
+{
+  "data": {
+    "state": "syncing",
+    "started_at": "2026-10-17T10:40:00Z",
+    "finished_at": null,
+    "last_synced_at": null,
+    "error": "",
+    "synced": 0
+  }
+}
+```
+
+## Read messages
+
+`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first, with the fields in [Read messages](/guides/direct-messages#read-messages). On Bluesky:
+
+- `platform_id` is Bluesky's message ID, and `sender_id` is the sender's DID.
+- `attachment_type`, `attachment_url`, and `reply_to` are `null` on every message read from Bluesky: SocialAPI reads only the text of a Bluesky message. A message you sent through SocialAPI with an attachment keeps its `attachment_type` and `attachment_url` in the list, although Bluesky received an empty message.
+- A conversation's history starts with its 100 most recent messages. Older messages are not available.
+- Bluesky reports no delivery or read receipts, so the `status` of an outgoing message does not change after the send.
+
+## Send a message
+
+`POST /v1/inbox/conversations/{id}/messages` sends the `text` of the request as a Bluesky message. The request fields are in [Send a message](/guides/direct-messages#send-a-message). On Bluesky:
+
+| Field | On Bluesky |
+|---|---|
+| `account_id` | Required. The connected account that owns the conversation. Another account returns `404 conversation.not_found` |
+| `text` | The message, up to 1,000 characters (Bluesky counts graphemes, so each emoji counts as 1), and at most 10,000 bytes. Longer text returns `400 validation.platform_param`, and the credit comes back. Send `text` on every Bluesky request |
+| `attachments`, `attachment_url` | Do not send attachments: each one is sent as an extra empty Bluesky message, and the file is not delivered. Put a link in `text` instead |
+| `quick_replies`, `buttons`, `cards`, `list_sections`, `list_button` | Not sent. The text goes out alone |
+| `reply_to_message_id` | Ignored |
+| `message_tag` | Returns `422 messaging.tag_not_supported`. Bluesky has no message tags |
+
+SocialAPI turns no link, hashtag, or `@handle` in a DM into a link or mention: the text is sent as plain text. A request costs 1 interaction credit. When the allowance is used up, the call returns `429 validation.interaction_limit_exhausted`.
+
+When the conversation is locked on Bluesky, the call returns `503 platform.bluesky.ConvoLocked` and the credit stays spent. The credit comes back only when the call fails with a `validation.*` error: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
+
+## What Bluesky does not support
+
+- **Reactions.** `POST` and `DELETE /v1/inbox/conversations/{id}/messages/{messageId}/reaction` return `501 resource.not_supported`.
+- **Typing indicators and seen receipts.** `POST /v1/inbox/conversations/{id}/sender-action` returns `501 resource.not_supported`. `POST /v1/inbox/conversations/{id}/read` returns `{ "success": true }`, and the person sees nothing.
+- **Attachments and interactive content.** Text only. Each attachment is sent as an extra empty message.
+- **Starting a conversation.** SocialAPI sends only into a conversation that exists on Bluesky and appears in `GET /v1/inbox/conversations`.
+- **A private reply to a comment.** Bluesky has no comment-to-DM path: see [Bluesky comments](/platforms/bluesky/comments#what-bluesky-does-not-support).
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Conversations loaded per sync | The 100 most recently active |
+| Message history of a conversation | Starts with its 100 most recent messages |
+| Message text (Bluesky) | 1,000 characters, counted as graphemes, and at most 10,000 bytes. Longer text returns `400 validation.platform_param`, and the credit comes back |
+| Syncs you start | 1 every 5 minutes per account or conversation |
+| Text through the MCP tool | 1,000 bytes |
+| Conversations per page | Default 25, up to 100 |
+| Messages per page | Default 25, up to 200 |
+
+## Errors and debugging
+
+Check these in order when a Bluesky DM call fails:
+
+1. **`401`, `403 auth.insufficient_scope`.** The API key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
+2. **`403 platform.bluesky.dm_scope_missing`.** The app password has no direct message access: see [Direct message access](#direct-message-access).
+3. **`403 account.permission_missing`.** The account lacks the `messages.read` or `messages.write` [permission](/guides/permissions). `error.meta.permission` names it.
+4. **`404 conversation.not_found`.** The conversation is not yours, or belongs to another connected account than `account_id`.
+5. **`400 validation.field_invalid` with `error.meta.field` set to `app_password`.** Bluesky no longer accepts the saved app password, for example because it was deleted in Bluesky settings. Create a new app password and connect the account again.
+6. **`403 account.reconnection_required`, `401 platform.bluesky.auth`.** Bluesky rejected the saved credential. Connect the account again.
+7. **`403 platform.bluesky.account_takedown`.** Bluesky suspended the account. Connecting again does not restore access.
+8. **`400 validation.*`.** The body is wrong: `error.meta.field` names the field, and for `validation.platform_param` `error.message` carries Bluesky's reason. A `field_invalid` on `app_password` is step 5.
+9. **`422 messaging.tag_not_supported`.** The request sent `message_tag`. Remove it.
+10. **`503 platform.bluesky.ConvoLocked`.** The conversation is locked on Bluesky.
+11. **`429 platform.bluesky.rate_limit`.** Bluesky's limit is used up. Wait, then retry.
+12. **`429 validation.interaction_limit_exhausted`.** Your plan's interaction allowance is used up: see [Plans and usage](/guides/plans).
+13. **`429 inbox.sync_rate_limited`.** A second sync of the same target within 5 minutes of the last one you started, after it finished. Wait for the seconds in `Retry-After`.
+14. **`501 resource.not_supported`.** A reaction, a typing indicator, or a seen receipt.
+15. **`503 platform.bluesky.api_error`.** The request to Bluesky failed, or Bluesky answered with no error name. Retry.
+
+Any other Bluesky refusal returns `503 platform.bluesky.{error}`, where `{error}` is Bluesky's error name, and `error.message` carries Bluesky's reason. Bluesky's own codes are in [Errors: Bluesky](/guides/errors#bluesky), and the DM codes in [Errors](/guides/errors).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `dms:read` | List and get conversations, list messages, start or read an inbox sync |
+| `dms:send` | Send a message |
+
+## Events
+
+SocialAPI sends no `dm.*` event for a Bluesky account: no `dm.received`, no `dm.sent`, and no `dm.status.*`. Read new messages with a sync, as in [New conversations and messages](#new-conversations-and-messages). See [Bluesky webhook events](/platforms/bluesky#webhook-events).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_conversations` | List conversations, most recent activity first |
+| `social_api_get_conversation` | Get one conversation |
+| `social_api_list_messages` | List the messages of a conversation, newest first |
+| `social_api_send_dm` | Send a text message. The text is 1,000 bytes at most. Quick replies and buttons are not sent on Bluesky |
+| `social_api_update_conversation` | Archive a conversation, or set it back to `active` |
+| `social_api_mark_conversation_read` | Mark a conversation as read in SocialAPI |
+
+There is no tool for inbox sync. See [MCP tools](/integrations/tools#direct-messages).
+
+## Related
+
+- [Bluesky API](/platforms/bluesky): connect the account with an app password that has DM access
+- [Bluesky comments](/platforms/bluesky/comments): replies to your posts
+- [Direct messages](/guides/direct-messages): the endpoints and fields shared by every platform
+- [Unified inbox](/guides/inbox#refresh-the-inbox-manually): the sync endpoint and its states
+- [Errors](/guides/errors#bluesky): every Bluesky error code

@@ -1,0 +1,275 @@
+---
+title: Bluesky comments
+sidebarTitle: "Comments"
+description: List the replies to your Bluesky posts, answer them, hide replies in threads you started, and delete your own replies through SocialAPI's comments API.
+---
+
+SocialAPI reads the replies to the posts of a connected Bluesky account and acts on them: reply publicly, hide and unhide a reply, and delete your own reply. On Bluesky a comment is a reply post, and the endpoints are the same as on every other platform with comments. A public reply costs 1 interaction credit, and reading, hiding, and deleting cost none. The cross-platform rules are on [Comments](/guides/comments).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/comments` | List your posts with their reply counts |
+| `GET` | `/v1/inbox/comments/{postId}` | List the replies to one post, every level in one list |
+| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies below one reply |
+| `POST` | `/v1/inbox/comments/{postId}` | Reply to a reply, or to the post itself |
+| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a reply in a thread you started |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide that reply |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete one of your own replies |
+
+`{postId}` is the post's AT URI, for example `at://did:plc:abc123xyz/app.bsky.feed.post/3kq2example`. It is `targets[].platform_post_id` on a post you published through SocialAPI, and `id` in `GET /v1/inbox/comments`. An AT URI contains `/` and `:`, so URL-encode it in the path: `at%3A%2F%2Fdid%3Aplc%3Aabc123xyz%2Fapp.bsky.feed.post%2F3kq2example`. `{commentId}` and `comment_id` take the reply's `sapi_cmt_` ID or its AT URI (`platform_id`). The `sapi_cmt_` ID needs no encoding. See [IDs](/guides/ids#what-each-endpoint-accepts).
+
+The like and private reply endpoints exist for every platform, but Bluesky supports neither: see [What Bluesky does not support](#what-bluesky-does-not-support).
+
+## Your first reply
+
+List the replies to a post. `account_id` is required:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/at%3A%2F%2Fdid%3Aplc%3Aabc123xyz%2Fapp.bsky.feed.post%2F3kq2example?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&limit=100" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "platform_id": "at://did:plc:jane456def/app.bsky.feed.post/3kq3reply1",
+      "platform": "bluesky",
+      "text": "Does the spring release include the new export?",
+      "author_id": "did:plc:jane456def",
+      "author_name": "jane.bsky.social",
+      "author_username": "jane.bsky.social",
+      "author_picture": "",
+      "is_owner": false,
+      "like_count": 4,
+      "reply_count": 1,
+      "has_replies": true,
+      "liked_by_viewer": false,
+      "is_hidden": false,
+      "parent_id": null,
+      "created_at": "2026-10-17T10:12:00Z",
+      "capabilities": {
+        "can_reply": true,
+        "can_delete": false,
+        "can_hide": false,
+        "can_like": false,
+        "can_private_reply": false
+      }
+    },
+    {
+      "id": "sapi_cmt_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1X",
+      "platform_id": "at://did:plc:abc123xyz/app.bsky.feed.post/3kq3reply2",
+      "platform": "bluesky",
+      "text": "Yes, it ships in the release today.",
+      "author_id": "did:plc:abc123xyz",
+      "author_name": "yourhandle.bsky.social",
+      "author_username": "yourhandle.bsky.social",
+      "author_picture": "",
+      "is_owner": true,
+      "like_count": 1,
+      "reply_count": 0,
+      "has_replies": false,
+      "liked_by_viewer": false,
+      "is_hidden": false,
+      "parent_id": null,
+      "created_at": "2026-10-17T10:20:00Z",
+      "capabilities": {
+        "can_reply": true,
+        "can_delete": false,
+        "can_hide": false,
+        "can_like": false,
+        "can_private_reply": false
+      }
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" }
+}
+```
+
+Reply to the first reply:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/at%3A%2F%2Fdid%3Aplc%3Aabc123xyz%2Fapp.bsky.feed.post%2F3kq2example" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "comment_id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "text": "It does. Details: https://example.com/spring"
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "comment_id": "sapi_cmt_HWBNFCJZEYALPVRSUKTRWBNXQHDMZCFJ"
+}
+```
+
+The reply is public on Bluesky once the call returns. `comment_id` in the response is the new reply's `sapi_cmt_` ID.
+
+## List replies
+
+`GET /v1/inbox/comments/{postId}` returns the replies to the post, up to 6 levels below it and at most `limit` of them, as one flat list. Each reply is followed by the replies below it, in the order Bluesky returns the thread.
+
+| Parameter | Description |
+|---|---|
+| `account_id` | Required. The connected account. A missing value returns `400 validation.field_required` |
+| `limit` | The number of replies returned, counted across every level. The default is 25. A value above 100 is treated as 100. A value of 0 or less, or one that is not an integer, returns `400 validation.field_invalid` |
+| `cursor` | Ignored on Bluesky |
+
+The list has one page: `has_more` is always `false` and `next_cursor` is always empty. Replies after the first `limit` are not returned, so pass `limit=100` to read as many as possible. On a long thread Bluesky can return fewer replies than exist, and there is no way to page past them. The YouTube filters `moderation_status`, `order`, and `q` do not filter Bluesky replies, but an invalid value still returns `400 validation.field_invalid`.
+
+Fields that differ from the [shared comment fields](/guides/comments#list-comments-and-replies):
+
+| Field | On Bluesky |
+|---|---|
+| `platform_id` | The reply's AT URI |
+| `author_id` | The author's DID, for example `did:plc:jane456def` |
+| `author_name`, `author_username` | Both hold the author's handle. The display name is not returned |
+| `author_picture` | Always empty |
+| `parent_id` | Always `null`, including for a reply to a reply. The list does not show which reply answers which |
+| `is_hidden` | Always `false` in both reply lists and in `social_api_list_post_comments`, including for a reply you hid. Keep your own record of the replies you hide |
+| `like_count`, `reply_count` | Bluesky's like count and reply count for the reply |
+| `capabilities` | `can_reply` is `true`. `can_delete`, `can_hide`, `can_like`, and `can_private_reply` are `false` on every Bluesky reply, including the replies you can delete or hide. Use the rules in [Hide and unhide a reply](#hide-and-unhide-a-reply) and [Delete your own reply](#delete-your-own-reply) instead |
+
+### Replies below one reply
+
+`GET /v1/inbox/comments/{postId}/{commentId}/replies` returns the replies below one reply, up to 6 levels below it, in the same shape. The default `limit` is 10, and a value above 100 is treated as 100. The list has one page, like the post list. To read the replies below one reply, including those deeper than 6 levels below the post, call this endpoint on a reply whose `has_replies` is `true`.
+
+### Posts with replies
+
+`GET /v1/inbox/comments?account_id={account_id}` lists the account's posts with `comment_count` (Bluesky's reply count) and `like_count`. `id` is the post's AT URI, the value for `{postId}`. `thumbnail` is `null` on Bluesky. The list holds the posts you published through SocialAPI and the posts SocialAPI imported: see [Retrieve posts](/platforms/bluesky/publishing#6-retrieve-posts). The parameters are in [List posts with comments](/guides/comments#list-posts-with-comments).
+
+## Reply to a post or a reply
+
+`POST /v1/inbox/comments/{postId}` publishes a reply as the connected account.
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected account that replies |
+| `text` | Required. The reply text. A missing value returns `400 validation.field_required` |
+| `comment_id` | The reply to answer. Omit it to reply to the post itself |
+
+A reply to a reply stays in the original post's thread, directly below the reply you answered. A reply is a Bluesky post, so its text holds at most 300 characters (Bluesky counts each emoji as 1). Bluesky refuses longer text with `400 validation.platform_param`.
+
+SocialAPI turns every `http://` or `https://` address in the text into a link and every `#tag` that starts the text or follows a space into a hashtag. It does not turn `@handle` into a mention: the text publishes as plain text and the mentioned account is not notified.
+
+A reply costs 1 interaction credit. When the allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. The credit comes back when the call fails with a `validation.*` error: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
+
+## Hide and unhide a reply
+
+Hiding a reply takes it out of the thread view for other people on Bluesky. The reply is not deleted: it stays on Bluesky. Only the author of the original post can hide replies to it, at any level of the thread. Hiding or unhiding a reply never changes who can reply to the post: its reply settings on Bluesky stay as they are, including on a post closed to replies.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/at%3A%2F%2Fdid%3Aplc%3Aabc123xyz%2Fapp.bsky.feed.post%2F3kq2example/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I/hide" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+Unhide with `DELETE` on the same path and `account_id` as a query parameter:
+
+```bash
+curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/at%3A%2F%2Fdid%3Aplc%3Aabc123xyz%2Fapp.bsky.feed.post%2F3kq2example/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I/hide?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+- **Your threads only.** Hiding a reply in a thread another account started returns `403 platform.bluesky.not_thread_owner`.
+- **300 per thread.** A thread holds at most 300 hidden replies. Hiding a 301st returns `422 platform.bluesky.hidden_replies_full`. Unhide a reply to make room.
+
+Hiding and unhiding cost no credit.
+
+## Delete your own reply
+
+`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes a reply the connected account wrote. It returns `{ "success": true }` and cannot be undone. Bluesky lets no account delete another account's reply: deleting one returns `403 platform.bluesky.not_own_record`. Hide that reply instead. Deleting costs no credit.
+
+## What Bluesky does not support
+
+- **Liking a reply.** `POST` and `DELETE /v1/inbox/comments/{postId}/{commentId}/like` return `501 resource.not_supported`.
+- **Private replies.** Bluesky has no way to send a DM from a reply: `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` returns `501 resource.not_supported`. To message the person, use [Bluesky direct messages](/platforms/bluesky/messages).
+- **Deleting another account's reply.** Hide it.
+- **Editing a reply.** Delete it and send a new reply.
+- **Automations.** Automations run on Instagram and Facebook only.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Replies per list call | Default 25, up to 100, on one page |
+| Replies below one reply per call | Default 10, up to 100, on one page |
+| Levels read below the post or reply you name | 6 |
+| Reply text | 300 characters (Bluesky counts each emoji as 1) |
+| Hidden replies per thread | 300 |
+| Bluesky writes per account | 5,000 points per hour and 35,000 per day. A reply costs 3 points, a hide or unhide 2, a delete 1 |
+
+When Bluesky's write budget is used up, the call fails with `429 platform.bluesky.rate_limit`. Wait, then retry. Write points are shared with publishing: see [Bluesky limits](/platforms/bluesky#limits).
+
+## Errors and debugging
+
+Check these in order when a Bluesky comment call fails:
+
+1. **`401`, `403 auth.insufficient_scope`.** The API key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
+2. **`403 account.permission_missing`.** The account lacks the `comments.read` or `comments.write` [permission](/guides/permissions). `error.meta.permission` names it.
+3. **`400 validation.field_invalid` with `error.meta.field` set to `app_password`.** Bluesky no longer accepts the saved app password, for example because it was deleted in Bluesky settings. Create a new app password and connect the account again: see [Connect an account](/platforms/bluesky#connect-an-account).
+4. **`403 account.reconnection_required`, `401 platform.bluesky.auth`.** Bluesky rejected the saved credential. Connect the account again.
+5. **`401 platform.bluesky.unauthorized`.** Bluesky refused the request as unauthorized. If it repeats, connect the account again.
+6. **`403 platform.bluesky.account_takedown`.** Bluesky suspended the account. Connecting again does not restore access.
+7. **`400 validation.field_required`, `400 validation.field_invalid`.** A required field is missing, or a parameter has a wrong value. `error.meta.field` names it: a value other than `app_password` points at your request.
+8. **`400 validation.platform_param`.** Bluesky rejected a parameter, for example reply text over 300 characters or a malformed AT URI. `error.message` carries Bluesky's reason.
+9. **`403 platform.bluesky.not_thread_owner`, `422 platform.bluesky.hidden_replies_full`.** A hide outside your own thread, or past 300 hidden replies.
+10. **`403 platform.bluesky.not_own_record`.** A delete of another account's reply.
+11. **`404 resource.not_found`.** The post or the reply was deleted on Bluesky.
+12. **`409 platform.bluesky.stale_record`.** The record changed while the request ran. Retry.
+13. **`429 platform.bluesky.rate_limit`.** Bluesky's write budget is used up. Wait, then retry.
+14. **`429 validation.interaction_limit_exhausted`.** Your plan's interaction allowance is used up: see [Plans and usage](/guides/plans).
+15. **`501 resource.not_supported`.** A like or a private reply.
+16. **`503 platform.bluesky.api_error`.** The request to Bluesky failed, or Bluesky answered with no error name. Retry.
+
+Any other Bluesky refusal returns `503 platform.bluesky.{error}`, where `{error}` is Bluesky's error name, and `error.message` carries Bluesky's reason. Bluesky's own codes are in [Errors: Bluesky](/guides/errors#bluesky), and the comment codes in [Errors](/guides/errors).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `inbox:read` | List posts with replies, list replies, list the replies below a reply |
+| `inbox:write` | Reply, hide, unhide, delete |
+
+## Events
+
+Bluesky sends SocialAPI no notification of new replies, so SocialAPI sends no `comment.received` event for a Bluesky account. Read new replies with `GET /v1/inbox/comments/{postId}`. See [Bluesky webhook events](/platforms/bluesky#webhook-events).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_inbox_posts` | List your posts with their reply counts |
+| `social_api_list_post_comments` | List the replies to one post. Pass the AT URI as `inbox_post_id`, unencoded |
+| `social_api_get_comment_replies` | List the replies below one reply. The default is 20, up to 100 |
+| `social_api_reply_to_comment` | Reply to a post or a reply. The tool accepts up to 2,200 bytes, and Bluesky up to 300 characters |
+| `social_api_hide_comment`, `social_api_unhide_comment` | Hide or unhide a reply in a thread you started |
+| `social_api_delete_comment` | Delete one of your own replies |
+| `social_api_moderate_comment` | Hide, unhide, or delete a reply by its `sapi_cmt_` ID |
+
+The tool list and error shape are in [MCP tools](/integrations/tools#comments).
+
+## Related
+
+- [Bluesky API](/platforms/bluesky): connect the account, mentions, scopes, and the write budget
+- [Bluesky direct messages](/platforms/bluesky/messages): message a person privately
+- [Bluesky publishing](/platforms/bluesky/publishing): the posts whose replies you read here
+- [Comments](/guides/comments): the endpoints and fields shared by every platform
+- [Errors](/guides/errors#bluesky): every Bluesky error code

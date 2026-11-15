@@ -1,0 +1,505 @@
+---
+title: "WhatsApp messages"
+sidebarTitle: "Messages"
+description: "Receive and reply to WhatsApp messages, send media, buttons, lists, and approved templates, and track delivery and read receipts through one API."
+---
+
+SocialAPI receives the messages people send to your connected WhatsApp Business number and lets you answer them with text, media, reply buttons, lists, and link buttons. WhatsApp allows a free-form message only within 24 hours of the person's last message. Outside that window, and to message someone first, you send an approved message template. Each send costs 1 interaction credit, and template sends need a paid plan. For the endpoints every platform shares, see [Direct messages](/guides/direct-messages).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/conversations?account_id={id}` | List the WhatsApp conversations of a connected account |
+| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{id}/read` | Set the conversation's `unread_count` to 0 in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{id}/messages` | Send text, media, or an interactive message inside the 24-hour window |
+| `POST` | `/v1/inbox/conversations/{id}/sender-action` | Show a typing indicator, or mark the person's messages read |
+| `POST` | `/v1/platforms/whatsapp/accounts/{id}/send-template` | Send an approved template, at any time |
+
+The [template management endpoints](#create-and-manage-templates) create, list, edit, and delete templates. The reaction endpoints return `501 resource.not_supported` on WhatsApp.
+
+## Your first reply
+
+List the conversations of your WhatsApp account:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "whatsapp",
+      "platform_id": "15551234567",
+      "participant_id": "15551234567",
+      "participant_name": "Jordan Lee",
+      "participant_picture": "",
+      "last_message": "Is my order on its way?",
+      "last_message_at": "2026-11-10T09:12:00Z",
+      "status": "active",
+      "unread_count": 1,
+      "created_at": "2026-11-10T09:12:00Z",
+      "updated_at": "2026-11-10T09:12:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": null
+}
+```
+
+Reply into that conversation:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Yes, it left our warehouse this morning."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL",
+  "message_ids": ["sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL"]
+}
+```
+
+HTTP 200 means WhatsApp accepted the message, not that it was delivered. Each entry of `message_ids` is the `id` that arrives on the [`dm.status.*` events](#delivery-and-read-receipts) for that message, so you can follow it to `delivered`, `read`, or `failed`.
+
+## The 24-hour service window
+
+WhatsApp accepts a free-form message (text, media, or interactive) only within 24 hours of the person's most recent message to your number. Each new message from the person, including a tap on a button or list row, restarts the 24 hours.
+
+- **Inside the window:** send anything with `POST /v1/inbox/conversations/{id}/messages`.
+- **Outside the window:** the send returns `400 whatsapp.window_closed`. Send an approved template with [`send-template`](#send-a-template) instead, which WhatsApp accepts at any time.
+
+A send WhatsApp refuses with `whatsapp.window_closed` still costs its interaction credit (see [When a credit comes back](/guides/plans#when-a-credit-comes-back)).
+
+## Conversations and contacts
+
+A conversation is one person writing to one connected WhatsApp number. SocialAPI creates it when the person first messages the number, or when you send them a template.
+
+| Field | On WhatsApp |
+|---|---|
+| `participant_id` | The person's WhatsApp ID: their phone number in international format, digits only, without `+` (for example `15551234567`) |
+| `participant_name` | The profile name WhatsApp reports for the person, or their WhatsApp username when they have no name |
+| `participant_picture` | Always empty: WhatsApp does not share profile pictures |
+| `platform_id` | The person's WhatsApp ID, the same value as `participant_id` |
+
+WhatsApp has no message history API, so a conversation holds only the messages sent and received after the number was connected. A number that stays on the WhatsApp Business app also brings the chat history the business chooses to share: see [Keep using the WhatsApp Business app](/platforms/whatsapp#keep-using-the-whatsapp-business-app).
+
+### Contacts with a WhatsApp username
+
+A person who uses a WhatsApp username can hide their phone number. WhatsApp then identifies them by a business-scoped user ID, a string that contains a dot, such as `CO.1648230076976170`, instead of a phone number. That ID is the conversation's `participant_id`, the `author.id` on `dm.received`, and the `recipient_id` on `dm.status.*` events. Reply to the conversation as usual. If the person later shares their phone number, their new messages start a separate conversation.
+
+## Send a text message
+
+`POST /v1/inbox/conversations/{id}/messages` sends into an existing conversation. The request fields are in [Send a message](/guides/direct-messages#send-a-message). On WhatsApp:
+
+- `text` holds up to 4,096 characters, WhatsApp's limit. WhatsApp rejects longer text with `400 platform.whatsapp.invalid_parameter`.
+- WhatsApp shows no link preview for a URL in `text`.
+- `reply_to_message_id` is ignored: the message is not shown as a reply.
+- `message_tag` returns `422 messaging.tag_not_supported`. Send without it.
+
+The text, with any buttons or list, is 1 message. Each attachment follows as its own message, in order. The request costs 1 interaction credit however many messages it sends. If a send fails part way, the earlier messages stay sent, the credit stays spent, and the error carries `error.meta.sent_count` and `error.meta.failed_index`.
+
+## Send media
+
+Add an `attachments` array to send images, video, audio, and documents. Each item names a `url` WhatsApp can fetch, or a `media_id` from your [media library](/guides/media):
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "attachments": [
+      { "source_type": "media_id", "source": "550e8400-e29b-41d4-a716-446655440000", "caption": "The damaged panel" },
+      { "source_type": "url", "source": "https://cdn.example.com/invoices/1042.pdf", "type": "file" }
+    ]
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL",
+  "message_ids": [
+    "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL",
+    "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVM"
+  ]
+}
+```
+
+Each attachment arrives as its own WhatsApp message, in the type below. When you omit `type`, SocialAPI reads it from the file extension, and an extension that is not a known image, video, or audio extension sends a document. Set `type` when the extension does not match the content.
+
+| `type` | Sent as | Formats | Maximum size | `caption` |
+|---|---|---|---|---|
+| `image` | Image | JPEG, PNG | 5 MB | Yes |
+| `video` | Video | MP4, 3GPP | 16 MB | Yes |
+| `audio` | Audio | AAC, AMR, MP3, M4A, OGG | 16 MB | No: returns `400 validation.caption_unsupported` |
+| `file`, or any other value | Document | PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT | 100 MB | Yes |
+
+- **Captions.** `caption` shows the text inside the media message instead of as a separate message.
+- **Voice notes.** `voice: true` sends audio as a voice note. WhatsApp accepts only Ogg files encoded with the OPUS codec as voice notes. `voice` on an attachment that is not audio returns `400 validation.voice_unsupported`.
+- **Image formats.** An image URL whose path ends in an image extension other than `.jpg`, `.jpeg`, or `.png` (for example `.webp` or `.gif`) returns `400 validation.image_format_unsupported`. To deliver that file unchanged, send it with `type: "file"`.
+- **Document names.** For a `url` attachment, the document's file name in the chat is the last segment of the URL path.
+- **Reachability.** WhatsApp downloads a `url` attachment itself, without credentials, so the URL must be public. A URL WhatsApp cannot download, or a file over its size limit, returns `400 whatsapp.media_download_failed`. A file WhatsApp refuses returns `400 whatsapp.media_upload_failed`.
+- **Not accepted.** `source_type: "platform_attachment_id"` returns `400 validation.attachment_id_unsupported`. Stickers cannot be sent.
+
+WhatsApp checks some files only after it accepts the send. In that case the request returns HTTP 200, and a later [`dm.status.failed` event](#delivery-and-read-receipts) carries WhatsApp's reason in `error_code`, `error_title`, and `error_message`.
+
+## Interactive messages
+
+An interactive message lets the person answer by tapping instead of typing. WhatsApp offers 3 kinds, set with these fields of the send request:
+
+| Kind | Fields | What the person sees |
+|---|---|---|
+| Reply buttons | `buttons`: 1 to 3 buttons of `type: "postback"` | Up to 3 buttons under the message |
+| List | `list_button` and `list_sections` | A button that opens a list of up to 10 rows |
+| Link button | `buttons`: exactly 1 button of `type: "url"` | 1 button that opens a web page |
+
+Every kind needs `text`, which becomes the message body, up to 1,024 characters. Missing `text` returns `400 validation.field_required`, and longer text returns `400 validation.text_too_long`. Set `buttons` or `list_sections`, not both: both return `400 validation.interactive_conflict`. Interactive messages are free-form, so they need the [24-hour window](#the-24-hour-service-window).
+
+### Reply buttons
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Your order is ready. How do you want to receive it?",
+    "buttons": [
+      { "type": "postback", "title": "Deliver it", "payload": "order:1042:deliver" },
+      { "type": "postback", "title": "I will pick it up", "payload": "order:1042:pickup" }
+    ]
+  }'
+```
+
+Response (HTTP 200): the same shape as [your first reply](#your-first-reply).
+
+| Field | Description |
+|---|---|
+| `buttons[].type` | `postback`, the default when omitted. A `phone_number` button, or any type other than `postback` and `url`, returns `400 validation.button_type_unsupported` |
+| `buttons[].title` | Required. The button label, up to 20 characters. Missing returns `400 validation.field_required`, longer returns `400 validation.title_too_long` |
+| `buttons[].payload` | Required. Your own value, returned to you when the person taps the button. Unique within the message: a repeated payload returns `400 validation.duplicate_payload` |
+
+More than 3 buttons returns `400 validation.too_many_buttons`.
+
+### Lists
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Which store do you want to pick up from?",
+    "list_button": "Choose a store",
+    "list_sections": [
+      {
+        "title": "Paris",
+        "rows": [
+          { "id": "store:paris-11", "title": "Paris 11e", "description": "Open until 20:00" },
+          { "id": "store:paris-15", "title": "Paris 15e" }
+        ]
+      }
+    ]
+  }'
+```
+
+| Field | Description |
+|---|---|
+| `list_button` | Required. The label of the button that opens the list, up to 20 characters |
+| `list_sections` | 1 to 10 sections. More returns `400 validation.too_many_sections` |
+| `list_sections[].title` | Required by WhatsApp when the list has more than 1 section: without it, WhatsApp refuses the send. The section heading, up to 24 characters |
+| `list_sections[].rows` | Required. At least 1 row per section, and 10 rows at most across all sections. More returns `400 validation.too_many_rows` |
+| `rows[].id` | Required. Your own value, returned to you when the person taps the row. Unique within the message: a repeated id returns `400 validation.duplicate_payload` |
+| `rows[].title` | Required. Up to 24 characters |
+| `rows[].description` | Optional. Up to 72 characters. Longer returns `400 validation.description_too_long` |
+
+A missing required field returns `400 validation.field_required`, and a label or title over its limit returns `400 validation.title_too_long`.
+
+### Link to a web page
+
+A message with exactly 1 button of `type: "url"` shows 1 button that opens `url`:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Your order has shipped.",
+    "buttons": [
+      { "type": "url", "title": "Track order", "url": "https://example.com/track/1042" }
+    ]
+  }'
+```
+
+`title` is required, up to 20 characters. `url` is required and starts with `https://` or `http://`. A missing title, a missing url, or a url with another scheme returns `400 validation.field_required`, and a longer title returns `400 validation.title_too_long`. A url button next to any other button returns `400 validation.button_type_unsupported`. Opening the link sends no event.
+
+### Receive taps
+
+A tap arrives as an ordinary [`dm.received`](/guides/webhook-events#dm-received) event, not as a separate event type. WhatsApp posts the tapped title into the conversation as the person's own message, so the tap also restarts the 24-hour window. The `payload` or row `id` you set is on the event's `metadata`:
+
+```json
+{
+  "content": { "text": "Deliver it" },
+  "metadata": {
+    "platform_id": "wamid.HBgLMTU1NTEyMzQ1NjcVAgASGBQzQUI0QzVENkU3RjhBOUIwQzFEMgA=",
+    "phone_number_id": "106540352242922",
+    "interactive_type": "button_reply",
+    "payload": "order:1042:deliver"
+  }
+}
+```
+
+`interactive_type` is `button_reply` for a reply button, `list_reply` for a list row, or `button` for a quick reply button of a template. Both fields are absent on an ordinary message, so route on `metadata.payload` when it is present and treat the message as text otherwise.
+
+## Template messages
+
+A template is a message Meta approved in advance. WhatsApp delivers an approved template at any time, so templates are how you message a person outside the 24-hour window, or before they have ever written to you. Sending a template does not open the 24-hour window. The window opens when the person replies, and free-form messages work from then on.
+
+### Send a template
+
+```bash
+curl -X POST https://api.social-api.ai/v1/platforms/whatsapp/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/send-template \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "15551234567",
+    "template_name": "order_confirmation",
+    "language": "en_US",
+    "components": [
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "text": "Jordan" },
+          { "type": "text", "text": "A1234" }
+        ]
+      }
+    ]
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "messaging_product": "whatsapp",
+  "contacts": [{ "input": "15551234567", "wa_id": "15551234567" }],
+  "messages": [{ "id": "wamid.HBgLMTU1NTEyMzQ1NjcVAgARGBI5QTNDQTVCM0Q0Q0Q2RTY3RTcA", "message_status": "accepted" }],
+  "message_id": "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL"
+}
+```
+
+| Field | Description |
+|---|---|
+| `to` | Required. The person's phone number in international format, digits only, without `+`. A business-scoped user ID (it contains a dot) also works |
+| `template_name` | Required. The name of a template that is `APPROVED` on the account |
+| `language` | Required. The language code of an approved variant of that template, for example `en_US` |
+| `components` | Optional. The values of the template's variables: one entry per component that has variables |
+| `components[].type` | `header` or `body`. A `button` component cannot be sent. Sending one fails with an error from WhatsApp |
+| `components[].parameters` | The values, in the order of the template's placeholders (`{{1}}`, `{{2}}`, ...). Each is `{ "type": "text", "text": "..." }` |
+| `contacts[].wa_id` | The person's WhatsApp ID. Their conversation uses it as `participant_id` |
+| `messages[].id` | WhatsApp's message ID. It is the `platform_id` of the message in the conversation |
+| `message_id` | The SocialAPI message ID. It is the `id` on the `dm.status.*` events for this message. Absent when WhatsApp returns no message ID or no WhatsApp ID for the person |
+
+The `{id}` in the path is the connected account ID. The sent template appears in the person's conversation, and SocialAPI creates that conversation if the person has none. Parameters are text only: a template whose header is an image, video, or document, or whose button holds a variable, cannot be sent through this endpoint.
+
+A template send costs 1 interaction credit and needs a paid plan. On the Free plan, `send-template` returns `403 whatsapp.paid_plan_required` and sends nothing, and replies to people who messaged you still work. See [Plans](/guides/plans).
+
+A name or language variant the account does not have returns `404 whatsapp.template_not_found`. A template Meta paused for low quality returns `400 whatsapp.template_paused`. A marketing template to a person who reached WhatsApp's daily limit of marketing messages returns `429 whatsapp.frequency_cap`. Parameters that do not match the template's placeholders return `503 platform.whatsapp.api_error`, with WhatsApp's code in `error.meta.platform_code` (for example `132000` for a wrong number of parameters): fix the request before you send it again.
+
+How many different people a number can message first in a rolling 24 hours depends on its Meta messaging tier. Read it as `messaging_tier_cap` from [`GET /v1/accounts/{id}/limits`](/guides/rate-limits#read-a-platforms-remaining-quota).
+
+### Create and manage templates
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/platforms/whatsapp/templates/validate` | Check a template against WhatsApp's rules without submitting it |
+| `POST` | `/v1/platforms/whatsapp/accounts/{id}/templates` | Submit a template for Meta's review |
+| `GET` | `/v1/platforms/whatsapp/accounts/{id}/templates` | List the account's templates, in every status |
+| `GET` | `/v1/platforms/whatsapp/templates/{template_id}` | Get one template by its WhatsApp template ID |
+| `PUT` | `/v1/platforms/whatsapp/templates/{template_id}` | Replace the components of a template |
+| `DELETE` | `/v1/platforms/whatsapp/accounts/{id}/templates?name={name}` | Delete a template and all its language variants |
+
+```bash
+curl -X POST https://api.social-api.ai/v1/platforms/whatsapp/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/templates \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "order_confirmation",
+    "category": "UTILITY",
+    "language": "en_US",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Hello {{1}}, your order {{2}} is confirmed.",
+        "example": { "body_text": [["Jordan", "A1234"]] }
+      }
+    ]
+  }'
+```
+
+Response (HTTP 201):
+
+```json
+{
+  "id": "1234567890123456",
+  "status": "PENDING",
+  "category": "UTILITY"
+}
+```
+
+- **Fields.** `name`, `category`, `language`, and `components` are required: a missing one returns `400 validation.field_required`. `name` holds lowercase letters, digits, and underscores, up to 512 characters. A longer name returns `400 validation.template_invalid`. `category` is `UTILITY`, `MARKETING`, or `AUTHENTICATION`, and Meta can recategorize a `UTILITY` template with marketing content as `MARKETING`. `components` holds exactly 1 `BODY` (an `AUTHENTICATION` template can omit it), and Meta approves a component with variables only when it carries an `example`. The full component schema is in the [API reference](/api-reference/introduction).
+- **Review.** A new template is `PENDING`. Meta moves it to `APPROVED` or `REJECTED`, and later can set it to `PAUSED` or `DISABLED`. Read the status with the list or get endpoint before sending.
+- **Validation.** A template that breaks a rule returns `400 validation.template_invalid`, with every issue in `error.meta.errors`. `POST /v1/platforms/whatsapp/templates/validate` takes the same body and returns `valid`, `errors`, and `warnings` without submitting anything.
+- **Editing.** An `APPROVED`, `REJECTED`, or `PAUSED` template can be edited. A successful edit returns HTTP 204. Meta reviews the edited template again, and an edited `APPROVED` or `PAUSED` template returns to `APPROVED` unless it fails that review. Meta allows an approved template 1 edit per 24 hours and 10 per 30 days.
+- **Get and edit.** `GET` and `PUT` by template ID return `404 whatsapp.no_account` when you have no connected WhatsApp account.
+- **Listing.** Pass `paging.cursors.after` from one page as `cursor` to read the next: see [Pagination](/guides/pagination).
+
+## Receive messages
+
+Each message people send to your number appears in its conversation and arrives as a [`dm.received`](/guides/webhook-events#dm-received) event. On WhatsApp the event's `type` is `dm`.
+
+The table describes each message as `GET /v1/inbox/conversations/{id}/messages` returns it. On the `dm.received` event, the same values are in `content.text` and `content.media[].type`.
+
+| What the person sends | `text` | `attachment_type` |
+|---|---|---|
+| Text | The text | `null` |
+| Image, video, or document | The caption, or empty | `image`, `video`, or `document` |
+| Audio or voice note | Empty | `audio` |
+| Sticker | Empty | `sticker` |
+| A tap on a button or list row | The tapped title | `null`, with the payload on the event's `metadata` ([Receive taps](#receive-taps)) |
+| Anything else, such as a location, a contact card, or a reaction | Empty | `null`. Read the event's `raw_payload` for its content |
+
+The `attachment_url` of a received file is a SocialAPI URL that you download with your API key, not a WhatsApp URL. See [Fetch an inbound attachment](/guides/inbox#fetch-an-inbound-attachment) for the endpoint and how long the file stays available.
+
+## Delivery and read receipts
+
+WhatsApp reports what happens to each message you send, and SocialAPI turns each report into an event and updates the message's `status` in the conversation:
+
+| Event | Meaning |
+|---|---|
+| `dm.sent` | WhatsApp accepted the message. At most once per message, with the message text |
+| `dm.status.sent` | WhatsApp accepted the message |
+| `dm.status.delivered` | The message reached the person's phone |
+| `dm.status.read` | The person read the message |
+| `dm.status.failed` | WhatsApp could not deliver the message. `error_code`, `error_title`, and `error_message` hold WhatsApp's reason |
+
+The `id` on these events is the SocialAPI message ID that the send returned. The payloads are in [Webhook events](/guides/webhook-events#dm-status-sent-dm-status-delivered-dm-status-read-and-dm-status-failed).
+
+To show the person that you read their messages, or that you are typing, call `POST /v1/inbox/conversations/{id}/sender-action` (see [Typing indicators and seen receipts](/guides/direct-messages#typing-indicators-and-seen-receipts)). On WhatsApp:
+
+- `mark_seen` marks the person's latest message, and every earlier one, as read: they see blue ticks.
+- `typing_on` shows a typing indicator and also marks the person's latest message as read. The indicator clears when you send a message or after 25 seconds.
+- `typing_off` returns `400 validation.action_unsupported`: WhatsApp has none.
+- `typing_on` and `mark_seen` need at least 1 message from the person in the conversation. Without one, the call returns `400 validation.no_inbound_message`.
+
+Sender actions cost no credit. `POST /v1/inbox/conversations/{id}/read` only resets `unread_count` in SocialAPI: the person sees nothing. WhatsApp does not report when the person is typing.
+
+## What WhatsApp does not support
+
+| You try | Result | Do instead |
+|---|---|---|
+| A free-form message more than 24 hours after the person's last message | `400 whatsapp.window_closed` | [Send a template](#send-a-template) |
+| A message to a number with no conversation | No conversation `id` to send to | [Send a template](#send-a-template), which creates the conversation; free-form replies work once the person answers |
+| A reaction | `501 resource.not_supported` | Reply with a message |
+| `quick_replies` or `cards` | Next to `buttons` or `list_sections`: `400 validation.quick_replies_unsupported` or `400 validation.cards_unsupported`. On their own, they are dropped and only `text` is sent. Without `text`, the send fails | [Reply buttons](#reply-buttons) or a [list](#lists) |
+| A phone number button | `400 validation.button_type_unsupported` | A template with a `PHONE_NUMBER` button |
+| `message_tag` | `422 messaging.tag_not_supported` | Send without it |
+| `reply_to_message_id` | Ignored | Send without it |
+| `source_type: "platform_attachment_id"` | `400 validation.attachment_id_unsupported` | A `url` or `media_id` attachment |
+| Messages from before the number was connected | Not available | None: WhatsApp has no history API |
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Free-form messages | Within 24 hours of the person's last message |
+| Text | 4,096 characters |
+| Interactive message body | 1,024 characters |
+| Reply buttons | 3 per message, 20 characters per title |
+| Link button | 1 per message, 20 characters per title |
+| List | 10 rows across up to 10 sections, 20 characters for `list_button`, 24 per section or row title, 72 per row description |
+| Image | 5 MB, JPEG or PNG |
+| Video and audio | 16 MB |
+| Document | 100 MB |
+| Text through the MCP tool | 1,000 bytes |
+
+Each send and each template send costs 1 interaction credit. When the allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction) lists what costs a credit.
+
+## Errors and debugging
+
+Check these in order when a send fails:
+
+1. **`401`, `403 auth.insufficient_scope`.** The API key is invalid, or a scoped key lacks `dms:send`.
+2. **`404 conversation.not_found`, `404 account.not_found`.** The conversation does not exist, is not yours, or belongs to another connected account than `account_id`, or the account is not one of your WhatsApp accounts.
+3. **`403 account.permission_missing`.** The connected account lacks the `messages.write` [permission](/guides/permissions).
+4. **`403 whatsapp.paid_plan_required`.** A template send on the Free plan.
+5. **`400 validation.*`.** The body is wrong. `error.meta.field` names the field. The codes are in the sections above.
+6. **`400 whatsapp.window_closed`.** The 24-hour window is closed: [send a template](#send-a-template).
+7. **`404 whatsapp.template_not_found`, `400 whatsapp.template_paused`.** The template name, language, or status does not allow the send. A disabled template returns `503 platform.whatsapp.api_error` with `platform_code` `132016`.
+8. **`400 whatsapp.undeliverable`, `403 whatsapp.user_opted_out`.** The number is not on WhatsApp, or the person opted out of your messages.
+9. **`400 whatsapp.media_download_failed`, `400 whatsapp.media_upload_failed`.** WhatsApp could not download or accept an attachment: see [Send media](#send-media).
+10. **`400 whatsapp.not_registered`.** The number is not registered for the WhatsApp Cloud API: call `POST /v1/platforms/whatsapp/phone-numbers/{id}/register` (see [Phone numbers](/platforms/whatsapp#phone-numbers-and-business-profile)).
+11. **`401 platform.whatsapp.auth`, `403 platform.whatsapp.permission_denied`, `403 account.reconnection_required`.** The connection is no longer authorized. [Reconnect the account](/guides/connect-accounts#reconnect-an-account).
+12. **`429 whatsapp.pair_rate_limit`, `429 whatsapp.frequency_cap`, `429 whatsapp.throughput_exceeded`, `429 platform.whatsapp.rate_limit`.** WhatsApp refused: too many messages to this person, or from this number. These responses carry no `Retry-After` header: retry with exponential backoff. `whatsapp.pair_rate_limit` and `whatsapp.frequency_cap` concern 1 person, and messages to other people still go out. `whatsapp.frequency_cap` means the person reached WhatsApp's daily limit of marketing messages: send that person the template on a later day. After `whatsapp.throughput_exceeded` or `platform.whatsapp.rate_limit`, further sends and other calls for the account can return `429 platform.whatsapp.throttled` with a `Retry-After` header: wait that long. See [Rate limits](/guides/rate-limits).
+13. **`429 messaging.velocity_limit`, `429 messaging.recipient_limit`, other `429 messaging.*`.** SocialAPI's sending limits, which apply to messages and to template sends. `messaging.velocity_limit` means the number sent too many messages in a short time. `messaging.recipient_limit` means too many different people were messaged in the current calendar day (UTC). Wait for the `Retry-After` header. Nothing was sent and no credit was used.
+14. **`503 platform.whatsapp.api_error`, `503 whatsapp.unknown`.** WhatsApp refused the request for another reason, or SocialAPI got no usable answer from WhatsApp. When WhatsApp refused it, `platform.whatsapp.api_error` carries Meta's numeric error code in `error.meta.platform_code`, and Meta's subcode in `error.meta.platform_subcode` when Meta sent one. Without `platform_code`, the message can still have been sent: see [Create requests are not idempotent](/guides/ids#create-requests-are-not-idempotent) before you send it again. `whatsapp.unknown` carries neither: retry it with exponential backoff.
+
+When the send returned HTTP 200 but the message never arrived, read the `dm.status.failed` event for that message. The full list is in [Errors](/guides/errors#whatsapp).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `dms:read` | List and get conversations, list messages |
+| `dms:send` | Send a message, send a template, show a typing indicator, mark messages read |
+
+## Events
+
+SocialAPI sends these WhatsApp message events to your [webhook endpoint](/guides/webhooks): [`dm.received`](/guides/webhook-events#dm-received), [`dm.sent`](/guides/webhook-events#dm-sent), and `dm.status.sent`, `dm.status.delivered`, `dm.status.read`, and `dm.status.failed`. `dm.sent` also fires for each message the business sends from the WhatsApp Business app on a number that stays on the app. An account without the `messages.read` [permission](/guides/permissions) receives no `dm.received`. With `messages.write` alone, it still receives every `dm.status.*` event, and `dm.sent` for messages sent through SocialAPI.
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_conversations` | List conversations, most recent activity first |
+| `social_api_get_conversation` | Get one conversation |
+| `social_api_list_messages` | List the messages of a conversation |
+| `social_api_send_dm` | Send text, with up to 3 reply buttons or 1 link button. The text is 1,000 bytes at most. The tool sends no attachments and no lists |
+| `social_api_send_sender_action` | Show a typing indicator, or mark the person's messages read |
+| `social_api_update_conversation` | Archive a conversation, or set it back to `active` |
+| `social_api_mark_conversation_read` | Reset `unread_count` in SocialAPI |
+
+No tool sends or manages templates: use the REST endpoints. See [MCP tools](/integrations/tools#direct-messages).
+
+## Related
+
+- [WhatsApp API](/platforms/whatsapp): connect a number, keep using the WhatsApp Business app, and the platform's capabilities.
+- [Direct messages](/guides/direct-messages): the endpoints and fields every platform shares.
+- [Webhook events](/guides/webhook-events#direct-messages): the `dm.received`, `dm.sent`, and `dm.status.*` payloads.
+- [Plans and usage](/guides/plans): template sends need a paid plan, and what costs a credit.
+- [Errors](/guides/errors#whatsapp): every WhatsApp error code.

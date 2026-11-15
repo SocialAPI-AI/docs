@@ -1,0 +1,392 @@
+---
+title: Zalo direct messages
+sidebarTitle: "Messages"
+description: List Zalo Official Account conversations, read messages, and reply with text, images, stickers, and buttons inside Zalo's 7-day messaging window.
+---
+
+SocialAPI's direct message (DM) API lists the conversations of a connected Zalo Official Account (OA), reads their messages, and sends replies. A conversation is one person talking to the OA. You can send a message only to a person who interacted with the OA within the last 7 days. A send costs 1 interaction credit, and reads cost none. The rules shared by every platform are in [Direct messages](/guides/direct-messages).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/conversations` | List conversations |
+| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message |
+| `POST` | `/v1/inbox/sync` | Refresh the conversation list or one conversation's messages |
+| `GET` | `/v1/inbox/sync` | Read the sync state of the conversation list or of one conversation |
+
+`{id}` is the conversation `id` that `GET /v1/inbox/conversations` returns. Reactions and typing indicators return `501 resource.not_supported` on Zalo: see [What Zalo does not support](#what-zalo-does-not-support).
+
+## Your first reply
+
+List the conversations of the Zalo account:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "zalo",
+      "platform_id": "2512523625412515",
+      "participant_id": "2512523625412515",
+      "participant_name": "Khoa Pham",
+      "participant_picture": "",
+      "last_message": "Is the store open on Sunday?",
+      "last_message_at": "2026-10-13T14:30:00Z",
+      "status": "active",
+      "unread_count": 0,
+      "created_at": "2026-10-13T14:31:00Z",
+      "updated_at": "2026-10-13T14:31:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": "2026-10-13T14:31:00Z"
+}
+```
+
+Send a reply into that conversation:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Yes, we are open from 9:00 to 21:00 on Sunday."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "",
+  "message_ids": [""]
+}
+```
+
+On Zalo, `message_id` is empty and each entry of `message_ids` is an empty string. The sent message appears in [the message list](#read-messages) with its Zalo message ID in `platform_id`.
+
+## Conversations
+
+`GET /v1/inbox/conversations` takes the parameters described in [Direct messages](/guides/direct-messages#conversations). Add `platform=zalo` to list only Zalo conversations. On Zalo:
+
+| Field | On Zalo |
+|---|---|
+| `platform_id`, `participant_id` | Both hold the person's Zalo user ID. Zalo user IDs are specific to your Official Account: the same person has another ID on another OA |
+| `participant_name` | The person's Zalo display name. Empty until a refresh of the conversation list finds a message the person sent among the Official Account's 10 most recent messages |
+| `participant_picture` | Always empty |
+| `unread_count` | Always `0`. To count unread messages, use [`dm.received`](#events) events |
+
+A person with no message, sent or received, among the Official Account's 10 most recent messages does not appear in the list until a refresh finds one. A conversation already in the list stays there. Send `POST /v1/inbox/sync` with `account_id` to refresh the list now: see [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually).
+
+SocialAPI has no endpoint that starts a new Zalo conversation. You reply into a conversation that the list returns.
+
+## Read messages
+
+`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first.
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages?limit=25" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "3b8f1d2e-6c4a-4f9b-8e7d-1a2b3c4d5e6f",
+      "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "platform_id": "63ecf43f0df7dba892e6",
+      "direction": "outgoing",
+      "text": "Yes, we are open from 9:00 to 21:00 on Sunday.",
+      "sender_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "sender_name": "",
+      "attachment_type": null,
+      "attachment_url": null,
+      "reply_to": null,
+      "status": "pending",
+      "status_updated_at": "2026-10-13T14:35:00Z",
+      "created_at": "2026-10-13T14:35:00Z"
+    },
+    {
+      "id": "0e4d2f6a-5b1c-4c7e-9a3d-8f2b6c1d4e7a",
+      "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "platform_id": "92e5d851aa8178dd2192",
+      "direction": "incoming",
+      "text": "[Attachment]",
+      "sender_id": "2512523625412515",
+      "sender_name": "Khoa Pham",
+      "attachment_type": "photo",
+      "attachment_url": "https://photo-stal-12.zadn.vn/a1b2c3d4e5f6.jpg",
+      "reply_to": null,
+      "created_at": "2026-10-13T14:29:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": "2026-10-13T14:36:00Z"
+}
+```
+
+The fields are described in [Read messages](/guides/direct-messages#read-messages). On Zalo:
+
+| Field | On Zalo |
+|---|---|
+| `platform_id` | Zalo's message ID. Use it as `reply_to_message_id` to quote the message |
+| `attachment_type` | Zalo's message type for a message with media: `photo`, `GIF`, `voice`, or `sticker`, as Zalo writes it. For a message you sent through SocialAPI, the `type` of your attachment, or the type inferred from its file. A link or location message has no attachment fields |
+| `attachment_url` | The media URL on Zalo's servers. For a message you sent through SocialAPI: the URL you sent, a SocialAPI media URL for a `media_id` attachment, or `null` for a sticker |
+| `reply_to` | Always `null` |
+| `status` | A message you sent through SocialAPI keeps `status: "pending"`: SocialAPI does not report delivery or read status on Zalo. A message the OA sent from Zalo's own apps has no `status` |
+
+`GET /v1/inbox/conversations/{id}/messages` returns up to the 10 most recent messages of the conversation (sent and received) as of the first time SocialAPI loads them, plus the messages you send through SocialAPI. That first load happens on your first read, or earlier when a `POST /v1/inbox/sync` with only `account_id` loads the conversation: see [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually). A message the person sends later appears only after you send `POST /v1/inbox/sync` with `account_id` and `conversation_id` (1 per conversation every 5 minutes), even when its `dm.received` event already arrived. When more than 10 messages, sent or received, pass between two loads, the older ones that you did not send through SocialAPI never appear.
+
+`limit` and `cursor` work as on every platform: see [Pagination](/guides/pagination).
+
+## Send a message
+
+`POST /v1/inbox/conversations/{id}/messages` sends a message to the person. Every message goes out as a Zalo consultation message, the message type Zalo reserves for answering a person who contacted the OA. SocialAPI sends `text` first, then each attachment in order, as separate messages. The request costs 1 interaction credit however many messages it sends.
+
+The fields are described in [Send a message](/guides/direct-messages#send-a-message). On Zalo:
+
+| Field | On Zalo |
+|---|---|
+| `account_id` | Required. The Zalo account that owns the conversation |
+| `text` | Zalo accepts up to 2,000 characters. SocialAPI does not check the length |
+| `attachments` | Images and stickers: see [Attachments](#attachments) |
+| `attachment_url` | Deprecated. Sent as an image |
+| `reply_to_message_id` | Quotes the message with this `platform_id`. It applies to the first message the request sends. Zalo requires `text` with a quote |
+| `buttons` | Sent: see [Buttons](#buttons) |
+| `cards` | SocialAPI sends the first card only, as a request for the person's contact information. When the request has `cards`, SocialAPI does not send `text` as a separate message, and Zalo's contact card has no text field. Send text you need the person to see in its own request. See [Contact request card](#contact-request-card) |
+| `message_tag` | Not available. Any value returns `422 messaging.tag_not_supported` before anything is sent, and costs no credit |
+| `quick_replies`, `list_sections`, `list_button` | Ignored |
+| `caption`, `voice` on an attachment | Ignored |
+
+SocialAPI does not apply the Instagram and Facebook limits on interactive content to Zalo, and it does not refuse `buttons` together with `cards`. Zalo does not document buttons on a contact card.
+
+### Attachments
+
+The `type` of an attachment decides what Zalo receives:
+
+| Attachment | What the person receives |
+|---|---|
+| `url` or `media_id`, with any `type` except `gif` or `sticker` | An image. Zalo accepts JPG and PNG images up to 1 MB, so send only those this way |
+| `url` or `media_id` with `type: "sticker"` | Not supported. Send the sticker ID as a `platform_attachment_id` |
+| `platform_attachment_id` with `type: "sticker"` | A Zalo sticker. `source` is the sticker's ID from Zalo's sticker catalog |
+| `platform_attachment_id` with any other `type` | Not available: `source` must come from Zalo's upload API, which SocialAPI does not offer |
+| Any source with `type: "gif"` | Not supported. Zalo requires a width and height for a GIF, and the request has no field for them, so the send fails |
+
+Files and uploaded-image IDs come from Zalo's upload API, which needs the Official Account's access token. SocialAPI does not expose that token or an upload endpoint, so you cannot send a file through SocialAPI. Stickers sent as `platform_attachment_id` work, because their IDs come from Zalo's public sticker catalog.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Here is the store front.",
+    "reply_to_message_id": "92e5d851aa8178dd2192",
+    "attachments": [
+      { "source_type": "url", "source": "https://cdn.example.com/storefront.jpg" }
+    ]
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "",
+  "message_ids": ["", ""]
+}
+```
+
+The person receives 2 messages: the text, which quotes their photo, then the image.
+
+### Buttons
+
+`buttons` attaches buttons to the message, which shows `text` as its body.
+
+| Field | On Zalo |
+|---|---|
+| `buttons[].type` | `url` opens `url` in Zalo. `postback`, or any other value, makes a tap send `payload` to the OA as a message that the person's chat does not show |
+| `buttons[].title` | The label. Zalo accepts up to 100 characters |
+| `buttons[].url` | The destination of a `url` button |
+| `buttons[].payload` | The value a `postback` button sends. Zalo accepts up to 1,000 characters |
+
+Zalo accepts at most 5 buttons per message, and shows them only in the Zalo mobile app. SocialAPI sends no `dm.postback` event for a tap on a Zalo button. A tap on a `postback` button counts as an interaction with the OA, so it reopens [the 7-day messaging window](#the-7-day-messaging-window).
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Your order has shipped.",
+    "buttons": [
+      { "type": "url", "title": "Track order", "url": "https://shop.example.com/orders/123" },
+      { "type": "postback", "title": "Talk to support", "payload": "#support" }
+    ]
+  }'
+```
+
+### Contact request card
+
+On Zalo, the first entry of `cards` becomes a card that asks the person to share their contact information with the OA. SocialAPI sends no event when the person shares it.
+
+| Field | On Zalo |
+|---|---|
+| `cards[0].title` | Required by Zalo. Up to 100 characters |
+| `cards[0].subtitle` | Required by Zalo. Up to 500 characters |
+| `cards[0].image_url` | Required by Zalo. The image shown on the card |
+| `cards[0].buttons` | Ignored |
+
+Every entry of `cards` after the first is ignored.
+
+## The 7-day messaging window
+
+Zalo lets an Official Account send a consultation message only to a person who interacted with the OA within the last 7 days and has not blocked it. Zalo counts these actions by the person as interactions:
+
+- Sending a message to the OA
+- Following the OA
+- Tapping **Message** on the OA's profile
+- Calling the OA, or accepting a call from it
+- Commenting on one of the OA's posts
+- Tapping a menu entry or a `postback` button that sends a message to the OA
+
+Zalo does not charge the Official Account for consultation messages sent within 48 hours of the person's last interaction. Between 48 hours and 7 days, Zalo can charge the OA per message.
+
+A send outside the window, or to a person Zalo does not let the OA reach, fails with `422 platform.zalo.not_deliverable`. `error.meta.zalo_code` holds Zalo's numeric reason code:
+
+| `zalo_code` | Reason |
+|---|---|
+| `-213` | The person does not follow the OA |
+| `-217` | The person blocked the OA's invitations |
+| `-227` | The person's Zalo account is banned, or has been inactive for more than 45 days |
+| `-230` | The person has not interacted with the OA in the last 7 days |
+| `-232` | The person has never interacted with the OA, or their last interaction expired |
+| `-244` | The person turned off this type of message from the OA |
+
+The refused send still costs 1 interaction credit. To avoid it, compare the time of the person's latest `dm.received` event with the 7-day window before you send. The message list can lag behind that event, so its `created_at` values are a weaker signal. Only text messages raise the event, so a person who interacted in another way can still be reachable. The person's next interaction reopens the window.
+
+## What Zalo does not support
+
+- **Reactions.** `POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` and `DELETE` on the same path return `501 resource.not_supported`.
+- **Typing indicators and seen receipts.** `POST /v1/inbox/conversations/{id}/sender-action` returns `501 resource.not_supported`.
+- **Promotion, transaction, and broadcast messages.** SocialAPI sends consultation messages only, so you cannot message a person outside the 7-day window.
+- **Message tags.** `message_tag` returns `422 messaging.tag_not_supported`.
+- **Quick replies and list menus.** `quick_replies` and `list_sections` are ignored.
+- **Delivery and read status.** A message you send keeps `status: "pending"`, and SocialAPI sends no `dm.sent` or `dm.status.*` event for Zalo.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Messaging window | 7 days from the person's last interaction with the OA |
+| Messages a refresh adds | Up to the 10 most recent, for the conversation list and for one conversation |
+| Text | 2,000 characters (Zalo's limit) |
+| Image | JPG or PNG, up to 1 MB (Zalo's limit) |
+| Buttons | 5 per message, 100 characters per title, 1,000 characters per payload (Zalo's limits) |
+| Text through the MCP tool | 1,000 bytes |
+
+Zalo also limits requests per minute for each app and each Official Account, sets usage quotas per feature, and limits how many messages one person can receive from the OA. When a limit is reached, the call fails with `429 platform.zalo.rate_limit` and no `Retry-After` header: wait at least 60 seconds, then retry with exponential backoff. See [Platform limits](/guides/rate-limits#platform-limits). A refused send costs 1 interaction credit. When retries with exponential backoff keep returning it, stop: the Official Account's or the person's quota is used up.
+
+## Errors and debugging
+
+Check these in order when a Zalo call fails:
+
+1. **`403 auth.insufficient_scope`, `403 account.permission_missing`, `403 account.reconnection_required`, `404 account.not_found`, `404 conversation.not_found`.** A scoped key lacks the scope the call needs (`dms:read` to list, get, or sync, `dms:send` to send), the account lacks the permission the call needs (`messages.write` to send, `messages.read` to start or read an inbox sync), needs [reconnecting](/guides/connect-accounts#reconnect-an-account), does not exist, or does not own the conversation. See [Errors and debugging](/guides/direct-messages#errors-and-debugging).
+2. **`400 validation.*`, `422 messaging.tag_not_supported`.** The body is wrong, or it sets `message_tag`. `error.meta.field` names a wrong field.
+3. **`422 platform.zalo.not_deliverable`.** The messaging window is closed, or Zalo does not let the OA reach the person. Read `error.meta.zalo_code`: see [The 7-day messaging window](#the-7-day-messaging-window).
+4. **`400 validation.platform_param`.** Zalo rejected a parameter, for example an image it cannot read. `error.message` carries Zalo's reason. When the first message of the request fails this way, the credit comes back.
+5. **`401 platform.zalo.auth`.** The access token expired or was revoked, or the OA no longer authorizes SocialAPI's app. Reconnect the account. Until you do, calls return `401 platform.zalo.auth` or `403 account.reconnection_required`.
+6. **`404 resource.not_found`.** Zalo reports that the Official Account was deleted or does not exist.
+7. **`429 validation.interaction_limit_exhausted`, `429 platform.zalo.rate_limit`.** Your plan's interaction allowance is used up, or a Zalo limit is reached: see [Limits](#limits).
+8. **`503 platform.zalo.e<N>`, `503 platform.zalo.api_error`.** Zalo returned an error SocialAPI does not map (`<N>` is the absolute value of Zalo's numeric code), or the request failed before Zalo answered.
+9. **`501 resource.not_supported`.** You called the reaction or sender action endpoint.
+10. **`429 inbox.sync_rate_limited`.** `POST /v1/inbox/sync` ran again for the same target before its wait ended. Wait for `Retry-After`: see [Refresh the inbox manually](/guides/inbox#refresh-the-inbox-manually).
+
+If a request fails after its first message, the earlier messages stay delivered, and `error.meta.sent_count` and `error.meta.failed_index` say where to resume. The full catalog is in [Errors](/guides/errors#zalo).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `dms:read` | List and get conversations, list messages, start or read an inbox sync |
+| `dms:send` | Send a message |
+
+The account also needs the `messages.read` and `messages.write` [permissions](/guides/permissions).
+
+## Events
+
+Zalo sends SocialAPI a person's text messages as they happen, and SocialAPI delivers each one to your [webhook endpoints](/guides/webhooks) as `dm.received`:
+
+```json
+{
+  "event": "dm.received",
+  "data": {
+    "id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "platform": "zalo",
+    "type": "dm.received",
+    "author": { "id": "2512523625412515" },
+    "content": { "text": "Is the store open on Sunday?" },
+    "metadata": null,
+    "received_at": "2026-10-13T14:30:00Z",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "9b2f6c1e-3a4d-4e8b-b7c5-2f1a8d6e0c43"
+  },
+  "raw_payload": {
+    "app_id": "360846524940903967",
+    "sender": { "id": "2512523625412515" },
+    "user_id_by_app": "552177279717587730",
+    "recipient": { "id": "388613280878808645" },
+    "event_name": "user_send_text",
+    "message": { "text": "Is the store open on Sunday?", "msg_id": "96d3cdf3af150460909" },
+    "timestamp": "1791901800000"
+  }
+}
+```
+
+`author.id` is the person's Zalo user ID, the `participant_id` of their conversation. The event has no `author.name`, no `conversation_id`, and no `platform_id`. To find the conversation, list conversations with `account_id` and match `participant_id`. If no conversation matches, send `POST /v1/inbox/sync` with `account_id`, wait until `state` is no longer `syncing`, then list again. `raw_payload` is the event as Zalo sent it.
+
+Only text messages raise an event. Images, files, stickers, audio, video, locations, links, business cards, follows, taps on **Message** on the OA's profile, reactions, read receipts, and messages the OA sends raise none. An account without the `messages.read` [permission](/guides/permissions) receives no `dm.received`. Every payload is on [Webhook events](/guides/webhook-events#dm-received).
+
+## Use from an AI agent
+
+| Tool | What it does on Zalo |
+|---|---|
+| `social_api_list_conversations` | Lists conversations |
+| `social_api_get_conversation` | Gets one conversation |
+| `social_api_list_messages` | Lists the messages of a conversation |
+| `social_api_send_dm` | Sends text up to 1,000 bytes, with optional `buttons`. `quick_replies` are ignored. The returned `message_id` is empty |
+| `social_api_update_conversation` | Archives a conversation, or sets it back to `active` |
+| `social_api_mark_conversation_read` | Marks a conversation as read in SocialAPI |
+
+`social_api_send_sender_action` returns `resource.not_supported` on Zalo. See [MCP tools](/integrations/tools#direct-messages).
+
+## Related
+
+- [Zalo API](/platforms/zalo): capabilities, connecting an Official Account, and scopes
+- [Zalo publishing](/platforms/zalo/publishing): publish and delete OA articles
+- [Direct messages](/guides/direct-messages): the request fields every platform shares
+- [Unified inbox](/guides/inbox#refresh-the-inbox-manually): refresh conversations and messages on demand
+- [Webhook events](/guides/webhook-events#dm-received): the `dm.received` payload
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit

@@ -1,0 +1,330 @@
+---
+title: YouTube comments
+sidebarTitle: "Comments"
+description: List, reply to, hide, moderate, edit, and delete YouTube video comments, filter held-for-review and likely-spam comments, and ban authors through one API.
+---
+
+SocialAPI reads the comments on the videos of a connected YouTube channel and acts on them: reply, post a top-level comment, hide, hold for review, ban the author, edit your own comments, and delete your own comments. YouTube comments use the same endpoints as every other platform, plus 2 YouTube endpoints for moderation and editing. The cross-platform rules are in [Comments](/guides/comments).
+
+A reply or a top-level comment costs 1 interaction credit, and each channel can post 5 of them per day (midnight to midnight Pacific Time) through the reply endpoint and the `social_api_reply_to_comment` MCP tool. Reading, hiding, moderating, editing, and deleting cost no credits. YouTube sends no comment events, so read new comments with the list endpoints.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/comments?account_id={account_id}` | List the channel's videos with their comment counts |
+| `GET` | `/v1/inbox/comments/{postId}` | List the top-level comments on a video |
+| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to a top-level comment |
+| `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or post a top-level comment on the video |
+| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a comment (sets it to `rejected`) |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide a `held_for_review` comment. Do not use it on a `rejected` comment |
+| `POST` | `/v1/platforms/youtube/comments/{commentId}/moderate` | Set a comment to `published`, `held_for_review`, or `rejected`, and optionally ban its author |
+| `PATCH` | `/v1/platforms/youtube/comments/{commentId}` | Edit the text of a comment your channel wrote |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a comment your channel wrote |
+
+`{postId}` is the YouTube video ID, for example `dQw4w9WgXcQ`: the `id` of a video in `GET /v1/inbox/comments`, or `targets[].platform_post_id` on a video you published through SocialAPI. `{commentId}` accepts the comment's `sapi_cmt_` ID or YouTube's comment ID (`platform_id`). See [IDs](/guides/ids#what-each-endpoint-accepts).
+
+## Your first request
+
+List the comments on a video, most relevant first. `account_id` is required:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/dQw4w9WgXcQ?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&order=relevance" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_GGGMNLULUSDPYPEQXNVLDKHMFWMTXHVZ",
+      "platform_id": "UgxK3m9pQ2",
+      "platform": "youtube",
+      "text": "Great video!",
+      "author_id": "UCxyz123",
+      "author_name": "Jane Smith",
+      "author_username": "Jane Smith",
+      "author_picture": "https://yt3.ggpht.com/abc",
+      "is_owner": false,
+      "like_count": 5,
+      "reply_count": 2,
+      "has_replies": true,
+      "liked_by_viewer": false,
+      "is_hidden": false,
+      "moderation_status": "published",
+      "parent_id": null,
+      "created_at": "2026-03-15T10:30:00Z",
+      "capabilities": {
+        "can_reply": true,
+        "can_delete": true,
+        "can_hide": true,
+        "can_like": false,
+        "can_private_reply": false
+      }
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" }
+}
+```
+
+Use `id` as `{commentId}` in the other comment calls. To answer Jane, send the reply request in [Reply or post a top-level comment](#reply-or-post-a-top-level-comment).
+
+## List videos with comments
+
+`GET /v1/inbox/comments?account_id={account_id}` lists the channel's videos, newest published first, with the same parameters, fields, and pagination as on every platform: see [List posts with comments](/guides/comments#list-posts-with-comments). The `id` of each video is its YouTube video ID.
+
+On a YouTube video, `comment_count` can differ from the count YouTube shows, and can trail new comments. Pass the channel's `account_id` when you poll: without it, the counts on YouTube videos can stay out of date.
+
+## List comments on a video
+
+`GET /v1/inbox/comments/{postId}` returns the top-level comments on 1 video. Replies are listed separately: see [Replies](#replies).
+
+| Parameter | Description |
+|---|---|
+| `account_id` | Required. The connected YouTube account that owns the video. A missing value returns `400 validation.field_required` |
+| `limit` | Comments per page. The default is 25. A value above 100 is treated as 100. A value of 0 or less, or one that is not an integer, returns `400 validation.field_invalid` |
+| `cursor` | The `next_cursor` of the previous page |
+| `moderation_status` | `published` (default), `held_for_review`, or `likely_spam`. The last 2 list the comments waiting for your review |
+| `order` | `recent` (default) or `relevance` (YouTube's relevance ranking). The default list, including `order=recent` and `moderation_status=published`, has no fixed order: sort by `created_at`. A list with `moderation_status=held_for_review` or `likely_spam`, `order=relevance`, or `q` comes in YouTube's order |
+| `q` | A keyword searched in the comment text, up to 256 bytes |
+
+A `moderation_status` or `order` outside these lists, or a `q` longer than 256 bytes, returns `400 validation.field_invalid`. A comment you hide with the hide endpoint stays in the default list with `is_hidden: true`. The `held_for_review` and `likely_spam` filters do not return it, and no filter lists `rejected` comments only. A page can hold fewer comments than `limit`. Follow `next_cursor` until `has_more` is `false`: see [Pagination](/guides/pagination#fetch-every-page).
+
+The fields are the same as on every platform ([List comments and replies](/guides/comments#list-comments-and-replies)). On YouTube:
+
+| Field | Description |
+|---|---|
+| `text` | The comment as plain text |
+| `author_id` | The author's YouTube channel ID |
+| `author_name`, `author_username` | Both hold the author's YouTube display name |
+| `is_owner` | Can be `false` on your channel's own comments, including comments posted through SocialAPI. To find your channel's comments, compare `author_id` with your channel ID |
+| `like_count` | Likes on the comment, as YouTube reports them |
+| `reply_count`, `has_replies` | YouTube's reply count for the top-level comment, and whether it is above 0 |
+| `liked_by_viewer` | Always `false`: YouTube has no comment likes for apps |
+| `is_hidden` | `true` when a top-level comment is hidden from the public (`held_for_review` or `rejected`). On a reply, read `moderation_status` instead. A comment you moderate with the moderate endpoint can show `is_hidden: false` in the default list |
+| `moderation_status` | `published`, `held_for_review`, `likely_spam`, or `rejected`. Can be absent: read `is_hidden` then |
+| `parent_id` | `null` on a top-level comment |
+| `capabilities` | The same on every YouTube comment, in the next table |
+
+| `capabilities` key | Value on YouTube |
+|---|---|
+| `can_reply` | `true` |
+| `can_delete` | `true` on every comment, but YouTube deletes only comments your channel wrote: see [Delete a comment](#delete-a-comment) |
+| `can_hide` | `true` |
+| `can_like` | `false` |
+| `can_private_reply` | `false` |
+
+When the video has comments turned off, the call returns `422 platform.youtube.comments_disabled`. Retrying does not help: stop requesting that video until the channel owner turns comments back on in YouTube Studio. After that, the error can continue for up to 24 hours.
+
+## Replies
+
+YouTube threads are 1 level deep. Every reply belongs to a top-level comment, and a reply has no replies of its own.
+
+`GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the replies to the top-level comment `{commentId}`, in the same shape as comments. It takes `account_id` (required), `limit` (default 10, a value above 100 is treated as 100), and `cursor`. It ignores `moderation_status`, `order`, and `q`.
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/dQw4w9WgXcQ/UgxK3m9pQ2/replies?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Each reply's `parent_id` is the `platform_id` of its top-level comment. To answer a reply, reply to its top-level comment: pass the reply's `parent_id` as `comment_id`.
+
+## Reply or post a top-level comment
+
+`POST /v1/inbox/comments/{postId}` posts as the channel. With `comment_id`, it replies to that top-level comment. Without `comment_id`, it posts a new top-level comment on the video.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/dQw4w9WgXcQ" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "comment_id": "sapi_cmt_GGGMNLULUSDPYPEQXNVLDKHMFWMTXHVZ",
+    "text": "Thanks, Jane! Part 2 is out next week."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "comment_id": "sapi_cmt_MEIXTW6PYL693Q1RUVM52P3KIVNIK9RLN9TGBMQ4Q57C51AE"
+}
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected YouTube account that posts. A missing value returns `400 validation.field_required` |
+| `text` | Required. The comment text. A missing value returns `400 validation.field_required`. YouTube refuses text over its own length limit with `400 platform.youtube.api_error` |
+| `comment_id` | The top-level comment to reply to. Omit it to post a top-level comment on the video |
+
+`comment_id` in the response is the new comment's `sapi_cmt_` ID.
+
+**Each call costs 1 interaction credit.** When the plan's interaction allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. The credit comes back when the call fails with a `validation.*` error: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
+
+**Each connected channel can post 5 replies and top-level comments per day, through `POST /v1/inbox/comments/{postId}` and the MCP tool `social_api_reply_to_comment` combined.** Comments posted in YouTube itself, and a post's `first_comment`, do not count. The day runs from midnight to midnight Pacific Time. A 6th call returns `429 validation.youtube_daily_reply_limit` and costs no credit: wait for midnight Pacific Time. A comment that YouTube refuses does not count toward the 5. Edits do not count.
+
+`GET /v1/accounts/{id}/limits` returns `daily_replies_limit` and `daily_replies_remaining` for the channel: see [Read a platform's remaining quota](/guides/rate-limits#read-a-platforms-remaining-quota).
+
+## Hide and unhide a comment
+
+`POST /v1/inbox/comments/{postId}/{commentId}/hide` sets the comment to `rejected`, which removes it from public view. Rejecting a top-level comment also hides all of its replies. Hiding is free.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/dQw4w9WgXcQ/UgxK3m9pQ2/hide" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+`DELETE` on the same path, with `account_id` as a query parameter, unhides a comment. Unhide works on a `held_for_review` comment. Do not use it on a `rejected` comment: YouTube does not move a `rejected` comment back to `published`, and a hidden comment is `rejected`. To keep a comment out of view while you decide, set it to `held_for_review` with the [moderate endpoint](#moderate-a-comment) instead of hiding it.
+
+## Moderate a comment
+
+`POST /v1/platforms/youtube/comments/{commentId}/moderate` sets a comment's moderation status explicitly, and can ban its author from commenting on your channel. Moderating is free. YouTube accepts it only from the owner of the channel or video the comment is on.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/platforms/youtube/comments/UgxK3m9pQ2/moderate \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "post_id": "dQw4w9WgXcQ",
+    "status": "rejected",
+    "ban_author": true
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected YouTube account |
+| `post_id` | Required. The YouTube video ID the comment is on |
+| `status` | Required. `published` (show the comment; YouTube does not move a `rejected` comment back to `published`), `held_for_review` (hide it until you review it), or `rejected` (hide it). A missing or other value returns `400 validation.field_invalid` |
+| `ban_author` | Optional, default `false`. `true` also rejects every later comment the author writes on your channel. Valid only with `status` `rejected`, otherwise `400 validation.field_invalid` |
+
+A missing `account_id` or `post_id` returns `400 validation.field_required`. An account on another platform returns `501 resource.not_supported`. `{commentId}` accepts the `sapi_cmt_` ID or YouTube's comment ID.
+
+## Edit your own comment
+
+`PATCH /v1/platforms/youtube/comments/{commentId}` replaces the text of a comment your channel wrote. Editing is free and does not count toward the daily limit of 5.
+
+```bash
+curl -X PATCH https://api.social-api.ai/v1/platforms/youtube/comments/UgxK3m9pQ2 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "post_id": "dQw4w9WgXcQ",
+    "text": "Thanks, Jane! Part 2 is out on Friday."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+`account_id`, `post_id` (the YouTube video ID), and `text` are all required. A missing one returns `400 validation.field_required`. YouTube refuses an edit to a comment another person wrote. An account on another platform returns `501 resource.not_supported`.
+
+## Delete a comment
+
+`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes a comment your channel wrote. It returns `{ "success": true }`, costs no credit, and cannot be undone.
+
+`capabilities.can_delete` is `true` on every YouTube comment, including other people's. Deleting a comment your channel did not write returns `422 platform.youtube.processing_failure`. Hide it instead.
+
+## What YouTube does not allow
+
+- **Like or unlike a comment.** YouTube has no comment-like API. The call returns `501 resource.not_supported`.
+- **Private reply to a commenter.** YouTube has no private replies or DMs. The call returns `501 resource.not_supported`.
+- **Delete another person's comment.** YouTube deletes only comments your channel wrote. Hide the comment instead.
+- **Edit another person's comment.** YouTube refuses it.
+- **List only `rejected` comments.** No `moderation_status` value does it.
+- **Restore a hidden (`rejected`) comment to `published`.** YouTube does not allow it. Use `held_for_review` for comments you plan to restore.
+- **Reply to a reply.** Threads are 1 level deep. Reply to the top-level comment.
+- **Comments on Community posts.** YouTube has no API for them. Only video comments are listed.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Replies and top-level comments per channel | 5 per day, midnight to midnight Pacific Time. Over the limit: `429 validation.youtube_daily_reply_limit` |
+| Comments per page | Default 25, up to 100 |
+| Replies per page | Default 10, up to 100 |
+| `q` filter length | 256 bytes |
+| Reply text through the MCP tool `social_api_reply_to_comment` | 2,200 bytes |
+| YouTube's own limits | A call that reaches one returns `429 platform.youtube.rate_limit`. Wait, then retry: see [Rate limits](/guides/rate-limits) |
+
+## Errors and debugging
+
+Check these in order when a YouTube comment call fails or returns nothing:
+
+1. **`401`, `403 auth.insufficient_scope`.** The API key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
+2. **`404 account.not_found`, `403 account.reconnection_required`, `401 platform.youtube.auth`, `401 platform.youtube.unauthorized`.** The `acc_` ID is not yours, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account). After `401 platform.youtube.unauthorized`, a healthy account keeps working: reconnect only if it persists.
+3. **`403 platform.youtube.account_suspended`.** YouTube suspended or closed the account or its channel. Reconnecting does not help: see [Suspended or closed channels](/platforms/youtube#suspended-or-closed-channels).
+4. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list comments and replies, `comments.write` to reply, hide, unhide, moderate, edit, or delete. `error.meta.permission` names it.
+5. **`400 validation.body_invalid`, `400 validation.field_required`, `400 validation.field_invalid`.** The JSON body is malformed, a required field is missing, or a parameter has a wrong value. For the last 2 codes, `error.meta.field` names the field.
+6. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The comment ID is the wrong type or belongs to another platform: see [IDs](/guides/ids#what-each-endpoint-accepts). The moderate and edit endpoints do not return these codes.
+7. **`404 resource.not_found`.** The video or the comment does not exist on YouTube: it was deleted, or the ID is wrong.
+8. **`422 platform.youtube.comments_disabled`.** The video has comments turned off. Stop requesting it until the owner turns them back on.
+9. **`422 platform.youtube.processing_failure`.** YouTube refused the request. On delete, your channel did not write the comment: hide it instead. On hide or moderate, the commenter already deleted the comment, or YouTube could not process the request: retry once, and stop if it repeats. On a reply or an edit, check the text and the comment ID, then retry once.
+10. **`403 platform.youtube.forbidden`.** YouTube refused the action for lack of permission, or the comment was deleted, or the comment ID is invalid. Check that the comment still exists and is on a video of the connected channel. Retrying does not help.
+11. **`4xx platform.youtube.api_error`.** YouTube refused the request for another reason, for example replying to a comment whose parent is private, or an account YouTube does not allow to comment. `error.message` carries YouTube's reason. Fix the request: retrying the same request fails again.
+12. **`503 platform.youtube.api_error`.** YouTube failed or could not be reached. Retry with backoff. Before you retry a reply, list the comments to check whether it was posted.
+13. **`403 platform.youtube.insufficientPermissions`.** The connection lacks the YouTube scope. Reconnect the account.
+14. **`429 validation.youtube_daily_reply_limit`.** The channel posted its 5 replies and top-level comments for the day. Wait for midnight Pacific Time.
+15. **`429 validation.interaction_limit_exhausted`.** Your plan's interaction allowance for the billing period is used up. Retrying does not help: wait for the next billing period or upgrade your plan, see [Plans and usage](/guides/plans).
+16. **`429 platform.youtube.rate_limit`.** YouTube's own limit. Read `Retry-After` when it is present. Without it, back off as described in [Rate limits](/guides/rate-limits).
+17. **`501 resource.not_supported`.** YouTube lacks the action (like, private reply), or the moderate or edit endpoint received an account on another platform.
+
+The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `inbox:read` | List videos with comments, list comments, list replies |
+| `inbox:write` | Reply, post a top-level comment, hide, unhide, moderate, edit, delete |
+
+The YouTube connection itself uses the 1 OAuth scope listed in [YouTube scopes](/platforms/youtube#scopes).
+
+## Events
+
+YouTube sends no comment events, so SocialAPI emits no `comment.received` for YouTube. Read new comments with `GET /v1/inbox/comments/{postId}`, and the replies to a comment with its `replies` endpoint. The post and account events a YouTube channel emits are in [YouTube webhook events](/platforms/youtube#webhook-events).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_inbox_posts` | List the channel's videos with their comment counts |
+| `social_api_list_post_comments` | List the comments on a video. It takes no `moderation_status`, `order`, or `q` filter |
+| `social_api_get_comment_replies` | List the replies to a top-level comment |
+| `social_api_reply_to_comment` | Reply to a comment, or post a top-level comment when `comment_id` is omitted. The text is 2,200 bytes at most. Counts toward the channel's 5 per day |
+| `social_api_hide_comment`, `social_api_unhide_comment` | Hide or unhide a comment |
+| `social_api_delete_comment` | Delete a comment your channel wrote |
+| `social_api_moderate_comment` | Hide, unhide, or delete a comment by its `sapi_cmt_` ID, with `action` set to `hide`, `unhide`, or `delete` |
+
+No MCP tool sets `held_for_review`, bans an author, or edits a comment: use the REST endpoints for those. The tool list is in [MCP tools](/integrations/tools#comments).
+
+## Related
+
+- [YouTube API](/platforms/youtube): capabilities, connect rules, scopes, and webhook events for the channel
+- [YouTube publishing](/platforms/youtube/publishing): upload videos and post a first comment
+- [Comments](/guides/comments): the cross-platform comment endpoints and fields
+- [Errors](/guides/errors#inbox-comments-messages-and-reviews): every comment error code
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit

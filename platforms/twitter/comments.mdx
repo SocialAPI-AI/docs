@@ -1,0 +1,242 @@
+---
+title: X / Twitter comments
+sidebarTitle: "Comments"
+description: List the replies to your X posts, reply to them, hide and unhide them, and delete your own replies through one API, with X's 7-day window and limits.
+---
+
+SocialAPI reads the replies to the posts of a connected X account and acts on them: it replies to them, hides and unhides them, and deletes the replies the account wrote. X has no separate comment object: a comment is a post that replies to another post, and SocialAPI lists it with the same endpoints and fields as a comment on every other platform. The cross-platform rules are in [Comments](/guides/comments).
+
+A public reply costs 1 interaction credit. Reading, hiding, unhiding, and deleting cost no credits. X also bills every read and write to your own X developer app, because X connects through [your own X app](/platforms/twitter/own-app). X sends no comment events, so read new replies with the list endpoints.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/comments?account_id={account_id}` | List the account's posts with their reply counts |
+| `GET` | `/v1/inbox/comments/{postId}` | List the replies to a post, at every depth of its conversation |
+| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the direct replies to one reply |
+| `POST` | `/v1/inbox/comments/{postId}` | Reply to a reply, or reply to the post itself |
+| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a reply in a conversation that the account's own post started |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide that reply |
+| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a reply the account wrote |
+
+`{postId}` is the X post ID, for example `1846123456789012345`: the `id` of a post in `GET /v1/inbox/comments`, or `targets[].platform_post_id` on a post you published through SocialAPI. `{commentId}` and `comment_id` accept the reply's `sapi_cmt_` ID or its X post ID (`platform_id`). See [IDs](/guides/ids#what-each-endpoint-accepts).
+
+## Your first request
+
+List the replies to a post. `account_id` is required:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/comments/1846123456789012345?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+      "platform_id": "1846198765432109876",
+      "platform": "twitter",
+      "text": "@acmecorp Does the spring collection ship to Canada?",
+      "author_id": "1402789345612345678",
+      "author_name": "Jane Smith",
+      "author_username": "janesmith",
+      "author_picture": "https://pbs.twimg.com/profile_images/1402789345612345678/jane_normal.jpg",
+      "is_owner": false,
+      "like_count": 3,
+      "reply_count": 1,
+      "has_replies": true,
+      "liked_by_viewer": false,
+      "is_hidden": false,
+      "parent_id": null,
+      "created_at": "2026-10-13T14:30:00Z",
+      "capabilities": {
+        "can_reply": true,
+        "can_delete": false,
+        "can_hide": true,
+        "can_like": false,
+        "can_private_reply": false
+      }
+    }
+  ],
+  "pagination": { "has_more": true, "next_cursor": "b26v89c19zqg8o3fpdg6ks7rmh6q3hcvxz4l2gjvukh" }
+}
+```
+
+The fields are described in [List comments and replies](/guides/comments#list-comments-and-replies). On X, `is_owner`, `parent_id`, `is_hidden`, `liked_by_viewer`, and every `capabilities` key hold the same value on every reply: see [Fields that differ on X](#fields-that-differ-on-x).
+
+## List the replies to a post
+
+`GET /v1/inbox/comments/{postId}` returns the replies in the post's conversation, newest first. The list holds direct replies to the post and replies to those replies, at every depth, in one flat list. Reposts are left out.
+
+| Parameter | Description |
+|---|---|
+| `account_id` | Required. The connected account that owns the post. A missing value returns `400 validation.field_required` |
+| `limit` | Replies per page. The default is 25. A value above 100 is treated as 100. A value of 0 or less, or one that is not an integer, returns `400 validation.field_invalid` |
+| `cursor` | The `next_cursor` of the previous page |
+
+- **7-day window.** X returns only replies posted in the last 7 days. A reply older than 7 days is not listed, whatever the age of the post. The post's `comment_count` in `GET /v1/inbox/comments` is X's reply count, which has no 7-day window, so it can be higher than the number of replies you can list.
+- **Paging.** Follow `next_cursor` until `has_more` is `false`. With a `limit` below 10, each page holds at most `limit` replies, and `next_cursor` skips the rest of that page's 10. Use a `limit` of 10 or more when you page.
+- **Filters.** `moderation_status`, `order`, and `q` do not filter or sort X replies. An invalid value still returns `400 validation.field_invalid`.
+
+`GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the direct replies to one reply, in the same shape, newest first. Its default `limit` is 10, the same 7-day window applies, and a `limit` above 100 is treated as 100. The paging rule above applies. A `limit` of 0 or less, or one that is not an integer, returns `400 validation.field_invalid`.
+
+`GET /v1/inbox/comments?account_id={account_id}&platform=twitter` lists the account's posts with their `comment_count`, which is X's reply count. The list includes the replies the account published, because X treats each reply as a post. Reposts are left out. The parameters are in [List posts with comments](/guides/comments#list-posts-with-comments).
+
+### Fields that differ on X
+
+| Field | Value on X |
+|---|---|
+| `is_owner` | Always `false`, including on a reply the connected account wrote. To find the account's own replies, compare `author_username` with the connected account's `username` |
+| `parent_id` | Always `null`, including on a reply to a reply. Use the `replies` endpoint to read one reply's direct replies |
+| `is_hidden` | Always `false`, including on a reply you hid |
+| `liked_by_viewer` | Always `false` |
+| `reply_count`, `has_replies` | X's reply count for the reply. `has_replies` is `true` when the count is above 0 |
+| `capabilities.can_reply` | `true` |
+| `capabilities.can_hide` | `true` on every reply. Hiding works only on a reply in a conversation the account started: see [Hide and unhide a reply](#hide-and-unhide-a-reply) |
+| `capabilities.can_delete` | `false` on every reply, including the account's own. Deleting a reply the account wrote still works: see [Delete a reply](#delete-a-reply) |
+| `capabilities.can_like`, `capabilities.can_private_reply` | `false` |
+| `moderation_status`, `author_headline`, `author_profile_url` | Absent |
+
+## Reply to a post or a reply
+
+`POST /v1/inbox/comments/{postId}` publishes a reply as the connected account. With `comment_id`, the reply answers that reply. Without it, the reply answers the post itself.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/1846123456789012345" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "comment_id": "sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "text": "Yes, we ship to Canada in 3 to 5 days."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "comment_id": "sapi_cmt_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1X"
+}
+```
+
+| Field | Description |
+|---|---|
+| `account_id` | Required. The connected account that replies |
+| `text` | Required. The reply text. A missing value returns `400 validation.field_required` |
+| `comment_id` | The reply to answer. Omit it to reply to the post itself |
+
+`comment_id` in the response is the new reply's `sapi_cmt_` ID. The reply is a public X post, live when the call returns.
+
+- **Cost.** A reply costs 1 interaction credit. When the plan's allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. The credit comes back when the request fails with a `validation.*` error or with `429 platform.twitter.throttled`: see [When a credit comes back](/guides/plans#when-a-credit-comes-back). Every other `platform.twitter.*` code and `501 resource.not_supported` keep the credit, including `403 platform.twitter.forbidden`, `403 platform.twitter.duplicate_content`, and `429 platform.twitter.rate_limit`.
+- **Who you can reply to.** A reply to another account's post goes through only when that post's author mentioned the connected account or quoted one of its posts. X refuses other replies with `403 platform.twitter.forbidden`.
+- **Text X refuses.** A reply X refuses as a post, for example one longer than X allows for the account (280 characters without X Premium), returns `400 validation.field_required` with `error.meta.field` set to `request_body`, and the credit is returned. A reply whose text repeats a recent post of the account returns `403 platform.twitter.duplicate_content`.
+
+## Hide and unhide a reply
+
+`POST /v1/inbox/comments/{postId}/{commentId}/hide` hides a reply. X keeps a hidden reply reachable by its link and de-emphasizes it in the conversation view. `DELETE` on the same path, with `account_id` as a query parameter, unhides it.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/comments/1846123456789012345/1846198765432109876/hide" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+X lets the connected account hide only a reply in a conversation that the account's own post started. Hiding a reply in another person's conversation returns `501 resource.not_supported`. Hiding and unhiding cost no credits. Hiding needs the `tweet.moderate.write` scope: see [Scopes](#scopes).
+
+## Delete a reply
+
+`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes a reply the connected account wrote. It returns `{ "success": true }`, costs no credit, and cannot be undone.
+
+X lets an account delete only its own posts. Deleting another person's reply fails with `501 resource.not_supported` or `403 platform.twitter.forbidden`: hide it instead. `can_delete` is `false` on every X reply, so decide from `author_username`, not from `can_delete`.
+
+## What X does not allow
+
+| Action | Result |
+|---|---|
+| Like or unlike a reply | `501 resource.not_supported`. X refuses like writes from apps on pay-per-use access |
+| Private reply to the author | `501 resource.not_supported`. X has no private reply. Sending `attachment` returns `400 validation.field_not_supported` |
+| List replies older than 7 days | Not returned. X returns replies from the last 7 days only |
+| Delete another person's reply | Deleting another person's reply fails with `501 resource.not_supported` or `403 platform.twitter.forbidden`: hide it instead. |
+| Hide a reply in another person's conversation | `501 resource.not_supported` |
+| Reply to a mention | `501 resource.not_supported`. List mentions with [Mentions](/guides/mentions) |
+| Answer replies automatically | [Automations](/guides/automations) do not run on X: creating one returns `422 automation.platform_unsupported` |
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Replies per page | Default 25, up to 100. Use 10 or more when you page: see [List the replies to a post](#list-the-replies-to-a-post) |
+| Replies to a reply per page | Default 10, up to 100 |
+| Reply age | 7 days |
+| Reply text through the MCP tool `social_api_reply_to_comment` | 2,200 bytes |
+| X's own rate limits | Per 15 minutes for each connected account: 300 requests to list replies, 100 posts and replies, 50 hides and unhides, and 50 deletes. X also lists a per-app limit of 10,000 posts and replies per 24 hours |
+| X credits and spending cap | Your X app out of credits, or at its spending limit, returns `402 platform.twitter.usage_capped`. Add credits in the X Developer Console |
+
+Past one of X's rate limits, the call returns `429 platform.twitter.rate_limit`, with a `Retry-After` header when X reports when the limit resets. The same code is returned when X is temporarily unavailable. See [Rate limits](/guides/rate-limits).
+
+## Errors and debugging
+
+Check these in order when an X comment call fails or returns nothing:
+
+1. **`401`, `403 auth.insufficient_scope`.** The API key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
+2. **`404 account.not_found`, `403 account.reconnection_required`, `401 platform.twitter.auth`, `401 platform.twitter.unauthorized`.** The `acc_` ID is not yours, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account). `401 platform.twitter.unauthorized` leaves the account working: if it persists, reconnect.
+3. **`412 byok.app_access_denied`, `401 byok.credentials_invalid`.** X refused your X app access to its API, or rejected the app credentials saved in SocialAPI. Fix the app as in [Use your own X app](/platforms/twitter/own-app#troubleshooting), then reconnect the account.
+4. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list replies, `comments.write` to reply, hide, unhide, or delete. `error.meta.permission` names it.
+5. **`403 platform.twitter.insufficient_scope`.** The X connection lacks a scope the call needs, for example `tweet.moderate.write` to hide. Reconnect the account.
+6. **`400 validation.field_required`, `400 validation.field_invalid`.** A required field is missing, or a parameter has a wrong value. `error.meta.field` names it. `request_body` means X refused the reply text.
+7. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The comment ID is the wrong type or belongs to another platform: see [IDs](/guides/ids#what-each-endpoint-accepts).
+8. **`403 platform.twitter.forbidden`, `403 platform.twitter.duplicate_content`.** X refused the reply or the delete: the account was not mentioned or quoted by the author it replies to, or the text repeats a recent post of the account. Deleting another person's reply fails with `501 resource.not_supported` or `403 platform.twitter.forbidden`: hide it instead.
+9. **`501 resource.not_supported`.** X lacks the action (like, private reply, reply to a mention), the reply to hide is in another person's conversation, or the reply to delete is another person's.
+10. **`402 platform.twitter.usage_capped`.** Your X app is out of credits or at its spending limit.
+11. **`429 validation.interaction_limit_exhausted`, `429 platform.twitter.rate_limit`, `429 platform.twitter.throttled`.** `validation.interaction_limit_exhausted`: your plan's interaction allowance is used up until the next billing period. Upgrade the plan to reply now. `platform.twitter.rate_limit`: X's own limit. Wait for the `Retry-After` header when it is present. `platform.twitter.throttled`: X refused this account with its own rate limit, and SocialAPI refuses its calls until the wait ends. Wait for the `Retry-After` header.
+
+When the list is empty, check that the post has replies from the last 7 days and that `account_id` is the account that published the post. The full catalog is in [Errors](/guides/errors#inbox-comments-messages-and-reviews).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `inbox:read` | List posts with replies, list replies, list the replies to a reply |
+| `inbox:write` | Reply, hide, unhide, delete |
+
+The X connection needs `tweet.read` and `users.read` to read replies, `tweet.write` to reply and delete, and `tweet.moderate.write` to hide and unhide. The full list is in [X scopes](/platforms/twitter#scopes).
+
+## Events
+
+X sends no comment events, so SocialAPI emits no `comment.received` for X. Read new replies with `GET /v1/inbox/comments/{postId}`. The events an X account does emit are in the Webhook events row of [X capabilities](/platforms/twitter#capabilities).
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_inbox_posts` | List the account's posts with their reply counts |
+| `social_api_list_post_comments` | List the replies to a post |
+| `social_api_get_comment_replies` | List the direct replies to one reply |
+| `social_api_reply_to_comment` | Reply to a reply, or to the post when `comment_id` is omitted. The text is 2,200 bytes at most |
+| `social_api_hide_comment`, `social_api_unhide_comment` | Hide or unhide a reply in a conversation that the account's own post started |
+| `social_api_delete_comment` | Delete a reply the account wrote |
+| `social_api_moderate_comment` | Hide, unhide, or delete a reply by its `sapi_cmt_` ID, with `action` set to `hide`, `unhide`, or `delete` |
+
+The tool list is in [MCP tools](/integrations/tools#comments).
+
+## Related
+
+- [X / Twitter API](/platforms/twitter): capabilities, connect rules, limits, and scopes for X
+- [X / Twitter direct messages](/platforms/twitter/messages): list and send X DMs
+- [X / Twitter publishing](/platforms/twitter/publishing): publish posts, threads, and replies with `in_reply_to_tweet_id`
+- [Comments](/guides/comments): the cross-platform comment endpoints and fields
+- [Use your own X app](/platforms/twitter/own-app): the X app that X bills for every call
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit

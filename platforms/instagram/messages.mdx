@@ -1,0 +1,311 @@
+---
+title: Instagram direct messages
+sidebarTitle: "Messages"
+description: Read and send Instagram DMs through SocialAPI, with the 24-hour messaging window, HUMAN_AGENT, attachments, reactions, and participant profiles.
+---
+
+SocialAPI lists the direct message (DM) conversations of a connected Instagram Business or Creator account, reads their messages, and sends replies with text, attachments, quick replies, buttons, and cards. A conversation is one person talking to the Instagram account. The endpoints are the ones every platform uses, described in [Direct messages](/guides/direct-messages). This page holds the rules that are specific to Instagram, including the differences between [Instagram Login and Facebook Login](/platforms/instagram#connect-through-facebook-login).
+
+Instagram lets the account message a person only inside the 24-hour messaging window that the person's last message opened, or up to 7 days with HUMAN_AGENT on Instagram Login, once enabled for your SocialAPI account. A DM request costs 1 interaction credit, however many messages it sends. Reads, reactions, typing indicators, seen receipts, and participant profiles cost nothing.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/conversations?platform=instagram` | List Instagram conversations |
+| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message |
+| `POST` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | React to a message |
+| `DELETE` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | Remove your reaction |
+| `POST` | `/v1/inbox/conversations/{id}/sender-action` | Show a typing indicator, or mark the person's messages seen |
+| `GET` | `/v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile` | Read the profile of a person in a conversation |
+
+`{id}` in the `/v1/inbox/conversations` paths is the conversation `id`. `{messageId}` is a message's `platform_id`. In the profile path, `{id}` is the connected account's `acc_` ID and `{participantId}` is the conversation's `participant_id`, the person's Instagram-scoped ID. See [IDs](/guides/ids#what-each-endpoint-accepts).
+
+## Your first message
+
+List the Instagram conversations of one connected account:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J&platform=instagram" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "instagram",
+      "platform_id": "aWdfZAG06MTpJR01lc3NhZA2VUaHJlYWQ6MTc4NDE0",
+      "participant_id": "2287522528728101",
+      "participant_name": "janesmith",
+      "participant_picture": "https://scontent.cdninstagram.com/v/t51/jane.jpg",
+      "last_message": "Is the blue one in stock?",
+      "last_message_at": "2026-10-13T14:30:00Z",
+      "status": "active",
+      "unread_count": 1,
+      "created_at": "2026-10-13T14:30:00Z",
+      "updated_at": "2026-10-13T14:30:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": "2026-10-13T14:31:00Z"
+}
+```
+
+Reply inside the messaging window:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Yes, the blue one ships today."
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+  "message_ids": ["sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I"]
+}
+```
+
+`message_ids` lists the SocialAPI ID of every message the request sent, in send order. The conversation and message fields are described in [Conversations](/guides/direct-messages#conversations) and [Read messages](/guides/direct-messages#read-messages).
+
+## The messaging window
+
+An Instagram account can message a person only within 24 hours of the person's last message. Each new message from the person restarts the 24 hours. Outside the window, the send returns `400 platform.instagram.window_closed`, and Instagram delivers nothing.
+
+- **After a refusal.** Once Instagram refuses a conversation for a closed window, SocialAPI refuses later sends on that conversation with the same code and `error.meta.blocked_locally: true`, until the person messages the account again, or 24 hours after Instagram's refusal, whichever comes first. These refusals cost no credit. A send that goes out with HUMAN_AGENT is not refused this way. See [The messaging window](/guides/direct-messages#the-messaging-window).
+- **Private replies.** A [private reply](/platforms/instagram/comments#send-a-private-reply) does not open the window. The person's answer to it does.
+- **Automations.** An [Automation](/guides/automations) never sends `message_tag`, so its DMs follow the 24-hour window.
+
+### Reply after 24 hours with HUMAN_AGENT
+
+`message_tag: "HUMAN_AGENT"` lets a member of your team reply to a conversation between 24 hours and 7 days after the person's last message. It applies only to accounts connected through Instagram Login.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Sorry for the wait, Jane. Your replacement shipped this morning.",
+    "message_tag": "HUMAN_AGENT"
+  }'
+```
+
+The response is the same as an untagged send. The rules:
+
+- **Human replies only.** Send the tag only on a reply a member of your team types. Never send it from a workflow, an automation, a bot, an AI agent acting on its own, a broadcast, a promotion, or a re-engagement message. You are responsible for following Meta's messaging policy.
+- **Enabled per SocialAPI account.** Ask support to enable HUMAN_AGENT for your SocialAPI account. Until it is enabled, a send with the tag returns `403 messaging.tag_not_enabled`.
+- **Window.** Within 24 hours of the person's last message, the message is sent without the tag, as an ordinary reply. More than 7 days after it, the send returns `400 messaging.human_agent_window_closed`, and the person must message the account first.
+- **Allowed values.** `HUMAN_AGENT` is the only value. Any other value, or the tag on an account connected through Facebook Login, returns `422 messaging.tag_not_supported`. Send without `message_tag` instead.
+- **Pause.** While HUMAN_AGENT is paused on the connected account, a send that needs the tag returns `429 messaging.tag_rate_limited`. When the error carries `error.meta.retry_after_seconds`, the pause ends at 00:00 UTC: wait that long, also given in the `Retry-After` header, then send again. Without it, the pause has no set end: reply without `message_tag` inside the 24-hour window, and contact support to learn when tagging resumes. Replies within 24 hours of the person's last message still work during a pause.
+- **Revoked.** Revoking is permanent until support enables HUMAN_AGENT again. After a revoke, every send with the tag returns `403 messaging.tag_not_enabled`, as before it was enabled. Send without `message_tag` inside the 24-hour window, or contact support.
+- **Misuse.** Misuse can pause HUMAN_AGENT on the connected account, revoke it for your SocialAPI account, and get the Instagram account restricted by Meta.
+
+## Message types and sizes
+
+An Instagram DM carries text, attachments, quick replies, buttons, or cards. The request fields are in [Send a message](/guides/direct-messages#send-a-message). SocialAPI sends the text first, then each attachment in order, as separate messages: text plus 2 images arrives as 3 messages and costs 1 credit.
+
+Instagram sets these sizes and refuses a larger message:
+
+| Content | Formats | Maximum |
+|---|---|---|
+| Text | UTF-8 | 1,000 bytes |
+| Image | PNG, JPEG | 8 MB |
+| Video | MP4, OGG, AVI, MOV, WebM | 25 MB |
+| Audio | AAC, M4A, WAV, MP4 | 25 MB |
+| File | PDF | 25 MB |
+
+- **Attachment sources.** Each item of `attachments[]` has a `source_type` of `url`, `media_id`, or `platform_attachment_id`. `type` is required with `platform_attachment_id`: without it, the request returns `400 validation.attachment_type_required`. Instagram fetches a `url` attachment itself, so the URL must be reachable without a login. If Instagram cannot fetch or accept the file, the send returns `422 platform.instagram.attachment_failed`.
+- **Interactive content.** Up to 13 quick replies, a button template with 1 to 3 buttons, or up to 10 cards, 1 of the 3 per message. The rules are in [Interactive messages](/guides/direct-messages#interactive-messages). A tap on a quick reply or a `postback` button arrives as a `dm.postback` event.
+- **Threaded replies.** `reply_to_message_id` works on Facebook Login. On Instagram Login, a send with it returns `422 platform.instagram.invalid_parameter`. Send the message without it.
+
+## React to a message
+
+`POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` adds the account's reaction to a message, and replaces the account's earlier reaction on it. `reaction` is a single emoji character, and Instagram accepts any emoji. Anything else returns `400 validation.invalid_reaction`. `DELETE` on the same path, with `account_id` as a query parameter, removes the reaction. Both work on Instagram Login and Facebook Login, return `{ "success": true }`, and cost no credit.
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages/m_AbCdEf123/reaction" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J", "reaction": "🎉" }'
+```
+
+Response (HTTP 200):
+
+```json
+{ "success": true }
+```
+
+A reaction the person adds to one of your messages sends no event.
+
+## Typing indicators and seen receipts
+
+`POST /v1/inbox/conversations/{id}/sender-action` with `action` set to `typing_on` or `typing_off` shows or hides a typing indicator, and `mark_seen` marks the person's messages as seen. Instagram shows the action only while the person is signed in. If Instagram refuses the action because the window is closed or a scope is missing, the call returns `400 platform.instagram.window_closed` or `403 platform.instagram.permission_denied`. It works on both login paths and costs no credit. The request and the `action` values are in [Typing indicators and seen receipts](/guides/direct-messages#typing-indicators-and-seen-receipts).
+
+Instagram does not report when the person is typing, so SocialAPI has no event for it.
+
+## Participant profile
+
+`GET /v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile` returns the profile of a person in a conversation, including whether the person follows the account (`is_user_follow_business`) and whether the account follows the person (`is_business_follow_user`). It works on both login paths.
+
+```bash
+curl "https://api.social-api.ai/v1/platforms/instagram/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/participants/2287522528728101/profile" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "id": "2287522528728101",
+  "username": "janesmith",
+  "name": "Jane Smith",
+  "profile_pic": "https://scontent.cdninstagram.com/v/t51/jane.jpg",
+  "follower_count": 310,
+  "is_verified_user": true,
+  "is_user_follow_business": true,
+  "is_business_follow_user": true
+}
+```
+
+| Field | Description |
+|---|---|
+| `id` | The person's Instagram-scoped ID, the conversation's `participant_id` |
+| `username`, `name` | The person's username and display name. Each is absent when Instagram has no value |
+| `profile_pic` | A link to the profile picture. Instagram expires the link: do not store it |
+| `follower_count` | The person's follower count. Absent when it is `0` |
+| `is_verified_user` | `true` when the person's account is verified. Absent when `false` |
+| `is_user_follow_business` | `true` when the person follows the connected account. Absent when `false` |
+| `is_business_follow_user` | `true` when the connected account follows the person. Absent when `false` |
+
+- **Consent.** Instagram discloses a profile only for a person who messaged the account or tapped an icebreaker or the persistent menu. For anyone else, the call returns `403 platform.instagram.230`. That error means Instagram withholds the data: it does not mean the person does not follow the account.
+- **Absent follow flags.** An absent follow flag means the person does not follow in that direction, or Instagram did not report it. The response does not tell the two apart.
+- **Freshness.** Read the follow fields at each call: they change whenever someone follows or unfollows.
+- **Deleted accounts.** A participant whose Instagram account was deleted or deactivated returns `404 platform.instagram.9010`.
+
+## Incoming messages
+
+- **Story mentions.** A story that mentions the account arrives as `dm.received` with an attachment of type `story_mention`, not as `mention.received`.
+- **Unsent messages.** When the person unsends a message, SocialAPI sends a `dm.deleted` event and the message disappears from the conversation.
+- **Messages sent from the Instagram app.** A message the account sends from the Instagram app appears in the conversation and sends a `dm.sent` event.
+- **Edits.** A message the person edits sends no event.
+
+## Instagram Login and Facebook Login
+
+Both login paths list conversations, read messages, send text, attachments, and interactive content, react, send typing indicators and seen receipts, and read participant profiles. They differ in these rows:
+
+| Feature | Instagram Login | Facebook Login |
+|---|---|---|
+| `message_tag: "HUMAN_AGENT"` | Replies up to 7 days after the person's last message, once enabled for your SocialAPI account | `422 messaging.tag_not_supported`. The 24-hour window applies |
+| Linked Facebook Page | Not needed | Required. A send on an account with no linked Page returns `409 platform.instagram.no_page` |
+| Platform scopes for DMs | `instagram_business_manage_messages` | `instagram_manage_messages` and `pages_messaging` |
+
+Every scope SocialAPI requests is listed in [Instagram scopes](/platforms/instagram#scopes) and [Facebook Login scopes](/platforms/instagram#facebook-login-scopes).
+
+## What Instagram does not allow
+
+- **Messaging a person first.** The account can message a person only after the person messaged it, or through a [private reply](/platforms/instagram/comments#send-a-private-reply) to their comment.
+- **Unsending or deleting a sent DM.** Instagram does not let apps unsend or delete a message. Only the Instagram app can.
+- **HUMAN_AGENT on Facebook Login.** Connect the account through Instagram Login to reply after 24 hours.
+- **Threaded replies on Instagram Login.** `reply_to_message_id` fails. Send the message without it.
+- **Old message requests.** Instagram does not return conversations in the account's Requests folder that have had no activity for 30 days.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Messaging window | 24 hours from the person's last message |
+| HUMAN_AGENT window | 7 days from the person's last message. Instagram Login only |
+| Text | 1,000 bytes of UTF-8 |
+| Images | 8 MB |
+| Video, audio, and PDF files | 25 MB |
+| Quick replies | 13 per message, 20 characters per title |
+| Buttons | 3 per message or card, 20 characters per title, 640 characters of body text |
+| Cards | 10 per message, 80 characters per title and subtitle |
+| Text through the MCP tool | 1,000 bytes |
+| Instagram's own rate limit | `429 platform.instagram.rate_limit`. See [Rate limits](/guides/rate-limits#platform-limits) |
+
+## Errors and debugging
+
+Check these in order when an Instagram DM call fails:
+
+1. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `messages.read` to read a participant profile, and `messages.write` to send a message, a reaction, or a sender action.
+2. **`404 conversation.not_found`, `401 platform.instagram.auth`, `403 account.reconnection_required`.** `404 conversation.not_found`: no conversation has that id, or, on a send, the conversation belongs to another connected account than `account_id`. The other two mean the token is no longer valid and the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
+3. **`400 platform.instagram.window_closed`.** The messaging window is closed. Wait for the person to message the account, or, on Instagram Login with HUMAN_AGENT enabled, send a typed reply with `message_tag`.
+4. **`403 messaging.tag_not_enabled`, `422 messaging.tag_not_supported`, `400 messaging.human_agent_window_closed`, `429 messaging.tag_rate_limited`.** A HUMAN_AGENT send is not enabled, not allowed on this account, too late, or paused: see [Reply after 24 hours with HUMAN_AGENT](#reply-after-24-hours-with-human_agent).
+5. **`400 validation.*`.** The body is wrong. `error.meta.field` names the field. The codes are in [Send a message](/guides/direct-messages#send-a-message).
+6. **`422 platform.instagram.attachment_failed`.** Instagram could not fetch or accept an attachment. Check that the URL is public and the file matches [Message types and sizes](#message-types-and-sizes).
+7. **`422 platform.instagram.invalid_parameter`.** Instagram rejected a parameter, for example `reply_to_message_id` on Instagram Login. Retrying unchanged does not help.
+8. **`422 platform.instagram.thread_unavailable`.** Instagram refused to deliver to this conversation, which can be restricted or unavailable. Retrying does not help.
+9. **`403 platform.instagram.permission_denied`.** The platform scopes granted at connect do not cover the action. Reconnect the account and approve every scope.
+10. **`409 platform.instagram.no_page`.** A send on a Facebook Login account with no linked Facebook Page. Reconnect the account.
+11. **`403 platform.instagram.230`, `404 platform.instagram.9010`.** A participant profile Instagram withholds, or a participant whose account no longer exists.
+12. **`429 messaging.recipient_limit`.** Too many different people were messaged this calendar day (UTC). Wait for the `Retry-After` header. Nothing was sent and no credit was used.
+13. **`429 validation.interaction_limit_exhausted`, `429 messaging.velocity_limit`, `429 platform.instagram.rate_limit`, `429 platform.instagram.throttled`.** Your plan's allowance, the account's sending pace (`429 messaging.velocity_limit`: wait for the `Retry-After` header), or Instagram's own limit. `429 platform.instagram.throttled`: wait for the `Retry-After` header, then retry. Read the `Retry-After` header when it is present: see [Rate limits](/guides/rate-limits).
+
+If a send fails part way, the earlier messages stay delivered, and the error carries `error.meta.sent_count` and `error.meta.failed_index`. Every code is in [Errors](/guides/errors#inbox-comments-messages-and-reviews), and Instagram's own codes are in [Instagram and Facebook errors](/guides/errors#instagram-and-facebook).
+
+## Scopes
+
+A [scoped API key](/guides/scoped-keys) needs these scopes:
+
+| Scope | Operations |
+|---|---|
+| `dms:read` | List and get conversations, list messages, read a participant profile |
+| `dms:send` | Send a message, add or remove a reaction, show a typing indicator, mark messages seen |
+
+## Events
+
+Instagram accounts emit these DM events to your [webhook endpoints](/guides/webhooks). Payloads are in [Webhook events](/guides/webhook-events#direct-messages).
+
+| Event | When it fires |
+|---|---|
+| `dm.received` | A person sends a DM, including a story mention |
+| `dm.sent` | A message left the account, including one sent from the Instagram app |
+| `dm.deleted` | A person unsent a message |
+| `dm.referral` | A person opened a conversation from an ad or referral link without sending a message |
+| `dm.postback` | A person tapped a quick reply or a `postback` button |
+| `dm.status.sent` | Instagram accepted a DM you sent |
+| `dm.status.read` | A person read a DM you sent. Instagram sends no delivery receipts, so there is no `dm.status.delivered` |
+
+An account without the `messages.read` [permission](/guides/permissions) receives none of these events, except `dm.status.read` when the account has `messages.write`.
+
+## Use from an AI agent
+
+| Tool | What it does |
+|---|---|
+| `social_api_list_conversations` | List conversations, most recent activity first |
+| `social_api_get_conversation` | Get one conversation |
+| `social_api_list_messages` | List the messages of a conversation, newest first |
+| `social_api_send_dm` | Send a text message with optional quick replies or buttons, and optional `message_tag`. The text is 1,000 bytes at most. The tool sends no attachments and no cards |
+| `social_api_update_conversation` | Archive a conversation, or set it back to `active` |
+| `social_api_mark_conversation_read` | Mark a conversation as read in SocialAPI |
+| `social_api_send_sender_action` | Show a typing indicator, or mark the person's messages seen |
+
+There is no tool for reactions or for participant profiles. See [MCP tools](/integrations/tools#direct-messages).
+
+## Related
+
+- [Instagram API](/platforms/instagram): capabilities, connection, and scopes for Instagram
+- [Instagram comments](/platforms/instagram/comments): private replies that start a conversation from a comment
+- [Direct messages](/guides/direct-messages): the endpoints and fields every platform shares
+- [Automations](/guides/automations): send Instagram DMs and answer button taps without your own handler
+- [Webhook events](/guides/webhook-events#direct-messages): the DM event payloads

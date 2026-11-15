@@ -4,6 +4,14 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-11-15" description="Inbox" tags={["Inbox", "Comments", "Direct messages"]}>
+  ## Comments and messages pages for each platform
+
+  Each platform now has its own pages for comments and direct messages, next to its publishing page. They cover what the platform supports, the request and response for each call, IDs, limits, costs, events, and an ordered list of errors to check when a call fails: [Instagram comments](/platforms/instagram/comments) and [messages](/platforms/instagram/messages), [Facebook comments](/platforms/facebook/comments) and [messages](/platforms/facebook/messages), [Threads comments](/platforms/threads/comments), [TikTok comments](/platforms/tiktok/comments), [YouTube comments](/platforms/youtube/comments), [LinkedIn comments](/platforms/linkedin/comments), [X comments](/platforms/twitter/comments) and [messages](/platforms/twitter/messages), [Bluesky comments](/platforms/bluesky/comments) and [messages](/platforms/bluesky/messages), [WhatsApp messages](/platforms/whatsapp/messages), [Telegram messages](/platforms/telegram/messages), and [Zalo messages](/platforms/zalo/messages). The inbox details that were on each platform overview page moved there.
+
+  `POST /v1/accounts/{id}/sync` allows 1 sync per account every 15 minutes, up from 5 minutes in the 2026-10-06 entry below. See [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts).
+</Update>
+
 <Update label="2026-11-15" description="MCP" tags={["MCP"]}>
   ## SocialAPI in the ChatGPT plugin directory
 
@@ -49,7 +57,7 @@ rss: true
 
   Facebook DMs now deliver `quick_replies`, `buttons`, and `cards`, with the same rules as Instagram. Before, a Facebook send delivered only the text. A tap on a quick reply or a `postback` button sends a `dm.postback` event with your `payload`, and `buttons` on an Automation's `send_dm` step are now delivered on Facebook. See [Interactive messages](/guides/direct-messages#interactive-messages).
 
-  A WhatsApp message can now carry a single `url` button, which opens its link when tapped. Before, every WhatsApp button had to be `postback`. A `url` button beside other buttons returns `400 validation.button_type_unsupported`. See [Link button](/platforms/whatsapp#link-button).
+  A WhatsApp message can now carry a single `url` button, which opens its link when tapped. Before, every WhatsApp button had to be `postback`. A `url` button beside other buttons returns `400 validation.button_type_unsupported`. See [Link button](/platforms/whatsapp/messages#link-to-a-web-page).
 </Update>
 
 <Update label="2026-11-10" description="WhatsApp" tags={["WhatsApp"]}>
@@ -190,7 +198,7 @@ rss: true
 <Update label="2026-10-26" description="WhatsApp" tags={["WhatsApp", "Accounts"]}>
   ## Connect WhatsApp with a redirect
 
-  `POST /v1/accounts/connect` with `platform: "whatsapp"` now returns an `auth_url`, like every other platform with a consent screen. Send your customer there and they come back to your `redirect_uri` with `account_id`. There is nothing to embed or host, and no domain to register with us, so the flow works from any domain. Set `onboarding: "business_app"` to connect a number that stays on the WhatsApp Business app. When the WhatsApp Business Account holds several numbers, the redirect carries `status=selection_required` and you pick one with `POST /v1/accounts/pending/{connection_id}/select`. See [Connecting](/platforms/whatsapp#connecting).
+  `POST /v1/accounts/connect` with `platform: "whatsapp"` now returns an `auth_url`, like every other platform with a consent screen. Send your customer there and they come back to your `redirect_uri` with `account_id`. There is nothing to embed or host, and no domain to register with us, so the flow works from any domain. Set `onboarding: "business_app"` to connect a number that stays on the WhatsApp Business app. When the WhatsApp Business Account holds several numbers, the redirect carries `status=selection_required` and you pick one with `POST /v1/accounts/pending/{connection_id}/select`. See [Connecting](/platforms/whatsapp#connect-an-account).
 </Update>
 
 <Update label="2026-10-25" description="Comments" tags={["Comments", "Instagram", "Facebook"]}>
@@ -511,7 +519,7 @@ rss: true
 <Update label="2026-09-08" description="WhatsApp" tags={["Accounts", "WhatsApp"]}>
   ## Register Cloud API numbers
 
-  Register a WhatsApp Cloud API number with `POST /v1/platforms/whatsapp/phone-numbers/{id}/request-code`, `verify-code`, and `register`. Registration handles the two-step verification PIN. See [Connecting](/platforms/whatsapp#connecting).
+  Register a WhatsApp Cloud API number with `POST /v1/platforms/whatsapp/phone-numbers/{id}/request-code`, `verify-code`, and `register`. Registration handles the two-step verification PIN. See [Connecting](/platforms/whatsapp#connect-an-account).
 </Update>
 
 <Update label="2026-09-08" description="Facebook" tags={["Accounts", "Facebook"]}>
@@ -529,7 +537,7 @@ rss: true
 <Update label="2026-09-06" description="YouTube" tags={["Errors", "YouTube"]}>
   ## YouTube suspended accounts
 
-  When YouTube suspends or closes the account or its channel, every call for that account returns `403` with `platform.youtube.account_suspended`. See [Errors](/guides/errors#x-linkedin-youtube-and-zalo).
+  When YouTube suspends or closes the account or its channel, every call for that account returns `403` with `platform.youtube.account_suspended`. See [Errors](/guides/errors#x-linkedin-and-youtube).
 </Update>
 
 <Update label="2026-09-06" description="Instagram and Facebook" tags={["Direct messages", "Instagram", "Facebook"]}>
@@ -554,7 +562,7 @@ rss: true
 <Update label="2026-09-05" description="WhatsApp" tags={["Accounts", "WhatsApp"]}>
   ## Connect WhatsApp from your own page
 
-  WhatsApp Embedded Signup runs in three legs: your backend starts the connection, Meta's popup collects the number, and your backend completes it. See [Connecting](/platforms/whatsapp#connecting).
+  WhatsApp Embedded Signup runs in three legs: your backend starts the connection, Meta's popup collects the number, and your backend completes it. See [Connecting](/platforms/whatsapp#connect-an-account).
 </Update>
 
 <Update label="2026-09-04" description="Publishing" tags={["Publishing"]}>
@@ -608,25 +616,25 @@ rss: true
 <Update label="2026-08-31" description="WhatsApp" tags={["WhatsApp", "Publishing"]}>
   ## Send media with a caption and filename
 
-  Messages can include media with an optional caption and filename. See [Sending media](/platforms/whatsapp#sending-media).
+  Messages can include media with an optional caption and filename. See [Sending media](/platforms/whatsapp/messages#send-media).
 </Update>
 
 <Update label="2026-08-31" description="WhatsApp" tags={["WhatsApp", "Direct messages"]}>
   ## Interactive messages
 
-  Send a message with up to 3 reply buttons, or with a list menu. When a contact taps an option, it arrives as an inbound message in the same `messages` array as text and media. See [Interactive messages](/platforms/whatsapp#interactive-messages).
+  Send a message with up to 3 reply buttons, or with a list menu. When a contact taps an option, it arrives as an inbound message in the same `messages` array as text and media. See [Interactive messages](/platforms/whatsapp/messages#interactive-messages).
 </Update>
 
 <Update label="2026-08-31" description="WhatsApp" tags={["WhatsApp", "Direct messages"]}>
   ## Inbound WhatsApp media
 
-  Media that contacts send is available from `GET /v1/inbox/media/{id}`, which returns the file. If the file is not ready yet, the call returns `504`, so retry it. See [Inbound media](/platforms/whatsapp#inbound-media).
+  Media that contacts send is available from `GET /v1/inbox/media/{id}`, which returns the file. If the file is not ready yet, the call returns `503`, so retry it. See [Inbound media](/platforms/whatsapp/messages#receive-messages).
 </Update>
 
 <Update label="2026-08-31" description="WhatsApp" tags={["WhatsApp", "Publishing"]}>
   ## Template sends return a message ID
 
-  A template send returns `message_id`, the SocialAPI ID of the message. See [Send a template](/platforms/whatsapp#send-a-template).
+  A template send returns `message_id`, the SocialAPI ID of the message. See [Send a template](/platforms/whatsapp/messages#send-a-template).
 </Update>
 
 <Update label="2026-08-30" description="Google" tags={["Google Business Profile", "Reviews"]}>
@@ -638,13 +646,13 @@ rss: true
 <Update label="2026-08-30" description="WhatsApp" tags={["WhatsApp", "Webhooks"]}>
   ## WhatsApp webhooks include account and conversation IDs
 
-  Breaking: `dm.received` for WhatsApp now sets `account_id` to the SocialAPI account ID, and sets `conversation_id`. Before, `account_id` held the WhatsApp phone number ID, so update code that read it as one. See [dm.received](/guides/webhook-events#dmreceived).
+  Breaking: `dm.received` for WhatsApp now sets `account_id` to the SocialAPI account ID, and sets `conversation_id`. Before, `account_id` held the WhatsApp phone number ID, so update code that read it as one. See [dm.received](/guides/webhook-events#dm-received).
 </Update>
 
 <Update label="2026-08-30" description="Facebook" tags={["Facebook", "Direct messages"]}>
   ## Private replies reject buttons
 
-  A private reply that includes `buttons` returns `400 validation.field_not_supported` with `field` set to `buttons`, and the message asks you to send text only. Before, the buttons were dropped without an error. See [Private replies](/platforms/facebook#private-replies).
+  A private reply that includes `buttons` returns `400 validation.field_not_supported` with `field` set to `buttons`, and the message asks you to send text only. Before, the buttons were dropped without an error. See [Private replies](/platforms/facebook/comments#private-replies).
 </Update>
 
 <Update label="2026-08-29" description="Google" tags={["Google Business Profile", "Accounts"]}>
@@ -662,7 +670,7 @@ rss: true
 <Update label="2026-08-28" description="WhatsApp" tags={["WhatsApp", "Errors"]}>
   ## WhatsApp replies inside the 24-hour window send
 
-  Replies to a contact inside the 24-hour service window are no longer rejected by SocialAPI with `whatsapp.window_closed`. WhatsApp decides whether a send is allowed. See [The 24-hour service window](/platforms/whatsapp#the-24-hour-service-window).
+  Replies to a contact inside the 24-hour service window are no longer rejected by SocialAPI with `whatsapp.window_closed`. WhatsApp decides whether a send is allowed. See [The 24-hour service window](/platforms/whatsapp/messages#the-24-hour-service-window).
 </Update>
 
 <Update label="2026-08-28" description="Instagram and Facebook" tags={["Direct messages", "Instagram", "Facebook"]}>
@@ -722,7 +730,7 @@ rss: true
 <Update label="2026-08-21" description="Instagram" tags={["Instagram", "Direct messages"]}>
   ## Messaging participant profiles
 
-  `GET /v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile` returns a messaging participant's profile, with follow status in both directions. Instagram returns it only for users who messaged the account or tapped an icebreaker or persistent menu item. For anyone else the call returns `403 platform.instagram.230`: Instagram did not disclose the relationship, which does not mean the user does not follow the account. See [Participant profile](/platforms/instagram#participant-profile).
+  `GET /v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile` returns a messaging participant's profile, with follow status in both directions. Instagram returns it only for users who messaged the account or tapped an icebreaker or persistent menu item. For anyone else the call returns `403 platform.instagram.230`: Instagram did not disclose the relationship, which does not mean the user does not follow the account. See [Participant profile](/platforms/instagram/messages#participant-profile).
 </Update>
 
 <Update label="2026-08-20" description="Inbox" tags={["Inbox"]}>
@@ -812,7 +820,7 @@ rss: true
 <Update label="2026-08-06" description="Facebook" tags={["Facebook", "Direct messages"]}>
   ## Ineligible private replies return a stable error
 
-  A private reply that Meta rejects because the comment is not eligible returns `platform.facebook.private_reply_ineligible`. The message explains that the 7-day window has passed or that the comment already received a private reply. See [Private replies](/platforms/facebook#private-replies).
+  A private reply that Meta rejects because the comment is not eligible returns `platform.facebook.private_reply_ineligible`. The message explains that the 7-day window has passed or that the comment already received a private reply. See [Private replies](/platforms/facebook/comments#private-replies).
 </Update>
 
 <Update label="2026-08-06" description="Facebook" tags={["Facebook", "Accounts"]}>
@@ -884,7 +892,7 @@ rss: true
 <Update label="2026-07-16" description="WhatsApp" tags={["Accounts", "Direct messages", "WhatsApp"]}>
   ## WhatsApp Business (beta)
 
-  WhatsApp Business is available in beta. Request access from the dashboard, then connect a phone number through Meta's signup flow to read and reply to messages, send message templates, and check the phone number status. See [Connecting](/platforms/whatsapp#connecting).
+  WhatsApp Business is available in beta. Request access from the dashboard, then connect a phone number through Meta's signup flow to read and reply to messages, send message templates, and check the phone number status. See [Connecting](/platforms/whatsapp#connect-an-account).
 </Update>
 
 <Update label="2026-07-14" description="Google Business Profile" tags={["Accounts", "Google Business Profile"]}>

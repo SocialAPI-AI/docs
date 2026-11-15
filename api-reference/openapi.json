@@ -3010,7 +3010,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns inbox posts that have comments, ordered by most-recently-commented. Supports filtering by account, platform, minimum comment count, and date range. Uses cursor-based pagination. YouTube commented posts only appear when the request is scoped with account_id (they are absent from the unfiltered aggregate), and that list returns a single page (no cursor).",
+                "description": "Returns the connected accounts' posts with their comment counts, newest published first. Add min_comments=1 to keep only posts that have comments. Filter by account, brand, platform, minimum comment count, and publish date. Uses cursor-based pagination.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -3053,7 +3053,7 @@
                     },
                     {
                         "example": "2026-01-01T00:00:00Z",
-                        "description": "Only return posts commented after this timestamp (RFC3339)",
+                        "description": "Only return posts published at or after this timestamp (RFC3339)",
                         "name": "since",
                         "in": "query",
                         "schema": {
@@ -3200,7 +3200,7 @@
                     },
                     {
                         "example": "great video",
-                        "description": "Keyword search across comment text (max 256 chars). YouTube only; other platforms do not filter by it.",
+                        "description": "Keyword search across comment text (max 256 bytes). YouTube only; other platforms do not filter by it.",
                         "name": "q",
                         "in": "query",
                         "schema": {
@@ -3715,7 +3715,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Likes a comment on the platform as the connected account. Supported on Facebook, LinkedIn Pages, and Instagram accounts connected with Facebook Login. Instagram accounts connected with Instagram Login cannot like comments. Check the can_like capability flag.",
+                "description": "Likes a comment on the platform as the connected account. Supported on Facebook, LinkedIn (company Pages and member profiles), TikTok (default connection), and Instagram accounts connected with Facebook Login. Instagram accounts connected with Instagram Login cannot like comments. Check the can_like capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -3827,7 +3827,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Removes a like from a comment on the platform. Supported on Facebook, LinkedIn Pages, and Instagram accounts connected with Facebook Login. Check the can_like capability flag.",
+                "description": "Removes a like from a comment on the platform. Supported on Facebook, LinkedIn (company Pages and member profiles), TikTok (default connection), and Instagram accounts connected with Facebook Login. Check the can_like capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -3935,7 +3935,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sends a direct message to the author of a comment. Only supported on Instagram and Facebook. Meta allows one private reply per comment, within 7 days of the comment; a second attempt or an expired window returns HTTP 400 with error code platform.instagram.private_reply_ineligible or platform.facebook.private_reply_ineligible. Once a comment has spent its one reply, or the comment is older than 7 days, further attempts are refused and do not count against your outbound message rate; the error carries a reason of already_replied, platform_refused or window_expired. The 400 is terminal: retrying it will never succeed. Set buttons (1 to 3) to send the reply as a button template with text as its body; a tap on a postback button arrives as a dm.postback event. Set attachment instead of text to send one image, video, audio or file: a private reply is a single message, so it carries either text (with optional buttons) or one attachment, never both. You cannot message the commenter again until they respond; once they do, the conversation continues within the standard 24-hour messaging window. Check the can_private_reply capability flag.",
+                "description": "Sends a direct message to the author of a comment. Only supported on Instagram and Facebook. Meta allows one private reply per comment, within 7 days of the comment; a second attempt or an expired window returns HTTP 400 with error code platform.instagram.private_reply_ineligible or platform.facebook.private_reply_ineligible. When the comment is already known to be ineligible, the error carries blocked_locally true and a reason of already_replied, platform_refused or window_expired. When blocked_locally is true, or the reply was text only, the 400 is final. When the platform refuses a reply that carried buttons or an attachment, the refusal can come from that content: send it once more as text only. Set buttons (1 to 3) to send the reply as a button template with text as its body; a tap on a postback button arrives as a dm.postback event. Set attachment instead of text to send one image, video, audio or file: a private reply is a single message, so it carries either text (with optional buttons) or one attachment, never both. You cannot message the commenter again until they respond; once they do, the conversation continues within the standard 24-hour messaging window. Check the can_private_reply capability flag.",
                 "tags": [
                     "Inbox Comments"
                 ],
@@ -4005,7 +4005,7 @@
                         }
                     },
                     "403": {
-                        "description": "The key's scopes do not include inbox:write",
+                        "description": "The key's scopes do not include inbox:write, or the account lacks the messages.write permission (account.permission_missing)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4550,7 +4550,7 @@
                         }
                     },
                     "429": {
-                        "description": "Platform rate limit exceeded, or human agent tagging is paused for this account (messaging.tag_rate_limited): replies that need the tag cannot be sent until the pause ends; retry after retry_after_seconds when it is present. Replies inside 24 hours of the person's last message still work.",
+                        "description": "Plan interaction allowance used up (validation.interaction_limit_exhausted), sending too fast (messaging.velocity_limit), too many different recipients this calendar day in UTC (messaging.recipient_limit), calls paused after the platform's own rate limit (platform.{platform}.throttled), the platform's own rate limit (platform.{platform}.rate_limit), or human agent tagging paused (messaging.tag_rate_limited). Wait for the Retry-After header when it is present. Replies inside 24 hours of the person's last message still work while tagging is paused.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4586,7 +4586,7 @@
                 "summary": "React to a message",
                 "parameters": [
                     {
-                        "example": "conv_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "example": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
                         "description": "Conversation ID",
                         "name": "id",
                         "in": "path",
@@ -4703,7 +4703,7 @@
                 "summary": "Remove a reaction from a message",
                 "parameters": [
                     {
-                        "example": "conv_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "example": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
                         "description": "Conversation ID",
                         "name": "id",
                         "in": "path",
@@ -4871,14 +4871,14 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Shows the other participant a typing indicator, or marks their messages as seen, without sending a message. Free: no interaction credit is used.\n\nSupported on Instagram, Facebook Messenger and WhatsApp. On Instagram and Messenger the typing indicator clears after 20 seconds or when you send a message. On WhatsApp, typing_on also marks the contact's latest message as read, clears after 25 seconds or when you reply, and needs at least one message from the contact. WhatsApp has no typing_off and returns 400. Marking a message seen on WhatsApp also marks every earlier message in the chat as read.\n\nInstagram and Messenger only accept these actions within 24 hours of the person's last message.",
+                "description": "Shows the other participant a typing indicator, or marks their messages as seen, without sending a message. Free: no interaction credit is used.\n\nSupported on Instagram, Facebook Messenger and WhatsApp. On Instagram and Messenger the typing indicator clears after 20 seconds or when you send a message. On WhatsApp, typing_on also marks the contact's latest message as read, clears after 25 seconds or when you reply, and needs at least one message from the contact. WhatsApp has no typing_off and returns 400. Marking a message seen on WhatsApp also marks every earlier message in the chat as read.",
                 "tags": [
                     "Inbox Conversations"
                 ],
                 "summary": "Show typing or mark seen",
                 "parameters": [
                     {
-                        "example": "conv_01HZ9X3Q4R5M6N7P8V2K0W1J",
+                        "example": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
                         "description": "Conversation ID",
                         "name": "id",
                         "in": "path",
@@ -5413,7 +5413,7 @@
                         }
                     },
                     "400": {
-                        "description": "Missing or invalid account_id",
+                        "description": "Missing or invalid account_id, or account.page_inactive: the conversation's Facebook Page is no longer connected, so its thread cannot be refreshed. Reconnect the Page to sync it again.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6868,7 +6868,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists every Page this login can manage, live from Meta, merged with assignment state. Pages granted after the last OAuth exchange appear here without re-authenticating. assignable reflects ownership only; the 5-page-per-brand cap is enforced when assigning.",
+                "description": "Lists every Page this login can manage, with the brand that holds each. assignable reflects ownership only. When facebook_page_selection is true, assigning can still fail on the per-brand Page allowance.",
                 "tags": [
                     "Facebook"
                 ],
@@ -6905,6 +6905,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "The API key lacks the accounts:read scope (auth.insufficient_scope)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Unknown login",
                         "content": {
@@ -6925,7 +6935,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Assigns one Page from this login to the given brand. Each Page belongs to exactly one brand, so a Page currently held by another brand of yours is moved to the target brand. Each brand can connect up to 5 Facebook Pages, a hard cap. Assigning beyond that limit is refused.",
+                "description": "Assigns one Page from this login to the given brand. Each Page belongs to exactly one brand, so a Page another of your brands holds moves to the target brand. When facebook_page_selection is true, assigning beyond your plan's Facebook Pages per brand returns 403 platform.facebook.page_cap.",
                 "tags": [
                     "Facebook"
                 ],
@@ -6972,8 +6982,18 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "brand_id is missing (validation.field_required), the body is not valid JSON (validation.body_invalid), or the login cannot access the Page (validation.page_not_granted)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
                     "403": {
-                        "description": "Brand already holds as many Facebook Pages as the plan allows (platform.facebook.page_cap)",
+                        "description": "The API key lacks the accounts:manage scope (auth.insufficient_scope), or the brand already holds as many Facebook Pages as the plan allows (platform.facebook.page_cap)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10023,7 +10043,7 @@
                     },
                     {
                         "example": 25,
-                        "description": "Maximum number of templates to return (1-100)",
+                        "description": "Maximum number of templates to return. Meta sets the page size and the maximum",
                         "name": "limit",
                         "in": "query",
                         "schema": {
@@ -10942,7 +10962,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the components of an existing message template by its WhatsApp template ID. Only APPROVED templates can be edited, and editing resets the template to PENDING for re-review. APPROVED templates are limited to one edit per day.",
+                "description": "Updates the components of an existing message template by its WhatsApp template ID. Only APPROVED, REJECTED or PAUSED templates can be edited. Meta reviews the edit again: an edited APPROVED or PAUSED template returns to APPROVED unless it fails review. Meta allows an approved template 1 edit per 24 hours and 10 per 30 days.",
                 "tags": [
                     "WhatsApp"
                 ],
@@ -11739,6 +11759,63 @@
                     },
                     "429": {
                         "description": "Too Many Requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/metrics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetches engagement metrics for up to 20 published posts in one call. Each ID can be a SocialAPI post ID or a platform post ID. Duplicate IDs are returned once.\nEach item has the same targets as GET /v1/posts/{pid}/metrics. A post that cannot be read (not found, or a platform post ID that matches several posts) gets an `error` on its item instead of failing the request.",
+                "tags": [
+                    "Posts"
+                ],
+                "summary": "Get metrics for several posts",
+                "parameters": [
+                    {
+                        "description": "Comma-separated post IDs (SocialAPI or platform), at most 20",
+                        "name": "post_ids",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.PostsMetricsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "post_ids missing, more than 20 IDs, or an ID longer than 100 characters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api_endpoints.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing API key",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -17316,6 +17393,43 @@
                     },
                     "pagination": {
                         "$ref": "#/components/schemas/api_endpoints.PaginationInfo"
+                    }
+                }
+            },
+            "api_endpoints.PostsMetricsItem": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "description": "Set when this post could not be read: not found, or a platform post ID that matches several posts.",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/api_endpoints.PostTargetErrorResponse"
+                            }
+                        ]
+                    },
+                    "post_id": {
+                        "description": "The post ID as given in post_ids.",
+                        "type": "string",
+                        "example": "9b2f1c34-5e6a-4d7b-8c9d-0e1f2a3b4c5d"
+                    },
+                    "targets": {
+                        "description": "Same targets as GET /v1/posts/{pid}/metrics. Empty when error is set.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PostTargetResponse"
+                        }
+                    }
+                }
+            },
+            "api_endpoints.PostsMetricsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "description": "One item per distinct post ID, in request order.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/api_endpoints.PostsMetricsItem"
+                        }
                     }
                 }
             },

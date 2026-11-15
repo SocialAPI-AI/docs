@@ -1,0 +1,284 @@
+---
+title: "Telegram direct messages"
+sidebarTitle: "Messages"
+description: "Receive the messages people send to your Telegram bot and reply with text, photos, and documents, with Telegram's limits, errors, and events."
+---
+
+SocialAPI receives the direct messages (DMs) people send to your Telegram bot in a private chat and sends your replies as text, photos, and documents. Every message arrives as a `dm.received` webhook event and lands in the inbox, where you read and answer it with the same conversation endpoints as every other platform. A Telegram bot cannot write first: you can message a person only after that person has messaged the bot, and from then on there is no reply window. For the endpoints every platform shares, see [Direct messages](/guides/direct-messages).
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/inbox/conversations` | List the bot's conversations. Add `platform=telegram` or `account_id` to filter |
+| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI. The person sees nothing |
+| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation, newest first |
+| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message |
+| `GET` | `/v1/inbox/media/{id}` | Download a file a person sent |
+
+`POST` and `DELETE` on `/v1/inbox/conversations/{id}/messages/{messageId}/reaction`, and `POST /v1/inbox/conversations/{id}/sender-action`, return `501 resource.not_supported` on Telegram. In the conversation paths, `{id}` is the conversation `id`, a UUID. In `/v1/inbox/media/{id}`, use the URL from `content.media[].url` or `attachment_url`.
+
+## Your first reply
+
+List the conversations of the bot:
+
+```bash
+curl "https://api.social-api.ai/v1/inbox/conversations?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "data": [
+    {
+      "id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+      "user_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+      "platform": "telegram",
+      "platform_id": "512345678",
+      "participant_id": "512345678",
+      "participant_name": "Jane Smith",
+      "participant_picture": "",
+      "last_message": "Has my order shipped?",
+      "last_message_at": "2026-10-13T14:30:00Z",
+      "status": "active",
+      "unread_count": 1,
+      "created_at": "2026-10-13T14:30:00Z",
+      "updated_at": "2026-10-13T14:30:00Z"
+    }
+  ],
+  "pagination": { "has_more": false, "next_cursor": "" },
+  "sync_state": "idle",
+  "last_synced_at": null
+}
+```
+
+Reply into that conversation with a text and a PDF:
+
+```bash
+curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages" \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "text": "Your order shipped this morning. Here is the invoice.",
+    "attachments": [
+      { "source_type": "url", "source": "https://example.com/invoices/A1234.pdf", "caption": "Invoice A1234" }
+    ]
+  }'
+```
+
+Response (HTTP 200):
+
+```json
+{
+  "success": true,
+  "message_id": "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL",
+  "message_ids": [
+    "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVL",
+    "sapi_dm_TT974YVQH4RAHNN2HY2DJSNY9111D7LMTP1XXPCVQVM"
+  ]
+}
+```
+
+The person receives 2 messages: the text, then the PDF as a document with the caption "Invoice A1234" under it. The request costs 1 interaction credit. `message_ids` lists the SocialAPI ID of each message in send order, and `message_id` is the first one (deprecated).
+
+## Who you can message
+
+A Telegram bot can only answer. SocialAPI sends a message to a person only after that person has opened a private chat with the bot and sent `/start` or any other message.
+
+- **Before the person writes:** there is no conversation to send into, because a conversation exists only once the person has messaged the bot.
+- **After the person writes:** the bot can answer at any time. Telegram has no 24-hour window or other reply window.
+- **When the person blocks the bot:** every send fails with `403 telegram.cannot_message` until the person unblocks the bot. SocialAPI does not change the conversation when the person blocks the bot: the conversation stays `active` and no event fires.
+
+Telegram support in SocialAPI covers private chats between one person and your bot. Do not add the bot to a group: messages from a group can appear in the inbox as a conversation, but a reply to that conversation is sent as a private message to the first group member who wrote, never to the group. If that member has not messaged the bot, the reply fails with `403 telegram.cannot_message`. Posts in a channel never arrive.
+
+## Receive messages
+
+Each message a person sends to the bot arrives as a [`dm.received`](/guides/webhook-events#dm-received) event and is added to its conversation in the inbox. Telegram gives bots no message history. The inbox starts with the messages Telegram delivers once the bot is connected, including messages up to 24 hours old that no other service received.
+
+```json
+{
+  "event": "dm.received",
+  "data": {
+    "id": "sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I",
+    "platform": "telegram",
+    "type": "dm",
+    "author": { "id": "512345678", "name": "Jane Smith", "username": "janesmith" },
+    "content": {
+      "text": "This is the box I received",
+      "media": [
+        { "url": "https://api.social-api.ai/v1/inbox/media/3b0f2c1d-8e4a-4f6b-9c7d-1a2b3c4d5e6f", "type": "image" }
+      ]
+    },
+    "metadata": { "platform_id": "41", "chat_id": "512345678" },
+    "received_at": "2026-10-13T14:30:00Z",
+    "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J",
+    "brand_id": "1c9f6f0e-2b3a-4c5d-8e7f-0a1b2c3d4e5f",
+    "conversation_id": "7f1c4e2b-2841-41a8-85d7-27b0f37ac067",
+    "platform_id": "41",
+    "reply_to": { "platform_id": "40" }
+  },
+  "raw_payload": {
+    "update_id": 873120455,
+    "message": {
+      "message_id": 41,
+      "from": { "id": 512345678, "is_bot": false, "first_name": "Jane", "last_name": "Smith", "username": "janesmith" },
+      "chat": { "id": 512345678, "type": "private", "first_name": "Jane", "last_name": "Smith", "username": "janesmith" },
+      "date": 1791901800,
+      "photo": [
+        { "file_id": "AgACAgQAAxkBAAIBKWY", "file_unique_id": "AQADm7kxG", "width": 1280, "height": 960 }
+      ],
+      "caption": "This is the box I received",
+      "reply_to_message": { "message_id": 40, "chat": { "id": 512345678, "type": "private" }, "date": 1791901700 }
+    }
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `type` | `dm` on Telegram. Match on `event`, not on `type` |
+| `author` | The person: `id` is their Telegram user ID, `name` their first and last name, or their username when Telegram reports no name, `username` their Telegram username when they have one. `avatar_url` is absent on Telegram |
+| `conversation_id` | The SocialAPI conversation to reply into |
+| `platform_id` | Telegram's message ID, the same value as `platform_id` on the message in `GET /v1/inbox/conversations/{id}/messages` |
+| `reply_to` | Set when the person replied to an earlier message: that message's `platform_id`. Absent otherwise |
+| `content.text` | The message text, or the caption of a file. Empty for a file without a caption |
+| `content.media` | The file the person sent, as `url` and `type`. Absent when the message has no file |
+| `raw_payload` | The Telegram update as Telegram sent it |
+
+There is no `recipient` field on Telegram events. `id` is the event's interaction ID: to find the message in the message list, join on `platform_id`, never on `id`.
+
+### Message types
+
+Telegram delivers one file per message. SocialAPI reports each Telegram message type with these `type` values, in `content.media[].type` on the event and in `attachment_type` on the message in `GET /v1/inbox/conversations/{id}/messages`:
+
+| Telegram message | `type` |
+|---|---|
+| Photo | `image` |
+| Document (any file sent as a file) | `document` |
+| Voice note, audio file | `audio` |
+| Video, video note (round video), animation (GIF) | `video` |
+| Sticker (static, animated, or video) | `sticker` |
+
+A message with none of these and no text, such as a location, a contact, or a poll, arrives with empty `content.text` and no `content.media`.
+
+### Files a person sends
+
+The `url` of a file is a SocialAPI URL of the form `https://api.social-api.ai/v1/inbox/media/{id}`, because Telegram files can be downloaded only with the bot's token. Fetch it with your API key. The same URL appears as `attachment_url` on the message in `GET /v1/inbox/conversations/{id}/messages`. It stays available for 30 days after the message arrives, then returns `410`.
+
+Telegram does not let bots download a file larger than 20 MB, so the URL of such a file returns `410`. A file that is not ready yet returns `503`: retry it. [Fetch an inbound attachment](/guides/inbox#fetch-an-inbound-attachment) lists every status the URL returns.
+
+### Edited and deleted messages
+
+A person can edit or delete a message in Telegram. Neither change raises a webhook event, and the inbox keeps the message as it first arrived.
+
+## Read conversations and messages
+
+The conversation and message lists work as on every other platform, described in [Direct messages](/guides/direct-messages#conversations). These fields have Telegram values:
+
+| Field | Telegram value |
+|---|---|
+| `platform_id` (conversation) | The Telegram chat ID. For a private chat it equals the person's Telegram user ID |
+| `participant_id`, `participant_name` | The person's Telegram user ID and their first and last name, or their username when Telegram reports no name |
+| `participant_picture` | Always empty on Telegram |
+| `platform_id` (message) | Telegram's message ID, a number that grows with each message in the chat |
+| `sender_id`, `sender_name` | On an incoming message, the person's Telegram user ID and name |
+| `attachment_type`, `attachment_url` | On an incoming message, the `type` from [Message types](#message-types) and the SocialAPI file URL |
+| `status` | On an outgoing message, `pending`, and it stays `pending`. Telegram reports no delivery or read status to bots, so the `200` response of the send is the confirmation |
+
+Telegram has no message history, so `POST /v1/inbox/sync` adds no messages. Pagination works as described in [Pagination](/guides/pagination#paginated-endpoints).
+
+## Send messages
+
+`POST /v1/inbox/conversations/{id}/messages` sends a message. The request fields are on [Send a message](/guides/direct-messages#send-a-message). A request with no `text`, no attachment, and no `quick_replies`, `buttons`, `cards`, or `list_sections` returns `400 validation.field_required`, and a request without `account_id` returns `400 validation.field_required` as well.
+
+SocialAPI sends the text first, then each attachment in order, each as its own Telegram message. These rules are specific to Telegram:
+
+- **Photo or document.** SocialAPI sends a file as a photo when its name ends in `.jpg`, `.jpeg`, `.png`, `.gif`, or `.webp`, and as a document otherwise. For a `url` attachment the name is the end of the URL path, without the query string. For a `media_id` attachment it is the file name you uploaded to your [media library](/guides/media). The attachment's `type` field does not change this choice.
+- **Captions.** An attachment's `caption` is shown under the file. The message `text` is always a separate message, also when you send the single file with the deprecated `attachment_url` field.
+- **No `platform_attachment_id`.** Send files as `url` or `media_id` attachments. A `platform_attachment_id` attachment fails with `400 validation.telegram_bad_request`, or with `400 validation.attachment_type_required` when it has no `type`.
+- **Public URLs.** Telegram downloads a `url` attachment itself, so the URL must be reachable without a login. A URL Telegram cannot fetch fails with `400 validation.telegram_bad_request`.
+- **Interactive content is not sent.** `quick_replies`, `buttons`, `cards`, `list_sections`, and `list_button` are ignored: SocialAPI sends the `text` without them, then any attachments. A request with `quick_replies`, `buttons`, `cards`, or `list_sections` and no `text` fails with `400 validation.telegram_bad_request` and sends nothing, even when it carries attachments.
+- **No replies to a specific message.** `reply_to_message_id` is ignored, so the message is sent as a plain message.
+- **No message tags.** A request with `message_tag` returns `422 messaging.tag_not_supported` and sends nothing.
+
+If one message of a request fails, the messages before it stay delivered. The error carries `error.meta.sent_count` (messages sent) and `error.meta.failed_index` (the item that failed, counted from 0: the text, or the interactive content without text, is item 0 when the request has one, otherwise the first attachment is item 0), so you can retry from there.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Message text | 4,096 characters |
+| Caption | 1,024 characters |
+| Photo sent as a `url` or `media_id` attachment | 5 MB |
+| Other file sent as a `url` or `media_id` attachment | 20 MB |
+| File a person sends that SocialAPI can download | 20 MB |
+| Download URL of a file a person sends | 30 days after the message arrives |
+| Message text through the MCP tool | 1,000 bytes |
+| Conversations per page (REST) | Default 25, up to 100 |
+| Messages per page (REST) | Default 25, up to 200 |
+
+Telegram enforces the text, caption, and file limits. A request over one of them fails with `400 validation.telegram_bad_request`, and `error.message` carries Telegram's own description. Telegram's guideline for bots is at most 1 message per second in one chat and 30 messages per second across all chats. When Telegram rate-limits the bot, the send fails with `429 platform.telegram.rate_limit`: wait the number of seconds in the `Retry-After` header before you retry. Without the header, wait at least 60 seconds, then retry with exponential backoff.
+
+## Cost
+
+Each send request costs 1 interaction credit, however many messages it sends. Listing, reading, archiving, marking as read, and downloading files cost nothing.
+
+A request refused with `400 validation.telegram_bad_request` before any of its messages was sent gets its credit back. A send refused with `403 telegram.cannot_message` or `429 platform.telegram.rate_limit` keeps the credit spent, and so does `validation.telegram_bad_request` once a message of the request has been sent. Any other error that Telegram or SocialAPI returns after sending has started keeps the credit spent. A request refused before sending, for example an invalid body, `403 auth.insufficient_scope`, `404 conversation.not_found`, `403 account.permission_missing`, `422 messaging.tag_not_supported`, or `429 validation.interaction_limit_exhausted`, costs nothing. When the allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. See [When a credit comes back](/guides/plans#when-a-credit-comes-back).
+
+## Errors and debugging
+
+Check these in order when a Telegram send fails:
+
+1. **`403 telegram.cannot_message`.** The person has not messaged the bot, or blocked it. Wait for the person to write to the bot.
+2. **`400 validation.telegram_bad_request`.** Telegram rejected the content: text or caption too long, a file over its size limit, or a URL Telegram could not fetch. Read `error.message` for Telegram's reason, fix the request, and send again.
+3. **`404 media.not_found`.** A `media_id` does not exist, is not yours, or has not finished uploading. Nothing was sent and no credit was used. Check it in your media library and send again.
+4. **`422 messaging.tag_not_supported`.** Remove `message_tag` from the request.
+5. **`429 platform.telegram.rate_limit`.** Wait for the seconds in `Retry-After`, then retry. Without the header, wait at least 60 seconds, then retry with exponential backoff.
+6. **`401 platform.telegram.auth`.** Telegram rejected the bot token, for example after `/revoke` in @BotFather. Connect the bot again with the new token: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
+7. **`503 platform.telegram.api_error`.** Telegram did not answer, or answered with an error SocialAPI does not map. Retry with backoff. If it persists, check that the conversation still exists in Telegram.
+8. **`403 account.permission_missing`.** The account lacks the `messages.write` [permission](/guides/permissions).
+9. **`403 auth.insufficient_scope`.** The API key is a [scoped key](/guides/scoped-keys) without `dms:send`.
+10. **`404 conversation.not_found`.** The conversation does not exist, is not yours, or belongs to another connected account than `account_id`.
+11. **`429 validation.interaction_limit_exhausted`.** Your interaction credits for the billing period are used up: see [Plans and usage](/guides/plans#when-you-reach-an-allowance).
+
+Every code is in [Errors](/guides/errors).
+
+## Scopes
+
+| Scope | Operations |
+|---|---|
+| `dms:read` | List and get conversations, list messages, start or read an inbox sync |
+| `dms:send` | Send a message |
+
+Scoped API keys are described in [Scoped API keys](/guides/scoped-keys).
+
+## Events
+
+A Telegram account emits one DM event, [`dm.received`](/guides/webhook-events#dm-received), described in [Receive messages](#receive-messages). It emits no `dm.sent`, no `dm.status.*`, no `dm.deleted`, and no `dm.postback`. An account without the `messages.read` [permission](/guides/permissions) receives no `dm.received` event, and no new messages appear in its conversations.
+
+## Use from an AI agent
+
+| Tool | What it does on Telegram |
+|---|---|
+| `social_api_list_conversations` | List the bot's conversations, most recent activity first |
+| `social_api_get_conversation` | Get one conversation |
+| `social_api_list_messages` | List the messages of a conversation, newest first |
+| `social_api_send_dm` | Send a text message of up to 1,000 bytes. The tool sends no attachments. SocialAPI drops `quick_replies` and `buttons` on Telegram. A call with `quick_replies` or `buttons` and no `text` fails with `validation.telegram_bad_request` |
+| `social_api_update_conversation` | Archive a conversation, or set it back to `active` |
+| `social_api_mark_conversation_read` | Mark a conversation as read in SocialAPI |
+
+`social_api_send_sender_action` returns `501 resource.not_supported` on Telegram. To send a file, use the REST endpoint. See [MCP tools](/integrations/tools#direct-messages).
+
+## Related
+
+- [Telegram API](/platforms/telegram): connect the bot, capabilities, and webhook events
+- [Direct messages](/guides/direct-messages): the request fields and conversation endpoints for every platform
+- [Webhook events](/guides/webhook-events#dm-received): the `dm.received` payload on every platform
+- [Unified inbox](/guides/inbox#fetch-an-inbound-attachment): every status of the file download URL
+- [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction): what costs an interaction credit

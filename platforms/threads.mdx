@@ -29,10 +29,10 @@ An unsupported call returns `501 resource.not_supported`. A Beta row depends on 
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post and publish a new one |
 | Delete a published post | Yes | |
 | List posts | Yes | Text posts, images, videos, carousels |
-| List replies | Yes | Replies to a post, and replies to a reply |
-| Reply to a reply | Yes | |
-| Delete a reply | Conditional | Only replies your account wrote. `can_delete` is `true` on every reply, including other accounts' replies, and deleting another account's reply fails |
-| Hide, unhide a reply | Yes | Only replies from other accounts (`can_hide` is `false` on your own replies). Needs the `threads_manage_replies` scope. Without it the call returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code |
+| List replies | Yes | Replies to a post, and replies to a reply. See [Threads comments](/platforms/threads/comments) |
+| Reply to a post or a reply | Yes | Text only |
+| Delete a reply | Conditional | Only replies your account wrote. `can_delete` is `true` on every reply, and deleting another account's reply fails |
+| Hide, unhide a reply | Yes | Only direct replies from other accounts to your post: a reply to a reply cannot be hidden on its own. `can_hide` is `true` on every reply, and hiding your own reply returns `403 platform.threads.10.4279017`. Needs the `threads_manage_replies` scope |
 | Like a reply | No | `501 resource.not_supported` |
 | Private reply | No | `501 resource.not_supported` |
 | DMs | No | Threads has no messaging API. `501 resource.not_supported` |
@@ -72,13 +72,9 @@ Response (HTTP 202):
 
 A Threads access token lasts about 60 days. SocialAPI refreshes it. If a call returns `401 platform.threads.auth`, the person revoked access or the refresh failed: reconnect the account. See [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
 
-## Replies
+## Comments
 
-List the replies to a post with `GET /v1/inbox/comments/{postId}`, where `postId` is the post's platform ID. Reply and delete work as described in [Comments](/guides/comments). Threads calls a comment a reply.
-
-- **Hide and unhide:** only replies from other accounts. They need the scope `threads_manage_replies`.
-- **Delete:** only replies your account wrote, and it works without `threads_manage_replies`. A reply from another account cannot be deleted: hide it instead.
-- A like and a private reply return `501 resource.not_supported`.
+Threads calls a comment a reply, and SocialAPI's comments endpoints read, answer, hide, and delete Threads replies. Listing, nested replies, moderation rules, limits, and errors are in [Threads comments](/platforms/threads/comments).
 
 ## Mentions
 
@@ -126,7 +122,7 @@ curl -X POST "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J
   -d '{"media_id": "sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I", "text": "Thanks for the mention!"}'
 ```
 
-`media_id` is the `id` from the list response. An account connected without `threads_manage_mentions` gets `403` with a `platform.threads.<code>` error code on the list, where `<code>` is Meta's error code. Reconnect the account to add the scope.
+`media_id` is the `id` from the list response. On an account connected without `threads_manage_mentions`, the list returns `platform.threads.<code>` (HTTP 403), where `<code>` is from 200 to 299, or `422 platform.threads.10` with Meta's reason in `error.message`. Reconnect the account to add the scope.
 
 ## Insights
 
@@ -247,7 +243,7 @@ Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitte
 | Video | 1 GB: MP4 or QuickTime |
 | Links in a post | 5 unique links |
 | Posts | 250 per 24 hours and 25 per hour for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
-| Replies | 1,000 per rolling 24 hours, set by Threads |
+| Replies and deletions | See [Threads comments limits](/platforms/threads/comments#limits) |
 | Threads' own rate limit | `429 platform.threads.rate_limit`. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 
 `GET /v1/accounts/{id}/limits` returns `posts_remaining`, `posts_total`, `replies_remaining`, and `replies_total`.
@@ -268,7 +264,7 @@ SocialAPI's Meta Threads app requests these scopes at connect. You apply for no 
 
 Threads asks for publishing and deleting as 1 pair of scopes shared by `posts.write` and `comments.write`, so the consent screen can show more than you selected. The account stays limited to the permissions you selected.
 
-`threads_manage_mentions`, `threads_manage_replies`, and `threads_manage_insights` are requested since 2026-10-17. An account connected before that date does not hold them: an insights call returns `403 platform.threads.insights_scope_missing`, and any other call that needs one returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. Reconnect the account to add them.
+`threads_manage_mentions`, `threads_manage_replies`, and `threads_manage_insights` are requested since 2026-10-17. An account connected before that date does not hold them: an insights call returns `403 platform.threads.insights_scope_missing`, and any other call that needs one returns `platform.threads.<code>` (HTTP 403), where `<code>` is from 200 to 299, or `422 platform.threads.10` with Meta's reason in `error.message`. Reconnect the account to add them.
 
 ### Beta scopes
 
@@ -281,11 +277,12 @@ These further scopes are requested only for accounts enrolled in the beta:
 | `threads_share_to_instagram` | `crossreshare_to_ig` on a post | `posts.write` |
 | `threads_keyword_search` | Requested with `threads_profile_discovery`. No SocialAPI endpoint uses it | Every account |
 
-Until Meta grants a scope for every account, a call that needs it from an account without it returns `403` with a `platform.threads.<code>` error code, where `<code>` is Meta's error code. A beta scope is added when the account connects: reconnect the account to add one granted later.
+Until Meta grants a scope for every account, a call that needs it from an account without it returns `platform.threads.<code>` (HTTP 403), where `<code>` is from 200 to 299, or `422 platform.threads.10` with Meta's reason in `error.message`. A beta scope is added when the account connects: reconnect the account to add one granted later.
 
 ## Related
 
 - [Threads publishing](/platforms/threads/publishing): fields, media rules, and quirks for publishing
+- [Threads comments](/platforms/threads/comments): list, answer, hide, and delete replies
 - [Connect accounts](/guides/connect-accounts): the shared connect flow
 - [Platforms](/platforms/overview): the capability matrix
 - [Errors](/guides/errors): every error code

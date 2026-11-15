@@ -28,7 +28,7 @@ An unsupported call returns `501 resource.not_supported`.
 | Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
 | Delete a published post | Yes | |
 | List posts | Partial | Company Page: the Page's posts, including posts made outside SocialAPI. Member profile: only the posts you published through SocialAPI |
-| Comments | Conditional | Company Page: list, reply, like, and delete. Member profile: reply, like, and delete only, because LinkedIn does not allow reading comments on a member's posts: listing returns `501 resource.not_supported`. Hide and private reply are not supported |
+| Comments | Conditional | Company Page: list, reply, like, and delete. Member profile: reply, like, and delete only, and listing returns `501 resource.not_supported`. Hide and private reply return `501 resource.not_supported`. See [LinkedIn comments](/platforms/linkedin/comments) |
 | Analytics | Conditional | `GET /v1/platforms/linkedin/insights` on a company Page or a member profile: see [Insights](#insights). Live post metrics return `501 resource.not_supported`. Stored post history covers company Page posts only: see [Analytics](/guides/analytics) |
 | DMs | No | `501 resource.not_supported` |
 | Mentions | Conditional | Company Page only: `GET /v1/accounts/{id}/mentions` returns posts and comments that mention the Page from the last 60 days, and `POST /v1/accounts/{id}/mentions/reply` answers them as the Page. A member profile returns `501 resource.not_supported` |
@@ -169,6 +169,10 @@ A LinkedIn account has no `login_id` in two cases:
 - **The connect granted fewer scopes than the member's login holds.** The login holds the scopes of the connect that gave that member's other LinkedIn accounts their `login_id`. For example, a `"profile"` connect when the login was authorized without `connection_type`, an `"organization"` connect when it was authorized with `"profile"`, or a shorter `permissions` list. Use the `login_id` of that member's other LinkedIn accounts instead, or reconnect the account with the same `connection_type` and `permissions` as the connect that authorized the login.
 - **The account was connected before 2026-11-05.** Reconnect it to get a `login_id`. The first case applies to that reconnect too. See the [changelog](/changelog).
 
+## Comments
+
+A company Page lists, replies to, likes, and deletes the comments on its posts, and a member profile replies to, likes, and deletes comments but cannot list them: see [LinkedIn comments](/platforms/linkedin/comments).
+
 ## Insights
 
 `GET /v1/platforms/linkedin/insights?account_id={id}` returns the follower count and per-post counts for a company Page or a member profile. `kind` tells them apart: `member` for a member profile, `organization` for a company Page. On a Page, `posts` covers the Page's 50 most recent posts.
@@ -226,6 +230,7 @@ Company Page scopes:
 ## Related
 
 - [LinkedIn publishing](/platforms/linkedin/publishing): fields, media rules, text formatting, and quirks for publishing
+- [LinkedIn comments](/platforms/linkedin/comments): list, reply to, like, and delete comments on company Page and member profile posts
 - [Connect accounts](/guides/connect-accounts): the shared connect flow and the profile or Page choice
 - [Platforms](/platforms/overview): the capability matrix
 - [Errors](/guides/errors): every error code

@@ -110,7 +110,7 @@ A call that needs a permission outside `effective_permissions` fails with `403 a
 - **Publishing** (`POST /v1/posts`, `POST /v1/posts/{pid}/publish`, `POST /v1/posts/{pid}/retry`, and a scheduled post when it is delivered) reports `account.permission_missing` on the target and returns no `403`.
 - **Removing a published post from a platform.** `DELETE /v1/posts/{pid}` reports the target in `results` with `outcome: "failed"` and leaves it `published`. `POST /v1/posts/{pid}/unpublish` returns `500 system.internal`, and the target stays `published`.
 - **Live post metrics** (`GET /v1/posts/{pid}/metrics`) report `resource.not_found` on the target.
-- **Stored lists.** `GET /v1/inbox/comments`, `GET /v1/inbox/conversations`, and `GET /v1/inbox/conversations/{id}/messages` return what SocialAPI stored and never return `account.permission_missing`.
+- **Lists.** `GET /v1/inbox/comments`, `GET /v1/inbox/conversations`, and `GET /v1/inbox/conversations/{id}/messages` never return `account.permission_missing`. Without the matching read permission, items that did not come from SocialAPI are not added to them. Removing the permission deletes what they already held: see [Removing a permission deletes data](#removing-a-permission-deletes-data).
 - **Review accounts.** `GET /v1/inbox/reviews` does not check `reviews.read`.
 
 A refused call costs what its path charges:
@@ -121,7 +121,7 @@ A refused call costs what its path charges:
 
 An account without a permission also stops receiving what it covers:
 
-- **Webhooks and Automations.** Comments, mentions, messages, and reviews for a permission the account lacks are dropped: they do not reach your webhook endpoints, your Automations, or the inbox. With `messages.write` alone, the account still receives `dm.status.read` on Instagram, `dm.status.delivered` and `dm.status.read` on Facebook, and every `dm.status.*` event on WhatsApp. It receives no `dm.sent` and no `dm.status.sent` on Instagram or Facebook.
+- **Webhooks and Automations.** Comments, mentions, messages, and reviews for a permission the account lacks are dropped: they do not reach your webhook endpoints, your Automations, or the inbox. With `messages.write` alone, the account still receives `dm.status.read` on Instagram, `dm.status.delivered` and `dm.status.read` on Facebook, and, on WhatsApp, every `dm.status.*` event and `dm.sent` for messages sent through SocialAPI. It receives no `dm.sent` and no `dm.status.sent` on Instagram or Facebook.
 - **Posts.** A post to an account without `posts.write` fails on its target with `account.permission_missing`, whether you publish it now or schedule it. For a scheduled post, the failure appears when the delivery runs.
 - **Analytics.** The account adds no new points to its stored analytics history.
 
@@ -196,7 +196,7 @@ A request with no `permissions` field returns `400 validation.field_required`. A
 
 | Permission removed | Deleted at once |
 |---|---|
-| `comments.read` | The account's comments and the posts they belong to |
+| `comments.read` | The account's comments, and every post `GET /v1/inbox/comments` lists for the account, including posts published through SocialAPI |
 | `messages.read` | The account's conversations and messages, with their attachments |
 | `posts.read` | Posts SocialAPI read from the platform, including their analytics history. Posts you published through SocialAPI are kept |
 | `analytics.read` | The account's stored analytics history |
