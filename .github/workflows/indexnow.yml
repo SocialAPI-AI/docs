@@ -1,0 +1,28 @@
+name: IndexNow
+
+# Mintlify deploys on its own from the push; this job waits for that deploy to
+# show up in the live sitemap, then submits the pages the push changed.
+on:
+  push:
+    branches: [main]
+    paths: ["**/*.mdx", "api-reference/openapi.json"]
+
+concurrency:
+  group: indexnow
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Submit changed pages to IndexNow
+        run: node scripts/indexnow-submit.mjs "${{ github.event.before }}" "${{ github.sha }}"
