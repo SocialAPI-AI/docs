@@ -13,9 +13,9 @@ A scheduled post costs 1 post credit when you create it, whatever the number of 
 |---|---|---|
 | `POST` | `/v1/posts` | Schedule a post with `scheduled_at` |
 | `GET` | `/v1/posts?status=scheduled` | List scheduled posts |
-| `PATCH` | `/v1/posts/{pid}` | Change the time, content, or targets of a scheduled post |
-| `POST` | `/v1/posts/{pid}/publish` | Publish a scheduled post now |
-| `DELETE` | `/v1/posts/{pid}` | Cancel a scheduled post |
+| `PATCH` | `/v1/posts/{post_id}` | Change the time, content, or targets of a scheduled post |
+| `POST` | `/v1/posts/{post_id}/publish` | Publish a scheduled post now |
+| `DELETE` | `/v1/posts/{post_id}` | Cancel a scheduled post |
 
 ## Schedule a post
 
@@ -95,7 +95,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-The first target publishes at `scheduled_at`. Each next target publishes a random delay between `min_seconds` and `max_seconds` after the previous one, in the order the targets are listed. With 4 targets and a 60 to 300 second gap, the times are, for example, 10:00:00, 10:02:41, 10:03:52, and 10:08:30. Read each target's planned time from `targets[].scheduled_at` with `GET /v1/posts/{pid}`.
+The first target publishes at `scheduled_at`. Each next target publishes a random delay between `min_seconds` and `max_seconds` after the previous one, in the order the targets are listed. With 4 targets and a 60 to 300 second gap, the times are, for example, 10:00:00, 10:02:41, 10:03:52, and 10:08:30. Read each target's planned time from `targets[].scheduled_at` with `GET /v1/posts/{post_id}`.
 
 - **Immediate start:** with `publish_now: true` and no `scheduled_at`, the first target publishes now and the others follow. The response still has `status: "scheduled"`, because the later targets are still waiting.
 - **Fixed gap:** set `min_seconds` equal to `max_seconds`.
@@ -104,8 +104,8 @@ The first target publishes at `scheduled_at`. Each next target publishes a rando
 - **Bounds:** `0 <= min_seconds <= max_seconds <= 86400`. A value outside them returns `400 validation.field_invalid`.
 - **Cost:** 1 post credit for the whole post.
 - **Results:** the post settles through the usual `post.published`, `post.partial`, and `post.failed` events.
-- **Rescheduling:** `PATCH /v1/posts/{pid}` with a post-level `scheduled_at` moves every target to that single time and removes the spread. To keep a spread, send a `scheduled_at` on each target.
-- **Where it applies:** `stagger` applies only to `POST /v1/posts`. `PATCH /v1/posts/{pid}`, `POST /v1/posts/{pid}/publish`, and `POST /v1/posts/validate` ignore it, and CSV import has no column for it.
+- **Rescheduling:** `PATCH /v1/posts/{post_id}` with a post-level `scheduled_at` moves every target to that single time and removes the spread. To keep a spread, send a `scheduled_at` on each target.
+- **Where it applies:** `stagger` applies only to `POST /v1/posts`. `PATCH /v1/posts/{post_id}`, `POST /v1/posts/{post_id}/publish`, and `POST /v1/posts/validate` ignore it, and CSV import has no column for it.
 
 ## How a scheduled post moves through statuses
 
@@ -115,16 +115,16 @@ flowchart LR
   B -->|PATCH scheduled_at| B
   B -->|DELETE| D[deleted]
   B -->|scheduled time reached| C[targets publishing]
-  B -->|POST /posts/pid/publish| C
+  B -->|"POST /posts/{post_id}/publish"| C
   C --> E[published, partial, or failed]
-  E -->|failed or partial: POST /posts/pid/retry| C
+  E -->|"failed or partial: POST /posts/{post_id}/retry"| C
 ```
 
 A scheduled post keeps the status `scheduled` while it waits for its time and while SocialAPI sends it, until every target has settled. While SocialAPI sends it, each target shows `publishing`. The post then becomes `published`, `partial`, or `failed`, and SocialAPI sends one `post.published`, `post.partial`, or `post.failed` event. The statuses and the per-target fields are in [Track post delivery](/guides/delivery#post-status).
 
 ## Edit or reschedule
 
-`PATCH /v1/posts/{pid}` changes a `scheduled` post. A new time or target list takes effect at once.
+`PATCH /v1/posts/{post_id}` changes a `scheduled` post. A new time or target list takes effect at once.
 
 ```bash
 curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
@@ -137,11 +137,11 @@ The response is HTTP 200 with the updated post. SocialAPI sends `post.updated` w
 
 ## Publish now
 
-`POST /v1/posts/{pid}/publish` sends a scheduled post immediately. It costs 1 post credit again, on top of the credit the scheduling cost. The response is HTTP 201 and the post is `publishing`. A post that is `published`, `partial`, or `failed` returns `409 post.state_invalid`.
+`POST /v1/posts/{post_id}/publish` sends a scheduled post immediately. It costs 1 post credit again, on top of the credit the scheduling cost. The response is HTTP 201 and the post is `publishing`. A post that is `published`, `partial`, or `failed` returns `409 post.state_invalid`.
 
 ## Cancel a scheduled post
 
-`DELETE /v1/posts/{pid}` cancels a `scheduled` post: SocialAPI removes the post and sends nothing. The response is HTTP 200 with `{"success": true, "deleted": true}`, and SocialAPI sends `post.deleted`. The post credit is not returned. Deleting a post that is already `publishing` returns `409 post.state_invalid`. See [Delete a post](/guides/delivery#delete-a-post).
+`DELETE /v1/posts/{post_id}` cancels a `scheduled` post: SocialAPI removes the post and sends nothing. The response is HTTP 200 with `{"success": true, "deleted": true}`, and SocialAPI sends `post.deleted`. The post credit is not returned. Deleting a post that is already `publishing` returns `409 post.state_invalid`. See [Delete a post](/guides/delivery#delete-a-post).
 
 ## Posting caps can delay a scheduled post
 
@@ -153,7 +153,7 @@ SocialAPI makes one delivery attempt per target at the scheduled time. A failed 
 
 Common causes are a disconnected account (`publishing.delivery.account_load_failed`), an account that lost the `posts.write` [permission](/guides/permissions) (`account.permission_missing`), content that stopped passing validation (`validation.publish`), and a platform refusal (`platform.{platform}.*`). The causes are in [Track post delivery](/guides/delivery#target-errors).
 
-To send a failed post again, fix the cause, optionally edit the post, and call `POST /v1/posts/{pid}/retry`. It re-sends only the failed targets and costs 1 post credit.
+To send a failed post again, fix the cause, optionally edit the post, and call `POST /v1/posts/{post_id}/retry`. It re-sends only the failed targets and costs 1 post credit.
 
 A scheduled post still publishes when your SocialAPI account is past due. See [Past-due accounts](/guides/plans#past-due-accounts).
 

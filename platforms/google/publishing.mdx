@@ -86,7 +86,7 @@ Response (HTTP 201):
 }
 ```
 
-SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`, and the post ends as `published`, `partial`, or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
+SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`, and the post ends as `published`, `partial`, or `failed`. Poll `GET /v1/posts/{post_id}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
 
 ### Platform data fields
 
@@ -136,7 +136,7 @@ curl -X POST https://api.social-api.ai/v1/posts \
 
 ## 4. Update post
 
-Before publishing, `PATCH /v1/posts/{pid}` edits a post in `draft`, `scheduled`, or `failed` status. The change applies when the post publishes:
+Before publishing, `PATCH /v1/posts/{post_id}` edits a post in `draft`, `scheduled`, or `failed` status. The change applies when the post publishes:
 
 ```bash
 curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
@@ -180,7 +180,7 @@ curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f
 | `400 publishing.validation_failed` | The new text or button breaks a Google rule, such as the 1,500 character limit | Fix the field named in the response |
 | `409 post.state_invalid` | The post is also live on another platform. Only a post live on Google alone can be edited | Delete and publish again, or edit a Google-only post |
 
-Targets that failed to publish take the new text and button too, so a later `POST /v1/posts/{pid}/retry` publishes the edited version.
+Targets that failed to publish take the new text and button too, so a later `POST /v1/posts/{post_id}/retry` publishes the edited version.
 
 When a post is live on several locations and only some accept the edit, the response is the error from the first location that refused. `error.meta.updated_account_ids` lists the locations that show the new version, and `error.meta.not_updated_account_ids` the ones that still show the old one. Fix the cause, then send the same request again.
 
@@ -188,7 +188,7 @@ When a post is live on several locations and only some accept the edit, the resp
 
 ## 5. Delete post
 
-`DELETE /v1/posts/{pid}` deletes the local post from Google for every published target, and removes a draft, scheduled, or failed post from SocialAPI:
+`DELETE /v1/posts/{post_id}` deletes the local post from Google for every published target, and removes a draft, scheduled, or failed post from SocialAPI:
 
 ```bash
 curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
@@ -209,7 +209,7 @@ Response (HTTP 200):
 
 If Google refuses the delete, or the local post no longer exists on Google, the target's `outcome` is `failed` with Google's reason in `message`, and SocialAPI keeps the post (`"deleted": false`).
 
-To remove the post from one location of a multi-target post, send `POST /v1/posts/{pid}/unpublish` with that target's `account_id`:
+To remove the post from one location of a multi-target post, send `POST /v1/posts/{post_id}/unpublish` with that target's `account_id`:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7/unpublish \
@@ -274,7 +274,7 @@ Google publishes a local post the moment it is created and has no scheduling of 
 
 ### A published post keeps its image and type
 
-After publishing, `PATCH /v1/posts/{pid}` changes the text and the button only. The image, the post type (`topicType`), and the event or offer details stay as published until you delete the post. A post that is also live on another platform cannot be edited at all, because the other platform would keep the old text.
+After publishing, `PATCH /v1/posts/{post_id}` changes the text and the button only. The image, the post type (`topicType`), and the event or offer details stay as published until you delete the post. A post that is also live on another platform cannot be edited at all, because the other platform would keep the old text.
 
 ### The location must allow posting
 
@@ -304,7 +304,7 @@ A failed target carries an `error` object:
 
 ### Recovery
 
-- Retry a `failed` or `partial` post with `POST /v1/posts/{pid}/retry`. A retry costs 1 post credit.
+- Retry a `failed` or `partial` post with `POST /v1/posts/{post_id}/retry`. A retry costs 1 post credit.
 - To change a published post, delete it and publish a new one.
 
 All codes, with their HTTP status, are listed in [Errors](/guides/errors).
@@ -392,7 +392,7 @@ Response (HTTP 200) once Google has the post:
 }
 ```
 
-If the target is `failed`, read `targets[].error` (section 7), fix the request, and call `POST /v1/posts/{pid}/retry`.
+If the target is `failed`, read `targets[].error` (section 7), fix the request, and call `POST /v1/posts/{post_id}/retry`.
 
 ---
 

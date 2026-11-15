@@ -13,17 +13,17 @@ Instagram lets the account message a person only inside the 24-hour messaging wi
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/conversations?platform=instagram` | List Instagram conversations |
-| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
-| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
-| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
-| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
-| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message |
-| `POST` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | React to a message |
-| `DELETE` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | Remove your reaction |
-| `POST` | `/v1/inbox/conversations/{id}/sender-action` | Show a typing indicator, or mark the person's messages seen |
-| `GET` | `/v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile` | Read the profile of a person in a conversation |
+| `GET` | `/v1/inbox/conversations/{conversation_id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{conversation_id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{conversation_id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages` | Send a message |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` | React to a message |
+| `DELETE` | `/v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` | Remove your reaction |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/sender-action` | Show a typing indicator, or mark the person's messages seen |
+| `GET` | `/v1/platforms/instagram/accounts/{account_id}/participants/{participant_id}/profile` | Read the profile of a person in a conversation |
 
-`{id}` in the `/v1/inbox/conversations` paths is the conversation `id`. `{messageId}` is a message's `platform_id`. In the profile path, `{id}` is the connected account's `acc_` ID and `{participantId}` is the conversation's `participant_id`, the person's Instagram-scoped ID. See [IDs](/guides/ids#what-each-endpoint-accepts).
+`{conversation_id}` in the `/v1/inbox/conversations` paths is the conversation `id`. `{message_id}` is a message's `platform_id`. In the profile path, `{account_id}` is the connected account's `acc_` ID and `{participant_id}` is the conversation's `participant_id`, the person's Instagram-scoped ID. See [IDs](/guides/ids#what-each-endpoint-accepts).
 
 ## Your first message
 
@@ -136,7 +136,7 @@ Instagram sets these sizes and refuses a larger message:
 
 ## React to a message
 
-`POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` adds the account's reaction to a message, and replaces the account's earlier reaction on it. `reaction` is a single emoji character, and Instagram accepts any emoji. Anything else returns `400 validation.invalid_reaction`. `DELETE` on the same path, with `account_id` as a query parameter, removes the reaction. Both work on Instagram Login and Facebook Login, return `{ "success": true }`, and cost no credit.
+`POST /v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` adds the account's reaction to a message, and replaces the account's earlier reaction on it. `reaction` is a single emoji character, and Instagram accepts any emoji. Anything else returns `400 validation.invalid_reaction`. `DELETE` on the same path, with `account_id` as a query parameter, removes the reaction. Both work on Instagram Login and Facebook Login, return `{ "success": true }`, and cost no credit.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages/m_AbCdEf123/reaction" \
@@ -155,13 +155,13 @@ A reaction the person adds to one of your messages sends no event.
 
 ## Typing indicators and seen receipts
 
-`POST /v1/inbox/conversations/{id}/sender-action` with `action` set to `typing_on` or `typing_off` shows or hides a typing indicator, and `mark_seen` marks the person's messages as seen. Instagram shows the action only while the person is signed in. If Instagram refuses the action because the window is closed or a scope is missing, the call returns `400 platform.instagram.window_closed` or `403 platform.instagram.permission_denied`. It works on both login paths and costs no credit. The request and the `action` values are in [Typing indicators and seen receipts](/guides/direct-messages#typing-indicators-and-seen-receipts).
+`POST /v1/inbox/conversations/{conversation_id}/sender-action` with `action` set to `typing_on` or `typing_off` shows or hides a typing indicator, and `mark_seen` marks the person's messages as seen. Instagram shows the action only while the person is signed in. If Instagram refuses the action because the window is closed or a scope is missing, the call returns `400 platform.instagram.window_closed` or `403 platform.instagram.permission_denied`. It works on both login paths and costs no credit. The request and the `action` values are in [Typing indicators and seen receipts](/guides/direct-messages#typing-indicators-and-seen-receipts).
 
 Instagram does not report when the person is typing, so SocialAPI has no event for it.
 
 ## Participant profile
 
-`GET /v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile` returns the profile of a person in a conversation, including whether the person follows the account (`is_user_follow_business`) and whether the account follows the person (`is_business_follow_user`). It works on both login paths.
+`GET /v1/platforms/instagram/accounts/{account_id}/participants/{participant_id}/profile` returns the profile of a person in a conversation, including whether the person follows the account (`is_user_follow_business`) and whether the account follows the person (`is_business_follow_user`). It works on both login paths.
 
 ```bash
 curl "https://api.social-api.ai/v1/platforms/instagram/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/participants/2287522528728101/profile" \

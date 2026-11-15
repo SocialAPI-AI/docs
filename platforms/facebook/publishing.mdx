@@ -100,7 +100,7 @@ Response (HTTP 201):
 }
 ```
 
-SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
+SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{post_id}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
 
 ### Platform data fields
 
@@ -352,11 +352,11 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
 
 ## 4. Update post
 
-A published Facebook post cannot be edited through SocialAPI. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a post that is live on this platform. Only `draft`, `scheduled`, and `failed` posts can be edited here; a published post can be edited only when it is live on Google Business Profile alone.
+A published Facebook post cannot be edited through SocialAPI. `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a post that is live on this platform. Only `draft`, `scheduled`, and `failed` posts can be edited here; a published post can be edited only when it is live on Google Business Profile alone.
 
-A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{pid}` before it publishes.
+A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{post_id}` before it publishes.
 
-To correct a published post, delete it with `DELETE /v1/posts/{pid}` and publish a new post.
+To correct a published post, delete it with `DELETE /v1/posts/{post_id}` and publish a new post.
 
 ---
 
@@ -367,7 +367,7 @@ curl -X DELETE https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a
   -H "Authorization: Bearer $SOCAPI_KEY"
 ```
 
-To remove only the Facebook target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{pid}` always removes every target.
+To remove only the Facebook target of a cross-platform post, unpublish it by `account_id`. `DELETE /v1/posts/{post_id}` always removes every target.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/unpublish \
@@ -456,11 +456,11 @@ A Facebook target includes `platform_media`: every photo and video on the publis
 
 Link and share posts have no `platform_media`: their image is a preview of the linked site, not media the Page posted. A Reel has none either, since List posts does not return Reels, whatever `share_to_feed` is.
 
-The links expire. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{id}/sync`, wait until `GET /v1/accounts/{id}/sync` is no longer `syncing`, then read the post again.
+The links expire. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{account_id}/sync`, wait until `GET /v1/accounts/{account_id}/sync` is no longer `syncing`, then read the post again.
 
 `url` is absent when Facebook does not expose a video's file. The cover image is still included.
 
-`POST /v1/accounts/{id}/sync` covers up to the 500 most recent posts on each Page of the account. It returns at once and the sync runs in the background: poll `GET /v1/accounts/{id}/sync` until `state` is no longer `syncing`. Each account can be synced once every 15 minutes, and your plan sets a daily limit; see [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts). The account needs the `posts.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
+`POST /v1/accounts/{account_id}/sync` covers up to the 500 most recent posts on each Page of the account. It returns at once and the sync runs in the background: poll `GET /v1/accounts/{account_id}/sync` until `state` is no longer `syncing`. Each account can be synced once every 15 minutes, and your plan sets a daily limit; see [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts). The account needs the `posts.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
 
 `platform_media` is separate from `media`, which lists what you sent when publishing through SocialAPI and is empty for posts published elsewhere.
 
@@ -512,7 +512,7 @@ Every code is in [Errors](/guides/errors).
 
 ### Recovery
 
-- **Rate limit.** Wait, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Rate limit.** Wait, then send `POST /v1/posts/{post_id}/retry`. See [Delivery](/guides/delivery).
 - **Auth error.** Reconnect the Facebook account through the OAuth flow to get a fresh token.
 - **API error.** Read `message`, fix the cause, and retry.
 

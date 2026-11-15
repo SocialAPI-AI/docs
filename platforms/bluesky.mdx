@@ -27,7 +27,7 @@ An unsupported call returns `501 resource.not_supported`. The `capabilities` obj
 | Publish a video | No | A `media_id` video returns `400 publishing.validation_failed`. A video sent as a `url` is skipped and the post publishes without it |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | No | `first_comment` is ignored |
-| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
+| Update a published post | No | `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
 | Delete a published post | Yes | |
 | List posts | Yes | |
 | List comments and replies | Yes | Replies up to 6 levels below the post, as one flat list with no cursor. See [Bluesky comments](/platforms/bluesky/comments) |
@@ -42,7 +42,7 @@ An unsupported call returns `501 resource.not_supported`. The `capabilities` obj
 | React to a DM | No | `501 resource.not_supported` |
 | Reviews | No | Bluesky has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | Automations run on Instagram and Facebook accounts only. `422 automation.platform_unsupported` |
-| Platform quota | Yes | `GET /v1/accounts/{id}/limits` returns Bluesky's fixed write budgets, `write_points_per_hour` and `write_points_per_day`, not the points left: see [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
+| Platform quota | Yes | `GET /v1/accounts/{account_id}/limits` returns Bluesky's fixed write budgets, `write_points_per_hour` and `write_points_per_day`, not the points left: see [Rate limits](/guides/rate-limits#read-a-platforms-remaining-quota) |
 | Webhook events | Partial | No comment or DM events. `mention.received` only when you list mentions. See [Webhook events](#webhook-events) |
 
 The capability matrix for every platform is on [Supported platforms](/platforms/overview).
@@ -117,7 +117,7 @@ SocialAPI lists, reads, and sends Bluesky direct messages (DMs), text only, when
 
 ## Webhook events
 
-Bluesky sends SocialAPI no notification of its own, so there is no `comment.received` or `dm.received` event: read comments and DMs with the inbox endpoints. Listing mentions with `GET /v1/accounts/{id}/mentions` sends a `mention.received` event for the listed items: see [Mentions you list](/guides/webhook-events#mentions-you-list). Bluesky does emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect the account, `account.disconnected` when SocialAPI flags the account for reconnection, and `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself. See [Webhook events](/guides/webhook-events).
+Bluesky sends SocialAPI no notification of its own, so there is no `comment.received` or `dm.received` event: read comments and DMs with the inbox endpoints. Listing mentions with `GET /v1/accounts/{account_id}/mentions` sends a `mention.received` event for the listed items: see [Mentions you list](/guides/webhook-events#mentions-you-list). Bluesky does emit the `post.*` events for posts you publish through SocialAPI, `account.connected` when you connect the account, `account.disconnected` when SocialAPI flags the account for reconnection, and `account.updated` when the account loses [permissions](/guides/permissions) you did not remove yourself. See [Webhook events](/guides/webhook-events).
 
 ## Limits
 
@@ -130,7 +130,7 @@ Bluesky sends SocialAPI no notification of its own, so there is no `comment.rece
 | Sign-ins per account (Bluesky) | 30 per 5 minutes |
 | Posts (SocialAPI) | 25 per hour and 50 per 24 hours for each account: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 
-When Bluesky's own limit is used up, the call fails with `429 platform.bluesky.rate_limit`. Wait, then retry. `GET /v1/accounts/{id}/limits` returns the 2 write budgets.
+When Bluesky's own limit is used up, the call fails with `429 platform.bluesky.rate_limit`. Wait, then retry. `GET /v1/accounts/{account_id}/limits` returns the 2 write budgets.
 
 ## Scopes
 

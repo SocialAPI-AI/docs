@@ -19,7 +19,7 @@ Every object SocialAPI returns has an `id` string. Treat every ID as an opaque s
 | Review | `sapi_rev_` prefix | `sapi_rev_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
 | Direct message, as the `id` of a `dm.*` webhook event and in `message_id` and `message_ids` of a send response | `sapi_dm_` prefix | `sapi_dm_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
 | Mention | `sapi_mnt_` prefix | `sapi_mnt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I` |
-| Message, as the `id` of an item in `GET /v1/inbox/conversations/{id}/messages` | UUID, no prefix | `7c9e6679-7425-40de-944b-e07fc1f90ae7` |
+| Message, as the `id` of an item in `GET /v1/inbox/conversations/{conversation_id}/messages` | UUID, no prefix | `7c9e6679-7425-40de-944b-e07fc1f90ae7` |
 | Post, brand, invite, API key, webhook endpoint, webhook delivery, media file, conversation, event, export, announcement | UUID, no prefix | `7c9e6679-7425-40de-944b-e07fc1f90ae7` |
 
 The `sapi_cmt_`, `sapi_rev_`, `sapi_dm_`, and `sapi_mnt_` IDs are interaction IDs: the `id` of each item returned by the comment, review, and mention endpoints, of each direct message in a webhook event, and of each message a send request returns. A message in a conversation's message list has a UUID `id` instead, and its `platform_id` is the platform's own ID. The two are different values for the same message. An API key's secret starts with `sapi_key_`, which is not an ID: the `id` of a key is a UUID, and the secret is shown once when you create the key.
@@ -30,12 +30,12 @@ Fields named `platform_id` hold the platform's own ID for the same object, such 
 
 - **Connected account:** every endpoint that takes an account uses `acc_` IDs.
 - **Post targets:** `page_id` and `board_id` accept the SocialAPI ID (`sapi_page_`, `sapi_board_`) or the platform's own ID.
-- **Comment routes:** `:postId` takes the platform's post ID. `:commentId` and `comment_id` take a `sapi_cmt_` ID or the platform's comment ID.
-- **Review routes:** `:id` takes a `sapi_rev_` ID or the platform's review ID.
-- **Conversation routes:** `:id` takes the conversation `id` returned by `GET /v1/inbox/conversations`. It is a UUID, not a `sapi_dm_` ID.
+- **Comment routes:** `:post_id` takes the platform's post ID. `:comment_id` and the `comment_id` field take a `sapi_cmt_` ID or the platform's comment ID.
+- **Review routes:** `:review_id` takes a `sapi_rev_` ID or the platform's review ID.
+- **Conversation routes:** `:conversation_id` takes the conversation `id` returned by `GET /v1/inbox/conversations`. It is a UUID, not a `sapi_dm_` ID.
 - **Mention replies:** `media_id` takes a `sapi_mnt_` ID or the platform's media ID.
-- **Read a post:** `GET /v1/posts/{pid}` takes the SocialAPI post ID or a platform post ID. A platform post ID that matches more than one post returns `409 ambiguous_post_id`: use the SocialAPI post ID.
-- **Post metrics:** `GET /v1/posts/{pid}/metrics` takes the SocialAPI post ID or a platform post ID, with the same `409 ambiguous_post_id`.
+- **Read a post:** `GET /v1/posts/{post_id}` takes the SocialAPI post ID or a platform post ID. A platform post ID that matches more than one post returns `409 ambiguous_post_id`: use the SocialAPI post ID.
+- **Post metrics:** `GET /v1/posts/{post_id}/metrics` takes the SocialAPI post ID or a platform post ID, with the same `409 ambiguous_post_id`.
 
 A SocialAPI interaction ID of the wrong type returns `400 validation.id_invalid`: for example a `sapi_rev_` ID in a comment route. An interaction ID created for a different platform than the account returns `400 validation.id_platform_mismatch`.
 
@@ -79,7 +79,7 @@ See [Comments](/guides/comments), [Reviews](/guides/reviews), and [Mentions](/gu
 ## What stays stable
 
 - **Interaction IDs:** the same comment, review, or mention always has the same `id`, in every response and every webhook event. Store it and join on it. For a direct message, the `sapi_dm_` ID is stable but the message list does not return it. To match a listed message to a webhook event, compare `platform_id`.
-- **Connected accounts:** an `acc_` ID stays the same for the life of the connection. Reconnecting the same platform account to your SocialAPI account keeps its `acc_` ID. Disconnecting an account with `DELETE /v1/accounts/{id}` deletes it, and connecting it again creates a new `acc_` ID.
+- **Connected accounts:** an `acc_` ID stays the same for the life of the connection. Reconnecting the same platform account to your SocialAPI account keeps its `acc_` ID. Disconnecting an account with `DELETE /v1/accounts/{account_id}` deletes it, and connecting it again creates a new `acc_` ID.
 - **Every other object:** an ID never changes for the life of the object.
 
 Store IDs as text, not as a typed `uuid` column: formats differ per object type, so never assume one format across objects.

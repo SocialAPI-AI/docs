@@ -23,18 +23,18 @@ A member profile cannot list comments: LinkedIn grants read access to a member's
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/comments` | List the account's posts with their comment counts: see [Posts with comments](#posts-with-comments) |
-| `GET` | `/v1/inbox/comments/{postId}` | List the comments on one post. Company Page only |
-| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to one comment. Company Page only |
-| `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or comment on the post |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a comment |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/like` | Like a comment as the connected account |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/like` | Remove that like |
+| `GET` | `/v1/inbox/comments/{post_id}` | List the comments on one post. Company Page only |
+| `GET` | `/v1/inbox/comments/{post_id}/{comment_id}/replies` | List the replies to one comment. Company Page only |
+| `POST` | `/v1/inbox/comments/{post_id}` | Reply to a comment, or comment on the post |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}` | Delete a comment |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/like` | Like a comment as the connected account |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/like` | Remove that like |
 
-`{postId}` is the LinkedIn post URN, for example `urn:li:share:7251234567890123456`. It is `targets[].platform_post_id` on a post you published through SocialAPI, or `id` in `GET /v1/inbox/comments`. Put the URN in the path as it is, not URL-encoded, and put a comment URN in the path the same way. `{commentId}` and `comment_id` accept the comment's `sapi_cmt_` ID or its LinkedIn comment URN: see [Comment IDs](#comment-ids).
+`{post_id}` is the LinkedIn post URN, for example `urn:li:share:7251234567890123456`. It is `targets[].platform_post_id` on a post you published through SocialAPI, or `id` in `GET /v1/inbox/comments`. Put the URN in the path as it is, not URL-encoded, and put a comment URN in the path the same way. `{comment_id}` and `comment_id` accept the comment's `sapi_cmt_` ID or its LinkedIn comment URN: see [Comment IDs](#comment-ids).
 
 ## List the comments on a company Page post
 
-`GET /v1/inbox/comments/{postId}` lists the top-level comments on a post of a company Page. `account_id` is required.
+`GET /v1/inbox/comments/{post_id}` lists the top-level comments on a post of a company Page. `account_id` is required.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/comments/urn:li:share:7251234567890123456?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
@@ -105,7 +105,7 @@ Pass `next_cursor` back as `cursor` until `has_more` is `false`. Treat the curso
 
 ### Replies
 
-`GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the replies to one comment, in the same shape. LinkedIn nests comments 1 level deep: a top-level comment has replies, and a reply has no replies of its own.
+`GET /v1/inbox/comments/{post_id}/{comment_id}/replies` lists the replies to one comment, in the same shape. LinkedIn nests comments 1 level deep: a top-level comment has replies, and a reply has no replies of its own.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/comments/urn:li:share:7251234567890123456/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I/replies?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
@@ -114,11 +114,11 @@ curl "https://api.social-api.ai/v1/inbox/comments/urn:li:share:72512345678901234
 
 ## Posts with comments
 
-`GET /v1/inbox/comments?account_id={id}` returns the account's posts with `comment_count`. On a company Page, the list holds the Page's posts, including posts made outside SocialAPI. On a member profile, the list holds only the posts published through SocialAPI, and `comment_count` counts the replies and top-level comments posted through SocialAPI, and does not go down when one is deleted. On LinkedIn posts, `thumbnail` is `null` and `like_count` is 0. `permalink` is the post's LinkedIn URL for a post published through SocialAPI, and `null` for a post made on LinkedIn. The parameters are in [List posts with comments](/guides/comments#list-posts-with-comments).
+`GET /v1/inbox/comments?account_id={account_id}` returns the account's posts with `comment_count`. On a company Page, the list holds the Page's posts, including posts made outside SocialAPI. On a member profile, the list holds only the posts published through SocialAPI, and `comment_count` counts the replies and top-level comments posted through SocialAPI, and does not go down when one is deleted. On LinkedIn posts, `thumbnail` is `null` and `like_count` is 0. `permalink` is the post's LinkedIn URL for a post published through SocialAPI, and `null` for a post made on LinkedIn. The parameters are in [List posts with comments](/guides/comments#list-posts-with-comments).
 
 ## Reply to a comment
 
-`POST /v1/inbox/comments/{postId}` posts a public reply as the company Page or as the member. Both connection types can reply.
+`POST /v1/inbox/comments/{post_id}` posts a public reply as the company Page or as the member. Both connection types can reply.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/comments/urn:li:share:7251234567890123456" \
@@ -156,7 +156,7 @@ Response (HTTP 200):
 
 ## Like and delete a comment
 
-`POST /v1/inbox/comments/{postId}/{commentId}/like` likes a comment as the connected account, and `DELETE` on the same path removes the like. `DELETE /v1/inbox/comments/{postId}/{commentId}` deletes the comment on LinkedIn and cannot be undone. Each returns `{ "success": true }`. `account_id` goes in the body for the `POST`, and in the query for both `DELETE` calls.
+`POST /v1/inbox/comments/{post_id}/{comment_id}/like` likes a comment as the connected account, and `DELETE` on the same path removes the like. `DELETE /v1/inbox/comments/{post_id}/{comment_id}` deletes the comment on LinkedIn and cannot be undone. Each returns `{ "success": true }`. `account_id` goes in the body for the `POST`, and in the query for both `DELETE` calls.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/comments/urn:li:share:7251234567890123456/sapi_cmt_GXRM4BNTW7KFYSD3HAEV6QJZ2CLP9U1I/like" \
@@ -189,8 +189,8 @@ A member profile cannot list comments, so it acts on the comments whose IDs it a
 
 ## What LinkedIn does not allow
 
-- **Hide and unhide.** LinkedIn has no hidden comments. `POST` and `DELETE` on `/v1/inbox/comments/{postId}/{commentId}/hide` return `501 resource.not_supported`. Delete the comment instead.
-- **Private replies.** LinkedIn has no private reply to a commenter. `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` returns `501 resource.not_supported`, or `400 validation.field_not_supported` when the request carries `attachment`. LinkedIn direct messages are not available either.
+- **Hide and unhide.** LinkedIn has no hidden comments. `POST` and `DELETE` on `/v1/inbox/comments/{post_id}/{comment_id}/hide` return `501 resource.not_supported`. Delete the comment instead.
+- **Private replies.** LinkedIn has no private reply to a commenter. `POST /v1/inbox/comments/{post_id}/{comment_id}/private-reply` returns `501 resource.not_supported`, or `400 validation.field_not_supported` when the request carries `attachment`. LinkedIn direct messages are not available either.
 - **Reading comments as a member profile.** On a member profile, listing comments or replies returns `501 resource.not_supported`. Connect the company Page to read the comments on its posts.
 - **Comment events.** SocialAPI sends no `comment.received` event for LinkedIn. List the comments on a company Page post to find new ones. Comments that mention the company Page come through [Mentions](/guides/mentions) and the `mention.received` event: see the Mentions row in [LinkedIn capabilities](/platforms/linkedin#capabilities).
 

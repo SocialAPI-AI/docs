@@ -11,7 +11,7 @@ A YouTube post uploads 1 video to 1 connected YouTube channel and sets its metad
 | Feature | Supported | Notes |
 |---|---|---|
 | Create post | Yes | 1 video per post. A title is required |
-| Update post | Yes | Before publishing: `PATCH /v1/posts/{pid}`. After publishing: `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` |
+| Update post | Yes | Before publishing: `PATCH /v1/posts/{post_id}`. After publishing: `PATCH /v1/platforms/youtube/accounts/{account_id}/videos/{video_id}` |
 | Delete post | Yes | Removes the video from YouTube |
 | Schedule | Yes | `scheduled_at` makes SocialAPI upload the video at that time. `platform_data.youtube.publish_at` uploads it now as private and makes YouTube publish it at that time |
 | First comment | Yes | `first_comment` is posted after the upload. A failure does not fail the post |
@@ -29,7 +29,7 @@ A YouTube post uploads 1 video to 1 connected YouTube channel and sets its metad
 - **One video.** A post takes exactly 1 video. Images are not accepted: an image fails pre-publish validation with `400 publishing.validation_failed`, and so does a second media item. Images appear only as thumbnails when you retrieve posts.
 - **Title.** A title is required and holds up to 100 characters. SocialAPI does not check the length: YouTube refuses a longer title and the target fails with `platform.youtube.api_error`.
 - **Description.** `text` becomes the description and holds up to 5,000 bytes. A longer `text` fails pre-publish validation with `400 publishing.validation_failed`.
-- **Media sources.** Use a `media_id` (a file in your [media library](/guides/media)) or a public `http(s)` `url` that SocialAPI fetches when it uploads. There is no `video_url` field. A `media_id` must be `ready`: a file you uploaded with the presigned flow stays `pending` until you call `POST /v1/media/{id}/verify`. A `platform_attachment_id` item returns `422 publishing.media.unsupported_source`.
+- **Media sources.** Use a `media_id` (a file in your [media library](/guides/media)) or a public `http(s)` `url` that SocialAPI fetches when it uploads. There is no `video_url` field. A `media_id` must be `ready`: a file you uploaded with the presigned flow stays `pending` until you call `POST /v1/media/{media_id}/verify`. A `platform_attachment_id` item returns `422 publishing.media.unsupported_source`.
 - **Unreachable files.** A `url` that does not answer fails the target with `validation.video_url`. A file whose size cannot be read fails it with `validation.video_size`.
 
 ---
@@ -95,7 +95,7 @@ Response (HTTP 201):
 }
 ```
 
-SocialAPI uploads in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
+SocialAPI uploads in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{post_id}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
 
 ### Where to put platform data
 
@@ -214,7 +214,7 @@ Which endpoint you use depends on whether the post is published.
 
 ### Before publishing
 
-`PATCH /v1/posts/{pid}` edits a post in `draft`, `scheduled`, or `failed` status. The change applies when the post publishes:
+`PATCH /v1/posts/{post_id}` edits a post in `draft`, `scheduled`, or `failed` status. The change applies when the post publishes:
 
 ```bash
 curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
@@ -234,7 +234,7 @@ The response (HTTP 200) is the updated post. On a published post this call retur
 
 ### After publishing
 
-`PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}` edits the video on YouTube. `{id}` is the connected account ID and `{videoId}` is the YouTube video ID (`platform_post_id`).
+`PATCH /v1/platforms/youtube/accounts/{account_id}/videos/{video_id}` edits the video on YouTube. `{account_id}` is the connected account ID and `{video_id}` is the YouTube video ID (`platform_post_id`).
 
 ```bash
 curl -X PATCH https://api.social-api.ai/v1/platforms/youtube/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/videos/dQw4w9WgXcQ \
@@ -264,7 +264,7 @@ Response (HTTP 200):
 - **Partial edits are safe.** A field you omit keeps its current value on YouTube. An omitted field is never erased.
 - **Tags.** `tags` sets the Studio tags, which are separate from any `#hashtags` in the description. Editing the description does not change the tags, and setting tags does not change the description. Omitting `tags`, or sending an empty array, leaves the tags as they are. The API cannot clear tags.
 - **`publish_at`.** It can be set only before the video is first published. It cannot change once the video is public.
-- **Unknown video.** A `videoId` that does not exist on the channel returns `404 resource.not_found`.
+- **Unknown video.** A `video_id` that does not exist on the channel returns `404 resource.not_found`.
 - **Thumbnail.** `cover_url` replaces the video's thumbnail. The thumbnail is set first: if it is refused, the request fails and no other field in it is applied. A request with only `cover_url` changes only the thumbnail.
 - **Thumbnail errors.** `403 platform.youtube.custom_thumbnail_forbidden` means the channel cannot set custom thumbnails, or YouTube refused a thumbnail for this video: verify the channel in YouTube Studio, then retry. An image that cannot be downloaded, is not a JPG or PNG, or is larger than 50 MB returns `400 validation.field_invalid` with `error.meta.field` set to `cover_url`. A channel that reached YouTube's limit on thumbnail uploads returns `429 platform.youtube.rate_limit`: wait, then retry.
 
@@ -272,7 +272,7 @@ Response (HTTP 200):
 
 ## 5. Delete post
 
-`DELETE /v1/posts/{pid}` removes the video from YouTube for every published YouTube target, and removes a draft, scheduled, or failed post from SocialAPI:
+`DELETE /v1/posts/{post_id}` removes the video from YouTube for every published YouTube target, and removes a draft, scheduled, or failed post from SocialAPI:
 
 ```bash
 curl -X DELETE https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
@@ -293,7 +293,7 @@ Response (HTTP 200):
 
 If YouTube refuses the delete, or the video no longer exists on YouTube, the target's `outcome` is `failed` with the reason in `message`, and SocialAPI keeps the post (`"deleted": false`).
 
-To remove the video from 1 channel of a multi-target post and keep the post, send `POST /v1/posts/{pid}/unpublish` with that target's `account_id`:
+To remove the video from 1 channel of a multi-target post and keep the post, send `POST /v1/posts/{post_id}/unpublish` with that target's `account_id`:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7/unpublish \
@@ -354,7 +354,7 @@ Response (HTTP 200):
 
 - `platform_post_id` is the YouTube video ID.
 - `metrics.likes` and `metrics.comments` come from YouTube. `shares` and `saves` are always `0`: YouTube does not report them.
-- The view count is `metrics.extra.view_count` in this list. `GET /v1/posts/{pid}/metrics` reads the metrics from YouTube at request time and returns the view count as `metrics.views` and `metrics.extra.views`.
+- The view count is `metrics.extra.view_count` in this list. `GET /v1/posts/{post_id}/metrics` reads the metrics from YouTube at request time and returns the view count as `metrics.views` and `metrics.extra.views`.
 - `metrics_synced_at` is on the target, not inside `metrics`. It is when SocialAPI last refreshed the metrics.
 - Channel-level counts are on the [YouTube API](/platforms/youtube#read-videos-and-channel-stats) page.
 
@@ -372,7 +372,7 @@ YouTube schedules private videos only. `publish_at` with `public` or `unlisted` 
 
 ### First comment, playlist add, and thumbnail never fail the post
 
-If the `first_comment`, the playlist add, or the `cover_url` thumbnail fails after a successful upload, the post stays `published` and the failure is not reported on the post. Retry a thumbnail with `PATCH /v1/platforms/youtube/accounts/{id}/videos/{videoId}`. Check the video on YouTube, or post the comment with `POST /v1/inbox/comments/{postId}`.
+If the `first_comment`, the playlist add, or the `cover_url` thumbnail fails after a successful upload, the post stays `published` and the failure is not reported on the post. Retry a thumbnail with `PATCH /v1/platforms/youtube/accounts/{account_id}/videos/{video_id}`. Check the video on YouTube, or post the comment with `POST /v1/inbox/comments/{post_id}`.
 
 ### Posting caps
 
@@ -402,7 +402,7 @@ All codes, with their HTTP status, are listed in [Errors](/guides/errors).
 
 ### Recovery
 
-- Retry a `failed` or `partial` post with `POST /v1/posts/{pid}/retry`. A retry costs 1 post credit. See [Delivery](/guides/delivery).
+- Retry a `failed` or `partial` post with `POST /v1/posts/{post_id}/retry`. A retry costs 1 post credit. See [Delivery](/guides/delivery).
 - After an auth error, reconnect the account, then retry.
 
 ---
@@ -501,7 +501,7 @@ Response (HTTP 200) once the upload finishes:
 }
 ```
 
-The video is on YouTube as private and becomes public at `2026-10-20T10:00:00Z`. If the target is `failed`, read `targets[].error` (section 7), fix the request, and call `POST /v1/posts/{pid}/retry`.
+The video is on YouTube as private and becomes public at `2026-10-20T10:00:00Z`. If the target is `failed`, read `targets[].error` (section 7), fix the request, and call `POST /v1/posts/{post_id}/retry`.
 
 ---
 

@@ -100,7 +100,7 @@ Response (HTTP 201):
 }
 ```
 
-SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{pid}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
+SocialAPI publishes in the background. The target moves from `pending` to `publishing`, then to `published` or `failed`. Poll `GET /v1/posts/{post_id}` or subscribe to the `post.published`, `post.partial`, and `post.failed` [webhook events](/guides/webhook-events). Publishing or scheduling costs 1 post credit; a draft is free (see [Plans and credits](/guides/plans)).
 
 ### Platform data fields
 
@@ -180,9 +180,9 @@ Set `first_comment` to a string to post an automated comment immediately after p
 
 ## 4. Update post
 
-A published Instagram post cannot be edited through SocialAPI. `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a post that is live on this platform. Only `draft`, `scheduled`, and `failed` posts can be edited here; a published post can be edited only when it is live on Google Business Profile alone.
+A published Instagram post cannot be edited through SocialAPI. `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a post that is live on this platform. Only `draft`, `scheduled`, and `failed` posts can be edited here; a published post can be edited only when it is live on Google Business Profile alone.
 
-A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{pid}` before it publishes.
+A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{post_id}` before it publishes.
 
 To correct a published post, delete it in the Instagram app and publish a new post.
 
@@ -190,9 +190,9 @@ To correct a published post, delete it in the Instagram app and publish a new po
 
 ## 5. Delete post
 
-On an account connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login), `DELETE /v1/posts/{pid}` deletes the post from Instagram, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI. The rest of this section covers Instagram Login.
+On an account connected through [Facebook Login](/platforms/instagram#connect-through-facebook-login), `DELETE /v1/posts/{post_id}` deletes the post from Instagram, and `POST /v1/posts/{post_id}/unpublish` removes it from Instagram and keeps it in SocialAPI. The rest of this section covers Instagram Login.
 
-On Instagram Login, `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for an Instagram target, and the post stays live on Instagram. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported` for an Instagram target. Instagram Login gives apps no media deletion call, so SocialAPI refuses rather than report a deletion that did not happen. Delete the post in the Instagram app.
+On Instagram Login, `DELETE /v1/posts/{post_id}` returns HTTP 200 with `results[].outcome: "not_supported"` for an Instagram target, and the post stays live on Instagram. `POST /v1/posts/{post_id}/unpublish` returns `501 resource.not_supported` for an Instagram target. Instagram Login gives apps no media deletion call, so SocialAPI refuses rather than report a deletion that did not happen. Delete the post in the Instagram app.
 
 For a cross-platform post, the other platforms are still deleted or unpublished. The response names every platform whose content is still live, so an Instagram target refusing does not undo the targets that succeeded. See [Delete a post](/guides/delivery#delete-a-post).
 
@@ -237,12 +237,12 @@ Each post includes a `targets` array with per-platform status and engagement met
 ```
 
 **Metrics notes:**
-- `likes` and `comments` come from the media object itself. `shares`, `saves` and the insight metrics below are read live from `GET /v1/posts/{pid}/metrics`.
+- `likes` and `comments` come from the media object itself. `shares`, `saves` and the insight metrics below are read live from `GET /v1/posts/{post_id}/metrics`.
 - `metrics_synced_at` reflects when SocialAPI last refreshed the metrics from Instagram.
 
 ### Live metrics and insights
 
-`GET /v1/posts/{pid}/metrics` reads the post's current counts and insights from Instagram:
+`GET /v1/posts/{post_id}/metrics` reads the post's current counts and insights from Instagram:
 
 ```bash
 curl "https://api.social-api.ai/v1/posts/6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/metrics" \
@@ -316,11 +316,11 @@ An Instagram target includes `platform_media`: every image and video on the publ
 | `url` | string | Link to the file, hosted by Instagram. |
 | `thumbnail_url` | string | Link to a video's cover image. Absent on images. |
 
-The links expire. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{id}/sync`, wait until `GET /v1/accounts/{id}/sync` is no longer `syncing`, then read the post again.
+The links expire. Download the files when you read the post rather than storing the links. To get fresh links, call `POST /v1/accounts/{account_id}/sync`, wait until `GET /v1/accounts/{account_id}/sync` is no longer `syncing`, then read the post again.
 
 `url` is absent when Instagram withholds the file, for example a video with licensed audio. The cover image is still included.
 
-`POST /v1/accounts/{id}/sync` covers up to the 500 most recent posts on an Instagram account. It returns at once and the sync runs in the background: poll `GET /v1/accounts/{id}/sync` until `state` is no longer `syncing`. Each account can be synced once every 15 minutes, and your plan sets a daily limit; see [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts). The account needs the `posts.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
+`POST /v1/accounts/{account_id}/sync` covers up to the 500 most recent posts on an Instagram account. It returns at once and the sync runs in the background: poll `GET /v1/accounts/{account_id}/sync` until `state` is no longer `syncing`. Each account can be synced once every 15 minutes, and your plan sets a daily limit; see [Refresh an account's posts](/guides/analytics#refresh-an-accounts-posts). The account needs the `posts.read` [permission](/guides/permissions): without it the call returns `403 account.permission_missing`.
 
 `platform_media` is separate from `media`, which lists what you sent when publishing through SocialAPI and is empty for posts published elsewhere.
 
@@ -342,7 +342,7 @@ Instagram removes a Story 24 hours after posting. The post stays in SocialAPI.
 
 ### Posting caps
 
-SocialAPI refuses a publish that would pass 25 posts in an hour or 45 posts in 24 hours for one account, with `429 publishing.velocity_limit`. A scheduled post is held and published when the window clears. Instagram's own cap is 50 posts per rolling 24 hours: `GET /v1/accounts/{id}/limits` returns `posts_remaining`. When Instagram refuses first, the target fails with `429 platform.instagram.rate_limit`. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+SocialAPI refuses a publish that would pass 25 posts in an hour or 45 posts in 24 hours for one account, with `429 publishing.velocity_limit`. A scheduled post is held and published when the window clears. Instagram's own cap is 50 posts per rolling 24 hours: `GET /v1/accounts/{account_id}/limits` returns `posts_remaining`. When Instagram refuses first, the target fails with `429 platform.instagram.rate_limit`. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
 
 ### Errors on a failed target
 
@@ -374,10 +374,10 @@ When Instagram rejects media during processing, it reports only a status of `ERR
 
 ### Recovery
 
-- **Rate limit.** Wait, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Rate limit.** Wait, then send `POST /v1/posts/{post_id}/retry`. See [Delivery](/guides/delivery).
 - **Auth error.** Reconnect the Instagram account through the OAuth flow to get a fresh token.
 - **Container timeout.** A large video or a slow media URL causes it. Upload the media again and retry.
-- **Container failed.** A temporary fault and a rejected file look the same. Retry once with `POST /v1/posts/{pid}/retry`. If it fails again, re-encode the media to the specifications above.
+- **Container failed.** A temporary fault and a rejected file look the same. Retry once with `POST /v1/posts/{post_id}/retry`. If it fails again, re-encode the media to the specifications above.
 
 ---
 

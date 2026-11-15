@@ -11,14 +11,14 @@ SocialAPI reads the replies to the posts of a connected Bluesky account and acts
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/comments` | List your posts with their reply counts |
-| `GET` | `/v1/inbox/comments/{postId}` | List the replies to one post, every level in one list |
-| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies below one reply |
-| `POST` | `/v1/inbox/comments/{postId}` | Reply to a reply, or to the post itself |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a reply in a thread you started |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide that reply |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete one of your own replies |
+| `GET` | `/v1/inbox/comments/{post_id}` | List the replies to one post, every level in one list |
+| `GET` | `/v1/inbox/comments/{post_id}/{comment_id}/replies` | List the replies below one reply |
+| `POST` | `/v1/inbox/comments/{post_id}` | Reply to a reply, or to the post itself |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Hide a reply in a thread you started |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Unhide that reply |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}` | Delete one of your own replies |
 
-`{postId}` is the post's AT URI, for example `at://did:plc:abc123xyz/app.bsky.feed.post/3kq2example`. It is `targets[].platform_post_id` on a post you published through SocialAPI, and `id` in `GET /v1/inbox/comments`. An AT URI contains `/` and `:`, so URL-encode it in the path: `at%3A%2F%2Fdid%3Aplc%3Aabc123xyz%2Fapp.bsky.feed.post%2F3kq2example`. `{commentId}` and `comment_id` take the reply's `sapi_cmt_` ID or its AT URI (`platform_id`). The `sapi_cmt_` ID needs no encoding. See [IDs](/guides/ids#what-each-endpoint-accepts).
+`{post_id}` is the post's AT URI, for example `at://did:plc:abc123xyz/app.bsky.feed.post/3kq2example`. It is `targets[].platform_post_id` on a post you published through SocialAPI, and `id` in `GET /v1/inbox/comments`. An AT URI contains `/` and `:`, so URL-encode it in the path: `at%3A%2F%2Fdid%3Aplc%3Aabc123xyz%2Fapp.bsky.feed.post%2F3kq2example`. `{comment_id}` and `comment_id` take the reply's `sapi_cmt_` ID or its AT URI (`platform_id`). The `sapi_cmt_` ID needs no encoding. See [IDs](/guides/ids#what-each-endpoint-accepts).
 
 The like and private reply endpoints exist for every platform, but Bluesky supports neither: see [What Bluesky does not support](#what-bluesky-does-not-support).
 
@@ -117,7 +117,7 @@ The reply is public on Bluesky once the call returns. `comment_id` in the respon
 
 ## List replies
 
-`GET /v1/inbox/comments/{postId}` returns the replies to the post, up to 6 levels below it and at most `limit` of them, as one flat list. Each reply is followed by the replies below it, in the order Bluesky returns the thread.
+`GET /v1/inbox/comments/{post_id}` returns the replies to the post, up to 6 levels below it and at most `limit` of them, as one flat list. Each reply is followed by the replies below it, in the order Bluesky returns the thread.
 
 | Parameter | Description |
 |---|---|
@@ -142,15 +142,15 @@ Fields that differ from the [shared comment fields](/guides/comments#list-commen
 
 ### Replies below one reply
 
-`GET /v1/inbox/comments/{postId}/{commentId}/replies` returns the replies below one reply, up to 6 levels below it, in the same shape. The default `limit` is 10, and a value above 100 is treated as 100. The list has one page, like the post list. To read the replies below one reply, including those deeper than 6 levels below the post, call this endpoint on a reply whose `has_replies` is `true`.
+`GET /v1/inbox/comments/{post_id}/{comment_id}/replies` returns the replies below one reply, up to 6 levels below it, in the same shape. The default `limit` is 10, and a value above 100 is treated as 100. The list has one page, like the post list. To read the replies below one reply, including those deeper than 6 levels below the post, call this endpoint on a reply whose `has_replies` is `true`.
 
 ### Posts with replies
 
-`GET /v1/inbox/comments?account_id={account_id}` lists the account's posts with `comment_count` (Bluesky's reply count) and `like_count`. `id` is the post's AT URI, the value for `{postId}`. `thumbnail` is `null` on Bluesky. The list holds the posts you published through SocialAPI and the posts SocialAPI imported: see [Retrieve posts](/platforms/bluesky/publishing#6-retrieve-posts). The parameters are in [List posts with comments](/guides/comments#list-posts-with-comments).
+`GET /v1/inbox/comments?account_id={account_id}` lists the account's posts with `comment_count` (Bluesky's reply count) and `like_count`. `id` is the post's AT URI, the value for `{post_id}`. `thumbnail` is `null` on Bluesky. The list holds the posts you published through SocialAPI and the posts SocialAPI imported: see [Retrieve posts](/platforms/bluesky/publishing#6-retrieve-posts). The parameters are in [List posts with comments](/guides/comments#list-posts-with-comments).
 
 ## Reply to a post or a reply
 
-`POST /v1/inbox/comments/{postId}` publishes a reply as the connected account.
+`POST /v1/inbox/comments/{post_id}` publishes a reply as the connected account.
 
 | Field | Description |
 |---|---|
@@ -195,12 +195,12 @@ Hiding and unhiding cost no credit.
 
 ## Delete your own reply
 
-`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes a reply the connected account wrote. It returns `{ "success": true }` and cannot be undone. Bluesky lets no account delete another account's reply: deleting one returns `403 platform.bluesky.not_own_record`. Hide that reply instead. Deleting costs no credit.
+`DELETE /v1/inbox/comments/{post_id}/{comment_id}?account_id={account_id}` deletes a reply the connected account wrote. It returns `{ "success": true }` and cannot be undone. Bluesky lets no account delete another account's reply: deleting one returns `403 platform.bluesky.not_own_record`. Hide that reply instead. Deleting costs no credit.
 
 ## What Bluesky does not support
 
-- **Liking a reply.** `POST` and `DELETE /v1/inbox/comments/{postId}/{commentId}/like` return `501 resource.not_supported`.
-- **Private replies.** Bluesky has no way to send a DM from a reply: `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` returns `501 resource.not_supported`. To message the person, use [Bluesky direct messages](/platforms/bluesky/messages).
+- **Liking a reply.** `POST` and `DELETE /v1/inbox/comments/{post_id}/{comment_id}/like` return `501 resource.not_supported`.
+- **Private replies.** Bluesky has no way to send a DM from a reply: `POST /v1/inbox/comments/{post_id}/{comment_id}/private-reply` returns `501 resource.not_supported`. To message the person, use [Bluesky direct messages](/platforms/bluesky/messages).
 - **Deleting another account's reply.** Hide it.
 - **Editing a reply.** Delete it and send a new reply.
 - **Automations.** Automations run on Instagram and Facebook only.
@@ -250,7 +250,7 @@ Any other Bluesky refusal returns `503 platform.bluesky.{error}`, where `{error}
 
 ## Events
 
-Bluesky sends SocialAPI no notification of new replies, so SocialAPI sends no `comment.received` event for a Bluesky account. Read new replies with `GET /v1/inbox/comments/{postId}`. See [Bluesky webhook events](/platforms/bluesky#webhook-events).
+Bluesky sends SocialAPI no notification of new replies, so SocialAPI sends no `comment.received` event for a Bluesky account. Read new replies with `GET /v1/inbox/comments/{post_id}`. See [Bluesky webhook events](/platforms/bluesky#webhook-events).
 
 ## Use from an AI agent
 

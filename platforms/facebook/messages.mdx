@@ -11,16 +11,16 @@ SocialAPI reads and sends the Messenger direct messages (DMs) of a connected Fac
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/conversations?platform=facebook` | List Facebook conversations |
-| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
-| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
-| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI |
-| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation |
-| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message as the Page |
-| `POST` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | React to a message |
-| `DELETE` | `/v1/inbox/conversations/{id}/messages/{messageId}/reaction` | Remove the Page's reaction |
-| `POST` | `/v1/inbox/conversations/{id}/sender-action` | Show a typing indicator, or mark the person's messages seen |
+| `GET` | `/v1/inbox/conversations/{conversation_id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{conversation_id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/read` | Mark a conversation as read in SocialAPI |
+| `GET` | `/v1/inbox/conversations/{conversation_id}/messages` | List the messages of a conversation |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages` | Send a message as the Page |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` | React to a message |
+| `DELETE` | `/v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` | Remove the Page's reaction |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/sender-action` | Show a typing indicator, or mark the person's messages seen |
 
-`{id}` is the conversation `id` from `GET /v1/inbox/conversations`. `{messageId}` is a message's `platform_id`. A conversation starts when the person messages the Page, or when the person answers a [private reply](/platforms/facebook/comments#private-replies). SocialAPI has no endpoint to start a conversation with someone who never messaged the Page.
+`{conversation_id}` is the conversation `id` from `GET /v1/inbox/conversations`. `{message_id}` is a message's `platform_id`. A conversation starts when the person messages the Page, or when the person answers a [private reply](/platforms/facebook/comments#private-replies). SocialAPI has no endpoint to start a conversation with someone who never messaged the Page.
 
 ## Your first message
 
@@ -104,11 +104,11 @@ SocialAPI has no participant profile endpoint for Facebook, and a Facebook conve
 
 ### Accounts with more than one Page
 
-A connected Facebook account can hold more than 1 Page, and each conversation belongs to one of them. Pass `page_id` (the `sapi_page_` ID from `GET /v1/accounts/{id}/pages`) to `GET /v1/inbox/conversations` to list the conversations of one Page. Sends, reactions, and sender actions take no Page parameter: SocialAPI acts as the Page that owns the conversation. See [Pages of an account](/platforms/facebook#pages-of-an-account).
+A connected Facebook account can hold more than 1 Page, and each conversation belongs to one of them. Pass `page_id` (the `sapi_page_` ID from `GET /v1/accounts/{account_id}/pages`) to `GET /v1/inbox/conversations` to list the conversations of one Page. Sends, reactions, and sender actions take no Page parameter: SocialAPI acts as the Page that owns the conversation. See [Pages of an account](/platforms/facebook#pages-of-an-account).
 
 ## Read messages
 
-`GET /v1/inbox/conversations/{id}/messages` lists the messages of a conversation, newest first, in the shape described in [Read messages](/guides/direct-messages#read-messages).
+`GET /v1/inbox/conversations/{conversation_id}/messages` lists the messages of a conversation, newest first, in the shape described in [Read messages](/guides/direct-messages#read-messages).
 
 - **Messages sent outside SocialAPI.** A message typed in Facebook's own apps, such as Meta Business Suite, appears as an `outgoing` message.
 - **Attachments.** `attachment_type` and `attachment_url` hold the first attachment of a message. The `dm.received` event carries every attachment.
@@ -119,7 +119,7 @@ When a conversation or a message is missing from a list, force a refresh with [`
 
 ## Send a message
 
-`POST /v1/inbox/conversations/{id}/messages` sends a message as the Page. The fields are in [Send a message](/guides/direct-messages#send-a-message). On Facebook:
+`POST /v1/inbox/conversations/{conversation_id}/messages` sends a message as the Page. The fields are in [Send a message](/guides/direct-messages#send-a-message). On Facebook:
 
 | Field | On Facebook |
 |---|---|
@@ -156,7 +156,7 @@ The Page can message a person only within 24 hours of the person's last message.
 
 ## React to a message
 
-`POST /v1/inbox/conversations/{id}/messages/{messageId}/reaction` adds the Page's emoji reaction to a message, and replaces its earlier one. `DELETE` on the same path, with `account_id` as a query parameter, removes it.
+`POST /v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction` adds the Page's emoji reaction to a message, and replaces its earlier one. `DELETE` on the same path, with `account_id` as a query parameter, removes it.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/conversations/7f1c4e2b-2841-41a8-85d7-27b0f37ac067/messages/m_AbCdEf123/reaction" \
@@ -175,7 +175,7 @@ Response (HTTP 200):
 
 ## Typing indicators and seen receipts
 
-`POST /v1/inbox/conversations/{id}/sender-action` shows the person a typing indicator, or marks their messages seen, without sending a message. It costs no credit.
+`POST /v1/inbox/conversations/{conversation_id}/sender-action` shows the person a typing indicator, or marks their messages seen, without sending a message. It costs no credit.
 
 | `action` | What the person sees |
 |---|---|

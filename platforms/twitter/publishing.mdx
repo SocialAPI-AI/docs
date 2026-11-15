@@ -159,19 +159,19 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) instead of `publish_now`. Soci
 
 ## 4. Update post
 
-SocialAPI offers no edit of a published X post. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post. To correct a published post, delete it and publish a new one.
+SocialAPI offers no edit of a published X post. `PATCH /v1/posts/{post_id}` edits only a post in `draft`, `scheduled`, or `failed` status, and returns `409 post.state_invalid` for a published post. To correct a published post, delete it and publish a new one.
 
 ---
 
 ## 5. Delete post
 
-`DELETE /v1/posts/{pid}` deletes the post from X when its X target is `published`. For a thread it deletes the first post only: the continuation posts stay on X until you delete them there. See [Delete a post](/guides/delivery#delete-a-post).
+`DELETE /v1/posts/{post_id}` deletes the post from X when its X target is `published`. For a thread it deletes the first post only: the continuation posts stay on X until you delete them there. See [Delete a post](/guides/delivery#delete-a-post).
 
 ---
 
 ## 6. Retrieve posts
 
-`GET /v1/posts?platform=twitter&account_ids={id}` lists the account's posts and replies, without reposts. Each published target carries `platform_post_id`, `permalink`, and `metrics` with `likes` and `comments` (the reply count). `GET /v1/posts/{pid}/metrics` reads the current counts from X. X reports no other counts through SocialAPI.
+`GET /v1/posts?platform=twitter&account_ids={account_id}` lists the account's posts and replies, without reposts. Each published target carries `platform_post_id`, `permalink`, and `metrics` with `likes` and `comments` (the reply count). `GET /v1/posts/{post_id}/metrics` reads the current counts from X. X reports no other counts through SocialAPI.
 
 ---
 
@@ -183,7 +183,7 @@ Text holds 280 characters, counted as Unicode characters. A longer text fails wi
 
 ### A thread can stop partway
 
-If a continuation post fails, publishing stops and the target fails. The posts already published stay on X, because X has no batch rollback. Check the account's X timeline before you retry: `POST /v1/posts/{pid}/retry` publishes the whole thread again.
+If a continuation post fails, publishing stops and the target fails. The posts already published stay on X, because X has no batch rollback. Check the account's X timeline before you retry: `POST /v1/posts/{post_id}/retry` publishes the whole thread again.
 
 ### Media must finish processing
 
@@ -204,9 +204,9 @@ A publish that fails after the request returned puts a structured error on the t
 
 ### Recovery
 
-- **Rate limit.** Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Rate limit.** Wait for the seconds in `Retry-After`, or at least 60 seconds when it is absent, then send `POST /v1/posts/{post_id}/retry`. See [Delivery](/guides/delivery).
 - **Auth or scope error.** Reconnect the X account through the OAuth flow.
-- **Usage cap.** Add X credits, then send `POST /v1/posts/{pid}/retry`.
+- **Usage cap.** Add X credits, then send `POST /v1/posts/{post_id}/retry`.
 
 ---
 

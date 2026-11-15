@@ -13,16 +13,16 @@ A reply or a top-level comment costs 1 interaction credit, and each channel can 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/comments?account_id={account_id}` | List the channel's videos with their comment counts |
-| `GET` | `/v1/inbox/comments/{postId}` | List the top-level comments on a video |
-| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to a top-level comment |
-| `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or post a top-level comment on the video |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a comment (sets it to `rejected`) |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide a `held_for_review` comment. Do not use it on a `rejected` comment |
-| `POST` | `/v1/platforms/youtube/comments/{commentId}/moderate` | Set a comment to `published`, `held_for_review`, or `rejected`, and optionally ban its author |
-| `PATCH` | `/v1/platforms/youtube/comments/{commentId}` | Edit the text of a comment your channel wrote |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a comment your channel wrote |
+| `GET` | `/v1/inbox/comments/{post_id}` | List the top-level comments on a video |
+| `GET` | `/v1/inbox/comments/{post_id}/{comment_id}/replies` | List the replies to a top-level comment |
+| `POST` | `/v1/inbox/comments/{post_id}` | Reply to a comment, or post a top-level comment on the video |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Hide a comment (sets it to `rejected`) |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Unhide a `held_for_review` comment. Do not use it on a `rejected` comment |
+| `POST` | `/v1/platforms/youtube/comments/{comment_id}/moderate` | Set a comment to `published`, `held_for_review`, or `rejected`, and optionally ban its author |
+| `PATCH` | `/v1/platforms/youtube/comments/{comment_id}` | Edit the text of a comment your channel wrote |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}` | Delete a comment your channel wrote |
 
-`{postId}` is the YouTube video ID, for example `dQw4w9WgXcQ`: the `id` of a video in `GET /v1/inbox/comments`, or `targets[].platform_post_id` on a video you published through SocialAPI. `{commentId}` accepts the comment's `sapi_cmt_` ID or YouTube's comment ID (`platform_id`). See [IDs](/guides/ids#what-each-endpoint-accepts).
+`{post_id}` is the YouTube video ID, for example `dQw4w9WgXcQ`: the `id` of a video in `GET /v1/inbox/comments`, or `targets[].platform_post_id` on a video you published through SocialAPI. `{comment_id}` accepts the comment's `sapi_cmt_` ID or YouTube's comment ID (`platform_id`). See [IDs](/guides/ids#what-each-endpoint-accepts).
 
 ## Your first request
 
@@ -69,7 +69,7 @@ Response (HTTP 200):
 }
 ```
 
-Use `id` as `{commentId}` in the other comment calls. To answer Jane, send the reply request in [Reply or post a top-level comment](#reply-or-post-a-top-level-comment).
+Use `id` as `{comment_id}` in the other comment calls. To answer Jane, send the reply request in [Reply or post a top-level comment](#reply-or-post-a-top-level-comment).
 
 ## List videos with comments
 
@@ -79,7 +79,7 @@ On a YouTube video, `comment_count` can differ from the count YouTube shows, and
 
 ## List comments on a video
 
-`GET /v1/inbox/comments/{postId}` returns the top-level comments on 1 video. Replies are listed separately: see [Replies](#replies).
+`GET /v1/inbox/comments/{post_id}` returns the top-level comments on 1 video. Replies are listed separately: see [Replies](#replies).
 
 | Parameter | Description |
 |---|---|
@@ -122,7 +122,7 @@ When the video has comments turned off, the call returns `422 platform.youtube.c
 
 YouTube threads are 1 level deep. Every reply belongs to a top-level comment, and a reply has no replies of its own.
 
-`GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the replies to the top-level comment `{commentId}`, in the same shape as comments. It takes `account_id` (required), `limit` (default 10, a value above 100 is treated as 100), and `cursor`. It ignores `moderation_status`, `order`, and `q`.
+`GET /v1/inbox/comments/{post_id}/{comment_id}/replies` lists the replies to the top-level comment `{comment_id}`, in the same shape as comments. It takes `account_id` (required), `limit` (default 10, a value above 100 is treated as 100), and `cursor`. It ignores `moderation_status`, `order`, and `q`.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/comments/dQw4w9WgXcQ/UgxK3m9pQ2/replies?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
@@ -133,7 +133,7 @@ Each reply's `parent_id` is the `platform_id` of its top-level comment. To answe
 
 ## Reply or post a top-level comment
 
-`POST /v1/inbox/comments/{postId}` posts as the channel. With `comment_id`, it replies to that top-level comment. Without `comment_id`, it posts a new top-level comment on the video.
+`POST /v1/inbox/comments/{post_id}` posts as the channel. With `comment_id`, it replies to that top-level comment. Without `comment_id`, it posts a new top-level comment on the video.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/comments/dQw4w9WgXcQ" \
@@ -165,13 +165,13 @@ Response (HTTP 200):
 
 **Each call costs 1 interaction credit.** When the plan's interaction allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. The credit comes back when the call fails with a `validation.*` error: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
 
-**Each connected channel can post 5 replies and top-level comments per day, through `POST /v1/inbox/comments/{postId}` and the MCP tool `social_api_reply_to_comment` combined.** Comments posted in YouTube itself, and a post's `first_comment`, do not count. The day runs from midnight to midnight Pacific Time. A 6th call returns `429 validation.youtube_daily_reply_limit` and costs no credit: wait for midnight Pacific Time. A comment that YouTube refuses does not count toward the 5. Edits do not count.
+**Each connected channel can post 5 replies and top-level comments per day, through `POST /v1/inbox/comments/{post_id}` and the MCP tool `social_api_reply_to_comment` combined.** Comments posted in YouTube itself, and a post's `first_comment`, do not count. The day runs from midnight to midnight Pacific Time. A 6th call returns `429 validation.youtube_daily_reply_limit` and costs no credit: wait for midnight Pacific Time. A comment that YouTube refuses does not count toward the 5. Edits do not count.
 
-`GET /v1/accounts/{id}/limits` returns `daily_replies_limit` and `daily_replies_remaining` for the channel: see [Read a platform's remaining quota](/guides/rate-limits#read-a-platforms-remaining-quota).
+`GET /v1/accounts/{account_id}/limits` returns `daily_replies_limit` and `daily_replies_remaining` for the channel: see [Read a platform's remaining quota](/guides/rate-limits#read-a-platforms-remaining-quota).
 
 ## Hide and unhide a comment
 
-`POST /v1/inbox/comments/{postId}/{commentId}/hide` sets the comment to `rejected`, which removes it from public view. Rejecting a top-level comment also hides all of its replies. Hiding is free.
+`POST /v1/inbox/comments/{post_id}/{comment_id}/hide` sets the comment to `rejected`, which removes it from public view. Rejecting a top-level comment also hides all of its replies. Hiding is free.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/comments/dQw4w9WgXcQ/UgxK3m9pQ2/hide" \
@@ -190,7 +190,7 @@ Response (HTTP 200):
 
 ## Moderate a comment
 
-`POST /v1/platforms/youtube/comments/{commentId}/moderate` sets a comment's moderation status explicitly, and can ban its author from commenting on your channel. Moderating is free. YouTube accepts it only from the owner of the channel or video the comment is on.
+`POST /v1/platforms/youtube/comments/{comment_id}/moderate` sets a comment's moderation status explicitly, and can ban its author from commenting on your channel. Moderating is free. YouTube accepts it only from the owner of the channel or video the comment is on.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/platforms/youtube/comments/UgxK3m9pQ2/moderate \
@@ -217,11 +217,11 @@ Response (HTTP 200):
 | `status` | Required. `published` (show the comment; YouTube does not move a `rejected` comment back to `published`), `held_for_review` (hide it until you review it), or `rejected` (hide it). A missing or other value returns `400 validation.field_invalid` |
 | `ban_author` | Optional, default `false`. `true` also rejects every later comment the author writes on your channel. Valid only with `status` `rejected`, otherwise `400 validation.field_invalid` |
 
-A missing `account_id` or `post_id` returns `400 validation.field_required`. An account on another platform returns `501 resource.not_supported`. `{commentId}` accepts the `sapi_cmt_` ID or YouTube's comment ID.
+A missing `account_id` or `post_id` returns `400 validation.field_required`. An account on another platform returns `501 resource.not_supported`. `{comment_id}` accepts the `sapi_cmt_` ID or YouTube's comment ID.
 
 ## Edit your own comment
 
-`PATCH /v1/platforms/youtube/comments/{commentId}` replaces the text of a comment your channel wrote. Editing is free and does not count toward the daily limit of 5.
+`PATCH /v1/platforms/youtube/comments/{comment_id}` replaces the text of a comment your channel wrote. Editing is free and does not count toward the daily limit of 5.
 
 ```bash
 curl -X PATCH https://api.social-api.ai/v1/platforms/youtube/comments/UgxK3m9pQ2 \
@@ -244,7 +244,7 @@ Response (HTTP 200):
 
 ## Delete a comment
 
-`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes a comment your channel wrote. It returns `{ "success": true }`, costs no credit, and cannot be undone.
+`DELETE /v1/inbox/comments/{post_id}/{comment_id}?account_id={account_id}` deletes a comment your channel wrote. It returns `{ "success": true }`, costs no credit, and cannot be undone.
 
 `capabilities.can_delete` is `true` on every YouTube comment, including other people's. Deleting a comment your channel did not write returns `422 platform.youtube.processing_failure`. Hide it instead.
 
@@ -305,7 +305,7 @@ The YouTube connection itself uses the 1 OAuth scope listed in [YouTube scopes](
 
 ## Events
 
-YouTube sends no comment events, so SocialAPI emits no `comment.received` for YouTube. Read new comments with `GET /v1/inbox/comments/{postId}`, and the replies to a comment with its `replies` endpoint. The post and account events a YouTube channel emits are in [YouTube webhook events](/platforms/youtube#webhook-events).
+YouTube sends no comment events, so SocialAPI emits no `comment.received` for YouTube. Read new comments with `GET /v1/inbox/comments/{post_id}`, and the replies to a comment with its `replies` endpoint. The post and account events a YouTube channel emits are in [YouTube webhook events](/platforms/youtube#webhook-events).
 
 ## Use from an AI agent
 

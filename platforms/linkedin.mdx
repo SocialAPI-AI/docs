@@ -25,13 +25,13 @@ An unsupported call returns `501 resource.not_supported`.
 | Publish text, image, video, multi-image, link posts | Yes | See [LinkedIn publishing](/platforms/linkedin/publishing) |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | No | `first_comment` is ignored |
-| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
+| Update a published post | No | `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
 | Delete a published post | Yes | |
 | List posts | Partial | Company Page: the Page's posts, including posts made outside SocialAPI. Member profile: only the posts you published through SocialAPI |
 | Comments | Conditional | Company Page: list, reply, like, and delete. Member profile: reply, like, and delete only, and listing returns `501 resource.not_supported`. Hide and private reply return `501 resource.not_supported`. See [LinkedIn comments](/platforms/linkedin/comments) |
 | Analytics | Conditional | `GET /v1/platforms/linkedin/insights` on a company Page or a member profile: see [Insights](#insights). Live post metrics return `501 resource.not_supported`. Stored post history covers company Page posts only: see [Analytics](/guides/analytics) |
 | DMs | No | `501 resource.not_supported` |
-| Mentions | Conditional | Company Page only: `GET /v1/accounts/{id}/mentions` returns posts and comments that mention the Page from the last 60 days, and `POST /v1/accounts/{id}/mentions/reply` answers them as the Page. A member profile returns `501 resource.not_supported` |
+| Mentions | Conditional | Company Page only: `GET /v1/accounts/{account_id}/mentions` returns posts and comments that mention the Page from the last 60 days, and `POST /v1/accounts/{account_id}/mentions/reply` answers them as the Page. A member profile returns `501 resource.not_supported` |
 | Reviews | No | LinkedIn has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | No | `422 automation.platform_unsupported` |
 | Webhook events | Partial | `account.connected`, `account.updated`, the `post.*` events, and on a company Page `account.disconnected` and `mention.received` |
@@ -83,10 +83,10 @@ A login is one LinkedIn member's authorization. Every LinkedIn account connected
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/platforms/linkedin/logins/{loginId}/profiles` | List the member profile and the company Pages the login can connect, with their brand |
-| `POST` | `/v1/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign` | Connect one of them to a brand |
+| `GET` | `/v1/platforms/linkedin/logins/{login_id}/profiles` | List the member profile and the company Pages the login can connect, with their brand |
+| `POST` | `/v1/platforms/linkedin/logins/{login_id}/profiles/{profile_id}/assign` | Connect one of them to a brand |
 
-`GET /v1/platforms/linkedin/logins/{loginId}/profiles` includes company Pages the member started administering after the authorization. A login authorized with `connection_type: "profile"` lists no company Page. The list leaves out the member profile when the login cannot publish as the member: a login authorized with `"organization"`, or with a `permissions` list that leaves out `posts.write`.
+`GET /v1/platforms/linkedin/logins/{login_id}/profiles` includes company Pages the member started administering after the authorization. A login authorized with `connection_type: "profile"` lists no company Page. The list leaves out the member profile when the login cannot publish as the member: a login authorized with `"organization"`, or with a `permissions` list that leaves out `posts.write`.
 
 ```bash
 curl https://api.social-api.ai/v1/platforms/linkedin/logins/cred_01J9K4R5M6N7P8V2K0W1J3QX/profiles \
@@ -127,12 +127,12 @@ Response (HTTP 200):
 |---|---|
 | `login_id`, `login_name` | The login, and the name of the LinkedIn member who authorized it |
 | `count` | The number of items in `profiles` |
-| `profiles[].platform_account_id` | LinkedIn's URN for the member profile or the company Page. Use it as `{profileId}` to assign it |
+| `profiles[].platform_account_id` | LinkedIn's URN for the member profile or the company Page. Use it as `{profile_id}` to assign it |
 | `profiles[].connection_type` | `profile` for the member profile, `organization` for a company Page |
 | `profiles[].name`, `username`, `picture_url` | The name, LinkedIn vanity name, and picture. `username` and `picture_url` are absent when LinkedIn returns none |
 | `profiles[].assignable` | `true` when none of your brands holds the account. `false` when a brand holds it: `assigned_brand_id`, `assigned_brand_name`, and `assigned_account_id` then name the brand and its account |
 
-`POST /v1/platforms/linkedin/logins/{loginId}/profiles/{profileId}/assign` connects one of them to a brand. `{profileId}` is the `platform_account_id`, sent as it is or URL-encoded.
+`POST /v1/platforms/linkedin/logins/{login_id}/profiles/{profile_id}/assign` connects one of them to a brand. `{profile_id}` is the `platform_account_id`, sent as it is or URL-encoded.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/platforms/linkedin/logins/cred_01J9K4R5M6N7P8V2K0W1J3QX/profiles/urn%3Ali%3Aorganization%3A12345678/assign" \
@@ -156,8 +156,8 @@ The new account is usable at once, and SocialAPI sends `account.connected`. The 
 - **One brand per LinkedIn account.** Assigning an account that another of your brands holds returns `400 validation.profile_already_assigned`, with `meta.brand_id` naming that brand. Assigning it to the brand that already holds it returns HTTP 201 with the same `account_id`.
 - **The login must still reach the account.** A company Page the login's member does not administer, any company Page when the login was authorized with `connection_type: "profile"`, or a member profile other than that member's own, returns `400 validation.profile_not_granted`, with the URN in `meta.platform_account_id`.
 - **The brand must be yours.** A missing `brand_id` returns `400 validation.field_required`. A brand that is not yours, or that is outside your [brand-restricted key](/guides/scoped-keys)'s brands, returns `404 brand.not_found`.
-- **The login must be yours.** An unknown `{loginId}` returns `404 resource.not_found` on both endpoints.
-- **The request must be well formed.** A body that is not valid JSON returns `400 validation.body_invalid`, and a `{profileId}` with broken URL encoding returns `400 validation.invalid_profile_id`.
+- **The login must be yours.** An unknown `{login_id}` returns `404 resource.not_found` on both endpoints.
+- **The request must be well formed.** A body that is not valid JSON returns `400 validation.body_invalid`, and a `{profile_id}` with broken URL encoding returns `400 validation.invalid_profile_id`.
 - **The login must still be authorized.** When LinkedIn refuses the login, both endpoints return `401 platform.linkedin.auth` or `401 platform.linkedin.unauthorized`: reconnect an account of that member with every scope the login holds. LinkedIn's own rate limit returns `429 platform.linkedin.rate_limit`, and other refusals by LinkedIn return a [platform error](/guides/errors#platform-errors). These errors do not change the status of any account.
 - **A login ends with its last account.** Disconnecting the last LinkedIn account on a login removes the login: both endpoints then return `404 resource.not_found` for its `login_id`.
 - **Cost.** Listing and assigning cost no credits.
@@ -175,7 +175,7 @@ A company Page lists, replies to, likes, and deletes the comments on its posts, 
 
 ## Insights
 
-`GET /v1/platforms/linkedin/insights?account_id={id}` returns the follower count and per-post counts for a company Page or a member profile. `kind` tells them apart: `member` for a member profile, `organization` for a company Page. On a Page, `posts` covers the Page's 50 most recent posts.
+`GET /v1/platforms/linkedin/insights?account_id={account_id}` returns the follower count and per-post counts for a company Page or a member profile. `kind` tells them apart: `member` for a member profile, `organization` for a company Page. On a Page, `posts` covers the Page's 50 most recent posts.
 
 - On a member profile, `posts` covers the 5 most recent posts published to the profile through SocialAPI. It is an empty array until you publish one, and `follower_count` is returned either way.
 - Each member profile post returns `impressions`, `unique_views`, `likes`, `comments`, and `shares`. `clicks` and `engagement_rate` are always 0 for a member profile.
@@ -190,7 +190,7 @@ A company Page lists, replies to, likes, and deletes the comments on its posts, 
 | `account.updated` | The account lost [permissions](/guides/permissions) you did not remove yourself (`change` is `permissions_reduced`) |
 | `post.published`, `post.partial`, `post.failed` | A post to this account finished: see [Delivery](/guides/delivery) |
 | `account.disconnected` | Company Page only: LinkedIn refused a read of the Page's posts because the login needs renewing (`reason` is `posts_sync_auth_failed`). Reconnect the account |
-| `mention.received` | Company Page only: you listed mentions with `GET /v1/accounts/{id}/mentions` and the call returned at least one item. See [Mentions you list](/guides/webhook-events#mentions-you-list) |
+| `mention.received` | Company Page only: you listed mentions with `GET /v1/accounts/{account_id}/mentions` and the call returned at least one item. See [Mentions you list](/guides/webhook-events#mentions-you-list) |
 
 Every event is described in [Webhook events](/guides/webhook-events).
 

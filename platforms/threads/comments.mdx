@@ -10,15 +10,15 @@ SocialAPI's comments API reads the replies to the posts of a connected Threads a
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/inbox/comments?platform=threads` | List your Threads posts, each with its `id` for `{postId}` |
-| `GET` | `/v1/inbox/comments/{postId}` | List the replies to one post |
-| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to one reply |
-| `POST` | `/v1/inbox/comments/{postId}` | Reply to the post, or to a reply when you send `comment_id` |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a direct reply from another account to your post |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide that reply |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a reply your account wrote |
+| `GET` | `/v1/inbox/comments?platform=threads` | List your Threads posts, each with its `id` for `{post_id}` |
+| `GET` | `/v1/inbox/comments/{post_id}` | List the replies to one post |
+| `GET` | `/v1/inbox/comments/{post_id}/{comment_id}/replies` | List the replies to one reply |
+| `POST` | `/v1/inbox/comments/{post_id}` | Reply to the post, or to a reply when you send `comment_id` |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Hide a direct reply from another account to your post |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Unhide that reply |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}` | Delete a reply your account wrote |
 
-`{postId}` is the Threads post ID: `targets[].platform_post_id` on a post you published through SocialAPI, or `id` from `GET /v1/inbox/comments`. A Threads post ID is digits, optionally followed by an underscore and more digits, such as `18045720651234567`. Any other value returns `400 validation.field_invalid` on `GET /v1/inbox/comments/{postId}`. `{commentId}` and `comment_id` accept the reply's `sapi_cmt_` ID or its Threads ID: see [IDs](/guides/ids#what-each-endpoint-accepts).
+`{post_id}` is the Threads post ID: `targets[].platform_post_id` on a post you published through SocialAPI, or `id` from `GET /v1/inbox/comments`. A Threads post ID is digits, optionally followed by an underscore and more digits, such as `18045720651234567`. Any other value returns `400 validation.field_invalid` on `GET /v1/inbox/comments/{post_id}`. `{comment_id}` and `comment_id` accept the reply's `sapi_cmt_` ID or its Threads ID: see [IDs](/guides/ids#what-each-endpoint-accepts).
 
 The like and private reply endpoints return `501 resource.not_supported` on Threads: see [What Threads does not support](#what-threads-does-not-support).
 
@@ -95,7 +95,7 @@ Response (HTTP 200):
 
 ## List replies
 
-`GET /v1/inbox/comments/{postId}` lists the direct replies to a post. `GET /v1/inbox/comments/{postId}/{commentId}/replies` lists the direct replies to one reply, in the same shape.
+`GET /v1/inbox/comments/{post_id}` lists the direct replies to a post. `GET /v1/inbox/comments/{post_id}/{comment_id}/replies` lists the direct replies to one reply, in the same shape.
 
 | Parameter | Description |
 |---|---|
@@ -103,7 +103,7 @@ Response (HTTP 200):
 | `limit` | Replies per page. The default is 25 on a post's replies list and 10 on a reply's replies list. A value above 100 is treated as 100. A value of 0 or less, or one that is not an integer, returns `400 validation.field_invalid` |
 | `cursor` | The `next_cursor` of the previous page |
 
-Threads lists replies newest first. A page can hold fewer replies than `limit`. Follow `next_cursor` until `has_more` is `false`: see [Pagination](/guides/pagination#fetch-every-page). On Threads, SocialAPI ignores `moderation_status`, `order`, and `q`. On `GET /v1/inbox/comments/{postId}`, an invalid value still returns `400 validation.field_invalid`.
+Threads lists replies newest first. A page can hold fewer replies than `limit`. Follow `next_cursor` until `has_more` is `false`: see [Pagination](/guides/pagination#fetch-every-page). On Threads, SocialAPI ignores `moderation_status`, `order`, and `q`. On `GET /v1/inbox/comments/{post_id}`, an invalid value still returns `400 validation.field_invalid`.
 
 Each reply has the fields described in [List comments and replies](/guides/comments#list-comments-and-replies). On Threads, these fields have fixed values:
 
@@ -115,7 +115,7 @@ Each reply has the fields described in [List comments and replies](/guides/comme
 | `like_count`, `reply_count` | Always `0`: Threads does not return reply counts here. Read `has_replies` to know whether a reply has replies |
 | `liked_by_viewer` | Always `false` |
 | `is_hidden` | Always `false`, including on a reply you hid |
-| `parent_id` | Always `null`, including in a replies list. The parent is the `{postId}` or `{commentId}` you requested |
+| `parent_id` | Always `null`, including in a replies list. The parent is the `{post_id}` or `{comment_id}` you requested |
 
 The `capabilities` object is the same on every Threads reply:
 
@@ -129,7 +129,7 @@ The `capabilities` object is the same on every Threads reply:
 
 ## Nested replies
 
-A Threads conversation is a tree: a reply can have its own replies, at any depth. The post's replies list returns only the replies made directly to the post. When a reply has `has_replies: true`, list its replies with `GET /v1/inbox/comments/{postId}/{commentId}/replies`, passing the reply's `id` as `{commentId}` and keeping the original post as `{postId}`. Repeat on each reply that has `has_replies: true` to read the whole tree.
+A Threads conversation is a tree: a reply can have its own replies, at any depth. The post's replies list returns only the replies made directly to the post. When a reply has `has_replies: true`, list its replies with `GET /v1/inbox/comments/{post_id}/{comment_id}/replies`, passing the reply's `id` as `{comment_id}` and keeping the original post as `{post_id}`. Repeat on each reply that has `has_replies: true` to read the whole tree.
 
 ```bash
 curl "https://api.social-api.ai/v1/inbox/comments/18045720651234567/sapi_cmt_KQ7MZ4RWH9TBXN3YDJ5VCLP8FG2SAE6U/replies?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
@@ -140,7 +140,7 @@ The response has the same shape as the post's replies list in [Your first reply]
 
 ## Reply to a post or a reply
 
-`POST /v1/inbox/comments/{postId}` publishes a public reply from the connected account.
+`POST /v1/inbox/comments/{post_id}` publishes a public reply from the connected account.
 
 | Field | Description |
 |---|---|
@@ -150,7 +150,7 @@ The response has the same shape as the post's replies list in [Your first reply]
 
 SocialAPI sends replies as text only, and a listed reply returns its text without its image or video. A reply costs 1 interaction credit. When the plan's interaction allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. The credit comes back only when the request fails with a `validation.*` error: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
 
-Threads allows 1,000 replies per rolling 24 hours for each account. `GET /v1/accounts/{id}/limits` returns the replies left in `replies_remaining` and the total in `replies_total`: see [Read a platform's remaining quota](/guides/rate-limits#read-a-platforms-remaining-quota).
+Threads allows 1,000 replies per rolling 24 hours for each account. `GET /v1/accounts/{account_id}/limits` returns the replies left in `replies_remaining` and the total in `replies_total`: see [Read a platform's remaining quota](/guides/rate-limits#read-a-platforms-remaining-quota).
 
 ## Hide and unhide a reply
 
@@ -191,7 +191,7 @@ Hiding and unhiding cost no credits.
 
 ## Delete a reply
 
-`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes a reply on Threads. It cannot be undone.
+`DELETE /v1/inbox/comments/{post_id}/{comment_id}?account_id={account_id}` deletes a reply on Threads. It cannot be undone.
 
 ```bash
 curl -X DELETE "https://api.social-api.ai/v1/inbox/comments/18045720651234567/sapi_cmt_W3NHR8YTQ5KZDV2MCJ7XBLP4GF9SAE6U?account_id=acc_01HZ9X3Q4R5M6N7P8V2K0W1J" \
@@ -212,8 +212,8 @@ Deleting costs no credits. It needs the `threads_delete` scope, not `threads_man
 
 ## What Threads does not support
 
-- **Liking a reply.** `POST` and `DELETE /v1/inbox/comments/{postId}/{commentId}/like` return `501 resource.not_supported`.
-- **Private replies.** `POST /v1/inbox/comments/{postId}/{commentId}/private-reply` returns `501 resource.not_supported`. Threads has no direct messages in its API, so there is no DM to start: answer with a public reply.
+- **Liking a reply.** `POST` and `DELETE /v1/inbox/comments/{post_id}/{comment_id}/like` return `501 resource.not_supported`.
+- **Private replies.** `POST /v1/inbox/comments/{post_id}/{comment_id}/private-reply` returns `501 resource.not_supported`. Threads has no direct messages in its API, so there is no DM to start: answer with a public reply.
 - **Editing a reply.** Threads' API cannot edit a published reply. Delete it and send a new one.
 - **Replies held for approval.** A post published with `enable_reply_approvals` (see [Threads publishing](/platforms/threads/publishing#platform-data-fields)) holds new replies until you approve them. SocialAPI has no endpoint to list or approve held replies: approve them in the Threads app.
 
@@ -234,7 +234,7 @@ Check these in order when a Threads reply call fails:
 
 1. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list replies, `comments.write` to reply, hide, unhide, or delete. `error.meta.permission` names it.
 2. **`404 account.not_found`, `403 account.reconnection_required`, `401 platform.threads.auth`.** The `acc_` ID is not yours, or the account needs reconnecting because the person revoked access or the token expired: see [Reconnect an account](/guides/connect-accounts#reconnect-an-account).
-3. **`400 validation.body_invalid`, `400 validation.field_required`, `400 validation.field_invalid`.** The JSON body of a reply or a hide is malformed, `account_id` or `text` is missing, `limit` is not a positive integer, or `{postId}` is not a Threads post ID. `error.meta.field` names the field. Fix the request and send it again.
+3. **`400 validation.body_invalid`, `400 validation.field_required`, `400 validation.field_invalid`.** The JSON body of a reply or a hide is malformed, `account_id` or `text` is missing, `limit` is not a positive integer, or `{post_id}` is not a Threads post ID. `error.meta.field` names the field. Fix the request and send it again.
 4. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The reply ID is not a comment ID, or it belongs to another platform.
 5. **`platform.threads.<code>` (HTTP 403), where `<code>` is from 200 to 299.** The account lacks a Threads scope the call needs. Reconnect the account.
 6. **`422 platform.threads.10`.** Threads refused the call as not permitted. `error.message` carries Meta's reason. When it names a missing permission, reconnect the account.

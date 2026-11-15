@@ -3,19 +3,19 @@ title: "Track post delivery"
 description: "Read the HTTP status, post status, and per-target results of a published post to see what reached each platform, and learn how deleting a post works."
 ---
 
-Publishing through SocialAPI is asynchronous: an HTTP success means SocialAPI accepted the post, not that every platform has published it. The post has a `status`, and each platform it goes to is a target in `targets[]` with its own `status`, `platform_post_id`, `permalink`, and `error`. Read them with `GET /v1/posts/{pid}` or receive them in the `post.published`, `post.partial`, and `post.failed` webhook events.
+Publishing through SocialAPI is asynchronous: an HTTP success means SocialAPI accepted the post, not that every platform has published it. The post has a `status`, and each platform it goes to is a target in `targets[]` with its own `status`, `platform_post_id`, `permalink`, and `error`. Read them with `GET /v1/posts/{post_id}` or receive them in the `post.published`, `post.partial`, and `post.failed` webhook events.
 
 ## Endpoints
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/posts/{pid}` | Read one post with its `status` and `targets[]` |
+| `GET` | `/v1/posts/{post_id}` | Read one post with its `status` and `targets[]` |
 | `GET` | `/v1/posts` | List posts with their targets |
-| `POST` | `/v1/posts/{pid}/publish` | Publish a `draft` or `scheduled` post now |
-| `POST` | `/v1/posts/{pid}/retry` | Re-send the failed targets of a `failed` or `partial` post |
-| `POST` | `/v1/posts/{pid}/unpublish` | Remove the published copies from the platforms and keep the post |
-| `DELETE` | `/v1/posts/{pid}` | Delete a post |
-| `POST` | `/v1/media/{id}/verify` | Verify uploaded media before it publishes |
+| `POST` | `/v1/posts/{post_id}/publish` | Publish a `draft` or `scheduled` post now |
+| `POST` | `/v1/posts/{post_id}/retry` | Re-send the failed targets of a `failed` or `partial` post |
+| `POST` | `/v1/posts/{post_id}/unpublish` | Remove the published copies from the platforms and keep the post |
+| `DELETE` | `/v1/posts/{post_id}` | Delete a post |
+| `POST` | `/v1/media/{media_id}/verify` | Verify uploaded media before it publishes |
 
 ## Publish and read the result
 
@@ -106,23 +106,23 @@ Response (HTTP 200) after the Threads target published and the Facebook target f
 }
 ```
 
-The post is `partial`: 1 target published and 1 failed. `POST /v1/posts/{pid}/retry` re-sends only the failed targets.
+The post is `partial`: 1 target published and 1 failed. `POST /v1/posts/{post_id}/retry` re-sends only the failed targets.
 
 ## Response codes
 
-`POST /v1/posts` and `POST /v1/posts/{pid}/publish` return the post object with one of these HTTP statuses:
+`POST /v1/posts` and `POST /v1/posts/{post_id}/publish` return the post object with one of these HTTP statuses:
 
 | HTTP status | Post `status` | Meaning |
 |---|---|---|
-| 201 | `draft`, `scheduled`, or `publishing` | SocialAPI created the post. With `publish_now` or `POST /v1/posts/{pid}/publish`, delivery continues in the background |
+| 201 | `draft`, `scheduled`, or `publishing` | SocialAPI created the post. With `publish_now` or `POST /v1/posts/{post_id}/publish`, delivery continues in the background |
 | 207 | `partial` | Some targets published and others failed before the response was built |
 | 422 | `failed` | Every target failed before the response was built. The body is the post object, not an error envelope |
 
 207 and 422 appear only when delivery finishes before SocialAPI builds the response. Do not rely on them: read `status` and each target's `status` on every response, whatever the HTTP status.
 
-`POST /v1/posts/{pid}/retry` returns `200` with `{"success": true}`, and the post goes back to `publishing`. Other statuses on these endpoints are errors in the standard envelope: `400 publishing.validation_failed` when the post fails validation (the issues are in `error.meta.issues`), `409 resource.conflict` for duplicate content, `409 post.state_invalid` when the post is not in a state the endpoint accepts, `400 publishing.no_targets` when the post has no publishable targets, `400 post.no_retryable_deliveries` when a retry finds no failed target, and `429 publishing.velocity_limit` or `429 validation.post_limit_exhausted`. See [Errors](/guides/errors).
+`POST /v1/posts/{post_id}/retry` returns `200` with `{"success": true}`, and the post goes back to `publishing`. Other statuses on these endpoints are errors in the standard envelope: `400 publishing.validation_failed` when the post fails validation (the issues are in `error.meta.issues`), `409 resource.conflict` for duplicate content, `409 post.state_invalid` when the post is not in a state the endpoint accepts, `400 publishing.no_targets` when the post has no publishable targets, `400 post.no_retryable_deliveries` when a retry finds no failed target, and `429 publishing.velocity_limit` or `429 validation.post_limit_exhausted`. See [Errors](/guides/errors).
 
-SocialAPI ignores request fields it does not recognize, so a misspelled field is not an error: the post is created without it. Send only the documented field names, and read the post back with `GET /v1/posts/{pid}` when a missing field would be costly.
+SocialAPI ignores request fields it does not recognize, so a misspelled field is not an error: the post is created without it. Send only the documented field names, and read the post back with `GET /v1/posts/{post_id}` when a missing field would be costly.
 
 ## Post status
 
@@ -132,7 +132,7 @@ A post has one of these statuses. SocialAPI derives it from the statuses of the 
 |---|---|
 | `draft` | Saved without `publish_now` or `scheduled_at`. Nothing is sent until you publish or schedule it |
 | `scheduled` | The post is waiting for its scheduled time, or SocialAPI is sending it, until every target settles. While it waits, every target is `pending` |
-| `publishing` | A post published now (`publish_now` or `POST /v1/posts/{pid}/publish`) has at least one target `publishing`, or some targets finished while others are still `pending` |
+| `publishing` | A post published now (`publish_now` or `POST /v1/posts/{post_id}/publish`) has at least one target `publishing`, or some targets finished while others are still `pending` |
 | `published` | Every target is `published` |
 | `partial` | At least one target is `published`, and at least one other target is `failed` or `unpublished` |
 | `failed` | No target is `published`, and at least one target is `failed` |
@@ -140,12 +140,12 @@ A post has one of these statuses. SocialAPI derives it from the statuses of the 
 
 ```mermaid
 flowchart LR
-  A[draft] -->|POST /posts/pid/publish| D[publishing]
-  B[scheduled] -->|POST /posts/pid/publish| D
+  A[draft] -->|"POST /posts/{post_id}/publish"| D[publishing]
+  B[scheduled] -->|"POST /posts/{post_id}/publish"| D
   B -->|scheduled time reached| E[published, partial, or failed]
   C[POST /posts with publish_now] --> D
   D --> E
-  E -->|failed or partial: POST /posts/pid/retry| D
+  E -->|"failed or partial: POST /posts/{post_id}/retry"| D
 ```
 
 A draft or scheduled post moves to `publishing` when you publish it. A post that is `published`, `partial`, or `failed` stays in that status until you retry, unpublish, or delete it.
@@ -181,7 +181,7 @@ Target `status` means:
 | `publishing` | Being sent, or sent and waiting for the platform to confirm |
 | `published` | The platform confirmed the post |
 | `failed` | The platform or SocialAPI refused or could not send it. `error` says why |
-| `unpublished` | You deleted it from the platform with `DELETE /v1/posts/{pid}` or `POST /v1/posts/{pid}/unpublish` |
+| `unpublished` | You deleted it from the platform with `DELETE /v1/posts/{post_id}` or `POST /v1/posts/{post_id}/unpublish` |
 
 On TikTok, the platform can confirm a post before it reports the post's ID. The target is then `published` with no `platform_post_id` and no `permalink`, and both appear after SocialAPI checks again. A TikTok draft sent with `post_mode: "inbox"` stays `published` with no `platform_post_id` or `permalink`: the post exists only in the creator's TikTok app.
 
@@ -200,7 +200,7 @@ A failed target carries an `error` object with 4 fields:
 
 Surface `error.message` to your users instead of a generic retry prompt. Target errors appear in 2 places:
 
-- **`targets[].error`** on every post response: `POST /v1/posts`, `POST /v1/posts/{pid}/publish`, `GET /v1/posts`, and `GET /v1/posts/{pid}`.
+- **`targets[].error`** on every post response: `POST /v1/posts`, `POST /v1/posts/{post_id}/publish`, `GET /v1/posts`, and `GET /v1/posts/{post_id}`.
 - **`results[].error`** in the `post.partial` and `post.failed` webhook events. The payload is `{post_id, status, results}`, and each item of `results` has `account_id`, `brand_id`, `page_id`, `platform`, `status`, `platform_post_id`, `permalink`, and `error`. The webhook `error` holds `code` and `message` only.
 
 Target errors do not appear in `GET /v1/events`: an event has `error_message` and `error_category`, with no `error_code`.
@@ -215,17 +215,17 @@ These codes describe delivery itself. A failure that comes from the platform has
 - `platform.{platform}.publish_failed`: the platform failed the request without a more specific code.
 - `system.internal`: SocialAPI stopped waiting for a stuck target (see above).
 
-Retry a failed or partial post with `POST /v1/posts/{pid}/retry`. It re-sends only the failed targets, resets them to `pending`, clears their errors, and costs 1 post credit. See [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction).
+Retry a failed or partial post with `POST /v1/posts/{post_id}/retry`. It re-sends only the failed targets, resets them to `pending`, clears their errors, and costs 1 post credit. See [Plans and usage](/guides/plans#what-counts-as-a-post-or-interaction).
 
 ## Verify media before you publish
 
-Media uploaded with the presigned flow has a status, and only `ready` media publishes. A media file is `pending` until you call `POST /v1/media/{id}/verify`, `ready` after verification, and `failed` when the file is missing or the upload would exceed your [storage quota](/guides/plans#plan-allowances).
+Media uploaded with the presigned flow has a status, and only `ready` media publishes. A media file is `pending` until you call `POST /v1/media/{media_id}/verify`, `ready` after verification, and `failed` when the file is missing or the upload would exceed your [storage quota](/guides/plans#plan-allowances).
 
 When you publish or schedule a post that references media that is not `ready`, `POST /v1/posts` returns `400 publishing.validation_failed`, and `error.meta.issues` contains an issue for field `media` with the message `media {id} is not ready or not found`. Draft posts skip this check and run it when you publish. With `skip_validation: true`, the post is accepted and the target fails at delivery. See [Media](/guides/media) for the upload flow.
 
 ## Delete a post
 
-`DELETE /v1/posts/{pid}` returns HTTP 200, not 204. What it does depends on the post's status:
+`DELETE /v1/posts/{post_id}` returns HTTP 200, not 204. What it does depends on the post's status:
 
 | Post status | What happens |
 |---|---|
@@ -267,7 +267,7 @@ A target the platform did not delete stays `published`, so SocialAPI shows what 
 
 ## Unpublish a post
 
-`POST /v1/posts/{pid}/unpublish` removes the published copies from the platforms and keeps the post. Send `{"account_id": "..."}` to remove one target only. Targets removed from the platform become `unpublished`. The post is `partial` while another target is still `published`, `failed` when none is published and one target failed, and `cancelled` when every target was removed. See [Platform support](/platforms/overview) for what each platform can delete.
+`POST /v1/posts/{post_id}/unpublish` removes the published copies from the platforms and keeps the post. Send `{"account_id": "..."}` to remove one target only. Targets removed from the platform become `unpublished`. The post is `partial` while another target is still `published`, `failed` when none is published and one target failed, and `cancelled` when every target was removed. See [Platform support](/platforms/overview) for what each platform can delete.
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7/unpublish \

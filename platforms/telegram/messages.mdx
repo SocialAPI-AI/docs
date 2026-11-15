@@ -11,14 +11,14 @@ SocialAPI receives the direct messages (DMs) people send to your Telegram bot in
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/conversations` | List the bot's conversations. Add `platform=telegram` or `account_id` to filter |
-| `GET` | `/v1/inbox/conversations/{id}` | Get one conversation |
-| `PATCH` | `/v1/inbox/conversations/{id}` | Archive a conversation, or set it back to `active` |
-| `POST` | `/v1/inbox/conversations/{id}/read` | Mark a conversation as read in SocialAPI. The person sees nothing |
-| `GET` | `/v1/inbox/conversations/{id}/messages` | List the messages of a conversation, newest first |
-| `POST` | `/v1/inbox/conversations/{id}/messages` | Send a message |
-| `GET` | `/v1/inbox/media/{id}` | Download a file a person sent |
+| `GET` | `/v1/inbox/conversations/{conversation_id}` | Get one conversation |
+| `PATCH` | `/v1/inbox/conversations/{conversation_id}` | Archive a conversation, or set it back to `active` |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/read` | Mark a conversation as read in SocialAPI. The person sees nothing |
+| `GET` | `/v1/inbox/conversations/{conversation_id}/messages` | List the messages of a conversation, newest first |
+| `POST` | `/v1/inbox/conversations/{conversation_id}/messages` | Send a message |
+| `GET` | `/v1/inbox/media/{media_id}` | Download a file a person sent |
 
-`POST` and `DELETE` on `/v1/inbox/conversations/{id}/messages/{messageId}/reaction`, and `POST /v1/inbox/conversations/{id}/sender-action`, return `501 resource.not_supported` on Telegram. In the conversation paths, `{id}` is the conversation `id`, a UUID. In `/v1/inbox/media/{id}`, use the URL from `content.media[].url` or `attachment_url`.
+`POST` and `DELETE` on `/v1/inbox/conversations/{conversation_id}/messages/{message_id}/reaction`, and `POST /v1/inbox/conversations/{conversation_id}/sender-action`, return `501 resource.not_supported` on Telegram. In the conversation paths, `{conversation_id}` is the conversation `id`, a UUID. In `/v1/inbox/media/{media_id}`, use the URL from `content.media[].url` or `attachment_url`.
 
 ## Your first reply
 
@@ -145,7 +145,7 @@ Each message a person sends to the bot arrives as a [`dm.received`](/guides/webh
 | `type` | `dm` on Telegram. Match on `event`, not on `type` |
 | `author` | The person: `id` is their Telegram user ID, `name` their first and last name, or their username when Telegram reports no name, `username` their Telegram username when they have one. `avatar_url` is absent on Telegram |
 | `conversation_id` | The SocialAPI conversation to reply into |
-| `platform_id` | Telegram's message ID, the same value as `platform_id` on the message in `GET /v1/inbox/conversations/{id}/messages` |
+| `platform_id` | Telegram's message ID, the same value as `platform_id` on the message in `GET /v1/inbox/conversations/{conversation_id}/messages` |
 | `reply_to` | Set when the person replied to an earlier message: that message's `platform_id`. Absent otherwise |
 | `content.text` | The message text, or the caption of a file. Empty for a file without a caption |
 | `content.media` | The file the person sent, as `url` and `type`. Absent when the message has no file |
@@ -155,7 +155,7 @@ There is no `recipient` field on Telegram events. `id` is the event's interactio
 
 ### Message types
 
-Telegram delivers one file per message. SocialAPI reports each Telegram message type with these `type` values, in `content.media[].type` on the event and in `attachment_type` on the message in `GET /v1/inbox/conversations/{id}/messages`:
+Telegram delivers one file per message. SocialAPI reports each Telegram message type with these `type` values, in `content.media[].type` on the event and in `attachment_type` on the message in `GET /v1/inbox/conversations/{conversation_id}/messages`:
 
 | Telegram message | `type` |
 |---|---|
@@ -169,7 +169,7 @@ A message with none of these and no text, such as a location, a contact, or a po
 
 ### Files a person sends
 
-The `url` of a file is a SocialAPI URL of the form `https://api.social-api.ai/v1/inbox/media/{id}`, because Telegram files can be downloaded only with the bot's token. Fetch it with your API key. The same URL appears as `attachment_url` on the message in `GET /v1/inbox/conversations/{id}/messages`. It stays available for 30 days after the message arrives, then returns `410`.
+The `url` of a file is a SocialAPI URL of the form `https://api.social-api.ai/v1/inbox/media/{media_id}`, because Telegram files can be downloaded only with the bot's token. Fetch it with your API key. The same URL appears as `attachment_url` on the message in `GET /v1/inbox/conversations/{conversation_id}/messages`. It stays available for 30 days after the message arrives, then returns `410`.
 
 Telegram does not let bots download a file larger than 20 MB, so the URL of such a file returns `410`. A file that is not ready yet returns `503`: retry it. [Fetch an inbound attachment](/guides/inbox#fetch-an-inbound-attachment) lists every status the URL returns.
 
@@ -195,7 +195,7 @@ Telegram has no message history, so `POST /v1/inbox/sync` adds no messages. Pagi
 
 ## Send messages
 
-`POST /v1/inbox/conversations/{id}/messages` sends a message. The request fields are on [Send a message](/guides/direct-messages#send-a-message). A request with no `text`, no attachment, and no `quick_replies`, `buttons`, `cards`, or `list_sections` returns `400 validation.field_required`, and a request without `account_id` returns `400 validation.field_required` as well.
+`POST /v1/inbox/conversations/{conversation_id}/messages` sends a message. The request fields are on [Send a message](/guides/direct-messages#send-a-message). A request with no `text`, no attachment, and no `quick_replies`, `buttons`, `cards`, or `list_sections` returns `400 validation.field_required`, and a request without `account_id` returns `400 validation.field_required` as well.
 
 SocialAPI sends the text first, then each attachment in order, each as its own Telegram message. These rules are specific to Telegram:
 

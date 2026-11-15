@@ -11,17 +11,17 @@ SocialAPI reads the comments on the posts of a connected Facebook Page and acts 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/inbox/comments?platform=facebook` | List posts with their comment counts |
-| `GET` | `/v1/inbox/comments/{postId}` | List the top-level comments on a post |
-| `GET` | `/v1/inbox/comments/{postId}/{commentId}/replies` | List the replies to a comment |
-| `POST` | `/v1/inbox/comments/{postId}` | Reply to a comment, or comment on the post as the Page |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/private-reply` | Send a private reply to the person who commented |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Hide a comment |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/hide` | Unhide a comment |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}` | Delete a comment |
-| `POST` | `/v1/inbox/comments/{postId}/{commentId}/like` | Like a comment as the Page |
-| `DELETE` | `/v1/inbox/comments/{postId}/{commentId}/like` | Remove the Page's like |
+| `GET` | `/v1/inbox/comments/{post_id}` | List the top-level comments on a post |
+| `GET` | `/v1/inbox/comments/{post_id}/{comment_id}/replies` | List the replies to a comment |
+| `POST` | `/v1/inbox/comments/{post_id}` | Reply to a comment, or comment on the post as the Page |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/private-reply` | Send a private reply to the person who commented |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Hide a comment |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/hide` | Unhide a comment |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}` | Delete a comment |
+| `POST` | `/v1/inbox/comments/{post_id}/{comment_id}/like` | Like a comment as the Page |
+| `DELETE` | `/v1/inbox/comments/{post_id}/{comment_id}/like` | Remove the Page's like |
 
-`{postId}` is Facebook's post ID: digits only, or `{page_id}_{post_id}`. `GET /v1/inbox/comments/{postId}` returns `400 validation.field_invalid` for a `postId` that cannot be a post ID, such as `posts` or a `sapi_cmt_` ID. `{commentId}` accepts the comment's `sapi_cmt_` ID or Facebook's comment ID: see [IDs](/guides/ids#what-each-endpoint-accepts). SocialAPI has no endpoint to edit a comment.
+`{post_id}` is Facebook's post ID: digits only, or `{page_id}_{post_id}`. `GET /v1/inbox/comments/{post_id}` returns `400 validation.field_invalid` for a `post_id` that cannot be a post ID, such as `posts` or a `sapi_cmt_` ID. `{comment_id}` accepts the comment's `sapi_cmt_` ID or Facebook's comment ID: see [IDs](/guides/ids#what-each-endpoint-accepts). SocialAPI has no endpoint to edit a comment.
 
 ## List the comments on a Page post
 
@@ -125,7 +125,7 @@ The reply is public on Facebook when the call returns. `comment_id` in the respo
 
 ## How Facebook fills a comment
 
-`GET /v1/inbox/comments/{postId}` returns the top-level comments of the post. Replies are not in that list: read them with `GET /v1/inbox/comments/{postId}/{commentId}/replies`, which returns them in the same shape, each with `parent_id` set to the `platform_id` of the comment they answer. The full field list is in [List comments and replies](/guides/comments#list-comments-and-replies).
+`GET /v1/inbox/comments/{post_id}` returns the top-level comments of the post. Replies are not in that list: read them with `GET /v1/inbox/comments/{post_id}/{comment_id}/replies`, which returns them in the same shape, each with `parent_id` set to the `platform_id` of the comment they answer. The full field list is in [List comments and replies](/guides/comments#list-comments-and-replies).
 
 | Field | On Facebook |
 |---|---|
@@ -143,17 +143,17 @@ The reply is public on Facebook when the call returns. `comment_id` in the respo
 
 ## Accounts with more than one Page
 
-A connected Facebook account can hold more than 1 Page. Comment calls take no Page parameter: SocialAPI acts as the Page that published the post. On an account with more than 1 Page, list the post with `GET /v1/inbox/comments` before acting on its comments. Until that list returns the post, SocialAPI acts as the account's default Page (`is_default: true` in `GET /v1/accounts/{id}/pages`), and a call on another Page's post fails. To list the posts of one Page, pass `page_id`, the Page's SocialAPI ID, to `GET /v1/inbox/comments`. See [Pages of an account](/platforms/facebook#pages-of-an-account).
+A connected Facebook account can hold more than 1 Page. Comment calls take no Page parameter: SocialAPI acts as the Page that published the post. On an account with more than 1 Page, list the post with `GET /v1/inbox/comments` before acting on its comments. Until that list returns the post, SocialAPI acts as the account's default Page (`is_default: true` in `GET /v1/accounts/{account_id}/pages`), and a call on another Page's post fails. To list the posts of one Page, pass `page_id`, the Page's SocialAPI ID, to `GET /v1/inbox/comments`. See [Pages of an account](/platforms/facebook#pages-of-an-account).
 
 ## Reply to a comment
 
-`POST /v1/inbox/comments/{postId}` posts a public reply as the Page. `account_id` and `text` are required: a missing one returns `400 validation.field_required`. With `comment_id`, the reply answers that comment. Without it, the Page comments on the post.
+`POST /v1/inbox/comments/{post_id}` posts a public reply as the Page. `account_id` and `text` are required: a missing one returns `400 validation.field_required`. With `comment_id`, the reply answers that comment. Without it, the Page comments on the post.
 
 A reply costs 1 interaction credit. When the plan's interaction allowance is used up, the call returns `429 validation.interaction_limit_exhausted`. A reply that fails with a `validation.*` error returns its credit: see [When a credit comes back](/guides/plans#when-a-credit-comes-back).
 
 ## Private replies
 
-A private reply is a one-time Messenger DM from the Page to the person who wrote a comment. Send it with `POST /v1/inbox/comments/{postId}/{commentId}/private-reply`. The public reply endpoint never sends one.
+A private reply is a one-time Messenger DM from the Page to the person who wrote a comment. Send it with `POST /v1/inbox/comments/{post_id}/{comment_id}/private-reply`. The public reply endpoint never sends one.
 
 ```bash
 curl -X POST "https://api.social-api.ai/v1/inbox/comments/104857392011223_822015663401928/822015663401928_1290445813011857/private-reply" \
@@ -191,17 +191,17 @@ A private reply costs no credit. The account needs the `messages.write` [permiss
 
 ## Hide and unhide a comment
 
-`POST /v1/inbox/comments/{postId}/{commentId}/hide`, with `account_id` in the body, hides a comment from the public, and `DELETE` on the same path, with `account_id` as a query parameter, shows it again. Both return `{ "success": true }`. A hidden comment stays visible to the person who wrote it.
+`POST /v1/inbox/comments/{post_id}/{comment_id}/hide`, with `account_id` in the body, hides a comment from the public, and `DELETE` on the same path, with `account_id` as a query parameter, shows it again. Both return `{ "success": true }`. A hidden comment stays visible to the person who wrote it.
 
 Facebook refuses to hide or unhide some comments, for example a comment the Page's moderation filters already hid. That refusal returns `422 platform.facebook.comment_not_hideable`, and retrying does not help. Examples of both calls are in [Hide and unhide a comment](/guides/comments#hide-and-unhide-a-comment).
 
 ## Delete a comment
 
-`DELETE /v1/inbox/comments/{postId}/{commentId}?account_id={account_id}` deletes the comment on Facebook and returns `{ "success": true }`. The Page can delete any comment on its own posts, including comments other people wrote. Deleting cannot be undone. To remove a comment from public view and keep the option to restore it, hide it instead.
+`DELETE /v1/inbox/comments/{post_id}/{comment_id}?account_id={account_id}` deletes the comment on Facebook and returns `{ "success": true }`. The Page can delete any comment on its own posts, including comments other people wrote. Deleting cannot be undone. To remove a comment from public view and keep the option to restore it, hide it instead.
 
 ## Like and unlike a comment
 
-`POST /v1/inbox/comments/{postId}/{commentId}/like` likes a comment as the Page, and `DELETE` on the same path removes the Page's like. Both take `account_id`: in the body for `POST`, as a query parameter for `DELETE`. Both return `{ "success": true }`. SocialAPI has no endpoint for other reactions on a comment.
+`POST /v1/inbox/comments/{post_id}/{comment_id}/like` likes a comment as the Page, and `DELETE` on the same path removes the Page's like. Both take `account_id`: in the body for `POST`, as a query parameter for `DELETE`. Both return `{ "success": true }`. SocialAPI has no endpoint for other reactions on a comment.
 
 ## Edited comments and Automations
 
@@ -229,7 +229,7 @@ Check these in order when a Facebook comment call fails or returns nothing:
 1. **`401`, `403 auth.insufficient_scope`.** The API key is invalid, or a scoped key lacks the scope in [Scopes](#scopes).
 2. **`404 account.not_found`, `403 account.reconnection_required`, `401 platform.facebook.auth`.** The `acc_` ID is not yours, or the account needs [reconnecting](/guides/connect-accounts#reconnect-an-account).
 3. **`403 account.permission_missing`.** The account lacks the [permission](/guides/permissions) the call needs: `comments.read` to list comments and replies, `comments.write` to reply, hide, unhide, delete, like, or unlike, and `messages.write` for a private reply. `error.meta.permission` names it.
-4. **`400 validation.*`.** The request is wrong: a required field is missing, an attachment comes with `text` or `buttons`, a button breaks its limits, or, on `GET /v1/inbox/comments/{postId}`, `postId` cannot be a post ID, such as `posts` or a `sapi_cmt_` ID. For a `validation.*` error, `error.meta.field` names the field.
+4. **`400 validation.*`.** The request is wrong: a required field is missing, an attachment comes with `text` or `buttons`, a button breaks its limits, or, on `GET /v1/inbox/comments/{post_id}`, `post_id` cannot be a post ID, such as `posts` or a `sapi_cmt_` ID. For a `validation.*` error, `error.meta.field` names the field.
 5. **`400 validation.id_invalid`, `400 validation.id_platform_mismatch`.** The comment ID is the wrong type, or belongs to another platform.
 6. **`404 resource.not_found`.** The post or comment was deleted on Facebook.
 7. **`400 platform.facebook.private_reply_ineligible`.** The comment already received its private reply, or is older than 7 days. When `error.meta.blocked_locally` is `true`, or the reply was text only, this 400 is final. When Facebook refuses a reply that carried `buttons` or an attachment, the refusal can come from that content: send it once more as text only.

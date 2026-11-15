@@ -26,7 +26,7 @@ An unsupported call returns `501 resource.not_supported`. A Beta row depends on 
 | Reply chains with `segments` | No | A Threads target publishes the first post only and ignores `segments` |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | No | `first_comment` is not published on Threads |
-| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post and publish a new one |
+| Update a published post | No | `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post and publish a new one |
 | Delete a published post | Yes | |
 | List posts | Yes | Text posts, images, videos, carousels |
 | List replies | Yes | Replies to a post, and replies to a reply. See [Threads comments](/platforms/threads/comments) |
@@ -78,7 +78,7 @@ Threads calls a comment a reply, and SocialAPI's comments endpoints read, answer
 
 ## Mentions
 
-A mention is a public Threads post that tags your account. `GET /v1/accounts/{id}/mentions` lists mentions, and `POST /v1/accounts/{id}/mentions/reply` replies to one. The `mention.received` event delivers a mention as it happens, and the list returns the same mention with the same `id`, so you can match them. Details are in [Mentions](/guides/mentions).
+A mention is a public Threads post that tags your account. `GET /v1/accounts/{account_id}/mentions` lists mentions, and `POST /v1/accounts/{account_id}/mentions/reply` replies to one. The `mention.received` event delivers a mention as it happens, and the list returns the same mention with the same `id`, so you can match them. Details are in [Mentions](/guides/mentions).
 
 ```bash
 curl "https://api.social-api.ai/v1/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/mentions?limit=20" \
@@ -246,7 +246,7 @@ Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitte
 | Replies and deletions | See [Threads comments limits](/platforms/threads/comments#limits) |
 | Threads' own rate limit | `429 platform.threads.rate_limit`. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 
-`GET /v1/accounts/{id}/limits` returns `posts_remaining`, `posts_total`, `replies_remaining`, and `replies_total`.
+`GET /v1/accounts/{account_id}/limits` returns `posts_remaining`, `posts_total`, `replies_remaining`, and `replies_total`.
 
 ## Scopes
 

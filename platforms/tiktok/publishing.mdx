@@ -162,7 +162,7 @@ SocialAPI forwards any additional keys in `platform_data.tiktok` that the table 
 
 ### Creator info and validation
 
-The longest video and the interaction locks differ per account. Call `GET /v1/accounts/{id}/creator-info` first ([Creator info](/platforms/tiktok#creator-info)), then dry-run the post with `POST /v1/posts/validate`:
+The longest video and the interaction locks differ per account. Call `GET /v1/accounts/{account_id}/creator-info` first ([Creator info](/platforms/tiktok#creator-info)), then dry-run the post with `POST /v1/posts/validate`:
 
 ```bash
 curl -X POST https://api.social-api.ai/v1/posts/validate \
@@ -204,13 +204,13 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) instead of `publish_now`. Soci
 
 ## 4. Update post
 
-TikTok gives apps no edit call. `PATCH /v1/posts/{pid}` edits only a post in `draft`, `scheduled`, or `failed` status, so a published TikTok post returns `409 post.state_invalid`. Delete the post in the TikTok app and publish a new one.
+TikTok gives apps no edit call. `PATCH /v1/posts/{post_id}` edits only a post in `draft`, `scheduled`, or `failed` status, so a published TikTok post returns `409 post.state_invalid`. Delete the post in the TikTok app and publish a new one.
 
 ---
 
 ## 5. Delete post
 
-TikTok gives apps no deletion call. `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the TikTok target, and the post stays on TikTok. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported` for a TikTok target. Delete the post in the TikTok app.
+TikTok gives apps no deletion call. `DELETE /v1/posts/{post_id}` returns HTTP 200 with `results[].outcome: "not_supported"` for the TikTok target, and the post stays on TikTok. `POST /v1/posts/{post_id}/unpublish` returns `501 resource.not_supported` for a TikTok target. Delete the post in the TikTok app.
 
 For a cross-platform post, the other platforms are still deleted or unpublished. See [Delete a post](/guides/delivery#delete-a-post).
 
@@ -218,7 +218,7 @@ For a cross-platform post, the other platforms are still deleted or unpublished.
 
 ## 6. Retrieve posts
 
-`GET /v1/posts?platform=tiktok&account_ids={id}` returns the posts SocialAPI has stored for the account, including posts published outside SocialAPI. A post published through SocialAPI appears when its target is `published`. `POST /v1/platforms/tiktok/accounts/{id}/sync` reads the 20 most recent posts from TikTok immediately: see [Sync videos](/platforms/tiktok#sync-videos).
+`GET /v1/posts?platform=tiktok&account_ids={account_id}` returns the posts SocialAPI has stored for the account, including posts published outside SocialAPI. A post published through SocialAPI appears when its target is `published`. `POST /v1/platforms/tiktok/accounts/{account_id}/sync` reads the 20 most recent posts from TikTok immediately: see [Sync videos](/platforms/tiktok#sync-videos).
 
 Response (HTTP 200) for one stored video:
 
@@ -259,7 +259,7 @@ Response (HTTP 200) for one stored video:
 }
 ```
 
-`GET /v1/posts/{pid}/metrics` reads the current counts from TikTok. It reads the account's 20 most recent posts and reuses that read for 10 minutes. For a post outside those 20, the target returns `404 resource.not_found`. A draft has no `platform_post_id`, so its target is not in the response.
+`GET /v1/posts/{post_id}/metrics` reads the current counts from TikTok. It reads the account's 20 most recent posts and reuses that read for 10 minutes. For a post outside those 20, the target returns `404 resource.not_found`. A draft has no `platform_post_id`, so its target is not in the response.
 
 ```json
 {
@@ -285,7 +285,7 @@ Response (HTTP 200) for one stored video:
 }
 ```
 
-The view count has a different key on each endpoint: `metrics.extra.view_count` on `GET /v1/posts`, and `metrics.views` with `metrics.extra.views` on `GET /v1/posts/{pid}/metrics`. Each is absent while the count is `0`. TikTok updates the counts with a delay of 24 to 48 hours. Reach, saves, and watch time are not available.
+The view count has a different key on each endpoint: `metrics.extra.view_count` on `GET /v1/posts`, and `metrics.views` with `metrics.extra.views` on `GET /v1/posts/{post_id}/metrics`. Each is absent while the count is `0`. TikTok updates the counts with a delay of 24 to 48 hours. Reach, saves, and watch time are not available.
 
 ---
 
@@ -335,7 +335,7 @@ TikTok often settles after the request that created the post returned, either be
 
 - **Do not confirm success on it.** Only `published` is a completed publish.
 - **Do not retry or republish it.** The post can already be live on TikTok, so a retry risks a duplicate post.
-- **Keep reading `GET /v1/posts/{pid}`, or wait for the webhook.** The `post.published`, `post.partial`, and `post.failed` events fire when the post reaches its final status, including after the original request returned.
+- **Keep reading `GET /v1/posts/{post_id}`, or wait for the webhook.** The `post.published`, `post.partial`, and `post.failed` events fire when the post reaches its final status, including after the original request returned.
 
 If TikTok reports the post live but has not returned its ID 2 hours after publishing started, the target settles at `published` without `platform_post_id` or `permalink`. A target TikTok still reports as processing 2 hours after publishing started fails with `500 system.internal`. Check the TikTok profile before retrying such a target: the post can still have gone live. A draft settles at `published` without `platform_post_id` or `permalink` once TikTok has placed it in the creator's TikTok inbox.
 
@@ -356,7 +356,7 @@ A publish that fails puts a structured error on the target, in `targets[].error`
 
 - **Validation error.** Fix the field the issue names, then send the post again.
 - **Auth error.** Reconnect the TikTok account through the OAuth flow.
-- **Failed target.** Read `targets[].error`, then send `POST /v1/posts/{pid}/retry`. See [Delivery](/guides/delivery).
+- **Failed target.** Read `targets[].error`, then send `POST /v1/posts/{post_id}/retry`. See [Delivery](/guides/delivery).
 
 ---
 

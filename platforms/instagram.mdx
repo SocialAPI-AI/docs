@@ -25,8 +25,8 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 | Publish feed image, Reel, carousel, Story | Yes | See [Instagram publishing](/platforms/instagram/publishing) |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | Yes | Not part of a Story |
-| Update a published post | No | `PATCH /v1/posts/{pid}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post in the Instagram app and publish a new one |
-| Delete a published post | Partial | Instagram Login: `DELETE /v1/posts/{pid}` returns HTTP 200 with `results[].outcome: "not_supported"` for the Instagram target, and the post stays live. `POST /v1/posts/{pid}/unpublish` returns `501 resource.not_supported`. Delete the post in the Instagram app. [Facebook Login](#connect-through-facebook-login): `DELETE /v1/posts/{pid}` deletes the post from Instagram, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI |
+| Update a published post | No | `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post in the Instagram app and publish a new one |
+| Delete a published post | Partial | Instagram Login: `DELETE /v1/posts/{post_id}` returns HTTP 200 with `results[].outcome: "not_supported"` for the Instagram target, and the post stays live. `POST /v1/posts/{post_id}/unpublish` returns `501 resource.not_supported`. Delete the post in the Instagram app. [Facebook Login](#connect-through-facebook-login): `DELETE /v1/posts/{post_id}` deletes the post from Instagram, and `POST /v1/posts/{post_id}/unpublish` removes it from Instagram and keeps it in SocialAPI |
 | List posts | Yes | Posts, Reels, and carousels |
 | List active stories | Yes | Only stories that are live now |
 | List comments and replies | Yes | Comments are read per post. See [Instagram comments](/platforms/instagram/comments) |
@@ -39,7 +39,7 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 | React to a DM | Yes | |
 | Unsend or delete a DM | No | Only the Instagram app can |
 | Messaging participant profile | Yes | Only for a person who messaged the account or tapped an icebreaker or the persistent menu. See [Participant profile](/platforms/instagram/messages#participant-profile) |
-| Mentions | Partial | `GET /v1/accounts/{id}/mentions` returns media the account is tagged in. Caption and comment @mentions arrive as `mention.received` events only |
+| Mentions | Partial | `GET /v1/accounts/{account_id}/mentions` returns media the account is tagged in. Caption and comment @mentions arrive as `mention.received` events only |
 | Reply to a mention | Yes | |
 | Reviews | No | Instagram has no reviews. `GET /v1/inbox/reviews/{account_id}` returns `422 account.platform_unsupported` |
 | Automations | Yes | Comment and DM triggers, buttons, multi-step flows, the Follow gate. See [Automations](/guides/automations) |
@@ -114,7 +114,7 @@ The person signs in to Facebook, not Instagram, and approves the scopes in [Face
 
 ### More than one Instagram account under one login
 
-A Facebook login can administer more than one Instagram account. The brand's Instagram account holds each Instagram account you select (or, without a selection step, every Instagram account the login granted that none of your other brands holds), each as a Page. The `platform_page_id` of such a Page is the Instagram account ID. List the Pages with `GET /v1/accounts/{id}/pages`, and publish to one with `page_id` on the post target: see [Delivery](/guides/delivery). A Facebook Page with no linked Instagram account is not listed.
+A Facebook login can administer more than one Instagram account. The brand's Instagram account holds each Instagram account you select (or, without a selection step, every Instagram account the login granted that none of your other brands holds), each as a Page. The `platform_page_id` of such a Page is the Instagram account ID. List the Pages with `GET /v1/accounts/{account_id}/pages`, and publish to one with `page_id` on the post target: see [Delivery](/guides/delivery). A Facebook Page with no linked Instagram account is not listed.
 
 - A login that grants no Instagram account ends with `status=error` and `error=platform.instagram.no_pages` on your `redirect_uri`.
 - Without a selection step, a login whose every Instagram account belongs to another of your brands, or is already held through Instagram Login, ends with `status=error` and `error=platform.instagram.no_assignable_pages`.
@@ -136,7 +136,7 @@ Hold each Instagram account through one path. Connecting through Facebook Login 
 |---|---|---|
 | Linked Facebook Page | Not needed | Required |
 | Instagram accounts per connection | One | Every account the login administers, each as a Page of the brand's Instagram account |
-| Delete a published post | No | Yes: `DELETE /v1/posts/{pid}` deletes it, and `POST /v1/posts/{pid}/unpublish` removes it from Instagram and keeps it in SocialAPI |
+| Delete a published post | No | Yes: `DELETE /v1/posts/{post_id}` deletes it, and `POST /v1/posts/{post_id}/unpublish` removes it from Instagram and keeps it in SocialAPI |
 | Like a comment | No | Yes |
 | `message_tag: "HUMAN_AGENT"` on a DM | A reply a member of your team types, up to 7 days after the person's last message, once enabled for your SocialAPI account | `422 messaging.tag_not_supported`. The 24-hour window applies |
 | `content_type` on a post | Required | Optional. `stories` and `carousel` apply as given. Otherwise, including `feed` and `reel`, the media decides: one video publishes as a Reel, one image as a feed post, 2 or more items as a carousel |
@@ -177,11 +177,11 @@ SocialAPI lists the DM conversations of an Instagram account, reads their messag
 
 ## Mentions
 
-`GET /v1/accounts/{id}/mentions` returns media in which another account tagged yours. An @mention written in a caption or a comment is not in that list: it arrives as a `mention.received` event, with `metadata.mention_type` set to `comment` or `caption`. Reply to a mention with `POST /v1/accounts/{id}/mentions/reply`. A story mention arrives as a DM: see [Incoming messages](/platforms/instagram/messages#incoming-messages). Details are in [Mentions](/guides/mentions).
+`GET /v1/accounts/{account_id}/mentions` returns media in which another account tagged yours. An @mention written in a caption or a comment is not in that list: it arrives as a `mention.received` event, with `metadata.mention_type` set to `comment` or `caption`. Reply to a mention with `POST /v1/accounts/{account_id}/mentions/reply`. A story mention arrives as a DM: see [Incoming messages](/platforms/instagram/messages#incoming-messages). Details are in [Mentions](/guides/mentions).
 
 ## Stories
 
-`GET /v1/platforms/instagram/accounts/{id}/stories` lists the stories that are live now. Instagram removes a story 24 hours after posting, so a call returns nothing older. The request takes `limit` (1 to 100, default 20) and `cursor`, and no `since`.
+`GET /v1/platforms/instagram/accounts/{account_id}/stories` lists the stories that are live now. Instagram removes a story 24 hours after posting, so a call returns nothing older. The request takes `limit` (1 to 100, default 20) and `cursor`, and no `since`.
 
 ```bash
 curl "https://api.social-api.ai/v1/platforms/instagram/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/stories?limit=10" \
@@ -224,9 +224,9 @@ A collaborator is invited when a post is published, with `platform_data.collabor
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collaborators` | Lists the collaborators of a post and the `status` of each invite. Call it with the account that published the post |
-| `POST` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collab/accept` | Accepts a pending invite and publishes the co-authored post on this account's feed. Call it with the invited account. An invite expires 14 days after it is sent |
-| `POST` | `/v1/platforms/instagram/accounts/{id}/media/{mediaId}/collab/decline` | Declines a pending invite. The post does not appear on this account's feed. Call it with the invited account |
+| `GET` | `/v1/platforms/instagram/accounts/{account_id}/media/{media_id}/collaborators` | Lists the collaborators of a post and the `status` of each invite. Call it with the account that published the post |
+| `POST` | `/v1/platforms/instagram/accounts/{account_id}/media/{media_id}/collab/accept` | Accepts a pending invite and publishes the co-authored post on this account's feed. Call it with the invited account. An invite expires 14 days after it is sent |
+| `POST` | `/v1/platforms/instagram/accounts/{account_id}/media/{media_id}/collab/decline` | Declines a pending invite. The post does not appear on this account's feed. Call it with the invited account |
 
 The list call returns HTTP 200:
 
@@ -245,7 +245,7 @@ Accepting or declining with no pending invite for the account on that media retu
 
 ## Account summary
 
-`GET /v1/platforms/instagram/accounts/{id}/summary` returns live profile counts and insight totals for the trailing 30 days.
+`GET /v1/platforms/instagram/accounts/{account_id}/summary` returns live profile counts and insight totals for the trailing 30 days.
 
 ```bash
 curl "https://api.social-api.ai/v1/platforms/instagram/accounts/acc_01HZ9X3Q4R5M6N7P8V2K0W1J/summary" \
@@ -305,7 +305,7 @@ Every `post.*` event in [Webhook events](/guides/webhook-events#posts) is emitte
 | Posts | 45 per 24 hours and 25 per hour for each Instagram account, including each Instagram account under a Facebook Login connection. Instagram's own cap is 50 per rolling 24 hours: see [Posting velocity caps](/guides/rate-limits#posting-velocity-caps) |
 | Instagram's own rate limit | `429 platform.instagram.rate_limit`. Credit rules: see [when a credit comes back](/guides/plans#when-a-credit-comes-back) |
 
-`GET /v1/accounts/{id}/limits` returns `posts_remaining`, the posts left in Instagram's rolling 24 hours.
+`GET /v1/accounts/{account_id}/limits` returns `posts_remaining`, the posts left in Instagram's rolling 24 hours.
 
 ## Scopes
 
