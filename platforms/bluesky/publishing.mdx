@@ -1,12 +1,12 @@
 ---
 title: Bluesky publishing
 sidebarTitle: "Publishing"
-description: Publish and schedule Bluesky posts with text and up to 4 images through SocialAPI, with media limits, link and hashtag handling, and delete.
+description: Publish and schedule Bluesky posts with text and up to 4 images or one video through SocialAPI, with media limits, link and hashtag handling, and delete.
 ---
 
 ## 1. Overview
 
-A Bluesky post is published once Bluesky has accepted it. Publishing goes through the same `POST /v1/posts` endpoint as every other platform. A post holds text, up to 4 images, or both. Bluesky has no video publishing through SocialAPI and no way to edit a published post.
+A Bluesky post is published once Bluesky has accepted it. Publishing goes through the same `POST /v1/posts` endpoint as every other platform. A post holds text, media, or both, where the media is up to 4 images or one video, never both. Bluesky has no way to edit a published post.
 
 | Field | Value |
 |---|---|
@@ -29,17 +29,19 @@ A Bluesky post is published once Bluesky has accepted it. Publishing goes throug
 | Text only | Omit `media` | Up to 300 characters |
 | Single image | One `media` entry that is an image | JPEG, PNG, GIF, or WebP, at most 2 MB |
 | Multiple images | 2 to 4 `media` entries, all images | The images appear together in one post |
-| Video | Not supported | See "Video" in section 7 |
+| Video | One `media` entry that is a video | MP4 only, at most 300 MB and 10 minutes. See "Video" below |
 
 **Text limit:** 300 characters, counted as Unicode characters. More returns `400 publishing.validation_failed`.
 
 **Image limit:** 4 images per post. More than 4 returns `400 publishing.validation_failed`.
 
-**File limits** apply to media you upload to SocialAPI (`source_type: "media_id"`). A file outside them fails validation with `400 publishing.validation_failed`. For a `url` item, SocialAPI checks the file type against these limits, and the size when the host reports it. When the host does not report the size, SocialAPI downloads the image when it publishes, and an image over 2 MB fails the target with `400 validation.field_invalid`, with `meta.field` set to `media`.
+**Video:** one video per post, and a video cannot share a post with images. Two videos, or a video with an image, returns `400 publishing.validation_failed`. Bluesky accepts MP4 only, up to 300 MB (300,000,000 bytes) and 10 minutes. A video target stays `publishing` while Bluesky processes the video, which can take a few minutes for a long video, and the post appears on Bluesky once the video is ready to play. Bluesky lets an account post video only after the account's email address is verified, and limits how many videos and how many bytes each account uploads per day: see "Video refused or not processed" in section 7.
 
-**Alt text:** SocialAPI publishes every image with empty alt text. There is no field to set it.
+**File limits** apply to media you upload to SocialAPI (`source_type: "media_id"`). A file outside them fails validation with `400 publishing.validation_failed`. For a `url` item, SocialAPI checks the file type against these limits, and the size when the host reports it. When the host does not report the size, SocialAPI downloads the file when it publishes, and an image over 2 MB, a video over 300 MB, or a video that is not MP4 fails the target with `400 validation.field_invalid`, with `meta.field` set to `media`.
 
-A `platform_attachment_id` item fails the Bluesky target with `422 publishing.media.unsupported_source`: Bluesky has no uploaded media to reference by ID. Send images as `url` or `media_id`.
+**Alt text:** SocialAPI publishes every image and video with empty alt text. There is no field to set it.
+
+A `platform_attachment_id` item fails the Bluesky target with `422 publishing.media.unsupported_source`: Bluesky has no uploaded media to reference by ID. Send images and videos as `url` or `media_id`.
 
 ---
 
@@ -175,17 +177,22 @@ Each post includes a `targets` array with the per-platform status and engagement
 
 Bluesky has no way to edit a published post. `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one.
 
-### Video
+### Video refused or not processed
 
-Bluesky video is not supported. A video uploaded to SocialAPI as `media_id` fails validation with `400 publishing.validation_failed`. A video sent as a `url` that SocialAPI recognizes as a video is skipped, and the post publishes without it.
+A video target fails, and no post is created on Bluesky, when:
+
+- `422 platform.bluesky.video_rejected`: Bluesky refused video from this account. The usual reasons are an email address not yet verified on Bluesky, an account too new to post video, or the daily video or upload size allowance used up. `error.message` carries Bluesky's reason. Verify the email in Bluesky, or wait for the daily allowance to reset, then send `POST /v1/posts/{post_id}/retry`.
+- `422 platform.bluesky.video_processing_failed`: Bluesky could not accept the file, for example because it is longer than Bluesky allows. `error.message` carries Bluesky's reason. Fix the file and publish a new post.
+- `502 platform.bluesky.video_processing_failed` or `502 platform.bluesky.video_service_error`: the failure was on Bluesky's side. Retry later.
+- `504 platform.bluesky.video_processing_timeout`: Bluesky did not finish processing the video within 8 minutes. Retry, or shorten or compress the video.
 
 ### Mentions are plain text
 
 An `@handle` in the text is not a mention. The mentioned account is not notified.
 
-### Image download failure
+### Media download failure
 
-SocialAPI downloads each `url` image when it publishes. When the download fails, the target fails with `500 system.internal`. Check that the URL is public and returns the image, then send `POST /v1/posts/{post_id}/retry`.
+SocialAPI downloads each `url` image or video when it publishes. When the download fails, the target fails with `500 system.internal`. Check that the URL is public and returns the file, then send `POST /v1/posts/{post_id}/retry`.
 
 ### Posting caps
 
@@ -208,7 +215,11 @@ A publish that fails after the request returned puts a structured error on the t
 - `403 platform.bluesky.account_takedown`: Bluesky suspended the account. Connecting again does not restore access.
 - `429 platform.bluesky.rate_limit`: Bluesky's quota is used up. Wait, then retry.
 - `400 validation.platform_param`: Bluesky rejected a parameter. `error.message` carries Bluesky's reason.
-- `400 validation.field_invalid`: an image sent as a `url` is larger than 2 MB.
+- `400 validation.field_invalid`: an image sent as a `url` is larger than 2 MB, or a video sent as a `url` is larger than 300 MB or not MP4.
+- `422 platform.bluesky.video_rejected`: Bluesky refused video from this account. `error.message` carries Bluesky's reason.
+- `422` or `502 platform.bluesky.video_processing_failed`: Bluesky could not process the video. With `422` the file is the problem, with `502` Bluesky is.
+- `502 platform.bluesky.video_service_error`: Bluesky's video service failed. Retry later.
+- `504 platform.bluesky.video_processing_timeout`: the video was not processed within 8 minutes. Retry.
 
 Every code is in [Errors](/guides/errors).
 
@@ -217,6 +228,8 @@ Every code is in [Errors](/guides/errors).
 - **Auth error.** Connect the account again with a working app password: `POST /v1/accounts/connect` with the same `platform` and `brand_id`. See [Connect accounts](/guides/connect-accounts).
 - **Rate limit.** Wait for the `Retry-After` header, then send `POST /v1/posts/{post_id}/retry`. See [Delivery](/guides/delivery).
 - **Image too large.** Resize the image to 2 MB or less, upload it again, and publish a new post.
+- **Video too large, too long, or not MP4.** Convert the video to MP4 of at most 300 MB and 10 minutes, upload it again, and publish a new post.
+- **Video refused.** Verify the account's email address in Bluesky, or wait for its daily video allowance to reset, then send `POST /v1/posts/{post_id}/retry`.
 
 ---
 

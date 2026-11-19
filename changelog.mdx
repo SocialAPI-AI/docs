@@ -10,6 +10,18 @@ rss: true
   `PATCH /v1/posts/{post_id}` with `text` now edits a published Facebook Page post in place, so it keeps its likes, comments and reach. This covers text, photo and album posts. Facebook videos, Reels and stories keep their published text. Instagram does not allow a caption to change after publishing: on a post live on both, the Facebook text is updated, the Instagram caption stays as published, and the response lists the Instagram account in `not_updated_account_ids`. A post live only where its text cannot change still returns `409 post.state_invalid`. See [Facebook publishing](/platforms/facebook/publishing#4-update-post).
 </Update>
 
+<Update label="2026-11-19" description="LinkedIn" tags={["LinkedIn", "Publishing", "Media"]}>
+  ## LinkedIn document posts
+
+LinkedIn profiles and company Pages can now publish one document per post, shown as a swipeable carousel: a PDF, PPT, PPTX, DOC or DOCX of up to 100 MB and 300 pages, sent as a `media_id` or a `url` item in `media`. Upload a document with `GET /v1/media/upload-url?media_type=application/pdf`. The post's `title` is shown on the document; without it the document takes its file name. A document cannot share a post with images, video or a link: that returns `400 publishing.validation_failed`, and every other platform rejects a document the same way. `GET /v1/posts/validate?platform=linkedin` now returns the document limits. See [Document posts](/platforms/linkedin/publishing#document-posts).
+</Update>
+
+<Update label="2026-11-19" description="Bluesky" tags={["Bluesky", "Publishing"]}>
+  ## Bluesky video publishing
+
+  Bluesky posts can now carry one video: an MP4 of up to 300 MB and 10 minutes, sent as a `media_id` or a `url` item in `media`. A video cannot share a post with images, and a post holds one video at most: either returns `400 publishing.validation_failed`. `GET /v1/posts/validate?platform=bluesky` now returns the Bluesky video limits. Bluesky requires a verified email address on the account before it accepts video, and a refusal fails the target with `422 platform.bluesky.video_rejected`. See [Bluesky publishing](/platforms/bluesky/publishing).
+</Update>
+
 <Update label="2026-11-15" description="API reference" tags={["API reference", "Inbox"]}>
   ## Operation IDs and descriptive path parameters in the API reference
 

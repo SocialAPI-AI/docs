@@ -5,7 +5,7 @@ description: "Connect a Bluesky account with an app password to publish posts, r
 icon: "bluesky"
 ---
 
-SocialAPI connects a Bluesky account with an app password. It publishes posts with up to 4 images, reads and answers replies and mentions, hides replies on your posts, and reads and sends direct messages (DMs) when the app password allows it. Bluesky has no consent screen: you create an app password in Bluesky, send it to SocialAPI in one request, and there is no OAuth redirect and no app to register. [Platform apps](/guides/platform-credentials) lists which app connects each platform.
+SocialAPI connects a Bluesky account with an app password. It publishes posts with up to 4 images or one video, reads and answers replies and mentions, hides replies on your posts, and reads and sends direct messages (DMs) when the app password allows it. Bluesky has no consent screen: you create an app password in Bluesky, send it to SocialAPI in one request, and there is no OAuth redirect and no app to register. [Platform apps](/guides/platform-credentials) lists which app connects each platform.
 
 ## At a glance
 
@@ -24,7 +24,7 @@ An unsupported call returns `501 resource.not_supported`. The `capabilities` obj
 |---|---|---|
 | Publish a text post | Yes | Up to 300 characters. See [Bluesky publishing](/platforms/bluesky/publishing) |
 | Publish a post with images | Yes | 1 to 4 images, each at most 2 MB |
-| Publish a video | No | A `media_id` video returns `400 publishing.validation_failed`. A video sent as a `url` is skipped and the post publishes without it |
+| Publish a video | Yes | One MP4 per post, at most 300 MB and 10 minutes, not combined with images. The account's email address must be verified on Bluesky |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | No | `first_comment` is ignored |
 | Update a published post | No | `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a published post. Delete the post and publish a new one |
@@ -138,7 +138,7 @@ Bluesky has no OAuth scopes. An app password gives SocialAPI the access of the a
 
 ## Related
 
-- [Bluesky publishing](/platforms/bluesky/publishing): text, images, scheduling, and deleting posts
+- [Bluesky publishing](/platforms/bluesky/publishing): text, images, video, scheduling, and deleting posts
 - [Bluesky comments](/platforms/bluesky/comments): reading, replying to, hiding, and deleting replies
 - [Bluesky direct messages](/platforms/bluesky/messages): reading and sending DMs
 - [Platform apps](/guides/platform-credentials): which app connects each platform

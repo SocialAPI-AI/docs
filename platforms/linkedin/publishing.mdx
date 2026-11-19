@@ -1,7 +1,7 @@
 ---
 title: LinkedIn publishing
 sidebarTitle: "Publishing"
-description: Full reference for publishing LinkedIn posts via SocialAPI, including images, videos, multi-image posts, link posts, text formatting, and visibility.
+description: Full reference for publishing LinkedIn posts via SocialAPI, including images, videos, multi-image posts, document (PDF carousel) posts, link posts, text formatting, and visibility.
 ---
 
 ## 1. Overview
@@ -30,11 +30,14 @@ LinkedIn posts publish as the connected member profile (`connection_type: "profi
 | Single image | One image in `media` | JPEG, PNG, or GIF |
 | Single video | One video in `media` | MP4 |
 | Multi-image | 2 to 20 images in `media` | Images only |
+| Document | One PDF, PPT, PPTX, DOC, or DOCX in `media` | Shown as a swipeable carousel. The document must be the only media item. See [Document posts](#document-posts) |
 | Link post | `platform_data.article_url` | The first attached image becomes the link thumbnail. Other media is ignored |
 
 A post cannot mix a video with images. A `media_id` video among 2 or more `media` items returns `400 publishing.validation_failed`. A `platform_attachment_id` video among 2 or more items fails the target at publish time with `400 validation.media_type`. A video sent by `url` among 2 or more items is refused by LinkedIn at upload.
 
-**File limits for media you upload to SocialAPI** (`source_type: "media_id"`): images at most 10 MB. Videos at most 500 MB, 3 seconds to 30 minutes long, and at most 30 frames per second. Text holds at most 3,000 characters. SocialAPI checks these limits before it publishes, and a violation returns `400 publishing.validation_failed`.
+A document cannot be combined with other media or with `article_url`. Validation returns `400 publishing.validation_failed` on the field `media` or `article_url`, and a document found among 2 or more items at publish time fails the target with `400 validation.media_type`.
+
+**File limits for media you upload to SocialAPI** (`source_type: "media_id"`): images at most 10 MB. Videos at most 500 MB, 3 seconds to 30 minutes long, and at most 30 frames per second. Documents at most 100 MB. Text holds at most 3,000 characters. SocialAPI checks these limits before it publishes, and a violation returns `400 publishing.validation_failed`. LinkedIn also caps a document at 300 pages, which it checks when it processes the file.
 
 <Warning>
   Attach media through the `media` array. Each item sets a `source_type`: `media_id` for a file you uploaded to SocialAPI, `url` for a public `http(s)` URL SocialAPI fetches at publish time, or `platform_attachment_id` for an asset URN you created through LinkedIn yourself. A multi-image post can mix all three. To upload first, see [Media](/guides/media).
@@ -135,6 +138,29 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
+### Document posts
+
+Attach one PDF, PPT, PPTX, DOC, or DOCX to publish a document post, which LinkedIn shows as a swipeable carousel. `text` becomes the post commentary. Upload the file with `media_type=application/pdf` (or the matching MIME type for the other formats), or send it as a `url`. A `url` must end in `.pdf`, `.ppt`, `.pptx`, `.doc`, or `.docx`, or be served with the document's MIME type.
+
+LinkedIn shows a title on every document. Set it with `title` on the post or the target. Without `title`, the document takes its file name without the extension, for example `Q3 report` for `Q3 report.pdf`. `platform_data.linkedin.media_title`, when set, takes precedence over both.
+
+```bash
+curl -X POST https://api.social-api.ai/v1/posts \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [{ "account_id": "acc_01HZ9X3Q4R5M6N7P8V2K0W1J" }],
+    "text": "Our Q3 results, in 12 slides.",
+    "title": "Q3 results",
+    "media": [{ "source_type": "media_id", "source": "f47ac10b-58cc-4372-a567-0e02b2c3d479" }],
+    "publish_now": true
+  }'
+```
+
+A document must be the only item in `media`. Documents publish on LinkedIn only: any other target carrying the same document fails validation. A document you uploaded through LinkedIn yourself can be sent as a `platform_attachment_id` with its `urn:li:document:` URN and `type: "file"`.
+
+LinkedIn processes the document after upload: see [Video and document processing](#video-and-document-processing) for the errors it can return.
+
 ### Platform data fields
 
 Send these keys in `platform_data.linkedin` on the post, which applies them to every LinkedIn target, member profile and company Page alike. To set them for one target, send them flat in that target's `platform_data` (`targets[].platform_data`, with no `linkedin` key). When both set the same key, the target's value wins.
@@ -148,7 +174,7 @@ Send these keys in `platform_data.linkedin` on the post, which applies them to e
 | `cta_url` | string | link post | Destination of the call-to-action button. Requires `article_url` |
 | `alt_text` | string | single image | Alt text for the image |
 | `alt_texts` | array of strings | multi-image | Alt text per image, matched to `media` by position |
-| `media_title` | string | single image, single video | Title of the attached file |
+| `media_title` | string | single image, single video, document | Title of the attached file. On a document it takes precedence over `title` |
 | `disable_reshare` | boolean | every post | When `true`, others cannot reshare the post |
 
 SocialAPI forwards any additional keys in `platform_data.linkedin` that the table above lists, and no others. LinkedIn has no other publish options that SocialAPI passes through: an unlisted key is ignored without a warning. A malformed `article_url`, a `cta_label` outside the list, or a `cta_label` or `cta_url` without `article_url` fails validation on that field.
@@ -198,9 +224,9 @@ For a member profile, the list holds the posts you published through SocialAPI. 
 
 SocialAPI returns the LinkedIn post ID as `platform_post_id` in the post body and in `post.published` events, with a `permalink`. You do nothing to retrieve it.
 
-### Video processing
+### Video and document processing
 
-LinkedIn processes a video after upload. A video LinkedIn cannot process fails the target with `422 platform.linkedin.processing_failed`. An upload or processing step that does not finish in time fails it with `503 platform.linkedin.upload_timeout` or `503 platform.linkedin.processing_timeout`. Upload a smaller or re-encoded file, then retry.
+LinkedIn processes a video or a document after upload. A video LinkedIn cannot process fails the target with `422 platform.linkedin.processing_failed`. An upload or processing step that does not finish in time fails it with `503 platform.linkedin.upload_timeout` or `503 platform.linkedin.processing_timeout`. Upload a smaller or re-encoded file, then retry. A document LinkedIn cannot process fails the same way with `422 platform.linkedin.processing_failed`, and one that does not finish processing in time with `platform.linkedin.processing_timeout`. Check that the file opens and has at most 300 pages, export it again as a PDF if needed, then retry.
 
 ### Link posts need their own preview
 

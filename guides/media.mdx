@@ -1,9 +1,9 @@
 ---
 title: Upload media
-description: Upload images and videos to your SocialAPI media library with one request or a presigned URL, or attach a public URL or platform attachment ID to a post.
+description: Upload images, videos, and documents to your SocialAPI media library with one request or a presigned URL, or attach a public URL or platform attachment ID to a post.
 ---
 
-Media in SocialAPI is the images and videos you attach to a post. A post carries an ordered `media` array, and each item names where the file comes from: your media library, a public URL, or a media ID you created on the platform. Order decides carousel sequence.
+Media in SocialAPI is the images, videos, and documents you attach to a post. A post carries an ordered `media` array, and each item names where the file comes from: your media library, a public URL, or a media ID you created on the platform. Order decides carousel sequence.
 
 Uploading, verifying, and listing media cost no credits. A credit is charged when a post is published or scheduled. Storage counts against your plan: Free has 100 MB, and every paid plan is unlimited. See [Plans and usage](/guides/plans#plan-allowances).
 
@@ -145,7 +145,16 @@ curl -X POST https://api.social-api.ai/v1/posts \
   }'
 ```
 
-The formats, sizes, and counts each platform accepts are on its publishing page. `GET /v1/posts/validate` returns them as data. See [Publish a post](/guides/publishing#validate-before-you-publish).
+The formats, sizes, and counts each platform accepts are on its publishing page. `GET /v1/posts/validate` returns them as data.
+
+### Documents
+
+A PDF, PPT, PPTX, DOC, or DOCX publishes on LinkedIn only, as a swipeable document carousel, and must be the only item in `media`. Upload it like any other file, with its MIME type as `media_type` (`application/pdf` for a PDF), or send it as a `url`. Every other platform rejects a document with `400 publishing.validation_failed`. Formats, limits, and the document title are on [LinkedIn publishing](/platforms/linkedin/publishing#document-posts).
+
+```bash
+curl "https://api.social-api.ai/v1/media/upload-url?media_type=application/pdf&filename=Q3%20report.pdf" \
+  -H "Authorization: Bearer $SOCAPI_KEY"
+``` See [Publish a post](/guides/publishing#validate-before-you-publish).
 
 ## Publish from a public URL
 
@@ -160,7 +169,7 @@ A `url` source is not stored in your library and uses no storage quota.
 ```
 
 - **Reachable:** the URL must be a public `http` or `https` address when you create the post and again when the post publishes. A URL that resolves to a private, loopback, or link-local address returns `400 validation.field_invalid`. A post scheduled for later fails when the URL stops working before it publishes. A URL that answers `401`, `404`, or `410` (an expired signed link, a deleted file) returns `422 publishing.media.url_unreachable`.
-- **Typed:** SocialAPI reads the file type from the URL. When it cannot, the request returns `422 publishing.media.untyped_url`. Use a URL with an extension such as `.jpg` or `.mp4`, or upload the file.
+- **Typed:** SocialAPI reads the file type from the URL. When it cannot, the request returns `422 publishing.media.untyped_url`. Use a URL with an extension such as `.jpg`, `.mp4`, or `.pdf`, or upload the file.
 - **Lookup failure:** when the host cannot be looked up for a moment, the request returns `503 system.internal`. Send it again.
 
 For a post scheduled far ahead, upload the file and use a `media_id`: a link that expires or changes before the post publishes fails the post.
