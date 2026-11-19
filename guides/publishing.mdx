@@ -241,7 +241,7 @@ curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f
 
 The response is HTTP 200 with the updated post. Editing costs no credit.
 
-- **Editable statuses:** `draft`, `scheduled`, and `failed`. Any other status returns `409 post.state_invalid`, and `error.meta.state` is the current status. A `published` post cannot be edited on any platform, except a YouTube video, which has its own endpoint. See [YouTube publishing](/platforms/youtube/publishing).
+- **Editable statuses:** `draft`, `scheduled`, and `failed` accept every field. A `published` or `partial` post accepts `text`, applied in place on Facebook Page posts and Google Business Profile: see [Facebook](/platforms/facebook/publishing#4-update-post) and [Google Business Profile](/platforms/google/publishing). Targets on other platforms keep their published text and are listed in `not_updated_account_ids`. A YouTube video has its own endpoint: see [YouTube publishing](/platforms/youtube/publishing). Any other status returns `409 post.state_invalid`, and `error.meta.state` is the current status.
 - **Editable fields:** `text`, `title`, `media`, `visibility`, `first_comment`, `scheduled_at`, `hidden`, `segments`, `platform_data`, and `targets`. Sending `targets` replaces all the post's targets.
 - **Validation:** an edit to content runs the validation again. It returns `400 publishing.validation_failed` for a post with errors, unless you send `skip_validation: true`.
 - **After a failure:** edit a `failed` post, then call `POST /v1/posts/{post_id}/retry`.

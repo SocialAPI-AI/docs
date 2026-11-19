@@ -25,7 +25,7 @@ An unsupported call returns `501 resource.not_supported`. Read the `capabilities
 | Publish feed image, Reel, carousel, Story | Yes | See [Instagram publishing](/platforms/instagram/publishing) |
 | Schedule a post | Yes | `scheduled_at` on the post |
 | First comment on a post | Yes | Not part of a Story |
-| Update a published post | No | `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a published post. A `draft`, `scheduled`, or `failed` post can be edited before it publishes. To correct it, delete the post in the Instagram app and publish a new one |
+| Update a published post | No | Instagram does not allow a caption to change after publishing. On a post that is also live on Facebook, `PATCH /v1/posts/{post_id}` edits the Facebook text, keeps the Instagram caption, and lists the Instagram account in `not_updated_account_ids`. A post live only on Instagram returns `409 post.state_invalid`. A `draft`, `scheduled`, or `failed` post can be edited before it publishes |
 | Delete a published post | Partial | Instagram Login: `DELETE /v1/posts/{post_id}` returns HTTP 200 with `results[].outcome: "not_supported"` for the Instagram target, and the post stays live. `POST /v1/posts/{post_id}/unpublish` returns `501 resource.not_supported`. Delete the post in the Instagram app. [Facebook Login](#connect-through-facebook-login): `DELETE /v1/posts/{post_id}` deletes the post from Instagram, and `POST /v1/posts/{post_id}/unpublish` removes it from Instagram and keeps it in SocialAPI |
 | List posts | Yes | Posts, Reels, and carousels |
 | List active stories | Yes | Only stories that are live now |

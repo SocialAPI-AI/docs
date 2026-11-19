@@ -14,7 +14,7 @@ A Facebook post goes to one Facebook Page. SocialAPI picks the format from the `
 | Auth type | OAuth 2.0 (Meta) |
 | Platform API | Meta Graph API (Facebook Pages) |
 | Create post | Yes |
-| Update post | Not after publishing (`409 post.state_invalid`). `draft`, `scheduled`, and `failed` posts can be edited |
+| Update post | Text of a published text, photo or album post. `draft`, `scheduled`, and `failed` posts accept every field |
 | Delete post | Yes |
 | Schedule | Yes (deferred publish via `scheduled_at`) |
 | First comment | Yes (best-effort; not on Stories) |
@@ -352,11 +352,21 @@ Set `scheduled_at` to an ISO 8601 timestamp (UTC) to defer publishing:
 
 ## 4. Update post
 
-A published Facebook post cannot be edited through SocialAPI. `PATCH /v1/posts/{post_id}` returns `409 post.state_invalid` for a post that is live on this platform. Only `draft`, `scheduled`, and `failed` posts can be edited here; a published post can be edited only when it is live on Google Business Profile alone.
+`PATCH /v1/posts/{post_id}` with `text` edits a published Facebook Page post in place. The post keeps its likes, comments, shares and reach.
 
-A post in `draft`, `scheduled`, or `failed` status can be edited with `PATCH /v1/posts/{post_id}` before it publishes.
+```bash
+curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f90ae7 \
+  -H "Authorization: Bearer $SOCAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Doors open at 7 pm tonight."}'
+```
 
-To correct a published post, delete it with `DELETE /v1/posts/{post_id}` and publish a new post.
+- **What can change:** the text of text, photo and album posts. Any other field returns `400 validation.field_not_editable`, with the field in `error.meta.field`.
+- **Videos, Reels and stories:** Facebook does not allow their text to be edited. Beside other targets they keep their published text and their accounts are listed in `not_updated_account_ids` in the response. A post live only on them returns `409 post.state_invalid`.
+- **Instagram on the same post:** Instagram does not allow a caption to change after publishing, so the Instagram target keeps its caption and its account is listed in `not_updated_account_ids`.
+- **Posts published elsewhere:** Facebook lets an app edit only the posts it published, so a post made in Facebook itself or in another tool cannot be edited here.
+
+A post in `draft`, `scheduled`, or `failed` status accepts every field before it publishes.
 
 ---
 

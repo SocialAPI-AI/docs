@@ -174,11 +174,11 @@ curl -X PATCH https://api.social-api.ai/v1/posts/7c9e6679-7425-40de-944b-e07fc1f
 
 | Response | Meaning | What to do |
 |---|---|---|
-| `200` | Google accepted the edit on every location. The response is the updated post | Nothing |
+| `200` | Google accepted the edit on every location. The response is the updated post. Targets on platforms that do not allow editing, such as Instagram, keep their published text and are listed in `not_updated_account_ids` | Nothing |
 | `400 validation.field_not_editable` | The request changes a field a published post cannot change, named in `error.meta.field` (image, post type, schedule, targets, and the rest) | Delete the post and publish a new one |
 | `400 validation.no_fields_to_update` | The request has neither `text` nor a `callToAction` | Send at least one |
 | `400 publishing.validation_failed` | The new text or button breaks a Google rule, such as the 1,500 character limit | Fix the field named in the response |
-| `409 post.state_invalid` | The post is also live on another platform. Only a post live on Google alone can be edited | Delete and publish again, or edit a Google-only post |
+| `409 post.state_invalid` | The post is live only on platforms whose published text cannot change | Delete the post and publish a new one |
 
 Targets that failed to publish take the new text and button too, so a later `POST /v1/posts/{post_id}/retry` publishes the edited version.
 
