@@ -546,6 +546,7 @@ Send `url` to the person. They approve on the platform's consent screen, SocialA
 - A `brand_id` that is not one of your brands returns `404 resource.not_found`.
 - A brand that already holds an account on that platform, or that already has an unused, unexpired invite for that platform, returns `409 resource.conflict`. A LinkedIn account in the brand does not block a LinkedIn invite: only an unused, unexpired LinkedIn invite does.
 - `platform: "linkedin_page"` returns `400 validation.platform_invalid`. Use `linkedin`.
+- Telegram, Bluesky, and App Store Connect have no consent screen for an invite to open, so `POST /v1/invites` for them returns `400 validation.field_invalid` with `meta.field` set to `platform`. Connect them with [`POST /v1/accounts/connect`](#your-first-connection) and their credentials.
 - A Facebook invite connects every Page of the person's login that none of your other brands holds. The person cannot choose Pages. When `facebook_page_selection` is `true`, more Pages than [your plan allows per brand](/guides/plans#facebook-pages-per-brand) end the invite with `platform.facebook.page_cap`.
 - An expired, used, or revoked link shows the person a SocialAPI error page.
 - `GET /v1/invites?brand_id={brand_id}` lists the brand's invites, newest first, each with `id`, `platform`, `token`, `url`, `is_active`, `expires_at`, `created_at`, and `permissions`. A missing `brand_id` returns `400 validation.field_required`.
