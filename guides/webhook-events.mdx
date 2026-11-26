@@ -287,7 +287,7 @@ What differs per platform:
 
 | Platform | Differences |
 |---|---|
-| Instagram | `recipient` is the connected account. `story` is set when the message replies to one of the account's stories. A story mention arrives as `dm.received` with `metadata.attachments[].type` of `story_mention`, not as `mention.received`. A message shared from a post carries the post in `metadata.attachments` (`media_id`, and `post_id` when the post was published through SocialAPI) and sets `platform_post_id` |
+| Instagram | `recipient` is the connected account. `story` is set when the person responded to one of the account's stories: with `content.text` or `metadata.attachments`, the message is a story reply. With empty `content.text` and no `metadata.attachments`, the person acted on the story without writing anything, for example by reposting it to their own story, so there is no message to answer. A story mention arrives as `dm.received` with `metadata.attachments[].type` of `story_mention`, not as `mention.received`. A message shared from a post carries the post in `metadata.attachments` (`media_id`, and `post_id` when the post was published through SocialAPI) and sets `platform_post_id` |
 | Facebook | Adds `page_id`. Has no profile picture for the sender: `author.avatar_url` is absent |
 | WhatsApp | `type` is `dm`. `author.id` is the sender's phone number, or their business-scoped user ID (for example `CO.1648230076976170`) when the sender uses a WhatsApp username and hides their number. `author.name` is the contact name WhatsApp reports, or the username when there is no name. `metadata` holds `platform_id` and `phone_number_id`. A tap on a reply button or list item also sets `metadata.interactive_type` and `metadata.payload` |
 | Telegram | `type` is `dm`. `metadata` holds `platform_id` and `chat_id` |
@@ -817,7 +817,7 @@ Comments, direct messages, and mentions share one `data` shape. Fields marked op
 | `permalink` | Optional. Threads replies and mentions, and TikTok mentions: the URL of the reply or mention |
 | `conversation_id` | Optional. The SocialAPI conversation ID of a DM on Instagram, Facebook, WhatsApp, and Telegram |
 | `platform_id` | Optional. The platform's message ID of a DM. Not set on `dm.referral` and on Zalo |
-| `story` | Optional. Instagram only: the story a message replies to, with `id`, `media_url`, and `expires_at` |
+| `story` | Optional. Instagram only: the story the person responded to, with `id`, `media_url`, and `expires_at`. Without `content.text` or `metadata.attachments`, the person reposted or otherwise acted on the story without writing a message |
 | `reply_to` | Optional. The earlier message a DM replies to, as `{ "platform_id": "..." }` |
 
 | Event | `type` value |
