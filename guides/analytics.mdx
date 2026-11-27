@@ -1,6 +1,6 @@
 ---
 title: Analytics
-description: Summarise how your posts performed across accounts, read daily history for accounts, brands, and posts, fetch live post metrics from each platform, and refresh an account's posts with one request.
+description: Summarise how your posts performed across accounts, read daily follower and activity history for accounts, brands, and posts, fetch live post metrics from each platform, and refresh an account's posts with one request.
 ---
 
 Analytics in SocialAPI has 3 parts: an overview of how your posts performed across accounts, stored daily history for accounts, brands, and posts, and live reads that fetch current figures from a platform. The overview and history never call a platform, so they answer fast and work when a token has expired. Live reads show the platform's current numbers.
@@ -197,10 +197,19 @@ A range longer than 400 days returns `400 validation.range_too_wide`. A `from` o
 | `reviews_answered` | `flow` | `owned` | Account, brand | Replies to reviews |
 | `replies_failed` | `flow` | `owned` | Account, brand | Replies, private replies, DMs, review replies, and mention replies that failed |
 | `comments_moderated` | `flow` | `owned` | Account, brand | Comments you hid, showed again, deleted, liked, or unliked |
+| `followers_count` | `gauge` | `sampled` | Account, brand | Followers of a TikTok, Bluesky, or Zalo account |
+| `instagram_followers_count` | `gauge` | `sampled` | Account, brand | Followers of an Instagram account |
+| `threads_followers_count` | `gauge` | `sampled` | Account, brand | Followers of a Threads account |
+| `linkedin_follower_count` | `gauge` | `sampled` | Account, brand | Followers of a LinkedIn Page or member profile |
+| `subscriber_count` | `gauge` | `sampled` | Account, brand | Subscribers of a YouTube channel |
+| `page_follows` | `gauge` | `sampled` | Account, brand | Followers of a Facebook Page. An account with several Pages returns their sum, or one Page with `page_id` |
+| `following_count` | `gauge` | `sampled` | Account, brand | Accounts that an Instagram, TikTok, or Bluesky account follows |
 
 - **Post history:** SocialAPI adds a point each time it syncs the post's account: when you connect it, and when you call `POST /v1/accounts/{account_id}/sync`. An account without `analytics.read` adds no points. On every platform except X, LinkedIn member profiles, WhatsApp, and Pinterest, post history also gains points without a sync call. History starts when SocialAPI first tracks the post, so a post that was published long ago has no earlier points. A post with 2 or more targets returns one series per metric, summed across its targets. Pinterest posts are not synced, so they have no history.
 - **Action counts:** SocialAPI counts the replies, DMs, and moderation actions you send through the API, MCP tools, and Automations, per account and per day (UTC). Today's count can be up to 24 hours behind. An account without `analytics.read` is not counted.
-- **Platform metrics:** follower, reach, and view history from the platforms is not stored. Read current figures from the platform insight endpoints below.
+- **Follower history:** SocialAPI keeps one point per day (UTC) for each connected account's follower count, with no request from you. An account without `analytics.read` adds no points. History starts on the first day SocialAPI tracks the account, so earlier days have no points. A day without a reading has no point, and `days_spanned` on the next point says how many days its `change` covers. A YouTube channel that hides its subscriber count has no `subscriber_count` points. A Threads account connected before 2026-10-17 has no follower points until you reconnect it. X, Pinterest, Google Business Profile, WhatsApp, and Telegram accounts have no follower history.
+- **Follower metric names:** each platform's follower count keeps its own metric name, so a brand with accounts on several platforms returns one follower series per name. Add the latest `value` of each series for a brand-wide total. `following_count` is the same name on every platform that has it.
+- **Reach and views:** reach and view history from the platforms is not stored. Read current figures from the platform insight endpoints below.
 
 ### Account, brand, and post history
 
