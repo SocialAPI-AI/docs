@@ -4,6 +4,14 @@ description: Changes to the SocialAPI API and documentation, newest first. Subsc
 rss: true
 ---
 
+<Update label="2026-11-27" description="Publishing" tags={["Publishing", "Instagram", "TikTok"]}>
+  ## Posting caps follow a rolling window
+
+  The posting caps per hour and per 24 hours are now rolling: capacity comes back one post at a time as earlier posts leave the window, the way Instagram, Threads and TikTok count their own limits. Before, a whole window's capacity came back at once, so an account could pass SocialAPI's cap and then be refused by the platform. `Retry-After` on `429 publishing.velocity_limit` is now the time until the next slot frees. The cap values are unchanged. See [Posting velocity caps](/guides/rate-limits#posting-velocity-caps).
+
+  ## Immediate publishes on a paused account are refused up front
+
+  When a platform has paused an account for a long time, for example after Instagram's daily post limit is reached, `POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{post_id}/publish` and `POST /v1/posts/{post_id}/retry` now return `429 platform.{platform}.throttled` with `Retry-After`, create nothing and spend no post credit. Before, the post was accepted and could fail later with `system.internal`. Posts waiting for a pause to end are no longer failed. See [When the platform has paused an account](/guides/rate-limits#when-the-platform-has-paused-an-account).
 <Update label="2026-11-27" description="Analytics" tags={["Analytics"]}>
   ## Daily follower history for connected accounts
 

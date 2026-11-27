@@ -77,7 +77,7 @@ SocialAPI caps how fast one publish target can publish, on top of your plan's po
 | Pinterest | No hourly cap | 1,000 |
 | Every other platform | 25 | 50 |
 
-The hourly window opens with the first publish counted in it and lasts 1 hour. The 24-hour window opens the same way and lasts 24 hours. On TikTok, the 24-hour cap of 13 binds before the hourly cap of 25.
+Both windows are rolling. A publish counts against the hourly cap for 1 hour and against the 24-hour cap for 24 hours, so capacity comes back one post at a time as earlier posts leave the window. `Retry-After` is the time until the next slot frees. On TikTok, the 24-hour cap of 13 binds before the hourly cap of 25.
 
 On Instagram, SocialAPI's cap of 45 sits below Instagram's 50 posts per rolling 24 hours. On TikTok, SocialAPI's cap of 13 sits below TikTok's own limit of 15 posts per day per account. Reaching SocialAPI's cap gives you `publishing.velocity_limit` and a `Retry-After`, instead of a platform rejection after the attempt.
 
@@ -88,6 +88,14 @@ TikTok also limits publishing to 6 posts per minute per account. SocialAPI does 
 - **Immediate publish** (`POST /v1/posts` with `publish_now: true`, `POST /v1/posts/{post_id}/publish`, `POST /v1/posts/{post_id}/retry`): the request returns `429 publishing.velocity_limit` and creates nothing. `meta.window` is `hour` or `day`, `meta.limit` is the cap reached, and `meta.account_id` is the connected account. A refused request spends no post credit.
 - **More than one target in one request:** the request is all or nothing. If one target is at a cap, the whole request is refused and no target's counter moves.
 - **Scheduled post:** a scheduled post is never failed by a velocity cap. SocialAPI holds the target and publishes it once the window clears, so it goes out late. The wait does not count as a failed delivery.
+
+### When the platform has paused an account
+
+After a platform refuses an account with its own limit, for example Instagram's 50 posts per rolling 24 hours, SocialAPI pauses calls for that account until the wait ends.
+
+- **Immediate publish during a long pause:** the request returns `429 platform.{platform}.throttled` with `Retry-After` and creates nothing. A refused request spends no post credit. Send it again after the wait, or schedule the post instead.
+- **Immediate publish during a short pause:** the request is accepted and the post is published when the pause ends.
+- **Scheduled post:** a scheduled post is never failed by a pause. The target stays `pending`, and SocialAPI publishes it when the pause ends.
 
 ## Platform limits
 
